@@ -159,6 +159,10 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     ], { cwd: root, env }), pattern);
   };
   try {
+    const missingEvidence = structuredClone(spec);
+    delete missingEvidence.networkEdgeEvidence;
+    await runRejectedBuild(missingEvidence, /production build requires network edge evidence/);
+
     const tampered = structuredClone(spec);
     tampered.networkEdgeEvidence.sourceInventory.sha256 = "f".repeat(64);
     await runRejectedBuild(tampered, /sourceInventory\.sha256 must match tracked input bytes/);

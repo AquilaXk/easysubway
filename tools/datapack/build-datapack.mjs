@@ -510,7 +510,12 @@ async function readPinnedBuildJson(reference, label, keys) {
 
 async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopologyEvidence) {
   const evidence = buildSpec.networkEdgeEvidence;
-  if (evidence == null) return;
+  if (evidence == null) {
+    if (fixture.packs?.some(({ artifactKind }) => artifactKind === "production")) {
+      throw new Error("production build requires network edge evidence");
+    }
+    return;
+  }
   assertExactKeys(
     evidence,
     ["sourceInventory", "capitalTopology", "itxCoverageContract"],
