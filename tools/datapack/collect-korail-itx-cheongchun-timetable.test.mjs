@@ -444,7 +444,10 @@ async function promoteUnchangedWithPin({ pin, topologyEvidence }) {
     });
     const { reference: previousReference } = await writeAdmittedSourceBundle(sourceDir, previous);
     const previousSha = previousReference.sha256;
-    const contractExtras = { sourceTimetableArtifact: previousReference };
+    const contractExtras = {
+      sourceTimetableArtifact: previousReference,
+      freshness: { nextReviewAt: "2026-07-13T00:00:00+09:00" },
+    };
     if (pin !== undefined) {
       contractExtras.officialEvidence = { korailCompletenessAdmission: { canonicalPackIdentity: pin } };
     }
@@ -1390,6 +1393,15 @@ test("UNCHANGED_AUTO 승격은 조건이 모두 충족되면 admission pin을 �
   // 출하 pack 실측 identity와 정확히 일치한다.
   assert.equal(pin.sha256, createHash("sha256").update(PACK_BYTES).digest("hex"));
   assert.equal(pin.sqliteSha256, createHash("sha256").update(gunzipSync(PACK_BYTES)).digest("hex"));
+});
+
+test("UNCHANGED_AUTO 승격은 contract freshness를 candidate와 동기화한다", async () => {
+  const { promoted, contract } = await promoteUnchangedWithPin({
+    pin: stalePin(),
+    topologyEvidence: shippedPackTopologyEvidence(),
+  });
+
+  assert.equal(contract.freshness.nextReviewAt, promoted.sourceTimetableArtifact.freshUntil);
 });
 
 test("UNCHANGED_AUTO 승격은 조건 미충족 시 admission pin을 불변 유지한다", async (context) => {

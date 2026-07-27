@@ -461,6 +461,7 @@ async function promoteItxSourceCandidateLocked({
       approvedArtifactSha256: approvalRequired ? candidateSha256 : null,
     },
   };
+  if (isPlainObject(contract.freshness)) contract.freshness.nextReviewAt = candidate.freshUntil;
   await maybeCorrectAdmissionPin({
     contract,
     candidate,
