@@ -23,6 +23,7 @@ import {
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { normalizeStationName } from "./collect-capital-route-topology.mjs";
 import { loadCapitalRouteTopologySnapshot } from "./apply-capital-route-topology-to-bundled-pack.mjs";
+import { isUnchangedRefresh } from "./apply-itx-topology-to-bundled-pack.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const canonicalSqliteHeaderVersion = 3_053_000;
@@ -538,8 +539,38 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
   const productionPacks = fixture.packs?.filter(({ artifactKind }) => artifactKind === "production") ?? [];
   if (productionPacks.length === 0) throw new Error("network edge evidence requires a production pack");
   for (const pack of productionPacks) {
+    materializeCapitalTopologySource(pack, topology, capitalAdmissions);
     applyCapitalNetworkEdgeEvidence(pack, topology, capitalTopology.pinned.snapshotId, capitalAdmissions);
     applyItxNetworkEdgeEvidence(pack, itxAdmission);
+  }
+}
+
+function materializeCapitalTopologySource(pack, topology, admissions) {
+  const lineIds = topology.lines.map(({ lineId }) => lineId).filter((lineId) => admissions.has(lineId));
+  const lineIdSet = new Set(lineIds);
+  const source = {
+    id: topology.sourceId,
+    owner: "국가철도공단·국토교통부",
+    url: topology.license?.evidenceUrl,
+    license: topology.license?.attribution,
+    licenseStatus: "redistributable",
+    redistributionAllowed: topology.license?.redistributionAllowed === true,
+    updateFrequency: "snapshot-on-change",
+    updatedAt: [...admissions.values()].map(({ verifiedAt }) => verifiedAt).sort().at(-1),
+    fields: [...topology.fieldsProvided],
+    coverageScope: {
+      regionIds: ["capital"],
+      operatorIds: [...new Set((pack.lines ?? [])
+        .filter(({ id }) => lineIdSet.has(id))
+        .map(({ operatorId }) => operatorId))].sort(compareStrings),
+      lineIds,
+      sourceDomains: ["route_graph_topology"],
+    },
+  };
+  const existing = pack.sourceInventory?.find(({ id }) => id === source.id);
+  if (existing == null) pack.sourceInventory.push(source);
+  else if (JSON.stringify(existing) !== JSON.stringify(source)) {
+    throw new Error("capital topology pack source inventory mismatch");
   }
 }
 
@@ -647,6 +678,12 @@ function applyCapitalNetworkEdgeEvidence(pack, topology, snapshotId, admissions)
         verificationStatus: "VERIFIED",
         lastVerifiedAt: admission.verifiedAt,
         evidenceHash: line.contentSha256,
+        ...(topology.fieldsProvided.includes("duration_seconds") ? {} : {
+          fieldProvenance: {
+            ...edge.fieldProvenance,
+            duration_seconds: { derivationKind: "GENERATED" },
+          },
+        }),
       });
     }
   }
@@ -682,6 +719,7 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
   }
   const source = JSON.parse(sourceBytes);
   const completeness = JSON.parse(completenessBytes);
+  const previous = JSON.parse(previousBytes);
   const { evidenceHash: sourceEvidenceHash, ...sourceWithoutEvidenceHash } = source;
   const { evidenceHash: completenessEvidenceHash, ...completenessWithoutEvidenceHash } = completeness;
   if (source?.schemaVersion !== 1
@@ -702,6 +740,9 @@ async function admittedItxNetworkEdgeEvidence(contract, topologyEvidence) {
     || completeness.sourceTimetableArtifact?.freshUntil !== reference.freshUntil
     || completenessEvidenceHash !== sha256(Buffer.from(JSON.stringify(completenessWithoutEvidenceHash)))) {
     throw new Error("ITX network edge admission evidence mismatch");
+  }
+  if (!isUnchangedRefresh(reference, source, previous)) {
+    throw new Error("ITX network edge unchanged admission is invalid");
   }
   const observedAt = requiredUtcDateString(source.observedAt, "ITX network edge source observedAt");
   const freshUntil = requiredUtcDateString(source.freshUntil, "ITX network edge source freshUntil");
@@ -1048,7 +1089,11 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
     if (fieldProvenance && !sourceScopes.has(sourceId)) {
       throw new Error(`${entityType}.${field} fieldProvenance source is missing from sourceInventory: ${sourceId}`);
     }
-    if (fieldProvenance && !sourceFields.get(sourceId)?.has(field)) {
+    const recordDerivationKind =
+      entityType === "facility" && field === "status" && !sourceFields.get(sourceId)?.has("status")
+        ? "GENERATED"
+        : derivationKind(provenanceRow, artifactKind);
+    if (fieldProvenance && recordDerivationKind !== "GENERATED" && !sourceFields.get(sourceId)?.has(field)) {
       throw new Error(`${entityType}.${field} fieldProvenance source does not provide ${field}: ${sourceId}`);
     }
     const coverageScopes = recordCoverageScopes(
@@ -1057,10 +1102,6 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
       lineIds,
       coverageOperatorIdsByLine,
     );
-    const recordDerivationKind =
-      entityType === "facility" && field === "status" && !sourceFields.get(sourceId)?.has("status")
-        ? "GENERATED"
-        : derivationKind(provenanceRow, artifactKind);
     for (const coverageScope of coverageScopes) {
       records.push({
         entityType,

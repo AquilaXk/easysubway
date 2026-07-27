@@ -33,6 +33,19 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
     ], { cwd: root, env });
     const manifest = JSON.parse(await readFile(path.join(baselineDir, "current.json"), "utf8"));
     const pack = manifest.packs.find(({ id }) => id === "capital");
+    const topologySource = pack.sourceInventory.find(({ id }) => id === "capital-route-topology");
+    assert.ok(topologySource);
+    assert.ok(topologySource.fields.includes("network_edges"));
+    assert.ok(!topologySource.fields.includes("duration_seconds"));
+    const fieldProvenance = JSON.parse(await readFile(
+      path.join(baselineDir, "current.provenance.json"),
+      "utf8",
+    ));
+    const capitalDurationRecords = fieldProvenance.packs
+      .flatMap(({ records }) => records)
+      .filter(({ sourceId, field }) => sourceId === "capital-route-topology" && field === "duration_seconds");
+    assert.ok(capitalDurationRecords.length > 0);
+    assert.ok(capitalDurationRecords.every(({ derivationKind }) => derivationKind === "GENERATED"));
     await copyFile(path.join(baselineDir, "catalog/capital-v1.sqlite.gz"), assetPath);
     const gzipBytes = await readFile(assetPath);
     assert.equal(gzipBytes[9], 255);
@@ -154,6 +167,32 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     const partial = structuredClone(spec);
     partial.fixturePath = partialPath;
     await runRejectedBuild(partial, /capital topology fixture projection mismatch/);
+
+    const changedSource = JSON.parse(await readFile(
+      "tools/datapack/sources/itx-cheongchun-source-timetable-20260727071853886.json",
+      "utf8",
+    ));
+    changedSource.normalizedSnapshotSets[0].sets.stationSet.push("station-tampered");
+    const { evidenceHash: ignored, ...changedSourceWithoutEvidenceHash } = changedSource;
+    changedSource.evidenceHash = sha256(Buffer.from(JSON.stringify(changedSourceWithoutEvidenceHash)));
+    const changedSourceBytes = Buffer.from(`${JSON.stringify(changedSource, null, 2)}\n`);
+    const changedSourcePath = path.join(workspace, "changed-itx-source.json");
+    await writeFile(changedSourcePath, changedSourceBytes);
+    const changedContract = JSON.parse(await readFile(
+      "tools/datapack/itx-cheongchun-coverage-contract.json",
+      "utf8",
+    ));
+    changedContract.sourceTimetableArtifact.artifactPath = changedSourcePath;
+    changedContract.sourceTimetableArtifact.sha256 = sha256(changedSourceBytes);
+    const changedContractBytes = Buffer.from(`${JSON.stringify(changedContract, null, 2)}\n`);
+    const changedContractPath = path.join(workspace, "changed-itx-contract.json");
+    await writeFile(changedContractPath, changedContractBytes);
+    const changed = structuredClone(spec);
+    changed.networkEdgeEvidence.itxCoverageContract = {
+      path: changedContractPath,
+      sha256: sha256(changedContractBytes),
+    };
+    await runRejectedBuild(changed, /ITX network edge unchanged admission is invalid/);
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
