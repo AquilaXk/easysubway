@@ -264,6 +264,7 @@ test("--check는 hash가 갱신된 bundled pack의 foreign key 손상도 거부�
   const sqlitePath = path.join(directory, "capital.sqlite");
   const indexPath = path.join(directory, "index.json");
   const evidencePath = path.join(directory, "evidence.json");
+  const contractPath = path.join(directory, "contract.json");
   const packBytes = await readFile(path.join(root, "apps/mobile/assets/datapacks/capital.sqlite.gz"));
   await writeFile(sqlitePath, gunzipSync(packBytes));
   const database = new DatabaseSync(sqlitePath);
@@ -288,21 +289,40 @@ test("--check는 hash가 갱신된 bundled pack의 foreign key 손상도 거부�
   await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
   const evidence = JSON.parse(await readFile(
     path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json"), "utf8"));
+  const historicalSourcePath = `tools/datapack/sources/${evidence.sourceArtifact.id}.json`;
+  const historicalSource = JSON.parse(await readFile(path.join(root, historicalSourcePath), "utf8"));
+  const contract = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json"), "utf8"));
+  Object.assign(contract.sourceTimetableArtifact, {
+    artifactId: evidence.sourceArtifact.id,
+    artifactPath: historicalSourcePath,
+    sha256: evidence.sourceArtifact.sha256,
+    completenessEvidencePath: historicalSourcePath.replace(/\.json$/, "-completeness-evidence.json"),
+    completenessEvidenceSha256: evidence.sourceArtifact.completenessEvidenceSha256,
+    freshUntil: evidence.sourceArtifact.freshUntil,
+  });
+  Object.assign(contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity, {
+    id: evidence.pack.id,
+    sha256: historicalSource.canonicalPackIdentity.sha256,
+    sqliteSha256: evidence.pack.inputSqliteSha256,
+  });
   Object.assign(evidence.pack, {
     outputSha256: sha256(corruptedPackBytes),
     outputSqliteSha256: sha256(sqliteBytes),
     byteSize: corruptedPackBytes.length,
     byteSizeDelta: corruptedPackBytes.length - evidence.pack.inputByteSize,
   });
+  await writeFile(contractPath, `${JSON.stringify(contract, null, 2)}\n`);
   await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
 
   await assert.rejects(execFileAsync(process.execPath, [
     "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
     "--pack", packPath,
     "--index", indexPath,
+    "--contract", contractPath,
     "--evidence", evidencePath,
     "--check",
-  ], { cwd: root, env: freshBuildEnv }), /admitted canonical input identity mismatch|foreign_key_check failed/);
+  ], { cwd: root, env: freshBuildEnv }), /foreign_key_check failed/);
 });
 
 test("ITX topology check는 self-consistent input size evidence 변조를 거부한다", async (context) => {
