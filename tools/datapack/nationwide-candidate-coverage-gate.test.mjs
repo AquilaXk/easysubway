@@ -2516,7 +2516,9 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
 // 이 하네스가 동작으로 바꾸지 않고, 그 비대칭이 의도된 기록이라는 것을 성질 자체로 고정한다 — 나중에
 // 상한이 생기면 이 단언이 깨져 spec·evidence 서술까지 함께 고치도록 강제한다.
 test("부산 노선도 편입은 상한이 없어 먼 미래 기준 시각도 조립을 통과한다", async () => {
-  const spec = await readJson(SPEC_PATH);
+  const fullSpec = await readJson(SPEC_PATH);
+  const trackedSpec = structuredClone(fullSpec);
+  const spec = structuredClone(fullSpec);
   const inventory = await readJson(INVENTORY_PATH);
   const inherited = await readJson(REVIEWED_PACK_PATH);
   const { capturedAt, freshUntil } = admissionEvidenceOf(
@@ -2532,9 +2534,18 @@ test("부산 노선도 편입은 상한이 없어 먼 미래 기준 시각도 �
     spec.packDataInclusions[BUSAN_TOPOLOGY_INDEX],
     spec.packDataInclusions[index],
   ];
+  trackedSpec.packDataInclusions = [
+    trackedSpec.packDataInclusions[BUSAN_TOPOLOGY_INDEX],
+    trackedSpec.packDataInclusions[index],
+  ];
 
+  const tracked = await applyPackDataInclusions(trackedSpec, inherited, inventory);
   const inclusions = await applyPackDataInclusions(spec, inherited, inventory);
   assert.equal(inclusions.records[1].materializedAt, farFuture);
+  assert.deepEqual(inclusions.pack, tracked.pack, "미래 pin은 downstream builder 입력을 바꾸지 않아야 한다");
+
+  const evidence = await readJson(EVIDENCE_PATH);
+  assertDeclaredTransitionsMatchVariants(fullSpec, evidence.variants);
 });
 
 // 노선도 편입의 하한 회귀는 나머지 셋과 진단 특정성이 비대칭이다: 시각표·편의시설은 신선도 전용 문구
