@@ -170,25 +170,7 @@ class AdminDesignGuardTest {
 	void adminAndOperatorColorConsumersUseSemanticTokensOnly() throws IOException {
 		List<String> rawColors = new ArrayList<>();
 		for (String path : CSS_FILES) {
-			String css = read(path).replaceAll("(?s)/\\*.*?\\*/", "");
-			Matcher colors = HEX_COLOR.matcher(css);
-			while (colors.find()) {
-				String color = colors.group();
-				boolean allowedTokenPrimitive = path.equals(CSS_TOKENS)
-					&& css.substring(0, colors.start()).lastIndexOf("--es-")
-						> css.substring(0, colors.start()).lastIndexOf(";");
-				boolean allowedChartSeries = path.equals(CSS_TOKENS)
-					&& color.equalsIgnoreCase("#2F6F9F")
-					&& css.substring(0, colors.start()).lastIndexOf("--admin-chart-series")
-						> css.substring(0, colors.start()).lastIndexOf(";");
-				boolean allowedDangerHover = path.equals(CSS_TOKENS)
-					&& color.equalsIgnoreCase("#000")
-					&& css.substring(0, colors.start()).lastIndexOf("--admin-danger-hover")
-						> css.substring(0, colors.start()).lastIndexOf(";");
-				if (!allowedTokenPrimitive && !allowedChartSeries && !allowedDangerHover) {
-					rawColors.add(path + ": " + color);
-				}
-			}
+			rawColors.addAll(rawColors(path, read(path)));
 		}
 		assertThat(rawColors).as("token 선언 밖 CSS raw color: %s", rawColors).isEmpty();
 
@@ -229,6 +211,53 @@ class AdminDesignGuardTest {
 			.contains("tokenColor('--admin-warn')")
 			.contains("tokenColor('--admin-ink-3')")
 			.doesNotContain("--admin-chart-series");
+		String operatorReportCharts = read(JS_OPERATOR_REPORT_CHARTS);
+		assertThat(operatorReportCharts)
+			.contains("var GOOD_LABELS = ['완료', '발송 완료'];")
+			.contains("var DANGER_LABELS = ['실패', '발송 실패'];")
+			.contains("var goodColor = tokenColor('--admin-good');")
+			.contains("var dangerColor = tokenColor('--admin-danger');")
+			.contains("var NEUTRAL_SEQUENCE = [\n"
+				+ "\t\ttokenColor('--admin-accent'),\n"
+				+ "\t\ttokenColor('--admin-ink-2'),\n"
+				+ "\t\ttokenColor('--admin-ink-3'),\n"
+				+ "\t\ttokenColor('--admin-chart-series')\n"
+				+ "\t];")
+			.contains("if (GOOD_LABELS.indexOf(label) !== -1) {\n\t\t\t\treturn goodColor;")
+			.contains("if (DANGER_LABELS.indexOf(label) !== -1) {\n\t\t\t\treturn dangerColor;");
+	}
+
+	@Test
+	void rawColorGuardRejectsRawHexInsideAlias() {
+		assertThat(rawColors(CSS_TOKENS,
+			":root { --new-alias: color-mix(in srgb, var(--es-surface-default), #123456); }"))
+			.containsExactly(CSS_TOKENS + ": #123456");
+	}
+
+	private static List<String> rawColors(String path, String source) {
+		String css = source.replaceAll("(?s)/\\*.*?\\*/", "");
+		List<String> rawColors = new ArrayList<>();
+		Matcher colors = HEX_COLOR.matcher(css);
+		while (colors.find()) {
+			String color = colors.group();
+			String preceding = css.substring(0, colors.start());
+			int declarationStart = Math.max(preceding.lastIndexOf(';'), preceding.lastIndexOf('{')) + 1;
+			String declaration = preceding.substring(declarationStart);
+			Matcher declarationName = Pattern.compile("\\s*(--[a-z0-9-]+)\\s*:").matcher(declaration);
+			String propertyName = declarationName.find() ? declarationName.group(1) : "";
+			boolean allowedTokenPrimitive = path.equals(CSS_TOKENS)
+				&& propertyName.startsWith("--es-");
+			boolean allowedChartSeries = path.equals(CSS_TOKENS)
+				&& color.equalsIgnoreCase("#2F6F9F")
+				&& propertyName.equals("--admin-chart-series");
+			boolean allowedDangerHover = path.equals(CSS_TOKENS)
+				&& color.equalsIgnoreCase("#000")
+				&& propertyName.equals("--admin-danger-hover");
+			if (!allowedTokenPrimitive && !allowedChartSeries && !allowedDangerHover) {
+				rawColors.add(path + ": " + color);
+			}
+		}
+		return rawColors;
 	}
 
 	@Test
