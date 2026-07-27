@@ -17687,6 +17687,31 @@ test("official OD fare release candidate는 승인 quote 순서에 의존하지 
   }
 });
 
+test("production candidate는 admission에 결속되지 않은 ITX timetable row를 거부한다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "production-unadmitted-itx-timetable-"));
+  try {
+    const fixture = JSON.parse(await readFile("tools/datapack/release/capital-production-canonical-pack.json", "utf8"));
+    fixture.packs[0].transitTrips[0].serviceClass = "ITX_CHEONGCHUN";
+    const fixturePath = path.join(workspace, "fixture.json");
+    await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
+    const buildSpec = JSON.parse(await readFile("tools/datapack/release/candidate-build-spec.json", "utf8"));
+    buildSpec.fixturePath = fixturePath;
+    const buildSpecPath = path.join(workspace, "build-spec.json");
+    await writeFile(buildSpecPath, `${JSON.stringify(buildSpec)}\n`);
+
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        "tools/datapack/build-datapack.mjs",
+        "--build-spec", buildSpecPath,
+        "--output", path.join(workspace, "output"),
+      ], { cwd: root, env: productionEnv }),
+      /production ITX timetable rows require explicit admission/,
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
 test("official OD fare release candidate는 admission과 다른 quote set evidence를 거부한다", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "official-od-fare-release-mismatch-"));
   try {

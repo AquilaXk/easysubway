@@ -455,6 +455,10 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256, officialOdFareEvid
 }
 
 async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
+  if (fixture.packs?.some((pack) => (pack.transitTrips ?? [])
+    .some(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN"))) {
+    throw new Error("production ITX timetable rows require explicit admission");
+  }
   const packs = fixture.packs?.filter((pack) => [
     ...(pack.transitTrips ?? []),
     ...(pack.networkEdges ?? []),
