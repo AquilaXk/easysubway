@@ -181,13 +181,22 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
   };
   const runRejectedCompletenessBuild = async (label, mutate, pattern) => {
     const contract = JSON.parse(await readFile("tools/datapack/itx-cheongchun-coverage-contract.json", "utf8"));
+    const source = JSON.parse(await readFile(contract.sourceTimetableArtifact.artifactPath, "utf8"));
     const completeness = JSON.parse(await readFile(contract.sourceTimetableArtifact.completenessEvidencePath, "utf8"));
-    mutate(completeness);
+    mutate({ source, completeness, reference: contract.sourceTimetableArtifact });
     const { evidenceHash: ignored, ...withoutEvidenceHash } = completeness;
     completeness.evidenceHash = sha256(Buffer.from(JSON.stringify(withoutEvidenceHash)));
     const completenessBytes = Buffer.from(`${JSON.stringify(completeness, null, 2)}\n`);
     const completenessPath = path.join(workspace, `${label}-completeness.json`);
     await writeFile(completenessPath, completenessBytes);
+    source.completenessEvidenceSha256 = sha256(completenessBytes);
+    const { evidenceHash: ignoredSourceHash, ...sourceWithoutEvidenceHash } = source;
+    source.evidenceHash = sha256(Buffer.from(JSON.stringify(sourceWithoutEvidenceHash)));
+    const sourceBytes = Buffer.from(`${JSON.stringify(source, null, 2)}\n`);
+    const sourcePath = path.join(workspace, `${label}-source.json`);
+    await writeFile(sourcePath, sourceBytes);
+    contract.sourceTimetableArtifact.artifactPath = sourcePath;
+    contract.sourceTimetableArtifact.sha256 = sha256(sourceBytes);
     contract.sourceTimetableArtifact.completenessEvidencePath = completenessPath;
     contract.sourceTimetableArtifact.completenessEvidenceSha256 = sha256(completenessBytes);
     const contractBytes = Buffer.from(`${JSON.stringify(contract, null, 2)}\n`);
@@ -303,12 +312,36 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       contract.claimGate.supportClaimAllowed = true;
     }, /ITX network edge claim boundary is invalid/);
 
-    await runRejectedCompletenessBuild("missing-itx-nested-admission", (completeness) => {
+    await runRejectedCompletenessBuild("missing-itx-nested-admission", ({ completeness }) => {
       completeness.sourceTimetableArtifact.status = "MISSING";
     }, /ITX network edge admission evidence mismatch/);
 
-    await runRejectedCompletenessBuild("drifted-itx-service-dates", (completeness) => {
+    await runRejectedCompletenessBuild("drifted-itx-service-dates", ({ completeness }) => {
       completeness.selectedServiceDates["7"] = "20260808";
+    }, /ITX network edge admission evidence mismatch/);
+
+    await runRejectedCompletenessBuild("noncanonical-itx-policy", ({ source, completeness, reference }) => {
+      source.policyVersion = "review-probe-v1";
+      completeness.sourceTimetableArtifact.policyVersion = source.policyVersion;
+      reference.policyVersion = source.policyVersion;
+    }, /ITX network edge admission evidence mismatch/);
+
+    await runRejectedCompletenessBuild("invalid-itx-service-date", ({ source, completeness, reference }) => {
+      source.selectedServiceDates["7"] = "20260807";
+      completeness.selectedServiceDates = structuredClone(source.selectedServiceDates);
+      source.freshUntil = "2026-08-08T00:00:00+09:00";
+      completeness.sourceTimetableArtifact.freshUntil = source.freshUntil;
+      reference.freshUntil = source.freshUntil;
+    }, /ITX network edge admission evidence mismatch/);
+
+    await runRejectedCompletenessBuild("unbound-itx-freshness", ({ source, completeness, reference }) => {
+      source.freshUntil = "2026-08-04T00:00:00+09:00";
+      completeness.sourceTimetableArtifact.freshUntil = source.freshUntil;
+      reference.freshUntil = source.freshUntil;
+    }, /ITX network edge admission evidence mismatch/);
+
+    await runRejectedCompletenessBuild("unredacted-itx-source", ({ source }) => {
+      source.credentialRedacted = false;
     }, /ITX network edge admission evidence mismatch/);
 
     const preverifiedFixture = JSON.parse(await readFile(
