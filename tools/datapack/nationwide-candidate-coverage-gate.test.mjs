@@ -23,7 +23,8 @@
 // 이 회귀들이 겨냥한 두 가드는 모두 어댑터의 경로 결속과 materializer
 // requiredSource의 창 판정이라 승계 행수 대조·pack 선행 조건 검사보다 먼저 걸린다(실측). 축소로 달라지는
 // addedRows는 그 판정에 닿지 않고, 가드를 끄면 진단 문구가 달라져 assert.rejects가 그대로 FAIL한다.
-// 순서 의존·체인 오염·addedRows 누적을 보는 회귀와 전이 판정을 보는 회귀는 그대로 전체 spec으로 돈다.
+// 순서 의존 회귀는 필요한 지역 chain만 명시하고, addedRows wiring은 합성 편입 한 건으로 고정한다.
+// 전체 spec→builder→report 배선은 tracked evidence 재생과 emit-before-validation 두 integration만 맡는다.
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -1434,6 +1435,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   const spec = await readJson(SPEC_PATH);
   const inventory = await readJson(INVENTORY_PATH);
   const inherited = await readJson(REVIEWED_PACK_PATH);
+  // 전국 prefix가 수도권·대전보다 먼저 만드는 표의 형상만 복원한다. 행은 순서 회귀의 입력이 아니므로
+  // 공유 materialization 결과 대신 빈 표를 둬 각 literal slice가 독립적으로 돈다.
   const inheritedWithCandidateTables = structuredClone(inherited);
   inheritedWithCandidateTables.packs[0].routeMapLineTracks = [];
   const evidence = await readJson(EVIDENCE_PATH);
@@ -2751,6 +2754,7 @@ test("조립 경로는 승계 행을 변조하는 materializer를 거부한다",
 const SEAM_INPUTS = { paths: ["stationMapPath"], linePaths: ["topologySnapshotPath"] };
 
 async function runWithMaterializers(spec, inventory, materializers) {
+  validateNationwideCandidateCoverageSpec(spec, inventory, materializers);
   return applyPackDataInclusions(
     spec,
     await readJson(REVIEWED_PACK_PATH),

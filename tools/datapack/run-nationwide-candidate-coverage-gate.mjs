@@ -1600,7 +1600,7 @@ function supportingRecordCountByField(provenance, entry) {
   ]));
 }
 
-export function assertDeclaredTransitionsMatchVariants(spec, variants) {
+function assertDeclaredNonTransitionsMatchVariants(spec, variants) {
   const nonTransitions = declaredNonTransitions(spec);
   // 선언된 non-transition은 기대 전환 집합에서만 빠진다. 그 키가 실제로 전환됐다면 선언이 성공을 숨기는
   // 데 쓰인 것이므로 여기서 먼저 거부한다(아래 집합 비교로도 걸리지만 원인을 문구로 특정한다).
@@ -1613,6 +1613,10 @@ export function assertDeclaredTransitionsMatchVariants(spec, variants) {
     );
   }
   assertNonTransitionReasons(nonTransitions, variants.lineScoped);
+  return nonTransitions;
+}
+
+function assertDeclaredTransitionSetMatchesVariants(spec, variants, nonTransitions) {
   const expectedKeys = declaredRequirementKeys(spec).filter((key) => !nonTransitions.has(key));
   // 전이 판정은 절대 수치가 아니라 두 variant의 상대 비교다. baseline SUPPORTED 총량을 0으로 못박으면
   // 승계 팩의 다른 소스가 line-scope를 갖는 순간(#2510 로드맵의 정상 진행) 무관한 PR에서 하네스가 깨진다.
@@ -1633,13 +1637,19 @@ export function assertDeclaredTransitionsMatchVariants(spec, variants) {
     );
   }
   assertDeclaredTransitionSources(spec, variants.lineScoped, nonTransitions);
+}
+
+export function assertDeclaredTransitionsMatchVariants(spec, variants) {
+  const nonTransitions = assertDeclaredNonTransitionsMatchVariants(spec, variants);
+  assertDeclaredTransitionSetMatchesVariants(spec, variants, nonTransitions);
   return nonTransitions;
 }
 
 function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, signing }) {
-  const nonTransitions = assertDeclaredTransitionsMatchVariants(spec, variants);
+  const nonTransitions = assertDeclaredNonTransitionsMatchVariants(spec, variants);
   assertEvidenceModelTotals(variants);
   assertCandidateRootPack(spec, reports);
+  assertDeclaredTransitionSetMatchesVariants(spec, variants, nonTransitions);
   const baselineStatuses = new Map(
     reports.baseline.requirements.map((entry) => [requirementKey(entry), entry.status]),
   );
