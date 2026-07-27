@@ -145,6 +145,7 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, n
   if (!/^[a-f0-9]{64}$/.test(snapshotSha256 ?? "") || evidence?.snapshotSha256 !== snapshotSha256) {
     throw new Error("Busan route map snapshot byte identity mismatch");
   }
+  const observedNow = assertRouteMapAdmissionFreshness(evidence, now, SOURCE_ID);
   if (source?.productionUseAllowed !== true || source.license?.redistributionAllowed !== true
     || source.license.commercialUseAllowed !== true || source.license.derivativeWorkAllowed !== true
     || evidence?.issue !== 2379
@@ -163,7 +164,8 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, n
     || evidence.connectorAssetCount !== snapshot.connectorAssetCount
     || evidence.topologySourceId !== snapshot.topologySourceId
     || evidence.topologySnapshotId !== snapshot.topologySnapshotId
-    || evidence.topologyContentSha256 !== snapshot.topologyContentSha256) {
+    || evidence.topologyContentSha256 !== snapshot.topologyContentSha256
+    || !Number.isFinite(observedNow) || observedNow < Date.parse(snapshot.capturedAt)) {
     throw new Error(`${SOURCE_ID} inventory evidence does not match snapshot`);
   }
   if (topologySnapshot?.sourceId !== TOPOLOGY_SOURCE_ID
@@ -177,7 +179,6 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, n
     }) || JSON.stringify(source.fieldsProvided) !== JSON.stringify(snapshot.fieldsProvided)) {
     throw new Error(`${SOURCE_ID} topology or coverage scope mismatch`);
   }
-  assertRouteMapAdmissionFreshness(evidence, now, SOURCE_ID);
   return source;
 }
 

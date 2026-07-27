@@ -138,6 +138,7 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, l
   if (!/^[a-f0-9]{64}$/.test(snapshotSha256 ?? "") || evidence?.snapshotSha256 !== snapshotSha256) {
     throw new Error(`${line.sourceId} snapshot byte identity mismatch`);
   }
+  const observedNow = assertRouteMapAdmissionFreshness(evidence, now, line.sourceId);
   if (source?.productionUseAllowed !== true || source.license?.redistributionAllowed !== true
     || source.license?.type !== "PUBLIC_DATA_FREE_USE"
     || source.license.commercialUseAllowed !== true || source.license.derivativeWorkAllowed !== true
@@ -168,11 +169,11 @@ function requiredSource(inventory, snapshot, snapshotSha256, topologySnapshot, l
       lineIds: [line.lineId],
       sourceDomains: ["route_map_positions"],
     })
-    || JSON.stringify(source.fieldsProvided) !== JSON.stringify(snapshot.fieldsProvided)) {
+    || JSON.stringify(source.fieldsProvided) !== JSON.stringify(snapshot.fieldsProvided)
+    || !Number.isFinite(observedNow) || observedNow < Date.parse(snapshot.capturedAt)) {
     throw new Error(`${line.sourceId} inventory evidence does not match snapshot`);
   }
   validateTopologyLineage(evidence, topologySnapshot, line);
-  assertRouteMapAdmissionFreshness(evidence, now, line.sourceId);
   return source;
 }
 

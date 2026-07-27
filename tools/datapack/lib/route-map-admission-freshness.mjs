@@ -13,4 +13,5 @@ export function assertRouteMapAdmissionFreshness(evidence, now, sourceId) {
   if (!Number.isFinite(observedNow) || observedNow < capturedAt || observedNow >= freshUntil) {
     throw new Error(`${sourceId} route-map admission snapshot is stale or future-dated`);
   }
+  return observedNow;
 }
