@@ -1509,7 +1509,8 @@ export function assertLineScopeRedescriptionsMatchActualRequiredSet(
     if (!launchRequiredDomains.has(redescription.sourceDomain)) continue;
     declared.set(key, redescription);
   }
-  const transitionDiagnostics = newCandidateSourceIds
+  const transitionDiagnostics = [...newCandidateSourceIds]
+    .sort(codepointCompare)
     .map((sourceId) => `NEW_CANDIDATE_SCOPE:${sourceId}`)
     .join(",");
 
