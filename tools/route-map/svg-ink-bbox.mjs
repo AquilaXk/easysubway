@@ -1,7 +1,7 @@
 // 오너 SVG의 **잉크 bbox**(실제로 그려지는 모든 것의 외곽)를 계산한다.
 //
 // 용도는 캔버스 여백 게이트다(#2603). viewBox를 잉크에 맞춰 조인 뒤로 우·하단
-// 여유가 40~80단위밖에 남지 않아, 오너가 가장자리에 요소를 추가하면 캔버스를
+// 여유가 39~80단위밖에 남지 않아, 오너가 가장자리에 요소를 추가하면 캔버스를
 // 넘어선다. 넘어선 요소는 컴파일러가 잘라내지 않고 `.vec`에 그대로 남기지만
 // (실측: viewBox 밖 원을 넣어도 산출물이 커진다), 캔버스 크기와 잉크가
 // 어긋나면 캔버스를 기준으로 삼는 판단이 전부 틀어지고 런타임·플랫폼에 따라
@@ -292,7 +292,7 @@ function visitArc(arc, visit) {
 }
 
 /** `d`가 실제로 지나는 점(곡선 극값 포함)을 [visit]한다. */
-export function visitPathExtremes(d, visit) {
+export function visitPathExtremes(d, visit, matrix = IDENTITY) {
   // 복잡한 대안 정규식 대신 명령 문자와 부호 앞에 공백을 넣어 분해한다.
   // `1e-4`의 지수 부호는 앞 문자가 e라 분해 대상이 아니다(lookbehind가 걸러낸다).
   const tokens = d
@@ -317,11 +317,22 @@ export function visitPathExtremes(d, visit) {
     }
     return value;
   };
+  const point = (x, y) => applyMatrix(matrix, x, y);
+  const emit = (x, y) => visit(...point(x, y));
   const curve = (x1, y1, x2, y2, x, y) => {
-    cubicExtremaAxis(cx, x1, x2, x, (v) => visit(v, cy));
-    cubicExtremaAxis(cy, y1, y2, y, (v) => visit(cx, v));
-    // 축별 극값만으로는 대각 극단을 놓칠 수 있어 끝점·제어 구간도 함께 방문.
-    visit(x, y);
+    const [p0, p1, p2, p3] = [
+      point(cx, cy),
+      point(x1, y1),
+      point(x2, y2),
+      point(x, y),
+    ];
+    cubicExtremaAxis(p0[0], p1[0], p2[0], p3[0], (v) =>
+      visit(v, p0[1]),
+    );
+    cubicExtremaAxis(p0[1], p1[1], p2[1], p3[1], (v) =>
+      visit(p0[0], v),
+    );
+    visit(...p3);
   };
   while (i < tokens.length) {
     if (/^[A-Za-z]$/.test(tokens[i])) cmd = tokens[i++];
@@ -335,26 +346,26 @@ export function visitPathExtremes(d, visit) {
         cy = num() + oy;
         sx = cx;
         sy = cy;
-        visit(cx, cy);
+        emit(cx, cy);
         cmd = rel ? "l" : "L";
         break;
       }
       case "L": {
         cx = num() + ox;
         cy = num() + oy;
-        visit(cx, cy);
+        emit(cx, cy);
         prevC = prevQ = null;
         break;
       }
       case "H": {
         cx = num() + ox;
-        visit(cx, cy);
+        emit(cx, cy);
         prevC = prevQ = null;
         break;
       }
       case "V": {
         cy = num() + oy;
-        visit(cx, cy);
+        emit(cx, cy);
         prevC = prevQ = null;
         break;
       }
@@ -392,9 +403,14 @@ export function visitPathExtremes(d, visit) {
         const y1 = num() + oy;
         const x = num() + ox;
         const y = num() + oy;
-        quadExtremaAxis(cx, x1, x, (v) => visit(v, cy));
-        quadExtremaAxis(cy, y1, y, (v) => visit(cx, v));
-        visit(x, y);
+        const [p0, p1, p2] = [
+          point(cx, cy),
+          point(x1, y1),
+          point(x, y),
+        ];
+        quadExtremaAxis(p0[0], p1[0], p2[0], (v) => visit(v, p0[1]));
+        quadExtremaAxis(p0[1], p1[1], p2[1], (v) => visit(p0[0], v));
+        visit(...p2);
         prevQ = [x1, y1];
         prevC = null;
         cx = x;
@@ -407,9 +423,14 @@ export function visitPathExtremes(d, visit) {
         const y1 = 2 * cy - py;
         const x = num() + ox;
         const y = num() + oy;
-        quadExtremaAxis(cx, x1, x, (v) => visit(v, cy));
-        quadExtremaAxis(cy, y1, y, (v) => visit(cx, v));
-        visit(x, y);
+        const [p0, p1, p2] = [
+          point(cx, cy),
+          point(x1, y1),
+          point(x, y),
+        ];
+        quadExtremaAxis(p0[0], p1[0], p2[0], (v) => visit(v, p0[1]));
+        quadExtremaAxis(p0[1], p1[1], p2[1], (v) => visit(p0[0], v));
+        visit(...p2);
         prevQ = [x1, y1];
         prevC = null;
         cx = x;
@@ -426,7 +447,7 @@ export function visitPathExtremes(d, visit) {
         const y = num() + oy;
         visitArc(
           { x1: cx, y1: cy, rx, ry, rotDeg: rot, largeArc, sweep, x2: x, y2: y },
-          visit,
+          emit,
         );
         prevC = prevQ = null;
         cx = x;
@@ -436,7 +457,7 @@ export function visitPathExtremes(d, visit) {
       case "Z": {
         cx = sx;
         cy = sy;
-        visit(cx, cy);
+        emit(cx, cy);
         prevC = prevQ = null;
         break;
       }
@@ -507,22 +528,24 @@ function visitTagInk(tag, name, matrix, inherited, visit) {
   const m = own ? composeMatrix(matrix, parseTransformChain(own)) : matrix;
   const half = strokeHalfOf(tag, inherited.stroke);
   const label = describeTag(tag, name);
-  const put = (x, y) => {
-    // stroke 반폭은 축 정렬로 부풀린다(회전 시 과대평가 — 안전한 방향).
-    const [ax, ay] = applyMatrix(m, x, y);
-    visit(ax, ay, label);
+  const strokeX = half * Math.hypot(m[0], m[2]);
+  const strokeY = half * Math.hypot(m[1], m[3]);
+  const putAbsolute = (x, y) => {
+    visit(x, y, label);
     if (half > 0) {
-      const [lx, ly] = applyMatrix(m, x - half, y - half);
-      const [rx, ry] = applyMatrix(m, x + half, y + half);
-      visit(lx, ly, label);
-      visit(rx, ry, label);
+      visit(x - strokeX, y - strokeY, label);
+      visit(x + strokeX, y + strokeY, label);
     }
+  };
+  const put = (x, y) => {
+    const [ax, ay] = applyMatrix(m, x, y);
+    putAbsolute(ax, ay);
   };
 
   switch (name) {
     case "path": {
       const d = firstAttr(tag, "d");
-      if (d) visitPathExtremes(d, put);
+      if (d) visitPathExtremes(d, putAbsolute, m);
       return;
     }
     case "circle": {
@@ -530,8 +553,11 @@ function visitTagInk(tag, name, matrix, inherited, visit) {
       const cy = numAttr(tag, "cy", 0);
       const r = numAttr(tag, "r");
       if (!Number.isFinite(r)) return;
-      put(cx - r, cy - r);
-      put(cx + r, cy + r);
+      const [x, y] = applyMatrix(m, cx, cy);
+      const dx = Math.hypot(m[0] * r, m[2] * r);
+      const dy = Math.hypot(m[1] * r, m[3] * r);
+      putAbsolute(x - dx, y - dy);
+      putAbsolute(x + dx, y + dy);
       return;
     }
     case "ellipse": {
@@ -540,8 +566,11 @@ function visitTagInk(tag, name, matrix, inherited, visit) {
       const rx = numAttr(tag, "rx");
       const ry = numAttr(tag, "ry");
       if (!Number.isFinite(rx) || !Number.isFinite(ry)) return;
-      put(cx - rx, cy - ry);
-      put(cx + rx, cy + ry);
+      const [x, y] = applyMatrix(m, cx, cy);
+      const dx = Math.hypot(m[0] * rx, m[2] * ry);
+      const dy = Math.hypot(m[1] * rx, m[3] * ry);
+      putAbsolute(x - dx, y - dy);
+      putAbsolute(x + dx, y + dy);
       return;
     }
     case "rect": {
@@ -551,6 +580,8 @@ function visitTagInk(tag, name, matrix, inherited, visit) {
       const h = numAttr(tag, "height");
       if (!Number.isFinite(w) || !Number.isFinite(h)) return;
       put(x, y);
+      put(x + w, y);
+      put(x, y + h);
       put(x + w, y + h);
       return;
     }
@@ -607,6 +638,10 @@ function visitTextInk(openTag, body, matrix, inherited, visit) {
     "text-anchor",
     inherited.textAnchor,
   );
+  const baseStroke = {
+    paint: inheritedAttr(openTag, "stroke", inherited.stroke.paint),
+    width: inheritedAttr(openTag, "stroke-width", inherited.stroke.width),
+  };
   const baseX = numAttr(openTag, "x", Number.NaN);
   const baseY = numAttr(openTag, "y", Number.NaN);
 
@@ -639,6 +674,7 @@ function visitTextInk(openTag, body, matrix, inherited, visit) {
           .replace(/px$/, ""),
       ),
       anchor: inheritedAttr(attrs, "text-anchor", baseAnchor),
+      strokeHalf: strokeHalfOf(attrs, baseStroke),
     });
   }
   if (!sawTspan) {
@@ -648,6 +684,7 @@ function visitTextInk(openTag, body, matrix, inherited, visit) {
       y: baseY,
       size: Number(String(baseSize ?? "0").trim().replace(/px$/, "")),
       anchor: baseAnchor,
+      strokeHalf: strokeHalfOf(openTag, inherited.stroke),
     });
   }
 
@@ -667,10 +704,18 @@ function visitTextInk(openTag, body, matrix, inherited, visit) {
     const top = run.y - (ascender / unitsPerEm) * run.size;
     const bottom = run.y - (descender / unitsPerEm) * run.size;
     const label = describeTag(openTag, "text", run.text);
-    const [x0, y0] = applyMatrix(m, left, top);
-    const [x1, y1] = applyMatrix(m, left + width, bottom);
-    visit(x0, y0, label);
-    visit(x1, y1, label);
+    const strokeX = run.strokeHalf * Math.hypot(m[0], m[2]);
+    const strokeY = run.strokeHalf * Math.hypot(m[1], m[3]);
+    for (const [x, y] of [
+      [left, top],
+      [left + width, top],
+      [left, bottom],
+      [left + width, bottom],
+    ]) {
+      const [ax, ay] = applyMatrix(m, x, y);
+      visit(ax - strokeX, ay - strokeY, label);
+      visit(ax + strokeX, ay + strokeY, label);
+    }
   }
 }
 

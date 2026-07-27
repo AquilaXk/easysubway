@@ -1,6 +1,6 @@
 // #2603 캔버스 여백 게이트 — 잉크가 viewBox 안에 있는지 5권역 전수 검사한다.
 //
-// 배경: 오너 SVG의 viewBox를 잉크에 맞춰 조이면서 우·하단 여유가 41~149단위로
+// 배경: 오너 SVG의 viewBox를 잉크에 맞춰 조이면서 우·하단 여유가 39~147단위로
 // 줄었다. 여유가 이렇게 얇으면 오너가 가장자리에 요소를 하나 더 얹는 순간
 // 캔버스를 넘어서는데, 그걸 잡는 검사가 지금까지 없었다
 // (`compile-basemap-vec.test.mjs`는 manifest viewBox의 **길이(4)** 만 봤다).
@@ -12,6 +12,7 @@
 // 여지도 남는다. 그래서 어긋남 자체를 상시로 막는다.
 
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -51,10 +52,10 @@ const REGIONS = [
  */
 const EXPECTED_MARGINS = {
   seoul: { left: 114.22, top: 309.51, right: 79.12, bottom: 79.93 },
-  busan: { left: 725.45, top: 976.83, right: 146.9, bottom: 148.98 },
-  daegu: { left: 34.55, top: 30.0, right: 50.0, bottom: 78.63 },
-  daejeon: { left: 513.0, top: 275.81, right: 43.29, bottom: 46.47 },
-  gwangju: { left: 443.0, top: 254.63, right: 41.13, bottom: 42.8 },
+  busan: { left: 725.45, top: 976.83, right: 146.9, bottom: 146.11 },
+  daegu: { left: 34.55, top: 30.0, right: 50.0, bottom: 76.13 },
+  daejeon: { left: 513.0, top: 273.81, right: 41.29, bottom: 44.47 },
+  gwangju: { left: 443.0, top: 252.63, right: 39.13, bottom: 40.8 },
 };
 
 /** 기준선 허용 오차. 폰트 advance·곡선 극값 계산의 미세 변동만 흡수한다. */
@@ -176,6 +177,43 @@ test("경계 밖 요소를 넣으면 게이트가 실패한다(게이트 실효�
     vy + vh - after.maxY >= 0,
     "세로 여유는 주입과 무관하게 유지돼야 합니다.",
   );
+});
+
+test("회전 도형은 변환된 네 모서리의 외곽으로 판정한다", () => {
+  const svg =
+    '<svg viewBox="0 0 10 10"><rect x="9" y="0" width="1" height="1" ' +
+    'transform="rotate(45 9.5 .5)"/></svg>';
+  assert.ok(
+    inkBBoxOf(svg).maxX > 10,
+    "회전된 사각형의 우측 모서리가 viewBox를 넘는 것을 잡아야 합니다.",
+  );
+});
+
+test("텍스트 stroke 외곽이 viewBox를 넘으면 게이트가 실패한다", () => {
+  const svg =
+    '<svg viewBox="0 0 10 10"><text x="8" y="5" font-size="1" ' +
+    'stroke="#000" stroke-width="4">A</text></svg>';
+  assert.ok(
+    inkBBoxOf(svg).maxX > 10,
+    "텍스트 fill이 안쪽이어도 stroke 외곽이 경계를 넘으면 잡아야 합니다.",
+  );
+});
+
+test("crop-viewbox는 유한한 양수 width/height만 허용한다", () => {
+  const script = path.join(here, "svg-crop", "crop-viewbox.py");
+  for (const [width, height] of [
+    ["nan", "10"],
+    ["0", "10"],
+    ["10", "-1"],
+  ]) {
+    const result = spawnSync(
+      "python3",
+      [script, "gwangju", "0", "0", width, height, "--dry"],
+      { encoding: "utf8" },
+    );
+    assert.notEqual(result.status, 0, `${width}×${height} viewBox가 거부돼야 합니다.`);
+    assert.match(result.stderr, /유한수|0보다 커야/);
+  }
 });
 
 test("장식 제외 집합 정합 — 헤더·범례는 정규화가 이미 걷어내고, 전면 배경만 잉크에서 뺀다", () => {

@@ -9,6 +9,7 @@
 사용법:
   python3 tools/route-map/svg-crop/crop-viewbox.py <region> <x> <y> <w> <h> [--dry]
 """
+import math
 import os
 import re
 import sys
@@ -58,6 +59,10 @@ def fmt(value: float) -> str:
 
 
 def crop(region: str, x, y, w, h, dry: bool = False) -> str:
+    if not all(math.isfinite(value) for value in (x, y, w, h)):
+        raise ValueError("viewBox 값은 모두 유한수여야 합니다.")
+    if w <= 0 or h <= 0:
+        raise ValueError("viewBox width/height는 0보다 커야 합니다.")
     path = svg_path_for(region)
     with open(path, "r", encoding="utf-8") as handle:
         text = handle.read()
