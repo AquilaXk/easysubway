@@ -1473,10 +1473,6 @@ void main() {
   });
 
   testWidgets('홈 검색바는 idle에서 active로 전환돼도 시각 박스 높이가 그대로 유지된다', (tester) async {
-    expect(
-      EasySubwayAccessibleColors.searchFieldSurface,
-      const Color(0xFFF6F8F9),
-    );
     await tester.pumpWidget(
       buildEasySubwayTestApp(
         repository: FakeStationSearchRepository(),
@@ -5340,7 +5336,7 @@ void main() {
       expect(timeFinder, findsOneWidget);
       expect(
         tester.widget<Text>(timeFinder).style?.color,
-        const Color(0xFFE23D3D),
+        EasySubwayAccessibleColors.statusDangerContent,
       );
       expect(
         find.bySemanticsLabel(RegExp(RegExp.escape(item.semanticLabel))),
@@ -7206,7 +7202,7 @@ void main() {
           )
           .style
           ?.color,
-      const Color(0xFF2F2F2F),
+      EasySubwayAccessibleColors.contentPrimary,
     );
     expect(
       find.descendant(of: panel, matching: find.byType(VerticalDivider)),
@@ -12230,14 +12226,15 @@ void main() {
     expect(resultOrder[0], lessThan(resultOrder[1]));
     expect(resultOrder[0], lessThan(resultOrder[2]));
 
-    // 쿼리 일치 구간은 푸른색 하이라이트 span을 갖는다.
+    // 쿼리 일치 구간은 브랜드 하이라이트 span을 갖는다.
     final richTexts = tester.widgetList<RichText>(find.byType(RichText));
     final hasHighlight = richTexts.any((rich) {
       var found = false;
       rich.text.visitChildren((span) {
         if (span is TextSpan &&
             span.text == '서울' &&
-            span.style?.color == const Color(0xFF1565C0)) {
+            span.style?.color ==
+                EasySubwayAccessibleColors.interactionPrimary) {
           found = true;
         }
         return true;

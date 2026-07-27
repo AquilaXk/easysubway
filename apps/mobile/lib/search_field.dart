@@ -35,9 +35,9 @@ const easySubwaySearchFieldIconSize = 22.0;
 /// 아이콘과 텍스트 사이 간격(8).
 const easySubwaySearchFieldIconGap = 8.0;
 
-/// hint(placeholder) 텍스트 스타일. mutedText·17·w600·height 미지정.
+/// hint(placeholder) 텍스트 스타일. secondaryText·17·w600·height 미지정.
 const easySubwaySearchFieldHintStyle = TextStyle(
-  color: EasySubwayAccessibleColors.mutedText,
+  color: EasySubwayAccessibleColors.secondaryText,
   fontSize: 17,
   fontWeight: FontWeight.w600,
 );
