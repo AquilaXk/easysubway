@@ -145,6 +145,7 @@ class AdminDesignGuardTest {
 			Map.entry("--admin-accent-ink", "var(--es-interaction-on-brand)"),
 			Map.entry("--admin-sidebar-bg", "var(--es-surface-default)"),
 			Map.entry("--admin-sidebar-accent", "var(--es-surface-signature)"),
+			Map.entry("--admin-sidebar-accent-border", "var(--es-interaction-on-signature-border)"),
 			Map.entry("--admin-primary", "var(--es-interaction-primary)"),
 			Map.entry("--admin-primary-hover", "var(--es-interaction-primary-pressed)"),
 			Map.entry("--admin-on-primary", "var(--es-interaction-on-primary)"),
@@ -159,7 +160,7 @@ class AdminDesignGuardTest {
 			Map.entry("--admin-danger-soft", "var(--es-status-danger-surface)"),
 			Map.entry("--admin-info-soft", "var(--es-status-info-surface)")
 		);
-		assertThat(expectedAliases).hasSize(26);
+		assertThat(expectedAliases).hasSize(27);
 		Map<String, String> actualAliases = new LinkedHashMap<>();
 		expectedAliases.keySet().forEach(name -> actualAliases.put(name, cssProperties.get(name)));
 		assertThat(actualAliases).containsExactlyInAnyOrderEntriesOf(expectedAliases);
@@ -194,6 +195,14 @@ class AdminDesignGuardTest {
 			.contains("outline-color: var(--admin-focus-on-signature);");
 		assertThat(rule(read(CSS_OPERATOR), "\\.nav-link:hover:focus-visible"))
 			.contains("outline-color: var(--admin-focus-on-signature);");
+		assertThat(rule(read(CSS_SHELL), "\\.admin-nav-item:hover"))
+			.contains("border-left-color: var(--admin-sidebar-accent-border);");
+		assertThat(rule(read(CSS_SHELL), "\\.admin-nav-item\\.is-active"))
+			.contains("border-left-color: var(--admin-sidebar-accent-border);");
+		assertThat(rule(read(CSS_OPERATOR), "\\.nav-link:hover"))
+			.contains("border-left-color: var(--admin-sidebar-accent-border);");
+		assertThat(rule(read(CSS_OPERATOR), "\\.nav-link\\.active"))
+			.contains("border-left-color: var(--admin-sidebar-accent-border);");
 		assertThat(read(CSS_COMPONENTS)).contains("color: var(--admin-on-primary);");
 		assertThat(read(CSS_OPERATOR)).contains("color: var(--admin-on-primary);");
 

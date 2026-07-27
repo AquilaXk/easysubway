@@ -85,6 +85,7 @@
 	--admin-accent-ink: var(--es-interaction-on-brand);
 	--admin-sidebar-bg: var(--es-surface-default);
 	--admin-sidebar-accent: var(--es-surface-signature);
+	--admin-sidebar-accent-border: var(--es-interaction-on-signature-border);
 	--admin-primary: var(--es-interaction-primary);
 	--admin-primary-hover: var(--es-interaction-primary-pressed);
 	--admin-on-primary: var(--es-interaction-on-primary);

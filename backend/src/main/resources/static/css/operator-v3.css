@@ -105,14 +105,14 @@ input:focus-visible {
 
 .nav-link:hover {
 	border-radius: 0;
-	border-left-color: var(--admin-border-strong);
+	border-left-color: var(--admin-sidebar-accent-border);
 	background: var(--admin-sidebar-accent);
 	color: var(--admin-ink);
 }
 
 .nav-link.active {
 	border-radius: 0;
-	border-left-color: var(--admin-accent);
+	border-left-color: var(--admin-sidebar-accent-border);
 	background: var(--admin-sidebar-accent);
 	color: var(--admin-accent-ink);
 	font-weight: var(--admin-w-strong);
