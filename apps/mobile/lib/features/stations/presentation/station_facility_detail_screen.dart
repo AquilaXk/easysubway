@@ -214,7 +214,8 @@ Color _facilityStatusNoticeIconColor(FacilityStatusSeverity severity) {
   return switch (severity) {
     FacilityStatusSeverity.blocked => EasySubwayAccessibleColors.red,
     FacilityStatusSeverity.caution => EasySubwayAccessibleColors.amber,
-    FacilityStatusSeverity.needsInfo => EasySubwayAccessibleColors.brand,
+    FacilityStatusSeverity.needsInfo =>
+      EasySubwayAccessibleColors.statusInfoContent,
     FacilityStatusSeverity.normal => EasySubwayAccessibleColors.mint,
   };
 }

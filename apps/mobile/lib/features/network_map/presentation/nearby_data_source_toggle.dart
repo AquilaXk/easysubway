@@ -5,9 +5,9 @@ import '../../../accessible_design.dart';
 /// 주변역 패널 실시간/시간표 세그먼트 토글 (오너 스펙 2026-07-16, #2200/#2207).
 ///
 /// 두 칸(59×48, 전체 118×48 터치 영역)이 하나의 라운드 컨테이너 안에 붙어 있는
-/// 단일 세그먼트 컨트롤이다. 비선택 배경([EasySubwayAccessibleColors.nearbyToggleIdleFill])이
+/// 단일 세그먼트 컨트롤이다. 비선택 surface와 secondary content가
 /// 두 칸을 하나로 감싸고(세로 inset 상하 8 → 시각 118×32, radius 16), 두 칸 사이
-/// 간격은 없다. 선택된 칸만 흰 배경 + brandSignature 2dp 테두리 pill(59×32, radius
+/// 간격은 없다. 선택된 칸만 default surface + secondary border pill(59×32, radius
 /// 16)로 그 절반 위에 겹쳐 그린다. 전환 애니메이션·splash는 없다. 비선택 칸을
 /// 누르면 [onToggle]로 데이터 소스를 뒤집고, 선택된 칸 탭은 no-op이다.
 class NearbyDataSourceToggle extends StatelessWidget {
@@ -82,7 +82,7 @@ class _Segment extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final tappable = enabled && !selected;
-    // 비활성 상태는 선택 칸의 흰 배경·brandSignature 테두리를 걷어내고 글자색을
+    // 비활성 상태는 선택 칸의 default surface·secondary border를 걷어내고 글자색을
     // mutedText로 낮춰, 활성 토글과 시각적으로 구분한다(여전히 비탭).
     final bool showPill;
     final Color textColor;
@@ -118,7 +118,9 @@ class _Segment extends StatelessWidget {
               height: 32,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: showPill ? Colors.white : Colors.transparent,
+                color: showPill
+                    ? EasySubwayAccessibleColors.surfaceDefault
+                    : Colors.transparent,
                 borderRadius: NearbyDataSourceToggle._radius,
                 border: showPill
                     ? Border.all(

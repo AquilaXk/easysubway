@@ -207,6 +207,10 @@ void main() {
       // 비선택 칸은 pill을 그리지 않는다(단일 배경 track이 뒤에서 감싼다).
       expect(timetableDeco.color, Colors.transparent);
       expect(timetableDeco.border, isNull);
+      expect(
+        tester.widget<Text>(find.text('시간표')).style!.color,
+        EasySubwayAccessibleColors.contentSecondary,
+      );
     });
 
     testWidgets('두 칸이 간격 없이 하나의 단일 배경 track 안에 붙어 있다', (tester) async {
@@ -363,14 +367,14 @@ void main() {
       return root.children!;
     }
 
-    testWidgets('"방면"으로 끝나면 역명은 노선색, " 방면"은 #2F2F2F로 분리한다', (tester) async {
+    testWidgets('"방면"으로 끝나면 역명은 노선색, " 방면"은 본문 역할색으로 분리한다', (tester) async {
       await tester.pumpWidget(hostTitle('성수 방면', _line2Green));
 
       final spans = spansOf(tester).cast<TextSpan>();
       expect(spans[0].text, '성수');
       expect(spans[0].style!.color, _line2Green);
       expect(spans[1].text, ' 방면');
-      expect(spans[1].style!.color, const Color(0xFF2F2F2F));
+      expect(spans[1].style!.color, EasySubwayAccessibleColors.contentPrimary);
     });
 
     testWidgets('2호선 선택 시 방면 역명이 #00A84D이다', (tester) async {
@@ -398,7 +402,7 @@ void main() {
   });
 
   group('NearbyArrivalRow 회귀 (Task 5 무변경 고정)', () {
-    testWidgets('"○○행"은 13sp w700 #2F2F2F, 도착 안내는 12sp w600으로 유지된다', (
+    testWidgets('"○○행"은 13sp w700 본문 역할색, 도착 안내는 12sp w600으로 유지된다', (
       tester,
     ) async {
       await tester.pumpWidget(
@@ -412,7 +416,7 @@ void main() {
       final dest = tester.widget<Text>(find.text('성수행'));
       expect(dest.style!.fontSize, 13);
       expect(dest.style!.fontWeight, FontWeight.w700);
-      expect(dest.style!.color, const Color(0xFF2F2F2F));
+      expect(dest.style!.color, EasySubwayAccessibleColors.contentPrimary);
 
       final eta = tester.widget<Text>(find.text('약 3분'));
       expect(eta.style!.fontSize, 12);
@@ -586,14 +590,14 @@ void main() {
       expect(find.byType(VerticalDivider), findsNothing);
     });
 
-    testWidgets('대시 스타일은 16sp w700 #2F2F2F이다', (tester) async {
+    testWidgets('대시 스타일은 16sp w700 본문 역할색이다', (tester) async {
       await tester.pumpWidget(
         host(const [NearbyPanelColumn(title: '건대입구 방면')]),
       );
       final dash = tester.widget<Text>(find.text('-'));
       expect(dash.style!.fontSize, 16);
       expect(dash.style!.fontWeight, FontWeight.w700);
-      expect(dash.style!.color, const Color(0xFF2F2F2F));
+      expect(dash.style!.color, EasySubwayAccessibleColors.contentPrimary);
     });
 
     testWidgets('대시 열은 열 단위 Semantics 라벨을 쓰고 대시 문자는 제외한다', (tester) async {

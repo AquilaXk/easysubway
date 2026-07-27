@@ -155,7 +155,7 @@ class _StationPointButton extends StatelessWidget {
       onPressed: onPressed,
       style: OutlinedButton.styleFrom(
         minimumSize: const Size.fromHeight(EasySubwayTouchTarget.general),
-        backgroundColor: Colors.white,
+        backgroundColor: EasySubwayAccessibleColors.surfaceDefault,
         foregroundColor: EasySubwayAccessibleColors.primary,
         side: const BorderSide(color: EasySubwayAccessibleColors.line),
         shape: const RoundedRectangleBorder(

@@ -313,12 +313,11 @@ class _NotificationInboxRow extends StatelessWidget {
     }
 
     final accent = _facilitySeverityAccent(item.severity);
-    final row = Container(
+    final row = Ink(
       padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: const BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: EasySubwayAccessibleColors.line),
-        ),
+      decoration: BoxDecoration(
+        color: accent.backgroundColor,
+        border: Border(bottom: BorderSide(color: accent.borderColor)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -350,7 +349,7 @@ class _NotificationInboxRow extends StatelessWidget {
                     Text(
                       item.kind,
                       style: const TextStyle(
-                        color: EasySubwayAccessibleColors.mutedText,
+                        color: EasySubwayAccessibleColors.contentSecondary,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
                       ),
@@ -429,12 +428,12 @@ _FacilitySeverityAccent _facilitySeverityAccent(
       iconColor: EasySubwayAccessibleColors.amber,
     ),
     FacilityStatusSeverity.needsInfo => const _FacilitySeverityAccent(
-      backgroundColor: Colors.white,
-      borderColor: EasySubwayAccessibleColors.needsInfo,
-      iconColor: EasySubwayAccessibleColors.needsInfo,
+      backgroundColor: EasySubwayAccessibleColors.statusInfoSurface,
+      borderColor: EasySubwayAccessibleColors.statusInfoContent,
+      iconColor: EasySubwayAccessibleColors.statusInfoContent,
     ),
     FacilityStatusSeverity.normal => const _FacilitySeverityAccent(
-      backgroundColor: Colors.white,
+      backgroundColor: EasySubwayAccessibleColors.surfaceDefault,
       borderColor: EasySubwayAccessibleColors.line,
       iconColor: EasySubwayAccessibleColors.mintDark,
     ),

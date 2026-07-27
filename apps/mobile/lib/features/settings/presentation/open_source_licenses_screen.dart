@@ -103,7 +103,7 @@ class _NoticeHeader extends StatelessWidget {
           child: const Text(
             'OSS Notice | EasySubway',
             style: TextStyle(
-              color: Colors.white,
+              color: EasySubwayAccessibleColors.interactionOnPrimary,
               fontSize: 20,
               fontWeight: FontWeight.w700,
             ),

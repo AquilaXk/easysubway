@@ -48,7 +48,7 @@ const _facilityReportCardRadius = BorderRadius.all(
 /// 텍스트로 상태를 구분하기 위한 전경색만 돌려준다.
 Color _reportStatusColor(String status) {
   return switch (status) {
-    'SUBMITTED' => EasySubwayAccessibleColors.needsInfo,
+    'SUBMITTED' => EasySubwayAccessibleColors.statusInfoContent,
     'UNDER_REVIEW' => EasySubwayAccessibleColors.amber,
     'ACCEPTED' || 'RESOLVED' => EasySubwayAccessibleColors.mintDark,
     'REJECTED' => EasySubwayAccessibleColors.red,
@@ -1428,7 +1428,7 @@ class _MyFacilityReportListScreenState
           icon: const Icon(
             Icons.arrow_back,
             size: 26,
-            color: Color(0xFF4B4B4B),
+            color: EasySubwayAccessibleColors.contentPrimary,
           ),
         ),
         flexibleSpace: const Align(
@@ -1712,7 +1712,7 @@ class MyFacilityReportDetailScreen extends StatelessWidget {
           icon: const Icon(
             Icons.arrow_back,
             size: 26,
-            color: Color(0xFF4B4B4B),
+            color: EasySubwayAccessibleColors.contentPrimary,
           ),
         ),
         flexibleSpace: const Align(
@@ -2666,6 +2666,7 @@ class _FacilityReportStatusPanel extends StatelessWidget {
                     _FacilityReportStatusRow(
                       label: '진행 상황',
                       value: result.statusLabel,
+                      valueColor: _reportStatusColor(result.status),
                     ),
                   ],
                 ),
@@ -2686,10 +2687,15 @@ class _FacilityReportStatusPanel extends StatelessWidget {
 }
 
 class _FacilityReportStatusRow extends StatelessWidget {
-  const _FacilityReportStatusRow({required this.label, required this.value});
+  const _FacilityReportStatusRow({
+    required this.label,
+    required this.value,
+    this.valueColor,
+  });
 
   final String label;
   final String value;
+  final Color? valueColor;
 
   @override
   Widget build(BuildContext context) {
@@ -2708,7 +2714,7 @@ class _FacilityReportStatusRow extends StatelessWidget {
         Text(
           value,
           style: textTheme.titleMedium?.copyWith(
-            color: EasySubwayAccessibleColors.text,
+            color: valueColor ?? EasySubwayAccessibleColors.text,
             fontWeight: FontWeight.w700,
             height: 1.25,
           ),

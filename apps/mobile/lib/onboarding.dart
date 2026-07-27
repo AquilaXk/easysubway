@@ -460,9 +460,11 @@ class _PermissionInfoRow extends StatelessWidget {
                 child: Switch(
                   value: value,
                   onChanged: onChanged,
-                  activeThumbColor: Colors.white,
+                  activeThumbColor:
+                      EasySubwayAccessibleColors.interactionOnPrimary,
                   activeTrackColor: EasySubwayAccessibleColors.brandSignature,
-                  inactiveThumbColor: Colors.white,
+                  inactiveThumbColor:
+                      EasySubwayAccessibleColors.interactionOnPrimary,
                   inactiveTrackColor:
                       EasySubwayAccessibleColors.switchInactiveTrack,
                   materialTapTargetSize: MaterialTapTargetSize.padded,

@@ -7,11 +7,11 @@ import '../domain/station_line.dart';
 import '../domain/station_models.dart';
 import 'station_line_badges.dart';
 
-/// 검색어 일치 구간 하이라이트(푸른색). 브랜드 primary는 회색이라 검색 전용.
-const _searchMatchHighlight = Color(0xFF1565C0);
+/// 검색어 일치 구간 하이라이트는 primary interaction 역할색을 쓴다.
+const _searchMatchHighlight = EasySubwayAccessibleColors.interactionPrimary;
 
 /// 즐겨찾기 채움 별빛.
-const _favoriteStarFilled = Color(0xFFFFC107);
+const _favoriteStarFilled = EasySubwayAccessibleColors.interactionPrimary;
 
 typedef StationSearchFavoriteToggle =
     void Function(StationSearchResult result, StationSearchLine? line);

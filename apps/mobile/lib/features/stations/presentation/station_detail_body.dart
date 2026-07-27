@@ -495,7 +495,7 @@ class _StationDetailContextChrome extends StatelessWidget {
                 icon: const Icon(
                   Icons.close,
                   size: 26,
-                  color: Color(0xFF4B4B4B),
+                  color: EasySubwayAccessibleColors.contentPrimary,
                 ),
               ),
           ],

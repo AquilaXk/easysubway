@@ -63,6 +63,15 @@ ThemeData _themeForPreferences(
         color: EasySubwayAccessibleColors.highContrastText,
       ),
     ),
+    filledButtonTheme: FilledButtonThemeData(
+      style: baseTheme.filledButtonTheme.style?.copyWith(
+        backgroundColor: WidgetStateProperty.resolveWith(
+          (states) => states.contains(WidgetState.pressed)
+              ? EasySubwayAccessibleColors.highContrastPrimary
+              : null,
+        ),
+      ),
+    ),
     // 보조 버튼이 중립 보더로 바뀌었으므로 고대비에서 보더·텍스트 대비를 보정.
     outlinedButtonTheme: OutlinedButtonThemeData(
       style: baseTheme.outlinedButtonTheme.style?.copyWith(

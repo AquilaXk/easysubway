@@ -139,7 +139,9 @@ class StationLineBadgeTab extends StatelessWidget {
               Container(
                 width: 30,
                 height: 2,
-                color: selected ? const Color(0xFF5A5A5A) : Colors.transparent,
+                color: selected
+                    ? EasySubwayAccessibleColors.interactionPrimary
+                    : Colors.transparent,
               ),
             ],
           ),
