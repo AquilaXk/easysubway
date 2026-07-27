@@ -41,16 +41,16 @@ class EasySubwayTokens extends ThemeExtension<EasySubwayTokens> {
   });
 
   static const light = EasySubwayTokens(
-    ink: EasySubwayAccessibleColors.text,
-    inkSecondary: EasySubwayAccessibleColors.secondaryText,
-    inkMuted: EasySubwayAccessibleColors.mutedText,
-    line: EasySubwayAccessibleColors.line,
-    surface: EasySubwayAccessibleColors.surface,
-    scaffold: EasySubwayAccessibleColors.scaffoldSurface,
-    accent: EasySubwayAccessibleColors.primary,
-    good: EasySubwayAccessibleColors.mint,
-    warn: EasySubwayAccessibleColors.amber,
-    danger: EasySubwayAccessibleColors.red,
+    ink: EasySubwayAccessibleColors.contentPrimary,
+    inkSecondary: EasySubwayAccessibleColors.contentSecondary,
+    inkMuted: EasySubwayAccessibleColors.contentMuted,
+    line: EasySubwayAccessibleColors.borderSubtle,
+    surface: EasySubwayAccessibleColors.surfaceDefault,
+    scaffold: EasySubwayAccessibleColors.surfaceScaffold,
+    accent: EasySubwayAccessibleColors.interactionPrimary,
+    good: EasySubwayAccessibleColors.statusSuccessContent,
+    warn: EasySubwayAccessibleColors.statusWarningContent,
+    danger: EasySubwayAccessibleColors.statusDangerContent,
     // 지도 오버레이 전용 — 지도 배경 시인성 때문에 accent로 수렴하지 않는다
     // (network_map의 기존 설계 의도 승계).
     mapSelectionAccent: EasySubwayAccessibleColors.mapSelectionAccent,

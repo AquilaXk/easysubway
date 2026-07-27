@@ -429,9 +429,9 @@ _FacilitySeverityAccent _facilitySeverityAccent(
       iconColor: EasySubwayAccessibleColors.amber,
     ),
     FacilityStatusSeverity.needsInfo => const _FacilitySeverityAccent(
-      backgroundColor: Colors.white,
-      borderColor: EasySubwayAccessibleColors.needsInfo,
-      iconColor: EasySubwayAccessibleColors.needsInfo,
+      backgroundColor: EasySubwayAccessibleColors.statusInfoSurface,
+      borderColor: EasySubwayAccessibleColors.statusInfoContent,
+      iconColor: EasySubwayAccessibleColors.statusInfoContent,
     ),
     FacilityStatusSeverity.normal => const _FacilitySeverityAccent(
       backgroundColor: Colors.white,

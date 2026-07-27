@@ -163,32 +163,36 @@ class EasySubwayApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       scrollBehavior: const EasySubwayScrollBehavior(),
       theme: ThemeData(
-        // fromSeed는 시드의 미세한 hue를 M3 톤 팔레트로 증폭해 액센트를 채도
-        // 있는 색으로 만든다(무채색 시드도 청록끼로 샌다). 무채색 잉크 원칙을
-        // 지키려 primary/secondary 계열을 명시적 무채색으로 덮어쓴다.
+        // fromSeed 파생색 대신 시그니처 역할색을 명시해 JSON 색 계약을 유지한다.
         colorScheme:
             ColorScheme.fromSeed(
-              seedColor: EasySubwayAccessibleColors.primary,
+              seedColor: EasySubwayAccessibleColors.interactionPrimary,
             ).copyWith(
-              primary: EasySubwayAccessibleColors.primary,
-              onPrimary: Colors.white,
-              secondary: EasySubwayAccessibleColors.primary,
-              onSecondary: Colors.white,
+              primary: EasySubwayAccessibleColors.interactionPrimary,
+              onPrimary: EasySubwayAccessibleColors.interactionOnPrimary,
+              secondary: EasySubwayAccessibleColors.interactionSecondaryBorder,
+              onSecondary: EasySubwayAccessibleColors.interactionOnBrand,
+              secondaryContainer:
+                  EasySubwayAccessibleColors.interactionSecondarySurface,
+              onSecondaryContainer:
+                  EasySubwayAccessibleColors.interactionOnBrand,
+              surface: EasySubwayAccessibleColors.surfaceDefault,
+              outline: EasySubwayAccessibleColors.borderSubtle,
             ),
         extensions: const [EasySubwayTokens.light],
         textTheme: easySubwayTextTheme(ThemeData(useMaterial3: true).textTheme),
-        scaffoldBackgroundColor: EasySubwayAccessibleColors.scaffoldSurface,
+        scaffoldBackgroundColor: EasySubwayAccessibleColors.surfaceScaffold,
         appBarTheme: const AppBarTheme(
           centerTitle: false,
           toolbarHeight: 64,
           // 평평한 상단바: Material3 surfaceTint(액센트 기반 청록 스크림)와
           // 스크롤 elevation 그림자를 끈다. 경계는 화면별 얇은 구분선으로만.
-          backgroundColor: EasySubwayAccessibleColors.topBarSurface,
+          backgroundColor: EasySubwayAccessibleColors.surfaceBrandChrome,
           surfaceTintColor: Colors.transparent,
           scrolledUnderElevation: 0,
           elevation: 0,
           titleTextStyle: TextStyle(
-            color: EasySubwayAccessibleColors.text,
+            color: EasySubwayAccessibleColors.contentPrimary,
             fontSize: 22,
             fontWeight: FontWeight.w700,
           ),
@@ -211,9 +215,9 @@ class EasySubwayApp extends StatelessWidget {
         outlinedButtonTheme: OutlinedButtonThemeData(
           style: OutlinedButton.styleFrom(
             minimumSize: const Size.fromHeight(EasySubwayTouchTarget.general),
-            foregroundColor: EasySubwayAccessibleColors.primary,
+            foregroundColor: EasySubwayAccessibleColors.interactionOnBrand,
             side: const BorderSide(
-              color: EasySubwayAccessibleColors.line,
+              color: EasySubwayAccessibleColors.interactionSecondaryBorder,
               width: 1.5,
             ),
             shape: const RoundedRectangleBorder(

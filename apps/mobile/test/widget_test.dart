@@ -2061,7 +2061,7 @@ void main() {
     expect(selectedText.style?.fontWeight, FontWeight.w700);
     expect(
       selectedText.style?.color,
-      EasySubwayAccessibleColors.brandSignature,
+      EasySubwayAccessibleColors.interactionOnBrand,
     );
     final busanText = tester.widget<Text>(
       find.descendant(of: busanRow, matching: find.text('부산')),
@@ -2078,7 +2078,7 @@ void main() {
     expect(checkFinder, findsOneWidget);
     expect(
       tester.widget<Icon>(checkFinder).color,
-      EasySubwayAccessibleColors.brandSignature,
+      EasySubwayAccessibleColors.interactionOnBrand,
     );
     expect(
       find.descendant(of: busanRow, matching: find.byIcon(Icons.check)),
@@ -7910,19 +7910,19 @@ void main() {
       expect(find.text('꺼짐'), findsWidgets);
       expect(
         EasySubwayAccessibleColors.brandSignature,
-        const Color(0xFF7C3AED),
+        const Color(0xFF5C6BC0),
       );
       expect(
         EasySubwayAccessibleColors.brandSignatureMedium,
-        const Color(0xFFAA7FF3),
+        const Color(0xFF7480D2),
       );
       expect(
         EasySubwayAccessibleColors.brandSignatureSoft,
-        const Color(0xFFD8C4FA),
+        const Color(0xFFE2E5FD),
       );
       expect(
         EasySubwayAccessibleColors.brandSignatureSurface,
-        const Color(0xFFF5EFFE),
+        const Color(0xFFB4BCFB),
       );
       final activeSettingsSwitch = tester
           .widgetList<Switch>(

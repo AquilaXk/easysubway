@@ -48,7 +48,7 @@ const _facilityReportCardRadius = BorderRadius.all(
 /// 텍스트로 상태를 구분하기 위한 전경색만 돌려준다.
 Color _reportStatusColor(String status) {
   return switch (status) {
-    'SUBMITTED' => EasySubwayAccessibleColors.needsInfo,
+    'SUBMITTED' => EasySubwayAccessibleColors.statusInfoContent,
     'UNDER_REVIEW' => EasySubwayAccessibleColors.amber,
     'ACCEPTED' || 'RESOLVED' => EasySubwayAccessibleColors.mintDark,
     'REJECTED' => EasySubwayAccessibleColors.red,

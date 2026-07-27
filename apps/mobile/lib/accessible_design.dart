@@ -157,7 +157,7 @@ class EasySubwayAccessibleColors {
   // 지도 배경 시인성 때문에 브랜드 액센트로 수렴하지 않는다 (기준 화면 실측 값).
 
   /// 지도 위 선택 역 말풍선 톤(밝은 시안).
-  static const mapSelectionAccent = Color(0xFF13B8D6);
+  static const mapSelectionAccent = Color(0xFF007C91);
 
   /// 지도 위 지역 선택 칩 톤(밝은 블루).
   static const mapRegionAccent = Color(0xFF006FD6);
