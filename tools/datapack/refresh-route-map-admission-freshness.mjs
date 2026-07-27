@@ -24,12 +24,19 @@ export function withRouteMapAdmissionFreshness(inventory) {
   return next;
 }
 
+export function assertInventoryMirrorByteParity(inventories) {
+  if (inventories.some(({ bytes }) => !bytes.equals(inventories[0].bytes))) {
+    throw new Error("source inventory mirrors must be byte-identical before refresh");
+  }
+}
+
 async function main() {
   const inventories = await Promise.all(inventoryPaths.map(async (relativePath) => ({
     relativePath,
-    inventory: JSON.parse(await readFile(path.join(root, relativePath), "utf8")),
+    bytes: await readFile(path.join(root, relativePath)),
   })));
-  const canonical = withRouteMapAdmissionFreshness(inventories[0].inventory);
+  assertInventoryMirrorByteParity(inventories);
+  const canonical = withRouteMapAdmissionFreshness(JSON.parse(inventories[0].bytes.toString("utf8")));
   const bytes = `${JSON.stringify(canonical, null, 2)}\n`;
   await Promise.all(inventories.map(({ relativePath }) => writeFile(path.join(root, relativePath), bytes)));
 }
