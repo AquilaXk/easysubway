@@ -1557,8 +1557,9 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
-  // 등재 소스를 빼면 그 소스는 baseline에서도 line-scope를 유지해 판정 자체는 그대로 나온다 —
-  // 전이를 뒷받침한 소스와 등재 목록의 일치 축만 이 누락을 잡는다.
+  // 등재 소스를 빼면 그 소스는 baseline에서도 line-scope를 유지해 판정 자체는 그대로 나온다. #2592의
+  // actual required set 역결속이 buildEvidence 이전에 이 누락을 막으므로, 더 늦은 supporting-source 대조가
+  // 아니라 선언/실측 exact-match 진단을 기대한다.
   await context.test("전이를 뒷받침한 소스가 등재 목록과 다르면 거부된다", async () => {
     await rejectsWith(
       (value) => {
@@ -1566,9 +1567,30 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
           ({ sourceId }) => sourceId !== "molit-urban-rail-full-route-daegu-line1-membership",
         );
       },
-      /supporting sources must equal the spec redescriptions/,
+      /line-scope redescriptions must exactly match the actual required set/,
     );
   });
+
+  // 선언 목록을 순회하는 검증만으로는 실제 candidate pack에 line-scope가 있는 소스를 선언에서 통째로
+  // 빼도 baseline과 lineScoped가 함께 그 scope를 유지해 통과한다. actual required set 역결속이 이
+  // 삭제를 source/domain 단위로 막아야 한다.
+  for (const { sourceId, sourceDomain } of [
+    { sourceId: "busan-transportation-timetable", sourceDomain: "schedule_timetable" },
+    { sourceId: "busan-transportation-route-map-positions", sourceDomain: "route_map_positions" },
+    { sourceId: "busan-transportation-accessibility", sourceDomain: "accessibility_facilities" },
+    { sourceId: "daegu-transportation-accessibility", sourceDomain: "accessibility_facilities" },
+  ]) {
+    await context.test(`${sourceId}/${sourceDomain} 재기술을 지우면 거부된다`, async () => {
+      await rejectsWith(
+        (value) => {
+          value.lineScopeRedescriptions = value.lineScopeRedescriptions.filter(
+            (entry) => entry.sourceId !== sourceId || entry.sourceDomain !== sourceDomain,
+          );
+        },
+        /line-scope redescriptions must exactly match the actual required set/,
+      );
+    });
+  }
 
   await context.test("선언과 다른 행수를 싣는 편입은 거부된다", async () => {
     await rejectsWith(
@@ -2479,7 +2501,8 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
           `capital:incheon-transit:${INCHEON_LINE1_ID}:route_graph_topology`;
       },
       new RegExp(
-        "requirements declared as non-transitioning must not be SUPPORTED after the line-scope redescription: "
+        "line-scope redescriptions must exactly match the actual required set"
+          + "|requirements declared as non-transitioning must not be SUPPORTED after the line-scope redescription: "
           + `capital:incheon-transit:${INCHEON_LINE1_ID}:route_graph_topology`,
       ),
     );
@@ -2510,7 +2533,7 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   await context.test("선언 없이 전환되지 않는 requirement가 남으면 거부된다", async () => {
     await rejectsWith(
       (value) => { delete nonTransitionEntryOf(value).redescription.nonTransitioningRequirements; },
-      /line-scoped SUPPORTED requirements must equal baseline plus the spec redescription requirementKeys/,
+      /line-scope redescriptions must exactly match the actual required set|line-scoped SUPPORTED requirements must equal baseline plus the spec redescription requirementKeys/,
     );
   });
 
