@@ -32,22 +32,71 @@ export function assertInventoryMirrorByteParity(inventories) {
 }
 
 export async function replaceFileAtomically(targetPath, bytes) {
+  const replacement = await stageFileReplacement(targetPath, bytes);
+  try {
+    await replacement.commit();
+  } finally {
+    await replacement.cleanup();
+  }
+}
+
+async function stageFileReplacement(targetPath, bytes) {
   const directory = path.dirname(targetPath);
   await mkdir(directory, { recursive: true });
   const mode = (await stat(targetPath)).mode & 0o777;
   const temporaryPath = path.join(directory, `.${path.basename(targetPath)}.${process.pid}.${randomUUID()}.tmp`);
-  let temporaryFile;
+  const temporaryFile = await open(temporaryPath, "wx", mode);
   try {
-    temporaryFile = await open(temporaryPath, "wx", mode);
     await temporaryFile.writeFile(bytes);
     await temporaryFile.sync();
     await temporaryFile.close();
-    temporaryFile = undefined;
-    await rename(temporaryPath, targetPath);
   } catch (error) {
-    await temporaryFile?.close().catch(() => {});
+    await temporaryFile.close().catch(() => {});
     await rm(temporaryPath, { force: true }).catch(() => {});
     throw error;
+  }
+  return {
+    targetPath,
+    commit: () => rename(temporaryPath, targetPath),
+    cleanup: () => rm(temporaryPath, { force: true }),
+  };
+}
+
+export async function replaceInventoryMirrors(
+  targets,
+  bytes,
+  { stageReplacement = stageFileReplacement, restore = replaceFileAtomically } = {},
+) {
+  const stageResults = await Promise.allSettled(
+    targets.map(({ targetPath }) => stageReplacement(targetPath, bytes)),
+  );
+  const staged = stageResults.filter(({ status }) => status === "fulfilled").map(({ value }) => value);
+  const stageFailure = stageResults.find(({ status }) => status === "rejected");
+  if (stageFailure) {
+    await Promise.allSettled(staged.map(({ cleanup }) => cleanup()));
+    throw stageFailure.reason;
+  }
+
+  const committed = [];
+  try {
+    for (const replacement of staged) {
+      await replacement.commit();
+      committed.push(replacement.targetPath);
+    }
+  } catch (error) {
+    const originals = new Map(targets.map(({ targetPath, originalBytes }) => [targetPath, originalBytes]));
+    const rollbackResults = await Promise.allSettled(
+      committed.reverse().map((targetPath) => restore(targetPath, originals.get(targetPath))),
+    );
+    const rollbackFailures = rollbackResults
+      .filter(({ status }) => status === "rejected")
+      .map(({ reason }) => reason);
+    if (rollbackFailures.length > 0) {
+      throw new AggregateError([error, ...rollbackFailures], "source inventory mirror rollback failed");
+    }
+    throw error;
+  } finally {
+    await Promise.allSettled(staged.map(({ cleanup }) => cleanup()));
   }
 }
 
@@ -59,7 +108,10 @@ async function main() {
   assertInventoryMirrorByteParity(inventories);
   const canonical = withRouteMapAdmissionFreshness(JSON.parse(inventories[0].bytes.toString("utf8")));
   const bytes = `${JSON.stringify(canonical, null, 2)}\n`;
-  await Promise.all(inventories.map(({ relativePath }) => replaceFileAtomically(path.join(root, relativePath), bytes)));
+  await replaceInventoryMirrors(inventories.map(({ relativePath, bytes: originalBytes }) => ({
+    targetPath: path.join(root, relativePath),
+    originalBytes,
+  })), bytes);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
