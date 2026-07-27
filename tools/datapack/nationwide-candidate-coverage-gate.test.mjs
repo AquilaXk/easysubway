@@ -1668,6 +1668,19 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     );
   });
 
+  await context.test("대전·광주 lineNumber도 저장소 정본과 다르면 거부된다", async () => {
+    for (const [index, materializer] of [
+      [DAEJEON_INDEX, "materialize-daejeon-timetable.mjs"],
+      [GWANGJU_INDEX, "materialize-gwangju-timetable.mjs"],
+    ]) {
+      await rejectsWith(
+        (value) => { value.packDataInclusions[0].lines[0].lineNumber = 2; },
+        new RegExp(`${materializer.replaceAll(".", "\\.")} pack data inclusion lines must match the tracked line numbers`),
+        { solo: index },
+      );
+    }
+  });
+
   await context.test("materializer 형상에 없는 lines 키는 거부된다", async () => {
     await rejectsWith(
       (value) => {
