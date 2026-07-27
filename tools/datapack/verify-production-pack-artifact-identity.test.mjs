@@ -326,10 +326,10 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       reference.policyVersion = source.policyVersion;
     }, /ITX network edge admission evidence mismatch/);
 
-    await runRejectedCompletenessBuild("invalid-itx-service-date", ({ source, completeness, reference }) => {
-      source.selectedServiceDates["7"] = "20260807";
+    await runRejectedCompletenessBuild("shifted-itx-service-dates", ({ source, completeness, reference }) => {
+      source.selectedServiceDates = { "7": "20260808", "8": "20260803", "9": "20260809" };
       completeness.selectedServiceDates = structuredClone(source.selectedServiceDates);
-      source.freshUntil = "2026-08-08T00:00:00+09:00";
+      source.freshUntil = "2026-08-10T00:00:00+09:00";
       completeness.sourceTimetableArtifact.freshUntil = source.freshUntil;
       reference.freshUntil = source.freshUntil;
     }, /ITX network edge admission evidence mismatch/);
