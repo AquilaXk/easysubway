@@ -188,7 +188,7 @@
   "dataSafetyDeclarations": {
     "tracking": false,
     "sharesDataWithThirdParties": true,
-    "thirdPartySharingScopeKo": "사용자가 출구 도보 길안내를 명시적으로 누른 경우에만 카카오맵 앱/웹을 연다. 앱에는 현재 위치 시작 좌표와 목적지 좌표를, 웹에는 목적지 좌표만 전달한다. 이 외부 지도 전달 좌표는 자체 서버에 저장하거나 tracking에 사용하지 않는다.",
+    "thirdPartySharingScopeKo": "출구 정보가 표시되면 공개 역·출구 좌표와 지도 화면 범위로 카카오맵 미리보기를 자동으로 불러오며 현재 위치는 사용하지 않는다. 사용자가 출구 지도 또는 도보 길안내를 누르면 카카오맵 앱/웹을 열고, 도보 길안내 앱에는 현재 위치 시작 좌표와 목적지 좌표를 전달한다. 이 외부 지도 전달 좌표는 자체 서버에 저장하거나 tracking에 사용하지 않는다.",
     "dataEncryptedInTransit": true,
     "dataDeletionRequestSupported": true,
     "requiredFieldsPerDataType": [
@@ -469,6 +469,7 @@
       "삭제 요청 방법",
       "개인정보 연락처",
       "외부 지도 길안내 제3자 공유 범위",
+      "카카오맵 출구 미리보기 자동 로드 범위",
       "tracking 없음",
       "SUBWAY 경로 검색은 단말에서만 처리",
       "선택형 ITX-청춘 Route V2 전송 항목과 논리 만료·5분 purge·물리 파기 경계",
@@ -480,8 +481,8 @@
     "publicContactEmailMustMatchAppSupportEmail": true,
     "recommendedCategoryKo": "Maps & Navigation 또는 Travel & Local 중 대중교통 접근성 이동 보조 설명과 가장 일치하는 항목",
     "requiredTagsKo": ["대중교통", "접근성", "지하철", "경로 안내"],
-    "reviewerNotesMustIncludeKo": ["로그인 없음", "위치 권한은 선택적 사용", "시설 신고 사진은 사용자가 직접 첨부할 때만 전송", "카카오맵 앱/웹 공유는 사용자가 지도 또는 도보 길안내를 누를 때만 실행"],
-    "contentRatingBasisKo": "대중교통 정보, 사용자 시설 신고 입력, 자체 서빙 비개인화 광고, 외부 지도 앱/웹은 사용자가 지도 또는 길안내를 명시적으로 누를 때만 열리고 광고 landing은 사용자가 광고를 명시적으로 누를 때만 외부 브라우저로 열리는 범위와 일치"
+    "reviewerNotesMustIncludeKo": ["로그인 없음", "위치 권한은 선택적 사용", "시설 신고 사진은 사용자가 직접 첨부할 때만 전송", "출구 정보가 표시되면 공개 역·출구 좌표로 카카오맵 미리보기를 자동 로드하며 현재 위치는 사용하지 않음", "외부 카카오맵 앱/웹은 사용자가 지도 또는 도보 길안내를 누를 때만 실행"],
+    "contentRatingBasisKo": "대중교통 정보, 사용자 시설 신고 입력, 자체 서빙 비개인화 광고, 출구 정보의 카카오맵 미리보기 자동 로드, 사용자가 지도 또는 길안내를 명시적으로 누를 때만 열리는 외부 지도 앱/웹, 사용자가 광고를 명시적으로 누를 때만 열리는 외부 브라우저 범위와 일치"
   },
   "crashAnrProviderDecision": {
     "separateCrashProvider": false,

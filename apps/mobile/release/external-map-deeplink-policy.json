@@ -1,9 +1,9 @@
 {
-  "schema": "easysubway.external_map_deeplink_policy.v1",
+  "schema": "easysubway.external_map_deeplink_policy.v2",
   "ownerIssue": "#1770",
   "approvedAt": "2026-07-09",
   "status": "SATISFIED",
-  "scope": "station_exit_ground_walk_guidance",
+  "scope": "station_exit_map_preview_and_ground_walk_guidance",
   "providerOrder": [
     "kakao-map"
   ],
@@ -11,8 +11,8 @@
     {
       "id": "kakao-map",
       "displayName": "카카오맵",
-      "requiresSdkKey": false,
-      "embeddedSdkAllowed": false,
+      "requiresSdkKey": true,
+      "embeddedSdkAllowed": true,
       "appScheme": "kakaomap",
       "appLookUriPattern": "kakaomap://look?p={latitude},{longitude}",
       "appWalkingRouteUriPattern": "kakaomap://route?sp={startLatitude},{startLongitude}&ep={endLatitude},{endLongitude}&by=foot",
@@ -20,12 +20,25 @@
       "copyFallback": true
     }
   ],
+  "embeddedPreview": {
+    "enabled": true,
+    "loadTrigger": "station_exit_section_visible",
+    "sharedCoordinates": [
+      "station",
+      "coordinate-valid exits",
+      "viewport"
+    ],
+    "sharesCurrentLocation": false,
+    "gesturesEnabled": false,
+    "tapAction": "existing-open-look-fallback"
+  },
   "fallbackOrder": [
     "appScheme",
     "webFallback",
     "copyCoordinate"
   ],
   "privacyContract": {
+    "publicCoordinatePreviewTransmission": "automatic_when_station_exit_section_visible",
     "currentLocationRequest": "explicit_user_tap_only",
     "serverTransmissionAllowed": false,
     "locationPersistenceAllowed": false,

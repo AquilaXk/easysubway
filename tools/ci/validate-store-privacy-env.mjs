@@ -9,6 +9,7 @@ const requiredKeys = [
   "EASYSUBWAY_SUPPORT_EMAIL",
   "EASYSUBWAY_SECURITY_EMAIL",
   "EASYSUBWAY_DATA_DELETION_EMAIL",
+  "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY",
 ];
 
 const androidRcProductionKeys = [
@@ -233,6 +234,10 @@ function validateEnv(values, options = {}) {
   validateEmail("EASYSUBWAY_SUPPORT_EMAIL", selected.get("EASYSUBWAY_SUPPORT_EMAIL"));
   validateEmail("EASYSUBWAY_SECURITY_EMAIL", selected.get("EASYSUBWAY_SECURITY_EMAIL"));
   validateEmail("EASYSUBWAY_DATA_DELETION_EMAIL", selected.get("EASYSUBWAY_DATA_DELETION_EMAIL"));
+  validateTokenValue(
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY",
+    selected.get("EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY"),
+  );
   selected.set(
     "EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256",
     createHash("sha256").update(JSON.stringify({

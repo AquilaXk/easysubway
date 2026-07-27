@@ -6,6 +6,8 @@ api_base_url_seen=false
 route_v2_online_enabled=false
 play_integrity_cloud_project_number=""
 play_integrity_cloud_project_number_seen=false
+kakao_map_native_app_key=""
+kakao_map_native_app_key_seen=false
 
 for arg in "$@"; do
   case "${arg}" in
@@ -32,6 +34,14 @@ for arg in "$@"; do
       play_integrity_cloud_project_number_seen=true
       play_integrity_cloud_project_number="${arg#--dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=}"
       ;;
+    --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=*)
+      if [[ "${kakao_map_native_app_key_seen}" == "true" ]]; then
+        printf 'EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY must be defined exactly once.\n' >&2
+        exit 1
+      fi
+      kakao_map_native_app_key_seen=true
+      kakao_map_native_app_key="${arg#--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=}"
+      ;;
   esac
 done
 
@@ -43,6 +53,14 @@ fi
 
 if [[ "${api_base_url_seen}" != "true" || -z "${api_base_url}" ]]; then
   printf 'EASYSUBWAY_API_BASE_URL is required for release.\n' >&2
+  exit 1
+fi
+if [[ "${kakao_map_native_app_key_seen}" != "true" || -z "${kakao_map_native_app_key}" ]]; then
+  printf 'EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY is required for release.\n' >&2
+  exit 1
+fi
+if [[ "${kakao_map_native_app_key}" != "${kakao_map_native_app_key//[[:space:]]/}" ]]; then
+  printf 'EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY must not contain whitespace.\n' >&2
   exit 1
 fi
 if [[ "${api_base_url}" != "${api_base_url//[[:space:]]/}" ]]; then
