@@ -317,9 +317,7 @@ class _NotificationInboxRow extends StatelessWidget {
       padding: const EdgeInsets.symmetric(vertical: 14),
       decoration: BoxDecoration(
         color: accent.backgroundColor,
-        border: Border(
-          bottom: BorderSide(color: accent.borderColor),
-        ),
+        border: Border(bottom: BorderSide(color: accent.borderColor)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,

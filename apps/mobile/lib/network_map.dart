@@ -2472,7 +2472,8 @@ class _NetworkMapTopBar extends StatelessWidget {
                                   maxLines: 1,
                                   overflow: TextOverflow.ellipsis,
                                   style: const TextStyle(
-                                    color: EasySubwayAccessibleColors.contentSecondary,
+                                    color: EasySubwayAccessibleColors
+                                        .contentSecondary,
                                     fontSize: 17,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -2482,7 +2483,8 @@ class _NetworkMapTopBar extends StatelessWidget {
                                 const SizedBox(width: 2),
                                 const Icon(
                                   Icons.keyboard_arrow_down,
-                                  color: EasySubwayAccessibleColors.contentSecondary,
+                                  color: EasySubwayAccessibleColors
+                                      .contentSecondary,
                                   size: 22,
                                 ),
                               ],

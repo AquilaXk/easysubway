@@ -410,9 +410,11 @@ class _AppSettingsPreferenceTile extends StatelessWidget {
               Switch(
                 value: enabled,
                 onChanged: onChanged,
-                activeThumbColor: EasySubwayAccessibleColors.interactionOnPrimary,
+                activeThumbColor:
+                    EasySubwayAccessibleColors.interactionOnPrimary,
                 activeTrackColor: EasySubwayAccessibleColors.switchActiveTrack,
-                inactiveThumbColor: EasySubwayAccessibleColors.interactionOnPrimary,
+                inactiveThumbColor:
+                    EasySubwayAccessibleColors.interactionOnPrimary,
                 inactiveTrackColor:
                     EasySubwayAccessibleColors.switchInactiveTrack,
                 materialTapTargetSize: MaterialTapTargetSize.padded,

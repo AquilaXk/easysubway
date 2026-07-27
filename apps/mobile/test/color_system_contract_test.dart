@@ -7,9 +7,13 @@ import 'package:flutter_test/flutter_test.dart';
 
 void main() {
   test('color system JSON과 Dart 정적 색상 계약이 일치한다', () {
-    final colorSystem = jsonDecode(
-      File('../../tools/design/easysubway-color-system.json').readAsStringSync(),
-    ) as Map<String, dynamic>;
+    final colorSystem =
+        jsonDecode(
+              File(
+                '../../tools/design/easysubway-color-system.json',
+              ).readAsStringSync(),
+            )
+            as Map<String, dynamic>;
     final primitives = colorSystem['primitives'] as Map<String, dynamic>;
     final semantic = colorSystem['semantic'] as Map<String, dynamic>;
 

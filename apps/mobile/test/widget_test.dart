@@ -92,12 +92,18 @@ OnboardingState _completedOnboardingStateWithPreferences({
 
 void _expectSignatureColorScheme(ColorScheme colorScheme) {
   expect(colorScheme.primary, EasySubwayAccessibleColors.interactionPrimary);
-  expect(colorScheme.onPrimary, EasySubwayAccessibleColors.interactionOnPrimary);
+  expect(
+    colorScheme.onPrimary,
+    EasySubwayAccessibleColors.interactionOnPrimary,
+  );
   expect(
     colorScheme.secondary,
     EasySubwayAccessibleColors.interactionSecondarySurface,
   );
-  expect(colorScheme.onSecondary, EasySubwayAccessibleColors.interactionOnBrand);
+  expect(
+    colorScheme.onSecondary,
+    EasySubwayAccessibleColors.interactionOnBrand,
+  );
   expect(
     colorScheme.secondaryContainer,
     EasySubwayAccessibleColors.interactionSecondaryPressedSurface,
@@ -1742,15 +1748,14 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('상록수역 1번 출구 엘리베이터'), findsOneWidget);
-    expect(
-      find.text('미확인 · 엘리베이터 설치 확인 · 운행상태 미확인'),
-      findsOneWidget,
-    );
+    expect(find.text('미확인 · 엘리베이터 설치 확인 · 운행상태 미확인'), findsOneWidget);
     expect(find.text('자세히 보기'), findsOneWidget);
-    final notificationRow = find.ancestor(
-      of: find.text('상록수역 1번 출구 엘리베이터'),
-      matching: find.byType(Container),
-    ).first;
+    final notificationRow = find
+        .ancestor(
+          of: find.text('상록수역 1번 출구 엘리베이터'),
+          matching: find.byType(Container),
+        )
+        .first;
     final notificationDecoration =
         tester.widget<Container>(notificationRow).decoration! as BoxDecoration;
     expect(
@@ -1760,9 +1765,7 @@ void main() {
     expect(
       notificationDecoration.border! as Border,
       const Border(
-        bottom: BorderSide(
-          color: EasySubwayAccessibleColors.statusInfoContent,
-        ),
+        bottom: BorderSide(color: EasySubwayAccessibleColors.statusInfoContent),
       ),
     );
     expect(
@@ -17806,7 +17809,9 @@ void main() {
 
     final statusIcon = tester.widget<Container>(
       find.descendant(
-        of: find.byKey(const Key('facilityDetailStatusNotice-facility-needs-info')),
+        of: find.byKey(
+          const Key('facilityDetailStatusNotice-facility-needs-info'),
+        ),
         matching: find.byType(Container),
       ),
     );
