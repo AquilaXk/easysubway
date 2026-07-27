@@ -28,10 +28,10 @@
     "inputSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
     "inputSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
     "inputByteSize": 359319,
-    "outputSha256": "afd584475ee6e420f3743c12fd8f51fe7cb5ad37b620d4e86aed1d4cc7c110f7",
-    "outputSqliteSha256": "1dea1adb965ffda147e5f71c01061ca21c308aeb14ca8314750b00970e2339fd",
-    "byteSize": 360990,
-    "byteSizeDelta": 1671
+    "outputSha256": "def0a3c43c06f144e14f93a66d47ca2978b7966585098b32ed7ccb37349a516a",
+    "outputSqliteSha256": "de86dccb9be70e6faafbd39b222346aa06cfbdd20904feed1a34bd17e71057b5",
+    "byteSize": 1372925,
+    "byteSizeDelta": 1013606
   },
   "readmissions": [
     {
@@ -1742,6 +1742,28 @@
           }
         }
       ]
+    },
+    {
+      "readmittedAt": "2026-07-27T17:53:19.446Z",
+      "provenance": "#2648 owner-approved cross-platform SQLite/gzip byte normalization; logical rows and ITX subgraph unchanged",
+      "previousPack": {
+        "sha256": "afd584475ee6e420f3743c12fd8f51fe7cb5ad37b620d4e86aed1d4cc7c110f7",
+        "sqliteSha256": "1dea1adb965ffda147e5f71c01061ca21c308aeb14ca8314750b00970e2339fd",
+        "byteSize": 360990
+      },
+      "newPack": {
+        "sha256": "def0a3c43c06f144e14f93a66d47ca2978b7966585098b32ed7ccb37349a516a",
+        "sqliteSha256": "de86dccb9be70e6faafbd39b222346aa06cfbdd20904feed1a34bd17e71057b5",
+        "byteSize": 1372925
+      },
+      "byteSizeDelta": 1011935,
+      "itxSubgraph": {
+        "unchanged": true,
+        "edgeCount": 48,
+        "edgesSha256": "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+        "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
+      },
+      "rowDiff": []
     }
   ]
 }
