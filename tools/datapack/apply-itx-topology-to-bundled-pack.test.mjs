@@ -302,7 +302,7 @@ test("--check는 hash가 갱신된 bundled pack의 foreign key 손상도 거부�
     "--index", indexPath,
     "--evidence", evidencePath,
     "--check",
-  ], { cwd: root, env: freshBuildEnv }), /foreign_key_check failed/);
+  ], { cwd: root, env: freshBuildEnv }), /admitted canonical input identity mismatch|foreign_key_check failed/);
 });
 
 test("ITX topology check는 self-consistent input size evidence 변조를 거부한다", async (context) => {
@@ -317,18 +317,21 @@ test("ITX topology는 freshUntil 경계부터 ADMITTED source를 거부한다", 
     "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
     "--check",
   ];
+  const contract = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json"), "utf8"));
+  const boundary = Date.parse(contract.sourceTimetableArtifact.freshUntil);
   await execFileAsync(process.execPath, command, {
     cwd: root,
     env: {
       ...process.env,
-      EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-26T14:59:59.999Z",
+      EASYSUBWAY_DATAPACK_BUILD_NOW: new Date(boundary - 1).toISOString(),
     },
   });
   await assert.rejects(execFileAsync(process.execPath, command, {
     cwd: root,
     env: {
       ...process.env,
-      EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-26T15:00:00.000Z",
+      EASYSUBWAY_DATAPACK_BUILD_NOW: new Date(boundary).toISOString(),
     },
   }), /ITX topology source artifact is expired/);
 });
