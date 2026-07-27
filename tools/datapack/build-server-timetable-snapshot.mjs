@@ -555,6 +555,7 @@ function admittedCanonicalPack({ canonicalPackGzipBytes, admittedCanonicalPackId
     && admittedCanonicalPackIdentity.sqliteSha256 === outputSqliteSha256;
   if (!directlyAdmitted) validateReadmissionEvidence({
     evidence: readmissionEvidence,
+    admittedCanonicalPackIdentity,
     outputSha256,
     outputSqliteSha256,
     byteSize: canonicalPackGzipBytes.length,
@@ -574,9 +575,16 @@ function admittedCanonicalPack({ canonicalPackGzipBytes, admittedCanonicalPackId
   };
 }
 
-function validateReadmissionEvidence({ evidence, outputSha256, outputSqliteSha256, byteSize }) {
+function validateReadmissionEvidence({
+  evidence,
+  admittedCanonicalPackIdentity,
+  outputSha256,
+  outputSqliteSha256,
+  byteSize,
+}) {
   const readmissions = evidence?.readmissions;
   let previous = ORIGINAL_ITX_ADMISSION_OUTPUT;
+  let includesAdmission = false;
   if (evidence?.schemaVersion !== 1
     || evidence.artifactKind !== "itx-cheongchun-mobile-topology-evidence"
     || evidence.serviceId !== "ITX_CHEONGCHUN"
@@ -589,6 +597,8 @@ function validateReadmissionEvidence({ evidence, outputSha256, outputSqliteSha25
     throw new Error("canonical topology pack identity mismatch");
   }
   for (const entry of readmissions) {
+    includesAdmission ||= previous.sha256 === admittedCanonicalPackIdentity.sha256
+      && previous.sqliteSha256 === admittedCanonicalPackIdentity.sqliteSha256;
     if (entry.previousPack?.sha256 !== previous.sha256
       || entry.previousPack?.sqliteSha256 !== previous.sqliteSha256
       || entry.previousPack?.byteSize !== previous.byteSize
@@ -598,7 +608,8 @@ function validateReadmissionEvidence({ evidence, outputSha256, outputSqliteSha25
     }
     previous = entry.newPack;
   }
-  if (previous.sha256 !== outputSha256
+  if (!includesAdmission
+    || previous.sha256 !== outputSha256
     || previous.sqliteSha256 !== outputSqliteSha256
     || previous.byteSize !== byteSize) {
     throw new Error("canonical topology pack identity mismatch");
