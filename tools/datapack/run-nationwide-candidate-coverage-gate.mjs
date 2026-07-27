@@ -402,7 +402,12 @@ export async function runNationwideCandidateCoverageGate({
 
 // 승계 pack에 지역 데이터를 싣는다. 승계 원본(production 트랙 파일)은 읽기만 하고, 편입은 tracked
 // materializer가 tracked snapshot을 재생하는 방식으로만 이뤄진다.
-async function applyPackDataInclusions(spec, inherited, inventory, materializers) {
+export async function applyPackDataInclusions(
+  spec,
+  inherited,
+  inventory,
+  materializers = PACK_DATA_MATERIALIZERS,
+) {
   const inheritedPack = (inherited.packs ?? []).find(
     (pack) => pack.id === spec.inheritsFrom.packId && pack.version === spec.inheritsFrom.packVersion,
   );
@@ -1595,7 +1600,7 @@ function supportingRecordCountByField(provenance, entry) {
   ]));
 }
 
-function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, signing }) {
+export function assertDeclaredTransitionsMatchVariants(spec, variants) {
   const nonTransitions = declaredNonTransitions(spec);
   // 선언된 non-transition은 기대 전환 집합에서만 빠진다. 그 키가 실제로 전환됐다면 선언이 성공을 숨기는
   // 데 쓰인 것이므로 여기서 먼저 거부한다(아래 집합 비교로도 걸리지만 원인을 문구로 특정한다).
@@ -1608,9 +1613,7 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
     );
   }
   assertNonTransitionReasons(nonTransitions, variants.lineScoped);
-  assertEvidenceModelTotals(variants);
   const expectedKeys = declaredRequirementKeys(spec).filter((key) => !nonTransitions.has(key));
-  assertCandidateRootPack(spec, reports);
   // 전이 판정은 절대 수치가 아니라 두 variant의 상대 비교다. baseline SUPPORTED 총량을 0으로 못박으면
   // 승계 팩의 다른 소스가 line-scope를 갖는 순간(#2510 로드맵의 정상 진행) 무관한 PR에서 하네스가 깨진다.
   // 아래 두 축은 그대로 fail closed로 남는다: 파일럿 키가 baseline에 이미 있으면 전이 실증이 성립하지 않고,
@@ -1630,6 +1633,13 @@ function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, si
     );
   }
   assertDeclaredTransitionSources(spec, variants.lineScoped, nonTransitions);
+  return nonTransitions;
+}
+
+function buildEvidence({ spec, inputs, packDataInclusions, reports, variants, signing }) {
+  const nonTransitions = assertDeclaredTransitionsMatchVariants(spec, variants);
+  assertEvidenceModelTotals(variants);
+  assertCandidateRootPack(spec, reports);
   const baselineStatuses = new Map(
     reports.baseline.requirements.map((entry) => [requirementKey(entry), entry.status]),
   );
