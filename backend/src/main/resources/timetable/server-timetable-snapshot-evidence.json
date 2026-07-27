@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "artifactKind": "server-timetable-snapshot-evidence",
   "schemaIdentity": "backend-timetable-snapshot-v1",
-  "snapshotId": "server-timetable-snapshot-a0eb22245b5d1e57",
-  "snapshotSha256": "a0eb22245b5d1e573b33a27ee703d9cfa54c24274965bc78c27028e1d4127849",
+  "snapshotId": "server-timetable-snapshot-f35da15247903066",
+  "snapshotSha256": "f35da1524790306636c89d5050dcedc112985b3f1d4313781f876e532dfde27b",
   "snapshotSqlByteSize": 9714509,
-  "snapshotGzipSha256": "b28e79a51d03dc4a4aef144fb11a5ff2c9ceebd673fb43ffbfe5a1e785fe313f",
+  "snapshotGzipSha256": "d7816ac02ee37796d4f73010f5e208d97174c7de704aa19d08fde3142c02c64c",
   "snapshotGzipByteSize": 348019,
   "freshUntil": "2026-08-03T00:00:00+09:00",
   "serviceIdentity": {
@@ -21,14 +21,14 @@
   },
   "canonicalPackIdentity": {
     "id": "capital",
-    "sha256": "6e4d7aafb533d57a405ee403c349d7608cbea9a5eda4f8dbcacb753da5d8e93e",
-    "sqliteSha256": "93aeff44980305e419bad1e618f0143854a2f625b331ba200dde6b779e616706"
+    "sha256": "0a6267a6899143a525846788c2c1a2c2c238b07790c7eb76712cdedb17ae4cdf",
+    "sqliteSha256": "ae931aabc270356d51713a72db20e47caa34d1316ee129c2f07561a7a8fc2211"
   },
   "canonicalPackLineage": {
     "provenance": "tracked-readmission-chain",
     "admittedInputSha256": "f91ccbba0dda86809355dc6b2eb686faaa6a72e88c06825be3ffe64a43139673",
     "admittedInputSqliteSha256": "b550b351daa17c5ddc3172bc4229f06a8834a92b3d4835ceb06d2ebaf748bce7",
-    "readmissionCount": 9
+    "readmissionCount": 10
   },
   "accessibilitySource": {
     "materializedSqlSha256": "3f0b8240eacf190cd3206e9803ea9cb9dfa6d0dbaf299e683cbd28ad5e430d2e"
@@ -123,5 +123,5 @@
     "transferRules": 0,
     "routeEdgeEvidence": 4
   },
-  "evidenceHash": "51e006604e3ba279fdc59c7ebdf7b5293e5e10b5b1080afda51ef30d0a0dfa20"
+  "evidenceHash": "4893cc22f7af5adbd64b03162c63bb2a0f5de6e6a22f7ab44f8d1cc15c90c88e"
 }
