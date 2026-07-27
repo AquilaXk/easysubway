@@ -24,6 +24,12 @@ import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const validatedItxAdmissionPacks = new WeakSet();
+const validatedItxAdmissionOutputs = new WeakMap();
+const originalItxAdmissionOutput = Object.freeze({
+  sha256: "dfe8420b2f26d2ca2948575098e0a6a5e278c3b203f7cd9c1f1b588a07e74b02",
+  sqliteSha256: "c39f23cd6b8b20f88672d0456b72a4efbd3697b81035cfb49ded289e50f3a4aa",
+  byteSize: 359388,
+});
 const productionMinimumTableRowNames = [
   "stations",
   "station_lines",
@@ -85,6 +91,14 @@ async function main() {
     const compressedSha256 = sha256(compressedBytes);
     const sqliteSha256 = sha256(sqliteBytes);
     const sizeBytes = compressedBytes.length;
+    const admittedOutput = validatedItxAdmissionOutputs.get(pack);
+    if (admittedOutput && !samePackIdentity(admittedOutput, {
+      sha256: compressedSha256,
+      sqliteSha256,
+      byteSize: sizeBytes,
+    })) {
+      throw new Error("built ITX pack identity does not match tracked readmission output");
+    }
     const representativeRouteRegressions = canonicalRepresentativeRouteRegressions(
       pack.representativeRouteRegressions,
     );
@@ -452,8 +466,7 @@ async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
     || evidence.sourceIssue !== 2135) {
     throw new Error("buildSpec ITX topology evidence must be the #2135 admission artifact");
   }
-  const admission = evidence.readmissions?.at(-1)?.itxSubgraph;
-  if (admission?.unchanged !== true) throw new Error("tracked ITX topology evidence must have an unchanged readmission");
+  const { output, projection: admission } = validateTrackedItxReadmissionChain(evidence);
   for (const pack of packs) {
     const edges = (pack.networkEdges ?? [])
       .filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN")
@@ -490,7 +503,57 @@ async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
       throw new Error("ITX_CHEONGCHUN route evidence projection does not match tracked topology evidence");
     }
     validatedItxAdmissionPacks.add(pack);
+    validatedItxAdmissionOutputs.set(pack, output);
   }
+}
+
+function validateTrackedItxReadmissionChain(evidence) {
+  if (!Array.isArray(evidence.readmissions) || evidence.readmissions.length === 0) {
+    throw new Error("tracked ITX readmission chain is invalid");
+  }
+  let previous = originalItxAdmissionOutput;
+  let projection;
+  for (const entry of evidence.readmissions) {
+    const candidateProjection = entry.itxSubgraph;
+    if (!samePackIdentity(entry.previousPack, previous)
+      || candidateProjection?.unchanged !== true
+      || !Number.isSafeInteger(candidateProjection.edgeCount)
+      || candidateProjection.edgeCount <= 0
+      || !/^[a-f0-9]{64}$/.test(candidateProjection.edgesSha256 ?? "")
+      || !/^[a-f0-9]{64}$/.test(candidateProjection.evidenceSha256 ?? "")
+      || (projection && (candidateProjection.edgeCount !== projection.edgeCount
+        || candidateProjection.edgesSha256 !== projection.edgesSha256
+        || candidateProjection.evidenceSha256 !== projection.evidenceSha256))) {
+      throw new Error("tracked ITX readmission chain is invalid");
+    }
+    projection ??= candidateProjection;
+    previous = requiredPackIdentity(entry.newPack);
+  }
+  const output = requiredPackIdentity({
+    sha256: evidence.pack?.outputSha256,
+    sqliteSha256: evidence.pack?.outputSqliteSha256,
+    byteSize: evidence.pack?.byteSize,
+  });
+  if (evidence.pack?.id !== "capital" || !samePackIdentity(previous, output)) {
+    throw new Error("tracked ITX readmission chain is invalid");
+  }
+  return { output, projection };
+}
+
+function requiredPackIdentity(identity) {
+  if (!/^[a-f0-9]{64}$/.test(identity?.sha256 ?? "")
+    || !/^[a-f0-9]{64}$/.test(identity?.sqliteSha256 ?? "")
+    || !Number.isSafeInteger(identity?.byteSize)
+    || identity.byteSize <= 0) {
+    throw new Error("tracked ITX readmission chain is invalid");
+  }
+  return identity;
+}
+
+function samePackIdentity(left, right) {
+  return left?.sha256 === right.sha256
+    && left?.sqliteSha256 === right.sqliteSha256
+    && left?.byteSize === right.byteSize;
 }
 
 function validateOfficialOdFareEvidence(evidence, fixture, admissions, admissionBytes) {

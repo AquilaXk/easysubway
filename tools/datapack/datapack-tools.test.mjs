@@ -1758,7 +1758,7 @@ test("데이터팩 생성기는 같은 buildSpec에서 candidate artifact hash�
   }
 });
 
-test("데이터팩 생성기는 tracked ITX topology evidence와 일치하는 buildSpec 행만 허용한다", async () => {
+test("데이터팩 생성기는 전체 identity chain이 없는 ITX topology evidence를 거부한다", async () => {
   const workDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-itx-evidence-"));
   const fixturePath = path.join(workDir, "fixture.json");
   const buildSpecPath = path.join(workDir, "build-spec.json");
@@ -1837,21 +1837,13 @@ test("데이터팩 생성기는 tracked ITX topology evidence와 일치하는 bu
     buildSpec.itxTopologyEvidenceSha256 = sha256(evidenceBytes);
     await writeFile(buildSpecPath, `${JSON.stringify(buildSpec, null, 2)}\n`);
 
-    await execFileAsync(process.execPath, [
-      "tools/datapack/build-datapack.mjs",
-      "--build-spec", buildSpecPath,
-      "--output", outputDir,
-    ], { cwd: root, env: productionEnv });
-
-    fixture.packs[0].networkEdges.at(-1).durationSeconds = 1;
-    await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
     await assert.rejects(
       execFileAsync(process.execPath, [
         "tools/datapack/build-datapack.mjs",
         "--build-spec", buildSpecPath,
         "--output", outputDir,
       ], { cwd: root, env: productionEnv }),
-      /ITX_CHEONGCHUN edge projection does not match tracked topology evidence/,
+      /tracked ITX readmission chain is invalid/,
     );
   } finally {
     await rm(workDir, { recursive: true, force: true });
