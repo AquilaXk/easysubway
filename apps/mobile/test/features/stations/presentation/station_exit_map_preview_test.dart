@@ -247,6 +247,68 @@ void main() {
     expect(controller.labels.pois['exit-1']!.lastStyle.icon!.width, 32);
     expect(controller.labels.pois['exit-2']!.lastStyle.icon!.width, 36);
   });
+
+  testWidgets('빠르게 출구를 왕복 선택해도 마지막 선택 marker만 강조한다', (tester) async {
+    final controller = _FakeKakaoMapController();
+    var selectedExitId = 'exit-1';
+    late StateSetter updateHost;
+    final exits = [
+      _exit(id: 'exit-1', number: '1', latitude: 37.301, longitude: 126.861),
+      _exit(id: 'exit-2', number: '2', latitude: 37.302, longitude: 126.862),
+    ];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateHost = setState;
+            return Scaffold(
+              body: StationExitMapPreview(
+                station: _station(),
+                exits: exits,
+                selectedExitId: selectedExitId,
+                onOpenSelected: () {},
+                nativeAppKey: 'test-native-map-key',
+                nativeMapBuilder: _readyMapBuilder(controller),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    for (
+      var attempt = 0;
+      attempt < 10 && controller.labels.addPoiCount < 2;
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    final delayedOldChange = Completer<void>();
+    controller.labels.pois['exit-1']!.nextChangeGate = delayedOldChange;
+
+    updateHost(() => selectedExitId = 'exit-2');
+    await tester.pump();
+    updateHost(() => selectedExitId = 'exit-1');
+    await tester.pump();
+    delayedOldChange.complete();
+    for (
+      var attempt = 0;
+      attempt < 10 && controller.labels.changeStyleCount < 4;
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+    await tester.pumpAndSettle();
+
+    expect(controller.labels.changeStyleCount, greaterThanOrEqualTo(4));
+    expect(controller.labels.pois['exit-1']!.lastStyle.icon!.width, 36);
+    expect(controller.labels.pois['exit-2']!.lastStyle.icon!.width, 32);
+  });
 }
 
 Future<void> _pumpPreview(
@@ -442,9 +504,13 @@ final class _FakePoi implements Poi {
 
   PoiStyle lastStyle;
   int changeStyleCount = 0;
+  Completer<void>? nextChangeGate;
 
   @override
   Future<void> changeStyles(PoiStyle style, [bool transition = false]) async {
+    final gate = nextChangeGate;
+    nextChangeGate = null;
+    await gate?.future;
     lastStyle = style;
     changeStyleCount++;
   }

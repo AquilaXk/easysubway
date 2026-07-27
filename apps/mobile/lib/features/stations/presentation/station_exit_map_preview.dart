@@ -79,6 +79,7 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
   bool _routeVisible = true;
   bool? _controllerRunning;
   int? _configuringGeneration;
+  Future<void> _selectionStyleQueue = Future<void>.value();
   int _generation = 0;
 
   List<StationExitPreviewPoint> get _points =>
@@ -118,9 +119,7 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
       return;
     }
     if (oldWidget.selectedExitId != widget.selectedExitId) {
-      unawaited(
-        _updateSelectedPoi(oldWidget.selectedExitId, widget.selectedExitId),
-      );
+      _scheduleSelectedPoiStyleSync();
     }
   }
 
@@ -307,35 +306,20 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
     return PoiStyle(icon: image, anchor: const KPoint(0.5, 0.5));
   }
 
-  Future<void> _updateSelectedPoi(String previousId, String selectedId) async {
-    if (_configuringGeneration == _generation) {
-      return;
-    }
-    final previous = _pois[previousId];
-    final selected = _pois[selectedId];
-    final previousPoint = _points
-        .where((point) => point.id == previousId)
-        .firstOrNull;
-    final selectedPoint = _points
-        .where((point) => point.id == selectedId)
-        .firstOrNull;
-    try {
-      if (previous != null && previousPoint != null) {
-        await previous.changeStyles(
-          await _markerStyle(previousPoint.number, selected: false),
-        );
-      }
-      if (!mounted || widget.selectedExitId != selectedId) {
+  void _scheduleSelectedPoiStyleSync() {
+    final generation = _generation;
+    _selectionStyleQueue = _selectionStyleQueue.then((_) async {
+      if (!mounted ||
+          generation != _generation ||
+          _configuringGeneration == generation) {
         return;
       }
-      if (selected != null && selectedPoint != null) {
-        await selected.changeStyles(
-          await _markerStyle(selectedPoint.number, selected: true),
-        );
+      try {
+        await _synchronizeSelectedPoiStyles(generation);
+      } on Object catch (error, stackTrace) {
+        _reportSanitizedError(error, stackTrace, '카카오맵 출구 선택 표시 실패');
       }
-    } on Object catch (error, stackTrace) {
-      _reportSanitizedError(error, stackTrace, '카카오맵 출구 선택 표시 실패');
-    }
+    });
   }
 
   void _onMapError(Error error) {
