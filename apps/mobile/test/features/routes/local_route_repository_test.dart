@@ -2305,6 +2305,362 @@ void main() {
     expect(rideStep.confidenceLabel, '');
   });
 
+  test('#2590 로컬 폴백의 승차 구간은 계단 개념 비적용으로 표기한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-step-free',
+      fromNodeId: 'station-a:line-test:LOCAL',
+      toNodeId: 'station-b:line-test:LOCAL',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      distanceMeters: 830,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.stepType == 'ride',
+    );
+    expect(rideStep.stairAccessState, 'notApplicable');
+    expect(result.stairAccessLabel, '계단 없는 길이에요');
+  });
+
+  test('#2590 검증된 접근 동선은 로컬에서도 확인 필요로 표기하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(database);
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-step-free',
+      fromNodeId: 'station-a:line-test:LOCAL',
+      toNodeId: 'station-b:line-test:LOCAL',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      distanceMeters: 830,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final accessSteps = result.steps
+        .where((step) => step.stepType == 'entry' || step.stepType == 'exit')
+        .toList(growable: false);
+    expect(accessSteps, isNotEmpty);
+    expect(
+      accessSteps.map((step) => step.requiresAccessibilityCheck),
+      everyElement(isFalse),
+    );
+    // 같은 칩 행이 서로 다른 말을 하지 않는다.
+    expect(result.stairAccessLabel, '계단 없는 길이에요');
+    expect(result.accessibilityBadgeLabel, '계단 없는 경로 확인');
+    // 확인 필요 표기에 매달려 있던 화면 구조도 함께 따라온다: 하차 동선이 별도
+    // 도착 안내 카드로 빠지지 않고 이동 목록에 남는다.
+    expect(result.arrivalGuidanceStep, isNull);
+    expect(result.movementSteps.length, result.steps.length);
+    // 구간 줄은 엘리베이터 확인 안내를 말하지 않는다. (시간·거리 값이 없을 때 나오는
+    // 다른 "미확인" 문구는 이 변경의 범위 밖이라 여기서 보지 않는다.)
+    expect(
+      result.steps.map((step) => step.burdenLabel),
+      everyElement(isNot(contains('엘리베이터'))),
+    );
+  });
+
+  test('#2590 무단차라 적혀 있어도 근거가 만료된 접근 동선은 무단차로 말하지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+    );
+    // 계단 상태는 STEP_FREE로 적혀 있지만 확인 시각이 만료된 진입 동선.
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'entry-a-stale',
+      fromNodeId: 'station-a',
+      toNodeId: 'station-a:line-test',
+      edgeType: 'ENTRY',
+      durationSeconds: 90,
+      lastVerifiedAtSeconds: 0,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-step-free',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      distanceMeters: 830,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'exit-b-verified',
+      fromNodeId: 'station-b:line-test',
+      toNodeId: 'station-b',
+      edgeType: 'EXIT',
+      durationSeconds: 60,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final entryStep = result.steps.singleWhere(
+      (step) => step.stepType == 'entry',
+    );
+    expect(entryStep.stairAccessState, 'unknown');
+    expect(entryStep.requiresAccessibilityCheck, isTrue);
+    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
+  });
+
+  test('#2590 근거가 없는 접근 동선은 로컬에서 확인 필요로 남는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    // 명시 access edge 없이 생성 연결선만 남긴다. 위상 보조선일 뿐 검증 근거가 아니다.
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+    );
+    await _insertVerifiedNetworkEdge(
+      database,
+      id: 'ride-a-b-step-free',
+      fromNodeId: 'station-a:line-test',
+      toNodeId: 'station-b:line-test',
+      edgeType: 'RIDE',
+      durationSeconds: 120,
+      distanceMeters: 830,
+    );
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final accessSteps = result.steps
+        .where((step) => step.stepType == 'entry' || step.stepType == 'exit')
+        .toList(growable: false);
+    expect(accessSteps, isNotEmpty);
+    expect(
+      accessSteps.map((step) => step.requiresAccessibilityCheck),
+      everyElement(isTrue),
+    );
+    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
+  });
+
+  test('#2590 출시 데이터팩 형태의 승차 구간에는 확인 안내를 붙이지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    // 번들 데이터팩(capital·core)의 실제 형태다: network_edges에 RIDE만 있고 근거
+    // 컬럼은 아예 없으며, 승차 edge의 stair_access_state는 사실상 전부 컬럼 기본값인
+    // UNKNOWN이다. 그 값을 그대로 옮기면 열차 승차 행에 확인 안내가 붙는다.
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+      fillInsertedNetworkEdgeEvidence: false,
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, service_pattern, includes_stairs, stair_access_state,
+        accessibility_status, reliability_score, last_verified_at, service_class
+      )
+      VALUES (
+        'edge-line-test-station-a-station-b',
+        'station-a:line-test',
+        'station-b:line-test',
+        120,
+        0,
+        'RIDE',
+        'LOCAL',
+        0,
+        'UNKNOWN',
+        'UNKNOWN',
+        100,
+        NULL,
+        'SUBWAY'
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.stepType == 'ride',
+    );
+    expect(rideStep.stairAccessState, 'notApplicable');
+    expect(rideStep.requiresAccessibilityCheck, isFalse);
+    expect(rideStep.burdenLabel, isNot(contains('엘리베이터')));
+    // 승차를 판정에서 뺀다고 해서 경로가 무단차로 올라가지는 않는다. 근거 없는 접근
+    // 동선이 그대로 미확인으로 남아 경로 표기를 잡아 준다.
+    final accessSteps = result.steps
+        .where((step) => step.stepType == 'entry' || step.stepType == 'exit')
+        .toList(growable: false);
+    expect(accessSteps, isNotEmpty);
+    expect(
+      accessSteps.map((step) => step.requiresAccessibilityCheck),
+      everyElement(isTrue),
+    );
+    expect(result.stairAccessLabel, '계단 여부를 확인하고 있어요');
+    expect(result.evidenceSummary, contains('ACCESSIBILITY_CHECK_REQUIRED'));
+  });
+
+  test('#2590 계단이 적힌 승차 구간은 비적용으로 빠지지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    // 승차 구간을 비적용으로 두는 것은 계단이 적혀 있지 않을 때뿐이다. 타입을 계단
+    // 사실보다 먼저 보면 계단이 적힌 승차 행이 판정에서 사라져 화면이 과소 표시된다.
+    // 백엔드 StairAccess.ofStep은 includesStairs를 최우선으로 보고 승차라도
+    // STAIR_ONLY를 낸다.
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+      fillInsertedNetworkEdgeEvidence: false,
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, service_pattern, includes_stairs, stair_access_state,
+        accessibility_status, reliability_score, last_verified_at, service_class
+      )
+      VALUES (
+        'edge-line-test-station-a-station-b',
+        'station-a:line-test',
+        'station-b:line-test',
+        120,
+        0,
+        'RIDE',
+        'LOCAL',
+        1,
+        'STAIR_ONLY',
+        'AVAILABLE',
+        95,
+        NULL,
+        'SUBWAY'
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final rideStep = result.steps.singleWhere(
+      (step) => step.stepType == 'ride',
+    );
+    expect(rideStep.includesStairs, isTrue);
+    expect(rideStep.stairAccessState, 'stairOnly');
+    // 계단 사실과 검증 여부는 다른 축이다. 근거가 없으면 확인 필요가 함께 붙는다.
+    expect(rideStep.requiresAccessibilityCheck, isTrue);
+    expect(rideStep.burdenLabel, contains('계단 포함'));
+    // 구간 줄에는 확인 안내를 적지 않는다(확인 필요는 경로 단위 표기가 말한다).
+    expect(rideStep.burdenLabel, isNot(contains('엘리베이터')));
+    expect(result.stairAccessLabel, '계단 포함');
+  });
+
+  test('#2590 계단으로 확인된 동선도 근거가 없으면 확인 필요를 함께 말한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedLineWithoutNetworkEdges(
+      database,
+      includeExplicitAccessEdges: false,
+      fillInsertedNetworkEdgeEvidence: false,
+    );
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, includes_stairs, stair_access_state,
+        accessibility_status, reliability_score
+      )
+      VALUES (
+        'exit-b-stair-only',
+        'station-b:line-test',
+        'station-b',
+        60,
+        0,
+        'EXIT',
+        1,
+        'STAIR_ONLY',
+        'AVAILABLE',
+        95
+      )
+    ''');
+    await database.customStatement('''
+      INSERT INTO network_edges (
+        id, from_node_id, to_node_id, duration_seconds, distance_meters,
+        edge_type, stair_access_state, accessibility_status, reliability_score
+      )
+      VALUES (
+        'ride-a-b-unknown-stair',
+        'station-a:line-test',
+        'station-b:line-test',
+        120,
+        830,
+        'RIDE',
+        'UNKNOWN',
+        'AVAILABLE',
+        95
+      )
+    ''');
+    final repository = LocalRouteRepository(catalogDatabase: database);
+
+    final result = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-a',
+        destinationStationId: 'station-b',
+        mobilityType: 'SENIOR',
+      ),
+    );
+
+    final exitStep = result.steps.singleWhere(
+      (step) => step.stepType == 'exit',
+    );
+    // 계단 사실과 검증 여부는 다른 축이다. 계단이 확인됐다고 해서 확인 안내가 사라지면
+    // 가장 확인이 필요한 조합에서 안내가 없어진다.
+    expect(exitStep.stairAccessState, 'stairOnly');
+    expect(exitStep.requiresAccessibilityCheck, isTrue);
+    expect(exitStep.burdenLabel, contains('계단 포함'));
+    // 판정(requiresAccessibilityCheck)은 위에서 이미 고정했다. 구간 줄에는 확인 안내를
+    // 적지 않고, 확인 필요는 바로 아래 경로 단위 표기가 말한다.
+    expect(exitStep.burdenLabel, isNot(contains('엘리베이터')));
+    expect(result.stairAccessLabel, '계단 포함');
+    expect(result.accessibilityBadgeLabel, '엘리베이터 상태를 살펴봐 주세요');
+    expect(result.arrivalGuidanceStep, isNotNull);
+  });
+
   test('로컬 경로 추천 이유와 음성 안내는 선택 경로에 없는 계단 차단 근거를 말하지 않는다', () async {
     final database = CatalogDatabase.memory();
     addTearDown(database.close);
@@ -4118,7 +4474,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           'facility-a-elevator'
         ),
         (
@@ -4131,7 +4487,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           NULL
         )
     ''');
@@ -4182,7 +4538,7 @@ void main() {
         'facility',
         'facility-a-elevator',
         'LEVEL_4',
-        1781827200
+        $_recentlyVerifiedAtSeconds
       )
     ''');
     await database.customStatement('''
@@ -4202,7 +4558,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           'facility-a-elevator'
         ),
         (
@@ -4215,7 +4571,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           NULL
         )
     ''');
@@ -4275,7 +4631,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           'facility-a-elevator'
         ),
         (
@@ -4288,7 +4644,7 @@ void main() {
           'STEP_FREE',
           'AVAILABLE',
           95,
-          1781827200,
+          $_recentlyVerifiedAtSeconds,
           NULL
         )
     ''');
@@ -5538,6 +5894,71 @@ void main() {
     expect(resolved.stepFreeAlternative, isNull);
     expect(resolved.originStationName, '상록수');
   });
+
+  test('#2590 온라인 결과는 표시 이름 치환을 거쳐도 백엔드 계단 판정으로 표시된다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = OnlineFirstRouteSearchRepository(
+      onlineRepository: _FixedOnlineRouteSearchRepository(
+        RouteSearchResult.fromV2(
+          RouteSearchV2Result.fromJson(
+            _routeV2Payload(
+              stairAccess: 'STEP_FREE',
+              accessLegStairAccess: 'STEP_FREE',
+              rideLegStairAccess: 'NOT_APPLICABLE',
+            ),
+          ),
+        ),
+      ),
+      localRepository: LocalRouteRepository(catalogDatabase: database),
+    );
+
+    final resolved = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(resolved.originStationName, '상록수');
+    expect(resolved.stairAccess, 'STEP_FREE');
+    expect(resolved.stairAccessLabel, '계단 없는 길이에요');
+  });
+
+  test('#2590 강등된 판정도 표시 이름 치환 뒤 무단차로 승격되지 않는다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await database.seedBaselineIfEmpty();
+    final repository = OnlineFirstRouteSearchRepository(
+      onlineRepository: _FixedOnlineRouteSearchRepository(
+        RouteSearchResult.fromV2(
+          RouteSearchV2Result.fromJson(
+            _routeV2Payload(
+              // 신뢰도 경고로 접근 leg까지 강등된 응답. 백엔드가 실제로 내는 형태다.
+              stairAccess: 'UNKNOWN',
+              accessLegStairAccess: 'UNKNOWN',
+              rideLegStairAccess: 'NOT_APPLICABLE',
+              reasonCodes: const ['STALE_ACCESSIBILITY_DATA'],
+            ),
+          ),
+        ),
+      ),
+      localRepository: LocalRouteRepository(catalogDatabase: database),
+    );
+
+    final resolved = await repository.searchRoute(
+      const RouteSearchRequest(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'WHEELCHAIR',
+      ),
+    );
+
+    expect(resolved.stairAccess, 'UNKNOWN');
+    expect(resolved.stairAccessLabel, '계단 여부를 확인하고 있어요');
+  });
 }
 
 class _FixedOnlineRouteSearchRepository implements RouteSearchRepository {
@@ -5557,6 +5978,9 @@ class _FixedOnlineRouteSearchRepository implements RouteSearchRepository {
 Map<String, Object?> _routeV2Payload({
   String status = 'FOUND',
   List<Object?> reasonCodes = const <Object?>[],
+  String? stairAccess,
+  String? accessLegStairAccess,
+  String? rideLegStairAccess,
 }) {
   return {
     'contractVersion': 'ROUTE_SEARCH_V2',
@@ -5624,6 +6048,7 @@ Map<String, Object?> _routeV2Payload({
               'level': 'LOW',
               'reasons': <Object?>[],
             },
+            'stairAccess': ?accessLegStairAccess,
           },
           {
             'legType': 'RIDE',
@@ -5658,9 +6083,11 @@ Map<String, Object?> _routeV2Payload({
               'level': 'LOW',
               'reasons': <Object?>[],
             },
+            'stairAccess': ?rideLegStairAccess,
           },
         ],
         'commercialEtaEligible': status == 'FOUND',
+        'stairAccess': ?stairAccess,
       },
     ],
   };
@@ -5781,6 +6208,17 @@ Future<void> _setOutOfStationTransferRuntimeEnabled(
   );
 }
 
+/// 픽스처가 말하는 "최근에 확인됨" 시각.
+///
+/// 절대 시각을 박으면 `isDataStaleAt`의 365일 창이 언젠가 그 시각을 지나 테스트가
+/// 스스로 뒤집힌다. 주입 시계를 쓰지 않는 테스트가 있으므로 벽시계 기준 상대 시각으로
+/// 둔다 — 고정 시계를 주입한 테스트에서는 그 시각보다 미래가 되지만, 만료 판정은
+/// "365일보다 과거인가"만 보므로 신선한 쪽으로 안전하다. 만료를 재현하려는 픽스처는
+/// 이 값을 쓰지 않고 만료된 시각을 직접 준다.
+final int _recentlyVerifiedAtSeconds =
+    DateTime.now().subtract(const Duration(days: 30)).millisecondsSinceEpoch ~/
+    1000;
+
 Future<void> _fillInsertedNetworkEdgeEvidence(CatalogDatabase database) async {
   await database.customStatement('''
     CREATE TRIGGER test_fill_network_edge_evidence
@@ -5794,7 +6232,7 @@ Future<void> _fillInsertedNetworkEdgeEvidence(CatalogDatabase database) async {
             'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
           provenance_kind = 'OFFICIAL_SOURCE',
           verification_status = 'VERIFIED',
-          last_verified_at = COALESCE(NEW.last_verified_at, 1781827200),
+          last_verified_at = COALESCE(NEW.last_verified_at, $_recentlyVerifiedAtSeconds),
           evidence_hash =
             '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       WHERE id = NEW.id
@@ -5826,7 +6264,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -5843,7 +6281,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -5860,7 +6298,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -5877,7 +6315,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -5894,7 +6332,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -5911,7 +6349,7 @@ Future<void> _addExplicitAccessEdges(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       )
   ''');
@@ -5929,7 +6367,7 @@ Future<void> _insertVerifiedNetworkEdge(
   String serviceClass = 'SUBWAY',
   String verificationStatus = 'VERIFIED',
   String provenanceKind = 'OFFICIAL_SOURCE',
-  int lastVerifiedAtSeconds = 1781827200,
+  int? lastVerifiedAtSeconds,
   String evidenceHash =
       '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef',
 }) async {
@@ -5957,7 +6395,7 @@ Future<void> _insertVerifiedNetworkEdge(
       serviceClass,
       provenanceKind,
       verificationStatus,
-      lastVerifiedAtSeconds,
+      lastVerifiedAtSeconds ?? _recentlyVerifiedAtSeconds,
       evidenceHash,
     ],
   );
@@ -6001,7 +6439,7 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6018,7 +6456,7 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6035,7 +6473,7 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       ),
       (
@@ -6052,7 +6490,7 @@ Future<void> _addSecondLineForTransferFixture(CatalogDatabase database) async {
         'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890',
         'OFFICIAL_SOURCE',
         'VERIFIED',
-        1781827200,
+        $_recentlyVerifiedAtSeconds,
         '1234567890abcdef1234567890abcdef1234567890abcdef1234567890abcdef'
       )
   ''');
@@ -6075,7 +6513,7 @@ Future<void> _addEligibleStationFacilityEvidence(
       )
       VALUES (?, ?, ?, 'EXISTS', 'test-source', 'test-source-snapshot',
         'provider-hash', 'evidence-hash', 'OFFICIAL_SOURCE', 'INSTALLED',
-        'AVAILABLE', 'REALTIME_OPERATION', 100, 1781827200, 1781827200, 1,
+        'AVAILABLE', 'REALTIME_OPERATION', 100, $_recentlyVerifiedAtSeconds, $_recentlyVerifiedAtSeconds, 1,
         'FACILITY_EXISTS_AND_PROVENANCE_VERIFIED')
     ''',
     [stationId, lineId, facilityType],
