@@ -138,7 +138,7 @@ void main() {
         '0xE8404445', '0xFF20262E',
       },
       'lib/features/stations/domain/station_line.dart': {
-        '0xFF006D77', '0xFF102A2C', 'Colors.white',
+        '0xFF006D77', '0xFF102A2C', '0xFF000000', 'Colors.white',
       },
       'lib/features/network_map/presentation/route_map_basemap_view.dart': {
         '0xFF466467', '0xCCFFFFFF',
@@ -165,9 +165,19 @@ void main() {
       },
     };
     final colorReferences = RegExp(
-      r'Color\(\s*(0x[0-9A-Fa-f]{8})\s*\)|'
+      r'Color\(\s*[^)]*?(0x[0-9A-Fa-f]{8})[^)]*\)|'
       r'Color\.from(?:ARGB|RGBO)\([^)]*\)|'
-      r'(?<![A-Za-z])Colors\.(?!transparent\b)[A-Za-z]+',
+      r'(?<![A-Za-z])Colors\.(?!transparent\b)[A-Za-z0-9_]+',
+    );
+    expect(
+      colorReferences.firstMatch('Colors.white70')?.group(0),
+      'Colors.white70',
+    );
+    expect(
+      colorReferences
+          .firstMatch('Color(0xFF000000 | parsed)')
+          ?.group(1),
+      '0xFF000000',
     );
     final violations = <String>[];
 

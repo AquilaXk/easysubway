@@ -6984,7 +6984,7 @@ class _NetworkMapRouteDraftField extends StatelessWidget {
                       child: const Icon(
                         Icons.close,
                         size: 14,
-                        color: Colors.white,
+                        color: EasySubwayAccessibleColors.interactionOnPrimary,
                       ),
                     ),
                     constraints: const BoxConstraints(
