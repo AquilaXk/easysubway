@@ -4,9 +4,13 @@ import { DatabaseSync } from "node:sqlite";
 
 import { extractBundledPackFixture } from "./export-bundled-pack-fixture.mjs";
 
-test("legacy bundled pack을 provenance 추론 없이 builder fixture로 옮긴다", () => {
+test("legacy bundled pack을 provenance 추론 없이 builder fixture로 옮긴다", (context) => {
   const database = new DatabaseSync(":memory:");
   const expectedDatabase = new DatabaseSync(":memory:");
+  context.after(() => {
+    database.close();
+    expectedDatabase.close();
+  });
   database.exec(`
     CREATE TABLE operators (id TEXT PRIMARY KEY, name_ko TEXT NOT NULL, name_en TEXT NOT NULL);
     CREATE TABLE lines (
@@ -203,8 +207,6 @@ test("legacy bundled pack을 provenance 추론 없이 builder fixture로 옮긴�
     station_lines: 1,
     network_edges: 1,
   });
-  database.close();
-  expectedDatabase.close();
 });
 
 test("지원하지 않는 schema table 행은 무음 유실 대신 거부한다", () => {
