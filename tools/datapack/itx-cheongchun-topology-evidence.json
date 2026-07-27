@@ -1756,6 +1756,10 @@
         "sqliteSha256": "de86dccb9be70e6faafbd39b222346aa06cfbdd20904feed1a34bd17e71057b5",
         "byteSize": 1372925
       },
+      "serializationOnly": {
+        "approvedByIssue": 2648,
+        "logicalRowsUnchanged": true
+      },
       "byteSizeDelta": 1011935,
       "itxSubgraph": {
         "unchanged": true,

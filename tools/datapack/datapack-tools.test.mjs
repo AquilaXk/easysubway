@@ -17645,11 +17645,15 @@ test("official OD fare release candidate는 승인된 두 방향 quote와 proven
                                       child_card_fare AS childCardFare,
                                       child_cash_fare AS childCashFare
                                FROM official_od_fare_quotes
-                               ORDER BY rowid`).all();
+                               WHERE source_id = ?
+                               ORDER BY rowid`).all(approvedEvidence.sourceId);
     } finally {
       database.close();
     }
-    assert.deepEqual(rows.map((row) => ({ ...row })), approvedEvidence.quotes);
+    const canonicalQuotes = [...approvedEvidence.quotes].sort((left, right) =>
+      codepointCompare(left.originStationId, right.originStationId)
+        || codepointCompare(left.destinationStationId, right.destinationStationId));
+    assert.deepEqual(rows.map((row) => ({ ...row })), canonicalQuotes);
     const manifest = JSON.parse(await readFile(path.join(outputDir, "current.json"), "utf8"));
     assert.ok(manifest.packs[0].sourceInventory.some(
       (source) => source.id === approvedEvidence.sourceId,

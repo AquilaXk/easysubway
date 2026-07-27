@@ -261,6 +261,22 @@ test("tracked production ITX topology evidence와 bundled pack은 --check를 통
   ], { cwd: root, env: freshBuildEnv });
 });
 
+test("64 KiB 초과 gzip은 승인된 serialization-only readmission이 없으면 거부한다", async (context) => {
+  const directory = await mkdtemp(path.join(os.tmpdir(), "itx-serialization-readmission-"));
+  context.after(() => rm(directory, { recursive: true, force: true }));
+  const evidencePath = path.join(directory, "evidence.json");
+  const evidence = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json"), "utf8"));
+  delete evidence.readmissions.at(-1).serializationOnly;
+  await writeFile(evidencePath, `${JSON.stringify(evidence, null, 2)}\n`);
+
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/apply-itx-topology-to-bundled-pack.mjs",
+    "--evidence", evidencePath,
+    "--check",
+  ], { cwd: root, env: freshBuildEnv }), /ITX topology evidence or bundled pack index is stale/);
+});
+
 test("UNCHANGED_AUTO historical fallback은 immediate previous source 변경을 거부한다", async () => {
   const contract = JSON.parse(await readFile(
     path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json"), "utf8"));
@@ -281,6 +297,21 @@ test("historical fallback은 admitted SQLite identity 변조를 거부한다", a
   const evidence = JSON.parse(await readFile(
     path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json"), "utf8"));
   evidence.pack.inputSqliteSha256 = "0".repeat(64);
+
+  await assert.rejects(
+    admittedTopologySource(contract.sourceTimetableArtifact, source, evidence, contractPath),
+    /admitted canonical input identity mismatch/,
+  );
+});
+
+test("historical fallback은 끊긴 readmission tail을 거부한다", async () => {
+  const contractPath = path.join(root, "tools/datapack/itx-cheongchun-coverage-contract.json");
+  const contract = JSON.parse(await readFile(contractPath, "utf8"));
+  const source = JSON.parse(await readFile(
+    path.join(root, contract.sourceTimetableArtifact.artifactPath), "utf8"));
+  const evidence = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/itx-cheongchun-topology-evidence.json"), "utf8"));
+  evidence.readmissions.at(-1).previousPack.sha256 = "0".repeat(64);
 
   await assert.rejects(
     admittedTopologySource(contract.sourceTimetableArtifact, source, evidence, contractPath),
