@@ -69,7 +69,7 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       .flatMap(({ records }) => records)
       .filter(({ sourceId, field }) => sourceId === "itx-cheongchun-source-timetable"
         && ["duration_seconds", "distance_meters"].includes(field));
-    assert.ok(itxPlaceholderRecords.length > 0);
+    assert.equal(new Set(itxPlaceholderRecords.map(({ entityId, field }) => `${entityId}\0${field}`)).size, 96);
     assert.ok(itxPlaceholderRecords.every(({ derivationKind }) => derivationKind === "GENERATED"));
     await copyFile(path.join(baselineDir, "catalog/capital-v1.sqlite.gz"), assetPath);
     const gzipBytes = await readFile(assetPath);
