@@ -549,13 +549,32 @@ test("v16 bundled pack 변환은 ITX topology 외 timetable·calendar·fare row�
     "transit_stop_times",
     "transit_trips",
   ];
-  inputDatabase.exec(`
-    DELETE FROM network_edges WHERE service_class = 'ITX_CHEONGCHUN';
-    DROP TABLE route_service_artifact_evidence;
-    ALTER TABLE network_edges DROP COLUMN service_class;
-    ALTER TABLE transit_trips DROP COLUMN service_class;
-    PRAGMA user_version = 16;
-  `);
+  inputDatabase.exec("PRAGMA foreign_keys = OFF");
+  inputDatabase.exec("DELETE FROM network_edges WHERE service_class = 'ITX_CHEONGCHUN'");
+  inputDatabase.exec("DROP TABLE route_service_artifact_evidence");
+  for (const table of ["network_edges", "transit_trips"]) {
+    const columns = inputDatabase.prepare(`PRAGMA table_info(${table})`).all()
+      .map(({ name }) => name)
+      .filter((name) => name !== "service_class")
+      .join(", ");
+    const schema = inputDatabase.prepare(
+      "SELECT sql FROM sqlite_schema WHERE type = 'table' AND name = ?",
+    ).get(table).sql
+      .replace(`CREATE TABLE ${table}`, `CREATE TABLE ${table}_v16`)
+      .replace("  service_class TEXT NOT NULL DEFAULT 'SUBWAY',\n", "")
+      .replace("  CHECK (service_class IN ('SUBWAY', 'ITX_CHEONGCHUN')),\n", "")
+      .replace("  CHECK (service_class IN ('SUBWAY', 'ITX_CHEONGCHUN'))\n", "")
+      .replace(",\n)", "\n)");
+    inputDatabase.exec(`
+      ${schema};
+      INSERT INTO ${table}_v16 (${columns}) SELECT ${columns} FROM ${table};
+      DROP TABLE ${table};
+      ALTER TABLE ${table}_v16 RENAME TO ${table};
+    `);
+  }
+  inputDatabase.exec("PRAGMA foreign_keys = ON");
+  assert.deepEqual(inputDatabase.prepare("PRAGMA foreign_key_check").all(), []);
+  inputDatabase.exec("PRAGMA user_version = 16");
   const beforeRows = Object.fromEntries(preservedTables.map((table) => [
     table,
     JSON.parse(JSON.stringify(inputDatabase.prepare(`SELECT * FROM ${table} ORDER BY rowid`).all())),
