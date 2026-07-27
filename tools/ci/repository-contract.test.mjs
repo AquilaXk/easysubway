@@ -6467,7 +6467,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-07-15");
   assert.equal(gate.latestGoNoGoStatus.currentDecision, "NO_GO");
   assert.equal(gate.latestGoNoGoStatus.decisionOwner, "release-owner");
-  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1021, 1022, 1230, 1414]);
+  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414]);
   assert.deepEqual(gate.latestGoNoGoStatus.recentlyResolvedEvidence, [
     "production-datapack-release-publish-success",
     "store-distribution-evidence-success",
@@ -6477,7 +6477,6 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "android-quality-local-emulator-real-device-smoke-summary",
     "abuse-rehearsal-local-and-store-preflight-summary",
     "operations-alert-and-mailbox-routing-summary",
-    "operations-phase-a-pass-phase-b-scheduled",
   ]);
   assert.deepEqual(gate.latestGoNoGoStatus.remainingP0Blockers, [
     "play-installed-build-provenance",
@@ -6487,6 +6486,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
     "play-installed-android-quality-performance-recovery-evidence",
     "production-like-abuse-rehearsal-evidence",
     "play-installed-server-minimized-final-acceptance-evidence",
+    "fixed-release-versioncode-build-submit-procedure",
     "route-result-v2-ui-badge-accessibility-copy-evidence",
     "route-release-readiness-tracker-evidence",
     "datapack-release-readiness-tracker-evidence",
@@ -6509,6 +6509,18 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.equal(gate.gates.find((item) => item.id === "G8_OPERATIONS").status, "BLOCKED_EXTERNAL");
   const operationsGate = readJson("apps/mobile/release/post-launch-operations-review-gate.json");
   const g8 = gate.gates.find((item) => item.id === "G8_OPERATIONS");
+  assert.ok(gate.latestGoNoGoStatus.blockingOpenIssues.includes(gate.latestOperationsEvidenceStatus.issue));
+  assert.ok(
+    gate.latestOperationsEvidenceStatus.remainingPhaseABlockers.every(
+      (blocker) => gate.latestGoNoGoStatus.remainingP0Blockers.includes(blocker),
+    ),
+  );
+  assert.equal(
+    gate.latestGoNoGoStatus.recentlyResolvedEvidence.some(
+      (evidence) => evidence.startsWith("operations-phase-a-pass"),
+    ),
+    false,
+  );
   const assertOperationsCoherence = (governance, operations, operationsGateEntry) => {
     assert.equal(governance.latestOperationsEvidenceStatus.preLaunchReadiness, operations.preLaunchReadiness.status);
     assert.equal(governance.latestOperationsEvidenceStatus.postLaunchObservation, operations.postLaunchObservation.status);

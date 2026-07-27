@@ -102,7 +102,7 @@
     "reviewedMainMergeSha": "ef0084147f0c89c872328b4acbfc040f6db5d0a2",
     "currentDecision": "NO_GO",
     "decisionOwner": "release-owner",
-    "blockingOpenIssues": [571, 1016, 1018, 1021, 1022, 1230, 1414],
+    "blockingOpenIssues": [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414],
     "recentlyResolvedEvidence": [
       "production-datapack-release-publish-success",
       "store-distribution-evidence-success",
@@ -111,8 +111,7 @@
       "server-minimized-android-release-scope-fixed",
       "android-quality-local-emulator-real-device-smoke-summary",
       "abuse-rehearsal-local-and-store-preflight-summary",
-      "operations-alert-and-mailbox-routing-summary",
-      "operations-phase-a-pass-phase-b-scheduled"
+      "operations-alert-and-mailbox-routing-summary"
     ],
     "remainingP0Blockers": [
       "play-installed-build-provenance",
@@ -122,6 +121,7 @@
       "play-installed-android-quality-performance-recovery-evidence",
       "production-like-abuse-rehearsal-evidence",
       "play-installed-server-minimized-final-acceptance-evidence",
+      "fixed-release-versioncode-build-submit-procedure",
       "route-result-v2-ui-badge-accessibility-copy-evidence",
       "route-release-readiness-tracker-evidence",
       "datapack-release-readiness-tracker-evidence"
