@@ -4735,6 +4735,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             _cameraFocusedStationKey = focusedStationKey;
             _pendingCamera = null;
             _camera = focusedCamera;
+            _requestedRendererCamera = focusedCamera;
+            _requestedRendererCamerasByRevision
+              ..clear()
+              ..[focusedCamera.revision] = focusedCamera;
             camera = focusedCamera;
             widget.onViewportChanged(focusedCamera.visibleSourceRect);
           } else if (focusedStation == null) {
@@ -5217,7 +5221,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   }
 
   void _panCameraToRevealFanMenu(NetworkMapStation station) {
-    final camera = _presentedRendererCamera ?? _pendingCamera ?? _camera;
+    final camera = _pendingCamera ?? _camera;
     if (camera == null) {
       return;
     }
