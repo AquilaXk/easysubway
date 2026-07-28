@@ -142,10 +142,7 @@ void main() {
   const alignmentThresholdPx = 5.0;
   const minStationCoverage = 700; // 수도권 800행 중 대다수 커버(하드 최소선).
 
-  void expectNoUnmatched(
-    Map<String, dynamic> fixture,
-    String regionKey,
-  ) {
+  void expectNoUnmatched(Map<String, dynamic> fixture, String regionKey) {
     final unmatched = (fixture['unmatched'] as List)
         .cast<Map<String, dynamic>>();
     expect(
@@ -153,11 +150,7 @@ void main() {
       0,
       reason: '$regionKey 팩 행 중 SVG 배정이 없는 역이 생겼다(미매핑 회귀)',
     );
-    expect(
-      unmatched,
-      isEmpty,
-      reason: '$regionKey fixture에 선언되지 않은 미매칭 역이 있다',
-    );
+    expect(unmatched, isEmpty, reason: '$regionKey fixture에 선언되지 않은 미매칭 역이 있다');
   }
 
   test('(B) seoul 바탕(SVG 배정) ↔ 인터랙션(팩) 좌표가 같은 viewBox 좌표계 — 전 역 하드 <5px', () {
