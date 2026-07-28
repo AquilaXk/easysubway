@@ -308,11 +308,8 @@ private final class RouteMapViewportWebViewFactory: NSObject, FlutterPlatformVie
       viewId: viewId,
       assetPath: params["assetPath"] as? String ?? "",
       mimeType: params["mimeType"] as? String ?? "",
-      sourceWidth: params["sourceWidth"].asDouble(),
-      sourceHeight: params["sourceHeight"].asDouble(),
       viewBox: params["viewBox"].asDoubleList(),
-      revision: params["revision"].asInt(),
-      labelCollisionScript: params["labelCollisionScript"] as? String ?? ""
+      revision: params["revision"].asInt()
     )
   }
 }
@@ -322,12 +319,10 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   private let channel: FlutterMethodChannel
   private let assetPath: String
   private let mimeType: String
-  private let sourceWidth: Double
-  private let sourceHeight: Double
   private var viewBox: [Double]
   private var revision: Int
-  private let labelCollisionScript: String
   private var webView: WKWebView?
+  private var initialAssetURL: URL?
 
   init(
     frame: CGRect,
@@ -335,11 +330,8 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     viewId: Int64,
     assetPath: String,
     mimeType: String,
-    sourceWidth: Double,
-    sourceHeight: Double,
     viewBox: [Double],
-    revision: Int,
-    labelCollisionScript: String
+    revision: Int
   ) {
     container = UIView(frame: frame)
     channel = FlutterMethodChannel(
@@ -348,18 +340,16 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     )
     self.assetPath = assetPath
     self.mimeType = mimeType
-    self.sourceWidth = sourceWidth
-    self.sourceHeight = sourceHeight
     self.viewBox = viewBox
     self.revision = revision
-    self.labelCollisionScript = labelCollisionScript
     super.init()
 
-    container.backgroundColor = .white
+    container.isUserInteractionEnabled = false
+    container.accessibilityElementsHidden = true
     channel.setMethodCallHandler { [weak self] call, result in
       self?.handle(call, result: result)
     }
-    load()
+    DispatchQueue.main.async { [weak self] in self?.load() }
   }
 
   func view() -> UIView {
@@ -379,6 +369,8 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
       result(nil)
     case "trimMemory":
       result(nil)
+    case "debugFault":
+      handleDebugFault(call, result: result)
     case "dispose":
       dispose()
       result(nil)
@@ -387,15 +379,40 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     }
   }
 
-  private func load() {
+  private func load(assetPathOverride: String? = nil) {
     destroyWebView()
     container.subviews.forEach { $0.removeFromSuperview() }
 
+    guard let assetURL = resolvedAssetURL(assetPathOverride ?? assetPath) else {
+      reportAssetLoadFailed()
+      return
+    }
+    initialAssetURL = assetURL
+
     let configuration = WKWebViewConfiguration()
+    WKContentRuleListStore.default().compileContentRuleList(
+      forIdentifier: "easysubway-route-map-block-network",
+      encodedContentRuleList: """
+        [{"trigger":{"url-filter":"^https?://.*"},"action":{"type":"block"}}]
+        """
+    ) { [weak self] ruleList, error in
+      guard let self, self.initialAssetURL == assetURL, let ruleList, error == nil else {
+        self?.reportAssetLoadFailed()
+        return
+      }
+      configuration.userContentController.add(ruleList)
+      self.loadDocument(assetURL, configuration: configuration)
+    }
+  }
+
+  private func loadDocument(_ assetURL: URL, configuration: WKWebViewConfiguration) {
+    guard initialAssetURL == assetURL else { return }
     let svgWebView = WKWebView(frame: container.bounds, configuration: configuration)
     webView = svgWebView
     svgWebView.navigationDelegate = self
-    svgWebView.backgroundColor = .white
+    svgWebView.isUserInteractionEnabled = false
+    svgWebView.accessibilityElementsHidden = true
+    svgWebView.backgroundColor = .clear
     svgWebView.isOpaque = false
     svgWebView.scrollView.isScrollEnabled = false
     svgWebView.scrollView.bounces = false
@@ -411,55 +428,42 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
       svgWebView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
     ])
 
-    svgWebView.loadHTMLString(htmlForSvg(), baseURL: Bundle.main.resourceURL)
+    svgWebView.loadFileURL(assetURL, allowingReadAccessTo: assetURL.deletingLastPathComponent())
   }
 
-  private func htmlForSvg() -> String {
-    guard mimeType == "image/svg+xml", !assetPath.isEmpty else {
-      return emptyHtml()
-    }
-    let lookupKey = FlutterDartProject.lookupKey(forAsset: assetPath)
-    guard let assetURL = Bundle.main.url(forResource: lookupKey, withExtension: nil) else {
-      return emptyHtml()
-    }
-    guard let svg = try? String(contentsOf: assetURL, encoding: .utf8) else {
-      return emptyHtml()
-    }
-    return """
-      <!doctype html>
-      <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <style>
-          html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
-          svg { display: block; width: 100%; height: 100%; }
-        </style>
-        <script>\(labelCollisionScript)</script>
-      </head>
-      <body>\(svg)</body>
-      </html>
-      """
-  }
-
-  private func emptyHtml() -> String {
-    "<!doctype html><html><body></body></html>"
+  private func resolvedAssetURL(_ path: String) -> URL? {
+    guard mimeType == "image/svg+xml", !path.isEmpty else { return nil }
+    let lookupKey = FlutterDartProject.lookupKey(forAsset: path)
+    return Bundle.main.url(forResource: lookupKey, withExtension: nil)
   }
 
   private func applyViewBox() {
     guard let currentWebView = webView else {
+      reportCameraApplyFailed()
       return
     }
-    let values = normalizedViewBox()
+    let values = viewBox
+    guard isValidViewBox(values) else {
+      reportCameraApplyFailed()
+      return
+    }
     let frameRevision = revision
-    let script = String(
-      format:
-        "(function(){const svg=document.querySelector('svg');if(!svg){return false;}svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');try{if(window.easysubwayApplyRouteMapLabelPolicy){window.easysubwayApplyRouteMapLabelPolicy();}}catch(e){}return true;})();",
-      locale: Locale(identifier: "en_US_POSIX"),
-      values[0],
-      values[1],
-      values[2],
-      values[3]
-    )
+    let encodedValues = values.map { String($0) }.joined(separator: ",")
+    let script = """
+      (function(){
+        const values=[\(encodedValues)];
+        const svg=document.documentElement;
+        if(!svg||svg.tagName.toLowerCase()!=='svg'||values.length!==4||!values.every(Number.isFinite)||values[2]<=0||values[3]<=0){return false;}
+        const allowed=['viewBox','width','height','preserveAspectRatio'];
+        const snapshot=(node)=>{const clone=node.cloneNode(true);for(const name of allowed){clone.removeAttribute(name);}return clone.outerHTML;};
+        const before=snapshot(svg);
+        svg.setAttribute('viewBox',values.join(' '));
+        svg.setAttribute('width',String(values[2]));
+        svg.setAttribute('height',String(values[3]));
+        svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+        return before===snapshot(svg);
+      })();
+      """
     currentWebView.evaluateJavaScript(script) { [weak self, weak currentWebView] result, _ in
       guard
         let self,
@@ -467,36 +471,53 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
         self.webView === currentWebView,
         result as? Bool == true
       else {
+        self?.reportCameraApplyFailed()
         return
       }
       self.channel.invokeMethod("framePresented", arguments: ["revision": frameRevision])
     }
   }
 
-  private func normalizedViewBox() -> [Double] {
-    if viewBox.count == 4, viewBox[2] > 0.0, viewBox[3] > 0.0 {
-      return viewBox
-    }
-    return [0.0, 0.0, max(sourceWidth, 1.0), max(sourceHeight, 1.0)]
+  private func isValidViewBox(_ values: [Double]) -> Bool {
+    values.count == 4 && values.allSatisfy { $0.isFinite } && values[2] > 0 && values[3] > 0
   }
 
-  private func showFallback(for terminatedWebView: WKWebView) {
-    guard webView === terminatedWebView else {
-      return
-    }
+  private func reportAssetLoadFailed() {
+    channel.invokeMethod("assetLoadFailed", arguments: nil)
+  }
+
+  private func reportCameraApplyFailed() {
+    channel.invokeMethod("cameraApplyFailed", arguments: nil)
+  }
+
+  private func handleProcessGone(_ terminatedWebView: WKWebView?, didCrash: Bool) {
+    guard terminatedWebView == nil || webView === terminatedWebView else { return }
+    channel.invokeMethod("processGone", arguments: ["didCrash": didCrash])
     destroyWebView()
-    let label = UILabel()
-    label.text = "노선도를 다시 불러오지 못했습니다."
-    label.textColor = .black
-    label.textAlignment = .center
-    label.translatesAutoresizingMaskIntoConstraints = false
-    container.addSubview(label)
-    NSLayoutConstraint.activate([
-      label.leadingAnchor.constraint(equalTo: container.leadingAnchor),
-      label.trailingAnchor.constraint(equalTo: container.trailingAnchor),
-      label.topAnchor.constraint(equalTo: container.topAnchor),
-      label.bottomAnchor.constraint(equalTo: container.bottomAnchor),
-    ])
+    container.subviews.forEach { $0.removeFromSuperview() }
+  }
+
+  private func handleDebugFault(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    #if DEBUG
+    result(nil)
+    let kind = (call.arguments as? [String: Any])?["kind"] as? String
+    DispatchQueue.main.async { [weak self] in
+      guard let self else { return }
+      switch kind {
+      case "invalidAsset":
+        self.load(assetPathOverride: "assets/datapacks/metro_map_pack/basemap/__missing_route_map__.svg")
+      case "invalidViewBox":
+        self.viewBox = [0, 0, .nan, 1]
+        self.applyViewBox()
+      case "debugProcessGone":
+        self.handleProcessGone(self.webView, didCrash: true)
+      default:
+        self.reportAssetLoadFailed()
+      }
+    }
+    #else
+    result(FlutterError(code: "debugUnavailable", message: "debug faults are unavailable in release", details: nil))
+    #endif
   }
 
   private func dispose() {
@@ -516,19 +537,15 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   }
 
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-    guard self.webView === webView else {
+    guard self.webView === webView, webView.url == initialAssetURL else {
+      reportAssetLoadFailed()
       return
     }
-    channel.invokeMethod("assetReady", arguments: nil)
     applyViewBox()
   }
 
   func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {
-    guard self.webView === webView else {
-      return
-    }
-    channel.invokeMethod("processGone", arguments: ["didCrash": true])
-    showFallback(for: webView)
+    handleProcessGone(webView, didCrash: true)
   }
 
   func webView(
@@ -536,15 +553,33 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     decidePolicyFor navigationAction: WKNavigationAction,
     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
   ) {
-    guard let scheme = navigationAction.request.url?.scheme?.lowercased() else {
+    if navigationAction.request.url == initialAssetURL {
       decisionHandler(.allow)
       return
     }
-    if scheme == "about" || scheme == "file" {
-      decisionHandler(.allow)
-      return
-    }
+    reportAssetLoadFailed()
     decisionHandler(.cancel)
+  }
+
+  func webView(
+    _ webView: WKWebView,
+    decidePolicyFor navigationResponse: WKNavigationResponse,
+    decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
+  ) {
+    if navigationResponse.response.url == initialAssetURL {
+      decisionHandler(.allow)
+      return
+    }
+    reportAssetLoadFailed()
+    decisionHandler(.cancel)
+  }
+
+  func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+    reportAssetLoadFailed()
+  }
+
+  func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+    reportAssetLoadFailed()
   }
 }
 

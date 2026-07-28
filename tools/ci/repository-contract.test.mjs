@@ -65,6 +65,62 @@ function collapseQuotedStringConcatenations(source) {
 
 const adEventEndpointOccurrence = /\/api\/ads\/events(?=["']|\?|$)/g;
 
+test("native route map은 canonical SVG 문서만 무수정 표시한다", () => {
+  const android = read("apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/RouteMapViewportWebView.kt");
+  const ios = read("apps/mobile/ios/Runner/AppDelegate.swift");
+  const iosProject = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
+  const iosViewport = ios.slice(ios.indexOf("private final class RouteMapViewportWebViewFactory"));
+  const runnerDebugConfiguration = iosProject.match(
+    /97C147061CF9000F007C117D \/\* Debug \*\/ = \{[\s\S]*?name = Debug;/,
+  )?.[0] ?? "";
+  const runnerReleaseConfiguration = iosProject.match(
+    /97C147071CF9000F007C117D \/\* Release \*\/ = \{[\s\S]*?name = Release;/,
+  )?.[0] ?? "";
+  const runnerProfileConfiguration = iosProject.match(
+    /249021D4217E4FDB00AE95B9 \/\* Profile \*\/ = \{[\s\S]*?name = Profile;/,
+  )?.[0] ?? "";
+
+  for (const [platform, source] of [["Android", android], ["iOS", iosViewport]]) {
+    assert.doesNotMatch(source, /labelCollisionScript|htmlForSvg|emptyHtml|loadHTMLString|loadDataWithBaseURL|UILabel/,
+      `${platform} must not wrap, rewrite, or replace the canonical SVG document`);
+    assert.match(source, /assetLoadFailed/, `${platform} must fail closed on asset/navigation/load errors`);
+    assert.match(source, /cameraApplyFailed/, `${platform} must fail closed on camera errors`);
+    assert.match(source, /processGone/, `${platform} must surface renderer loss`);
+    assert.match(source, /debugProcessGone/, `${platform} must expose a debug-only renderer-loss fault`);
+    assert.match(source, /document\.documentElement/, `${platform} camera script must require the SVG root`);
+    assert.match(source, /cloneNode\(true\)/, `${platform} camera script must snapshot before mutation`);
+    assert.match(source, /preserveAspectRatio/, `${platform} camera script must change only viewport root attributes`);
+    assert.match(source, /isFinite/, `${platform} must reject non-finite camera dimensions`);
+  }
+
+  assert.match(android, /loadUrl\(resolvedUrl\)/);
+  assert.match(android, /file:\/\/\/android_asset\//);
+  assert.match(android, /isClickable = false/);
+  assert.match(android, /setOnTouchListener \{ _, _ -> true \}/);
+  assert.match(android, /importantForAccessibility = View\.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS/);
+  assert.match(android, /initialAssetUrl/);
+  assert.match(android, /request\.url\.toString\(\) == initialAssetUrl/);
+  assert.match(android, /ApplicationInfo\.FLAG_DEBUGGABLE/);
+  assert.match(android, /reportAssetLoadFailedFromWebThread/);
+  assert.match(android, /result != "true"/);
+
+  assert.match(iosViewport, /loadFileURL\(assetURL, allowingReadAccessTo: assetURL\.deletingLastPathComponent\(\)\)/);
+  assert.match(iosViewport, /isUserInteractionEnabled = false/);
+  assert.match(iosViewport, /accessibilityElementsHidden = true/);
+  assert.match(iosViewport, /initialAssetURL/);
+  assert.match(iosViewport, /request\.url == initialAssetURL/);
+  assert.match(iosViewport, /WKContentRuleListStore\.default\(\)\.compileContentRuleList/);
+  assert.match(iosViewport, /url-filter.*https\?/);
+  assert.match(iosViewport, /#if DEBUG/);
+  assert.match(runnerDebugConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;/);
+  assert.doesNotMatch(runnerReleaseConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS/);
+  assert.doesNotMatch(runnerProfileConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS/);
+  assert.match(iosViewport, /result as\? Bool == true/);
+  for (const source of [android, iosViewport]) {
+    assert.match(source, /return before===snapshot\(svg\);/);
+  }
+});
+
 function containsAdEventEndpoint(source) {
   // ponytail: literal/quoted-concat endpoint만 탐지한다. 새 interpolation/variable 광고 endpoint를
   // 허용해야 할 때는 regex를 넓히지 말고 Dart AST 기반 검사로 교체한다.
@@ -19357,7 +19413,7 @@ test("Android 다음 열차 위젯은 로컬 snapshot과 명시적 구성만 사
   assert.match(provider, /easysubway:\/\/station\/detail/);
 });
 
-test("home_widget 호환 iOS deployment target은 모든 configuration에서 14.0 이상이다", () => {
+test("home_widget 호환 iOS deployment target은 모든 configuration에서 15.0 이상이다", () => {
   const project = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
   const deploymentTargets = [
     ...project.matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);/g),
@@ -19365,7 +19421,7 @@ test("home_widget 호환 iOS deployment target은 모든 configuration에서 14.
 
   assert.ok(deploymentTargets.length > 0);
   assert.ok(
-    deploymentTargets.every((target) => Number.parseFloat(target) >= 14),
+    deploymentTargets.every((target) => Number.parseFloat(target) >= 15),
   );
 });
 
