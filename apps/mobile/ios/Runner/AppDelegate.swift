@@ -314,6 +314,17 @@ private final class RouteMapViewportWebViewFactory: NSObject, FlutterPlatformVie
   }
 }
 
+private let routeMapFontAssets: [(weight: Int, path: String)] = [
+  (400, "fonts/Pretendard-Regular.otf"),
+  (600, "fonts/Pretendard-SemiBold.otf"),
+  (700, "fonts/Pretendard-Bold.otf"),
+  (800, "fonts/Pretendard-ExtraBold.otf"),
+  (900, "fonts/Pretendard-Black.otf"),
+]
+// ponytail: local fonts get 5s; add a script bridge only if cold-load evidence exceeds this bound.
+private let fontReadinessMaxAttempts = 100
+private let fontReadinessPollSeconds = 0.05
+
 private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView, WKNavigationDelegate {
   private let container: UIView
   private let channel: FlutterMethodChannel
@@ -325,6 +336,9 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   private var initialAssetURL: URL?
   private var loadGeneration = 0
   private var isDisposed = false
+  private var fontURLs: [Int: URL] = [:]
+  private var documentReady = false
+  private var fontReadinessAttempts = 0
 
   init(
     frame: CGRect,
@@ -364,7 +378,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
       let params = call.arguments as? [String: Any] ?? [:]
       viewBox = params["viewBox"].asDoubleList()
       revision = params["revision"].asInt()
-      applyViewBox()
+      if documentReady { applyViewBox() }
       result(nil)
     case "reload":
       load()
@@ -385,15 +399,22 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     guard !isDisposed else { return }
     loadGeneration += 1
     let generation = loadGeneration
+    documentReady = false
+    fontReadinessAttempts = 0
+    fontURLs = [:]
     destroyWebView()
     container.subviews.forEach { $0.removeFromSuperview() }
     initialAssetURL = nil
 
-    guard let assetURL = resolvedAssetURL(assetPathOverride ?? assetPath) else {
+    guard
+      let assetURL = resolvedAssetURL(assetPathOverride ?? assetPath),
+      let resolvedFonts = resolvedFontURLs()
+    else {
       reportAssetLoadFailed()
       return
     }
     initialAssetURL = assetURL
+    fontURLs = resolvedFonts
 
     let configuration = WKWebViewConfiguration()
     WKContentRuleListStore.default().compileContentRuleList(
@@ -419,6 +440,15 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
 
   private func loadDocument(_ assetURL: URL, generation: Int, configuration: WKWebViewConfiguration) {
     guard isCurrentLoad(generation, assetURL: assetURL) else { return }
+    guard let regularFontURL = fontURLs[400] else {
+      reportAssetLoadFailed()
+      return
+    }
+    let readAccessURL = regularFontURL.deletingLastPathComponent().deletingLastPathComponent()
+    guard assetURL.standardizedFileURL.path.hasPrefix(readAccessURL.standardizedFileURL.path + "/") else {
+      reportAssetLoadFailed()
+      return
+    }
     let svgWebView = WKWebView(frame: container.bounds, configuration: configuration)
     webView = svgWebView
     svgWebView.navigationDelegate = self
@@ -440,13 +470,103 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
       svgWebView.bottomAnchor.constraint(equalTo: container.bottomAnchor),
     ])
 
-    svgWebView.loadFileURL(assetURL, allowingReadAccessTo: assetURL.deletingLastPathComponent())
+    svgWebView.loadFileURL(assetURL, allowingReadAccessTo: readAccessURL)
   }
 
   private func resolvedAssetURL(_ path: String) -> URL? {
     guard mimeType == "image/svg+xml", !path.isEmpty else { return nil }
     let lookupKey = FlutterDartProject.lookupKey(forAsset: path)
     return Bundle.main.url(forResource: lookupKey, withExtension: nil)
+  }
+
+  private func resolvedFontURLs() -> [Int: URL]? {
+    var urls: [Int: URL] = [:]
+    for font in routeMapFontAssets {
+      let lookupKey = FlutterDartProject.lookupKey(forAsset: font.path)
+      guard let url = Bundle.main.url(forResource: lookupKey, withExtension: nil) else { return nil }
+      urls[font.weight] = url
+    }
+    return urls
+  }
+
+  private func prepareDocument(_ currentWebView: WKWebView) {
+    let css = routeMapFontAssets.compactMap { font -> String? in
+      guard let url = fontURLs[font.weight] else { return nil }
+      return "@font-face{font-family:'Pretendard';src:url('\(url.absoluteString)') format('opentype');" +
+        "font-weight:\(font.weight);font-style:normal;font-display:block;}"
+    }.joined()
+    guard css.isEmpty == false, let cssLiteral = javaScriptLiteral(css) else {
+      reportAssetLoadFailed()
+      return
+    }
+    // The asset stays byte-identical; this only resolves its declared Pretendard family.
+    let script = """
+      (function(){
+        const svg=document.documentElement;
+        if(!svg||svg.tagName.toLowerCase()!=='svg'||!document.fonts){return false;}
+        const style=document.createElementNS('http://www.w3.org/2000/svg','style');
+        style.textContent=\(cssLiteral);
+        svg.insertBefore(style,svg.firstChild);
+        const allowed=['viewBox','width','height','preserveAspectRatio'];
+        window.__easySubwaySvgIntegrityViolation=false;
+        const observer=new MutationObserver((records)=>{
+          for(const record of records){
+            if(record.type==='attributes'&&record.target===svg&&allowed.includes(record.attributeName)){continue;}
+            window.__easySubwaySvgIntegrityViolation=true;
+            observer.disconnect();
+            break;
+          }
+        });
+        observer.observe(svg,{subtree:true,childList:true,characterData:true,attributes:true});
+        window.__easySubwaySvgObserver=observer;
+        window.__easySubwayFontState='pending';
+        const specs=['400 12px Pretendard','600 12px Pretendard','700 12px Pretendard','800 12px Pretendard','900 12px Pretendard'];
+        Promise.all(specs.map((spec)=>document.fonts.load(spec,'가'))).then(()=>{
+          window.__easySubwayFontState=specs.every((spec)=>document.fonts.check(spec,'가'))?'ready':'failed';
+        }).catch(()=>{window.__easySubwayFontState='failed';});
+        return true;
+      })();
+      """
+    currentWebView.evaluateJavaScript(script) { [weak self, weak currentWebView] result, _ in
+      guard let self, let currentWebView, self.webView === currentWebView, result as? Bool == true else {
+        self?.reportAssetLoadFailed()
+        return
+      }
+      self.pollDocumentReady(currentWebView)
+    }
+  }
+
+  private func pollDocumentReady(_ currentWebView: WKWebView) {
+    guard webView === currentWebView, !documentReady else { return }
+    currentWebView.evaluateJavaScript("window.__easySubwayFontState || 'failed'") {
+      [weak self, weak currentWebView] result, _ in
+      guard let self, let currentWebView, self.webView === currentWebView, !self.documentReady else { return }
+      switch result as? String {
+      case "ready":
+        self.documentReady = true
+        self.applyViewBox()
+      case "failed":
+        self.reportAssetLoadFailed()
+      default:
+        self.fontReadinessAttempts += 1
+        guard self.fontReadinessAttempts < fontReadinessMaxAttempts else {
+          self.reportAssetLoadFailed()
+          return
+        }
+        DispatchQueue.main.asyncAfter(deadline: .now() + fontReadinessPollSeconds) { [weak self, weak currentWebView] in
+          guard let self, let currentWebView else { return }
+          self.pollDocumentReady(currentWebView)
+        }
+      }
+    }
+  }
+
+  private func javaScriptLiteral(_ value: String) -> String? {
+    guard
+      let data = try? JSONSerialization.data(withJSONObject: [value]),
+      let json = String(data: data, encoding: .utf8)
+    else { return nil }
+    return String(json.dropFirst().dropLast())
   }
 
   private func applyViewBox() {
@@ -465,15 +585,12 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
       (function(){
         const values=[\(encodedValues)];
         const svg=document.documentElement;
-        if(!svg||svg.tagName.toLowerCase()!=='svg'||values.length!==4||!values.every(Number.isFinite)||values[2]<=0||values[3]<=0){return false;}
-        const allowed=['viewBox','width','height','preserveAspectRatio'];
-        const snapshot=(node)=>{const clone=node.cloneNode(true);for(const name of allowed){clone.removeAttribute(name);}return clone.outerHTML;};
-        const before=snapshot(svg);
+        if(!svg||svg.tagName.toLowerCase()!=='svg'||window.__easySubwaySvgIntegrityViolation===true||values.length!==4||!values.every(Number.isFinite)||values[2]<=0||values[3]<=0){return false;}
         svg.setAttribute('viewBox',values.join(' '));
         svg.setAttribute('width','100%');
         svg.setAttribute('height','100%');
         svg.setAttribute('preserveAspectRatio','xMidYMid meet');
-        return before===snapshot(svg);
+        return true;
       })();
       """
     currentWebView.evaluateJavaScript(script) { [weak self, weak currentWebView] result, _ in
@@ -507,6 +624,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     channel.invokeMethod("processGone", arguments: ["didCrash": didCrash])
     destroyWebView()
     container.subviews.forEach { $0.removeFromSuperview() }
+    documentReady = false
   }
 
   private func handleDebugFault(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -557,7 +675,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
       reportAssetLoadFailed()
       return
     }
-    applyViewBox()
+    prepareDocument(webView)
   }
 
   func webViewWebContentProcessDidTerminate(_ webView: WKWebView) {

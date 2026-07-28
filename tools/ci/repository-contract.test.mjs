@@ -89,11 +89,15 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
     assert.match(source, /processGone/, `${platform} must surface renderer loss`);
     assert.match(source, /debugProcessGone/, `${platform} must expose a debug-only renderer-loss fault`);
     assert.match(source, /document\.documentElement/, `${platform} camera script must require the SVG root`);
-    assert.match(source, /cloneNode\(true\)/, `${platform} camera script must snapshot before mutation`);
+    assert.doesNotMatch(
+      source,
+      /cloneNode\(true\)|outerHTML/,
+      `${platform} camera updates must not clone or serialize the full SVG DOM`,
+    );
     assert.match(
       source,
       /const allowed=\['viewBox','width','height','preserveAspectRatio'\];/,
-      `${platform} camera snapshot must name exactly the allowed root attributes`,
+      `${platform} integrity guard must name exactly the allowed root attributes`,
     );
     assert.match(source, /isFinite/, `${platform} must reject non-finite camera dimensions`);
     assert.deepEqual(
@@ -113,11 +117,18 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
       /svg\.setAttribute\('(width|height)',String\(values\[[23]\]\)\);/,
       `${platform} must not interpret source-coordinate dimensions as CSS pixels`,
     );
-    assert.match(
-      source,
-      /const before=snapshot\(svg\);[\s\S]*return before===snapshot\(svg\);/,
-      `${platform} must gate success on immutable SVG snapshot equality`,
-    );
+    assert.match(source, /MutationObserver/, `${platform} must monitor non-camera DOM mutations`);
+    assert.match(source, /document\.fonts\.load/, `${platform} must await bundled web fonts`);
+    assert.match(source, /@font-face/, `${platform} must register Pretendard in the WebView document`);
+    assert.match(source, /font-display:block/, `${platform} must not expose fallback-font frames`);
+    assert.match(source, /Pretendard-Regular\.otf/);
+    assert.match(source, /Pretendard-SemiBold\.otf/);
+    assert.match(source, /Pretendard-Bold\.otf/);
+    assert.match(source, /Pretendard-ExtraBold\.otf/);
+    assert.match(source, /Pretendard-Black\.otf/);
+    assert.match(source, /documentReady/, `${platform} must queue camera state until SVG and fonts are ready`);
+    assert.match(source, /prepareDocument/, `${platform} must prepare the canonical document once per load`);
+    assert.match(source, /fontReadinessAttempts/, `${platform} font readiness polling must be bounded`);
   }
 
   assert.match(android, /loadUrl\(resolvedUrl\)/);
@@ -141,7 +152,7 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
     /if \(webView !== currentWebView \|\| result != "true"\) \{[\s\S]*reportCameraApplyFailed\(\)[\s\S]*\} else \{[\s\S]*framePresented/,
   );
 
-  assert.match(iosViewport, /loadFileURL\(assetURL, allowingReadAccessTo: assetURL\.deletingLastPathComponent\(\)\)/);
+  assert.match(iosViewport, /loadFileURL\(assetURL, allowingReadAccessTo: readAccessURL\)/);
   assert.match(iosViewport, /isUserInteractionEnabled = false/);
   assert.match(iosViewport, /accessibilityElementsHidden = true/);
   assert.match(iosViewport, /initialAssetURL/);

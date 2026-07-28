@@ -21,6 +21,19 @@ import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
 import java.io.ByteArrayInputStream
 import java.io.IOException
+import org.json.JSONObject
+
+private val routeMapFontAssets = listOf(
+    400 to "fonts/Pretendard-Regular.otf",
+    600 to "fonts/Pretendard-SemiBold.otf",
+    700 to "fonts/Pretendard-Bold.otf",
+    800 to "fonts/Pretendard-ExtraBold.otf",
+    900 to "fonts/Pretendard-Black.otf",
+)
+
+// ponytail: local fonts get 5s; add a JS bridge only if cold-load evidence exceeds this bound.
+private const val fontReadinessMaxAttempts = 100
+private const val fontReadinessPollMillis = 50L
 
 class RouteMapViewportWebViewFactory(
     codec: StandardMessageCodec,
@@ -63,6 +76,9 @@ private class RouteMapViewportPlatformView(
     )
     private var webView: WebView? = null
     private var initialAssetUrl: String? = null
+    private var fontUrls = emptySet<String>()
+    private var documentReady = false
+    private var fontReadinessAttempts = 0
 
     init {
         channel.setMethodCallHandler { call, result ->
@@ -70,7 +86,7 @@ private class RouteMapViewportPlatformView(
                 "setCamera" -> {
                     viewBox = call.argument<Any>("viewBox").asDoubleList()
                     revision = call.argument<Any>("revision").asInt()
-                    applyViewBox()
+                    if (documentReady) applyViewBox()
                     result.success(null)
                 }
                 "reload" -> {
@@ -94,14 +110,19 @@ private class RouteMapViewportPlatformView(
     }
 
     private fun load(assetPathOverride: String? = null) {
+        documentReady = false
+        fontReadinessAttempts = 0
+        fontUrls = emptySet()
         destroyWebView()
         container.removeAllViews()
         val resolvedUrl = resolvedAssetUrl(assetPathOverride ?: assetPath)
-        if (resolvedUrl == null) {
+        val resolvedFonts = resolvedFontUrls()
+        if (resolvedUrl == null || resolvedFonts == null) {
             reportAssetLoadFailed()
             return
         }
         initialAssetUrl = resolvedUrl
+        fontUrls = resolvedFonts.values.toSet()
         val svgWebView = WebView(container.context).apply {
             isClickable = false
             isFocusable = false
@@ -140,6 +161,20 @@ private class RouteMapViewportPlatformView(
         }
     }
 
+    private fun resolvedFontUrls(): Map<Int, String>? {
+        return try {
+            routeMapFontAssets.associate { (weight, path) ->
+                val lookupKey = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(path)
+                container.context.assets.open(lookupKey).close()
+                weight to "file:///android_asset/$lookupKey"
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
     private fun routeMapWebViewClient(): WebViewClient = object : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val allowed = request.url.toString() == initialAssetUrl
@@ -155,7 +190,8 @@ private class RouteMapViewportPlatformView(
         }
 
         override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
-            if (request.url.toString() == initialAssetUrl) return null
+            val url = request.url.toString()
+            if (url == initialAssetUrl || url in fontUrls) return null
             reportAssetLoadFailedFromWebThread()
             return WebResourceResponse("text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)))
         }
@@ -165,7 +201,7 @@ private class RouteMapViewportPlatformView(
                 reportAssetLoadFailed()
                 return
             }
-            applyViewBox()
+            prepareDocument(view)
         }
 
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
@@ -175,6 +211,77 @@ private class RouteMapViewportPlatformView(
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
             handleProcessGone(view, detail.didCrash())
             return true
+        }
+    }
+
+    private fun prepareDocument(currentWebView: WebView) {
+        val fonts = resolvedFontUrls() ?: run {
+            reportAssetLoadFailed()
+            return
+        }
+        val css = fonts.entries.joinToString("") { (weight, url) ->
+            "@font-face{font-family:'Pretendard';src:url('$url') format('opentype');" +
+                "font-weight:$weight;font-style:normal;font-display:block;}"
+        }
+        // The asset stays byte-identical; this only resolves its declared Pretendard family.
+        val script = """
+            (function(){
+              const svg=document.documentElement;
+              if(!svg||svg.tagName.toLowerCase()!=='svg'||!document.fonts){return false;}
+              const style=document.createElementNS('http://www.w3.org/2000/svg','style');
+              style.textContent=${JSONObject.quote(css)};
+              svg.insertBefore(style,svg.firstChild);
+              const allowed=['viewBox','width','height','preserveAspectRatio'];
+              window.__easySubwaySvgIntegrityViolation=false;
+              const observer=new MutationObserver((records)=>{
+                for(const record of records){
+                  if(record.type==='attributes'&&record.target===svg&&allowed.includes(record.attributeName)){continue;}
+                  window.__easySubwaySvgIntegrityViolation=true;
+                  observer.disconnect();
+                  break;
+                }
+              });
+              observer.observe(svg,{subtree:true,childList:true,characterData:true,attributes:true});
+              window.__easySubwaySvgObserver=observer;
+              window.__easySubwayFontState='pending';
+              const specs=['400 12px Pretendard','600 12px Pretendard','700 12px Pretendard','800 12px Pretendard','900 12px Pretendard'];
+              Promise.all(specs.map((spec)=>document.fonts.load(spec,'가'))).then(()=>{
+                window.__easySubwayFontState=specs.every((spec)=>document.fonts.check(spec,'가'))?'ready':'failed';
+              }).catch(()=>{window.__easySubwayFontState='failed';});
+              return true;
+            })();
+        """.trimIndent()
+        currentWebView.evaluateJavascript(script) { result ->
+            if (webView !== currentWebView || result != "true") {
+                reportAssetLoadFailed()
+                return@evaluateJavascript
+            }
+            pollDocumentReady(currentWebView)
+        }
+    }
+
+    private fun pollDocumentReady(currentWebView: WebView) {
+        if (webView !== currentWebView || documentReady) return
+        currentWebView.evaluateJavascript("window.__easySubwayFontState || 'failed'") { result ->
+            if (webView !== currentWebView || documentReady) return@evaluateJavascript
+            when (result) {
+                "\"ready\"" -> {
+                    documentReady = true
+                    applyViewBox()
+                }
+                "\"failed\"" -> reportAssetLoadFailed()
+                else -> {
+                    fontReadinessAttempts += 1
+                    if (fontReadinessAttempts >= fontReadinessMaxAttempts) {
+                        reportAssetLoadFailed()
+                    } else {
+                        mainHandler.postDelayed(
+                            { pollDocumentReady(currentWebView) },
+                            fontReadinessPollMillis,
+                        )
+                    }
+                }
+            }
         }
     }
 
@@ -194,15 +301,12 @@ private class RouteMapViewportPlatformView(
             (function(){
               const values=[$encodedValues];
               const svg=document.documentElement;
-              if(!svg||svg.tagName.toLowerCase()!=='svg'||values.length!==4||!values.every(Number.isFinite)||values[2]<=0||values[3]<=0){return false;}
-              const allowed=['viewBox','width','height','preserveAspectRatio'];
-              const snapshot=(node)=>{const clone=node.cloneNode(true);for(const name of allowed){clone.removeAttribute(name);}return clone.outerHTML;};
-              const before=snapshot(svg);
+              if(!svg||svg.tagName.toLowerCase()!=='svg'||window.__easySubwaySvgIntegrityViolation===true||values.length!==4||!values.every(Number.isFinite)||values[2]<=0||values[3]<=0){return false;}
               svg.setAttribute('viewBox',values.join(' '));
               svg.setAttribute('width','100%');
               svg.setAttribute('height','100%');
               svg.setAttribute('preserveAspectRatio','xMidYMid meet');
-              return before===snapshot(svg);
+              return true;
             })();
         """.trimIndent()
         currentWebView.evaluateJavascript(script) { result ->
@@ -237,6 +341,7 @@ private class RouteMapViewportPlatformView(
             current.destroy()
         }
         webView = null
+        documentReady = false
     }
 
     private fun handleDebugFault(kind: String?, result: MethodChannel.Result) {
@@ -273,6 +378,7 @@ private class RouteMapViewportPlatformView(
             view.destroy()
         }
         webView = null
+        documentReady = false
     }
 }
 
