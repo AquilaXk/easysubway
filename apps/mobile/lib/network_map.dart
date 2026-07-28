@@ -4487,8 +4487,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   // basemap 6차(#2068): asset id(seoul/busan/...) → station명 → 오너 라벨 앵커.
   // 소비처는 (1) geometry bounds 확장(networkMapOwnerLabelSourceRects — 라벨까지
   // 담아 탭 히트·팬 한계를 맞춘다)과 (2) 초기 카메라 가독 배율뿐이다. 라벨 렌더는
-  // .vec 바탕층이 담당한다(#2068 SVG 충실도). 로드 전·실패 시 null → 두 소비처
-  // 모두 기존(라벨 미반영) 동작으로 안전 폴백한다.
+  // canonical SVG 바탕층이 담당한다(#2068 SVG 충실도). 로드 전·실패 시 null →
+  // 두 소비처 모두 기존(라벨 미반영) 동작으로 안전 폴백한다.
   Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>? _ownerLabelsByRegion;
   // 초기 카메라 가독 배율(#2068 트랙 QA 후속) 캐시 — _readableInitialMapScaleFor.
   double? _readableInitialMapScaleCache;
@@ -6450,8 +6450,8 @@ Rect _ownerLabelLineSourceRect(
 }
 
 /// basemap 오너 라벨 1건의 실제 렌더 rect를 source 좌표로 산출한다(#2068,
-/// 다줄 라벨 렌더 갱신). 라벨 자체는 .vec 바탕층이 그리므로(#2068 SVG 충실도)
-/// 이 rect는 렌더가 아니라 **geometry bounds 확장**(팬 한계·탭 히트 소스 경계)에
+/// 다줄 라벨 렌더 갱신). 라벨 자체는 canonical SVG 바탕층이 그리므로
+/// (#2068 SVG 충실도) 이 rect는 렌더가 아니라 **geometry bounds 확장**에
 /// 쓰인다 — entry.fontSizePx는 이미 source(viewBox) 단위 로컬 font-size라 design
 /// 변환·클램프 없이 그대로 쓴다(클램프가 있으면 bounds가 실제 렌더보다 좁게
 /// 잡혀 라벨이 잘릴 수 있다).

@@ -15,7 +15,7 @@ import 'route_map_transfer_marker.dart';
 // unresolvedOverlapCount로 집계해 감사·튜닝 대상으로 남긴다.
 //
 // #2068 SVG 충실도(2026-07-26 오너 결정) 이후 이 솔버는 **구조화 노선도 모드
-// 전용**이다. 바탕층(basemap) 모드는 오너 SVG 역명 라벨이 .vec에 그대로 구워져
+// 전용**이다. 바탕층(basemap) 모드는 오너 SVG 역명 라벨이 canonical SVG에 있어
 // 앱이 라벨을 아예 그리지 않으므로(structured_route_map_painter.dart의
 // [routeMapPictureLabelLayout]) 솔버를 호출하지 않는다. 그래서 옛 basemap 전용
 // 경로(오너 앵커 고정 배치·권역 중앙값 font-size·노드/표장 장애물 시드·동명
