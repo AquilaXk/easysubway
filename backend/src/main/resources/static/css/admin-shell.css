@@ -313,6 +313,12 @@
 	box-shadow: none;
 }
 
+.admin-topbar-search:focus-within {
+	border-color: var(--admin-border-strong);
+	outline: 3px solid var(--admin-focus);
+	outline-offset: 3px;
+}
+
 .admin-topbar-search input[type="search"]:focus {
 	outline: 0;
 }

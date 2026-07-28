@@ -885,6 +885,8 @@ class AdminDesignGuardTest {
 	@DisplayName("주간 요일은 간결하게 표시하고 확인 필요는 가로 스트립을 사용한다")
 	void dashboardWeeklyAndTriageKeepVisualBreathingRoom() throws IOException {
 		String data = read(CSS_DATA);
+		String shell = read(CSS_SHELL);
+		String dashboard = read("backend/src/main/resources/templates/admin/dashboard.html");
 
 		assertThat(rule(data, "\\.dashboard-week-days"))
 			.contains("margin: 14px 0 0;");
@@ -893,7 +895,13 @@ class AdminDesignGuardTest {
 			.contains("grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));");
 		assertThat(data)
 			.contains(".dashboard-operations-details")
+			.contains("@media (max-width: 1200px) {\n\t.dashboard-overview-grid {\n\t\tgrid-template-columns: 1fr;")
 			.doesNotContain(".admin-dashboard-page .dashboard-urgent,");
+		assertThat(rule(shell, "\\.admin-topbar-search:focus-within"))
+			.contains("outline: 3px solid var(--admin-focus);");
+		assertThat(dashboard.indexOf("dashboardUrgentItems"))
+			.as("긴급 신호는 기본 접힘 상세 지표보다 먼저 렌더한다")
+			.isLessThan(dashboard.indexOf("<details class=\"dashboard-operations-details\">"));
 	}
 
 	@Test
