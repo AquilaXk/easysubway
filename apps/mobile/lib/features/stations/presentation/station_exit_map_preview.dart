@@ -297,6 +297,7 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
     } on Object catch (error, stackTrace) {
       _reportSanitizedError(error, stackTrace, '카카오맵 미리보기 구성 실패');
       if (mounted && generation == _generation) {
+        _finishController();
         setState(() => _mapFailed = true);
       }
     } finally {
@@ -310,14 +311,22 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
     while (mounted && generation == _generation) {
       final selectedExitId = widget.selectedExitId;
       for (final point in _points) {
+        if (!mounted || generation != _generation) {
+          return;
+        }
         final poi = _pois[point.id];
         if (poi != null) {
-          await poi.changeStyles(
-            await _markerStyle(
-              point.number,
-              selected: point.id == selectedExitId,
-            ),
+          final style = await _markerStyle(
+            point.number,
+            selected: point.id == selectedExitId,
           );
+          if (!mounted || generation != _generation) {
+            return;
+          }
+          await poi.changeStyles(style);
+          if (!mounted || generation != _generation) {
+            return;
+          }
         }
       }
       if (selectedExitId == widget.selectedExitId) {
@@ -504,26 +513,38 @@ class _MapMessagePanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    return Container(
-      key: const Key('stationExitMapPreview'),
-      constraints: const BoxConstraints(minHeight: 144),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Text(message, textAlign: TextAlign.center),
-          const SizedBox(height: 4),
-          Text(
-            detail,
-            textAlign: TextAlign.center,
-            style: Theme.of(context).textTheme.bodySmall,
-          ),
-          ?action,
-        ],
+    return Semantics(
+      container: true,
+      explicitChildNodes: true,
+      liveRegion: true,
+      label: '$message $detail',
+      child: Container(
+        key: const Key('stationExitMapPreview'),
+        constraints: const BoxConstraints(minHeight: 144),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            ExcludeSemantics(
+              child: Column(
+                children: [
+                  Text(message, textAlign: TextAlign.center),
+                  const SizedBox(height: 4),
+                  Text(
+                    detail,
+                    textAlign: TextAlign.center,
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                ],
+              ),
+            ),
+            ?action,
+          ],
+        ),
       ),
     );
   }

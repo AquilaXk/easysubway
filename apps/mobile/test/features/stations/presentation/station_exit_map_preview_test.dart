@@ -80,16 +80,11 @@ void main() {
       selectedExitId: 'exit-2',
       nativeMapBuilder: _readyMapBuilder(controller),
     );
-    for (
-      var attempt = 0;
-      attempt < 10 && controller.labels.addPoiCount < 2;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 10)),
-      );
-      await tester.pump();
-    }
+    await _pumpUntil(
+      tester,
+      () => controller.labels.addPoiCount >= 2,
+      reason: '선택 출구 fallback marker까지 준비되어야 한다',
+    );
 
     expect(controller.labels.positions['exit-2']!.latitude, 37.302795);
     expect(controller.labels.positions['exit-2']!.longitude, 126.866489);
@@ -132,6 +127,59 @@ void main() {
 
     expect(keys, hasLength(2));
     expect(keys[0], isNot(keys[1]));
+  });
+
+  testWidgets('지도 구성 실패는 controller를 종료한다', (tester) async {
+    final controller = _FakeKakaoMapController(failSetClickable: true);
+
+    await runWithMobileErrorReporter((_) {}, () async {
+      await _pumpPreview(
+        tester,
+        nativeMapBuilder: _readyMapBuilder(controller),
+      );
+      await _pumpUntil(
+        tester,
+        () => controller.finishCount == 1,
+        reason: '구성 실패 뒤 controller가 종료되어야 한다',
+      );
+      await tester.pump();
+    });
+
+    expect(find.text('지도 미리보기를 불러오지 못했어요.'), findsOneWidget);
+  });
+
+  testWidgets('SDK 오류 안내는 live region으로 전환된다', (tester) async {
+    final semanticsHandle = tester.ensureSemantics();
+    void Function(Error)? reportError;
+    await _pumpPreview(
+      tester,
+      nativeMapBuilder:
+          ({
+            required key,
+            required option,
+            required onMapReady,
+            required onMapError,
+          }) {
+            reportError = onMapError;
+            return const ColoredBox(color: Colors.grey);
+          },
+    );
+
+    await runWithMobileErrorReporter((_) {}, () async {
+      reportError!(_FakeMapError());
+      await tester.pump();
+    });
+
+    expect(
+      tester.getSemantics(
+        find.bySemanticsLabel('지도 미리보기를 불러오지 못했어요. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.'),
+      ),
+      isSemantics(
+        label: '지도 미리보기를 불러오지 못했어요. 네트워크 상태를 확인한 뒤 다시 시도해 주세요.',
+        isLiveRegion: true,
+      ),
+    );
+    semanticsHandle.dispose();
   });
 
   testWidgets('SDK 오류 안내는 큰 글자에서 144dp보다 높게 확장된다', (tester) async {
@@ -313,28 +361,21 @@ void main() {
     await tester.runAsync(
       () => Future<void>.delayed(const Duration(milliseconds: 20)),
     );
-    for (
-      var attempt = 0;
-      attempt < 10 && controller.labels.addPoiCount == 0;
-      attempt++
-    ) {
-      await tester.pump(const Duration(milliseconds: 1));
-    }
+    await _pumpUntil(
+      tester,
+      () => controller.labels.addPoiCount > 0,
+      reason: '첫 marker 구성이 시작되어야 한다',
+    );
     expect(controller.labels.addPoiCount, 1);
 
     updateHost(() => selectedExitId = 'exit-2');
     await tester.pump();
     firstPoiGate.complete();
-    for (
-      var attempt = 0;
-      attempt < 10 && controller.labels.changeStyleCount < 2;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 10)),
-      );
-      await tester.pump();
-    }
+    await _pumpUntil(
+      tester,
+      () => controller.labels.changeStyleCount >= 2,
+      reason: '현재 선택으로 marker style이 수렴해야 한다',
+    );
     await tester.pumpAndSettle();
 
     expect(controller.labels.changeStyleCount, 2);
@@ -369,16 +410,11 @@ void main() {
         ),
       ),
     );
-    for (
-      var attempt = 0;
-      attempt < 10 && controller.labels.addPoiCount < 2;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 10)),
-      );
-      await tester.pump();
-    }
+    await _pumpUntil(
+      tester,
+      () => controller.labels.addPoiCount >= 2,
+      reason: '선택 변경 전 marker 두 개가 준비되어야 한다',
+    );
     final delayedOldChange = Completer<void>();
     controller.labels.pois['exit-1']!.nextChangeGate = delayedOldChange;
 
@@ -387,21 +423,77 @@ void main() {
     updateHost(() => selectedExitId = 'exit-1');
     await tester.pump();
     delayedOldChange.complete();
-    for (
-      var attempt = 0;
-      attempt < 10 && controller.labels.changeStyleCount < 4;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 10)),
-      );
-      await tester.pump();
-    }
+    await _pumpUntil(
+      tester,
+      () => controller.labels.changeStyleCount >= 4,
+      reason: '연속 선택 변경의 style 작업이 완료되어야 한다',
+    );
     await tester.pumpAndSettle();
 
     expect(controller.labels.changeStyleCount, greaterThanOrEqualTo(4));
     expect(controller.labels.pois['exit-1']!.lastStyle.icon!.width, 36);
     expect(controller.labels.pois['exit-2']!.lastStyle.icon!.width, 32);
+  });
+
+  testWidgets('위젯이 제거되면 진행 중인 marker style 동기화를 멈춘다', (tester) async {
+    final controller = _FakeKakaoMapController();
+    var selectedExitId = 'exit-1';
+    final exits = [
+      _exit(id: 'exit-1', number: '1', latitude: 37.301, longitude: 126.861),
+      _exit(id: 'exit-2', number: '2', latitude: 37.302, longitude: 126.862),
+    ];
+    late StateSetter updateHost;
+    final reportedErrors = <FlutterErrorDetails>[];
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateHost = setState;
+            return Scaffold(
+              body: StationExitMapPreview(
+                station: _station(),
+                exits: exits,
+                selectedExitId: selectedExitId,
+                onOpenSelected: () {},
+                nativeAppKey: 'test-native-map-key',
+                nativeMapBuilder: _readyMapBuilder(controller),
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await _pumpUntil(
+      tester,
+      () => controller.labels.addPoiCount == 2,
+      reason: '초기 marker 두 개가 준비되어야 한다',
+    );
+    final oldStyleGate = Completer<void>();
+    controller.labels.pois['exit-1']!.nextChangeGate = oldStyleGate;
+
+    await runWithMobileErrorReporter(
+      (details) => reportedErrors.add(details),
+      () async {
+        updateHost(() => selectedExitId = 'exit-2');
+        await tester.pump();
+        await _pumpUntil(
+          tester,
+          () => controller.labels.pois['exit-1']!.nextChangeGate == null,
+          reason: '첫 marker style 변경이 시작되어야 한다',
+        );
+        await tester.pumpWidget(const SizedBox.shrink());
+        oldStyleGate.complete();
+        await tester.runAsync(
+          () => Future<void>.delayed(const Duration(milliseconds: 20)),
+        );
+        await tester.pump();
+      },
+    );
+
+    expect(controller.finishCount, 1);
+    expect(reportedErrors, isEmpty);
+    expect(controller.labels.pois['exit-2']!.changeStyleCount, 0);
   });
 
   testWidgets('카메라 이동 중 출구를 바꿔도 현재 선택 marker로 수렴한다', (tester) async {
@@ -432,31 +524,21 @@ void main() {
         ),
       ),
     );
-    for (
-      var attempt = 0;
-      attempt < 10 && controller.moveCameraCount == 0;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 10)),
-      );
-      await tester.pump();
-    }
+    await _pumpUntil(
+      tester,
+      () => controller.moveCameraCount > 0,
+      reason: '카메라 이동이 시작되어야 한다',
+    );
     expect(controller.moveCameraCount, 1);
 
     updateHost(() => selectedExitId = 'exit-2');
     await tester.pump();
     moveCameraGate.complete();
-    for (
-      var attempt = 0;
-      attempt < 10 && controller.labels.changeStyleCount < 2;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 10)),
-      );
-      await tester.pump();
-    }
+    await _pumpUntil(
+      tester,
+      () => controller.labels.changeStyleCount >= 2,
+      reason: '카메라 이동 뒤 선택 style이 수렴해야 한다',
+    );
     await tester.pumpAndSettle();
 
     expect(controller.labels.pois['exit-1']!.lastStyle.icon!.width, 32);
@@ -512,13 +594,11 @@ void main() {
       ),
     );
     await tester.pump();
-    for (
-      var attempt = 0;
-      attempt < 10 && oldController.labels.addPoiCount == 0;
-      attempt++
-    ) {
-      await tester.pump(const Duration(milliseconds: 1));
-    }
+    await _pumpUntil(
+      tester,
+      () => oldController.labels.addPoiCount > 0,
+      reason: '이전 지도의 marker 구성이 시작되어야 한다',
+    );
 
     await runWithMobileErrorReporter((_) {}, () async {
       failMap(_FakeMapError());
@@ -526,16 +606,11 @@ void main() {
     });
     await tester.tap(find.widgetWithText(TextButton, '다시 시도'));
     await tester.pump();
-    for (
-      var attempt = 0;
-      attempt < 10 && newController.labels.addPoiCount < 2;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 10)),
-      );
-      await tester.pump();
-    }
+    await _pumpUntil(
+      tester,
+      () => newController.labels.addPoiCount >= 2,
+      reason: '재시도한 지도의 marker 두 개가 준비되어야 한다',
+    );
 
     firstPoiGate.complete();
     await tester.runAsync(
@@ -544,16 +619,11 @@ void main() {
     await tester.pump();
     updateHost(() => selectedExitId = 'exit-2');
     await tester.pump();
-    for (
-      var attempt = 0;
-      attempt < 10 && newController.labels.changeStyleCount < 2;
-      attempt++
-    ) {
-      await tester.runAsync(
-        () => Future<void>.delayed(const Duration(milliseconds: 10)),
-      );
-      await tester.pump();
-    }
+    await _pumpUntil(
+      tester,
+      () => newController.labels.changeStyleCount >= 2,
+      reason: '재시도한 지도의 선택 style이 수렴해야 한다',
+    );
 
     expect(newController.labels.pois['exit-1']!.lastStyle.icon!.width, 32);
     expect(newController.labels.pois['exit-2']!.lastStyle.icon!.width, 36);
@@ -635,6 +705,21 @@ Future<void> _pumpPreview(
       ),
     ),
   );
+}
+
+Future<void> _pumpUntil(
+  WidgetTester tester,
+  bool Function() condition, {
+  required String reason,
+  int attempts = 10,
+}) async {
+  for (var attempt = 0; attempt < attempts && !condition(); attempt++) {
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 10)),
+    );
+    await tester.pump();
+  }
+  expect(condition(), isTrue, reason: reason);
 }
 
 StationExitNativeMapBuilder _recordingMapBuilder({
@@ -730,8 +815,14 @@ class _MapReadyStubState extends State<_MapReadyStub> {
 }
 
 final class _FakeKakaoMapController implements KakaoMapController {
-  _FakeKakaoMapController({Completer<void>? firstPoiGate, this.moveCameraGate})
-    : labels = _FakeLabelController(firstPoiGate: firstPoiGate);
+  _FakeKakaoMapController({
+    Completer<void>? firstPoiGate,
+    this.moveCameraGate,
+    bool failSetClickable = false,
+  }) : labels = _FakeLabelController(
+         firstPoiGate: firstPoiGate,
+         failSetClickable: failSetClickable,
+       );
 
   final _FakeLabelController labels;
   final Completer<void>? moveCameraGate;
@@ -769,9 +860,10 @@ final class _FakeKakaoMapController implements KakaoMapController {
 }
 
 final class _FakeLabelController implements LabelController {
-  _FakeLabelController({this.firstPoiGate});
+  _FakeLabelController({this.firstPoiGate, this.failSetClickable = false});
 
   final Completer<void>? firstPoiGate;
+  final bool failSetClickable;
   final pois = <String, _FakePoi>{};
   final positions = <String, LatLng>{};
   int addPoiCount = 0;
@@ -779,7 +871,11 @@ final class _FakeLabelController implements LabelController {
       pois.values.fold(0, (count, poi) => count + poi.changeStyleCount);
 
   @override
-  Future<void> setClickable(bool clickable) async {}
+  Future<void> setClickable(bool clickable) async {
+    if (failSetClickable) {
+      throw StateError('setClickable failed');
+    }
+  }
 
   @override
   Future<Poi> addPoi(

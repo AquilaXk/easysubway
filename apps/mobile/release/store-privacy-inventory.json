@@ -17,6 +17,7 @@
   "encryptionInTransitRequired": true,
   "userDataDeletionSupported": true,
   "embeddedMapPreview": {
+    "inventoryDataId": "embedded_map_preview_public_coordinates",
     "provider": "kakao-map",
     "loadTrigger": "station_exit_section_visible",
     "sharedData": [
@@ -27,6 +28,11 @@
     "currentLocationShared": false,
     "serverStored": false,
     "tracking": false,
+    "googlePlayLocationClassification": {
+      "included": false,
+      "policyReference": "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+      "rationaleKo": "공개 역·출구 좌표와 이를 포함하도록 계산한 지도 화면 범위는 사용자 또는 기기의 물리적 위치가 아닌 공개된 역·출구 위치이므로 Google Play Data Safety의 Location 항목에서 제외한다. 현재 위치 사용은 precise_location 인벤토리에서 별도로 선언한다."
+    },
     "evidence": [
       "apps/mobile/lib/features/stations/presentation/station_exit_map_preview.dart",
       "apps/mobile/release/external-map-deeplink-policy.json"

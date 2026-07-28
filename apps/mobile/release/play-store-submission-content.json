@@ -188,7 +188,7 @@
   "dataSafetyDeclarations": {
     "tracking": false,
     "sharesDataWithThirdParties": true,
-    "thirdPartySharingScopeKo": "출구 정보가 표시되면 공개 역·출구 좌표와 지도 화면 범위로 카카오맵 미리보기를 자동으로 불러오며 현재 위치는 사용하지 않는다. 사용자가 출구 지도 또는 도보 길안내를 누르면 카카오맵 앱/웹을 열고, 도보 길안내 앱에는 현재 위치 시작 좌표와 목적지 좌표를 전달한다. 이 외부 지도 전달 좌표는 자체 서버에 저장하거나 tracking에 사용하지 않는다.",
+    "thirdPartySharingScopeKo": "출구 정보가 표시되면 공개 역·출구 좌표와 지도 화면 범위로 카카오맵 미리보기를 자동으로 불러오며 현재 위치는 사용하지 않는다. 사용자가 출구 지도 또는 도보 길안내를 누르면 카카오맵 앱/웹 실행을 차례로 시도하고, 모두 사용할 수 없으면 좌표를 복사한다. 도보 길안내 앱에는 현재 위치 시작 좌표와 목적지 좌표를 전달한다. 이 외부 지도 전달 좌표는 자체 서버에 저장하거나 tracking에 사용하지 않는다.",
     "dataEncryptedInTransit": true,
     "dataDeletionRequestSupported": true,
     "requiredFieldsPerDataType": [
@@ -214,6 +214,7 @@
       {
         "dataType": "Location",
         "inventoryDataIds": ["precise_location", "facility_report_location"],
+        "excludedInventoryDataIds": ["embedded_map_preview_public_coordinates"],
         "containsCollectedData": true,
         "containsRequiredData": false,
         "containsOptionalData": true,

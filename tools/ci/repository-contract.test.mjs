@@ -16978,6 +16978,9 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
       `${dataType} matrix optional flag must match inventory`,
     );
   }
+  assert.deepEqual(dataSafetyAnswerMatrix.get("Location").excludedInventoryDataIds, [
+    storePrivacyInventory.embeddedMapPreview.inventoryDataId,
+  ]);
   assert.equal(dataSafetyAnswerMatrix.get("Diagnostics").containsLocalOnlyDiagnostics, true);
   assert.equal(playStoreContent.privacyPolicyRequirements.urlMustBePublicHttps, true);
   assert.equal(playStoreContent.privacyPolicyRequirements.urlMustBeUnauthenticated, true);
@@ -17006,6 +17009,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
   assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("출구 정보가 표시되면 공개 역·출구 좌표로 카카오맵 미리보기를 자동 로드하며 현재 위치는 사용하지 않음"));
   assert.match(playStoreContent.dataSafetyDeclarations.thirdPartySharingScopeKo, /자동으로 불러/);
   assert.match(playStoreContent.dataSafetyDeclarations.thirdPartySharingScopeKo, /현재 위치는 사용하지 않/);
+  assert.match(playStoreContent.dataSafetyDeclarations.thirdPartySharingScopeKo, /사용할 수 없으면 좌표를 복사/);
   assert.equal(playStoreContent.crashAnrProviderDecision.separateCrashProvider, false);
   assert.ok(playStoreContent.crashAnrProviderDecision.sourceOfTruth.includes("Android vitals"));
   assert.ok(playStoreContent.crashAnrProviderDecision.sourceOfTruth.includes("Google Play pre-launch report"));
@@ -17593,6 +17597,16 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.equal(inventory.embeddedMapPreview.currentLocationShared, false);
   assert.equal(inventory.embeddedMapPreview.serverStored, false);
   assert.equal(inventory.embeddedMapPreview.tracking, false);
+  assert.equal(inventory.embeddedMapPreview.inventoryDataId, "embedded_map_preview_public_coordinates");
+  assert.equal(inventory.embeddedMapPreview.googlePlayLocationClassification.included, false);
+  assert.equal(
+    inventory.embeddedMapPreview.googlePlayLocationClassification.policyReference,
+    "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+  );
+  assert.match(
+    inventory.embeddedMapPreview.googlePlayLocationClassification.rationaleKo,
+    /사용자 또는 기기의 물리적 위치가 아닌 공개된 역·출구 위치/,
+  );
   assert.match(inventory.privacyPolicyUrlSource, /EASYSUBWAY_PRIVACY_POLICY_URL/);
   assert.deepEqual(inventory.googlePlayDataSafetyRequiredFields, [
     "collected",
