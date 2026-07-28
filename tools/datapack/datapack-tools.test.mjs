@@ -1959,6 +1959,7 @@ test("데이터팩 생성기는 일반 fixture 입력으로 production channel�
     "tools/datapack/release/capital-production-reviewed-pack.json",
     "utf8",
   ));
+  makeProductionSourceFixtureExplicitlyUnavailable(fixture);
   const fixturePath = path.join(workspace, "fixture.json");
   await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
 
@@ -12443,8 +12444,8 @@ test("공식 source ingest adapter는 동일 station-line-type 시설을 evidenc
     id: "facility-sadang-elevator-kric-2",
     name: "사당 엘리베이터 설치 정보 2",
     providerFacilityRef: "facility-sadang-elevator-kric-2",
-    providerRecordHash: sha256("provider:facility-sadang-elevator-kric-2:kric-station-elevator"),
-    evidenceHash: sha256("evidence:facility-sadang-elevator-kric-2:kric-station-elevator:2026-06-22T00:00:00.000Z"),
+    providerRecordHash: sha256("provider:facility-sadang-elevator-kric-2:kric-station-convenience-standard"),
+    evidenceHash: sha256("evidence:facility-sadang-elevator-kric-2:kric-station-convenience-standard:2026-06-22T00:00:00.000Z"),
   });
 
   const generated = await importOfficialSourceInput(outputDir, input);
@@ -12471,7 +12472,7 @@ test("공식 source ingest adapter는 동일 station-line-type 시설을 evidenc
         stationId: "station-sadang",
         lineId: "seoul-4",
         facilityType: "ELEVATOR",
-        sourceId: "kric-station-elevator",
+        sourceId: "kric-station-convenience-standard",
         strictRouteEligible: false,
         strictRouteEligibleReason: "OPERATION_STATUS_UNKNOWN",
       },
@@ -15953,6 +15954,25 @@ function makeProductionSourceFixtureStrictCoverageValid(fixture) {
     sourceSnapshotId: "kric-station-elevator-movement-snapshot-20260622",
     verifiedAt: "2026-06-22T00:00:00.000Z",
   });
+}
+
+function makeProductionSourceFixtureExplicitlyUnavailable(fixture) {
+  const pack = fixture.packs[0];
+  for (const edge of pack.networkEdges.filter(({ edgeType }) => ["ENTRY", "EXIT"].includes(edgeType))) {
+    edge.stairAccessState = "STEP_FREE";
+    edge.accessibilityStatus = "NO_OFFICIAL_FEED";
+    edge.verificationStatus = "VERIFIED";
+  }
+  for (const evidence of pack.stationFacilityEvidence.filter(
+    ({ facilityType }) => facilityType === "ACCESSIBILITY_STATUS_PROBE",
+  )) {
+    evidence.evidenceKind = "NOT_EXISTS";
+    evidence.installationStatus = "NOT_COVERED";
+    evidence.operationalStatus = "NOT_COVERED";
+    evidence.statusMeaning = "FEED_ABSENCE_RECORD";
+    evidence.strictRouteEligible = false;
+    evidence.strictRouteEligibleReason = "NO_OFFICIAL_STATUS_FEED";
+  }
 }
 
 function addApprovedMovementPathwayEvidence(pack, { sourceId, sourceSnapshotId, verifiedAt }) {

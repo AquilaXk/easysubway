@@ -215,8 +215,8 @@ test("provider result 실패와 schema drift는 retry하지 않는다", async ()
   }
 });
 
-test("provider resultCode 00 no-data envelope는 explicit-zero로 보존한다", async () => {
-  const snapshots = await collectKricAccessibilitySnapshots({
+test("header 없는 provider resultCode 00도 absence evidence로 인정하지 않는다", async () => {
+  await assert.rejects(() => collectKricAccessibilitySnapshots({
     roster: roster.slice(0, 1),
     operations: [operation],
     serviceKey: "key",
@@ -225,9 +225,7 @@ test("provider resultCode 00 no-data envelope는 explicit-zero로 보존한다",
       status: 200,
       json: async () => ({ resultCode: "00", resultMsg: "redacted" }),
     }),
-  });
-
-  assert.equal(snapshots[0].queries[0].status, "ABSENT_EXPLICIT_ZERO");
+  }), /KRIC accessibility provider result invalid/);
 });
 
 test("resultCode가 없는 bare array는 absence evidence로 인정하지 않는다", async () => {

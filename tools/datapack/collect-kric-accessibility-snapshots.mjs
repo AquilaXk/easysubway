@@ -295,11 +295,9 @@ async function requestRows({ operation, tuple, serviceKey, fetchImpl, requestTim
     throw new Error(`KRIC accessibility schema invalid: ${operation.sourceId}`);
   }
   const rawResponseSha256 = hash(payload);
-  const resultCode = payload?.resultCode ?? payload?.header?.resultCode;
+  const resultCode = payload?.header?.resultCode;
   if (resultCode === "00" && Array.isArray(payload?.body)) {
     payload = payload.body;
-  } else if (resultCode === "00" && Object.keys(payload).every((key) => ["resultCode", "resultMsg"].includes(key))) {
-    return { rows: [], rawResponseSha256 };
   } else {
     const safeCode = /^[A-Za-z0-9._-]{1,32}$/.test(resultCode ?? "") ? resultCode : "UNKNOWN";
     const safeKeys = Object.keys(payload ?? {}).filter((key) => /^[A-Za-z0-9._-]{1,32}$/.test(key))
