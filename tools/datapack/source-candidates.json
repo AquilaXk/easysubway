@@ -3263,10 +3263,10 @@
           "rawObjectUri"
         ],
         "fullSnapshot": {
-          "snapshotId": "kric-station-convenience-standard-20260728",
-          "snapshotPath": "tools/datapack/sources/kric-station-convenience-standard-20260728.json",
-          "capturedAt": "2026-07-28T12:42:27.741Z",
-          "freshUntil": "2026-07-29T12:42:27.741Z",
+          "snapshotId": "kric-station-convenience-standard-20260728T184503338Z",
+          "snapshotPath": "tools/datapack/sources/kric-station-convenience-standard-20260728T184503338Z.json",
+          "capturedAt": "2026-07-28T18:45:03.338Z",
+          "freshUntil": "2026-07-29T18:45:03.338Z",
           "queryCount": 2,
           "rowCount": 27,
           "contentSha256": "063975fd27b899204e7d4240cb4c56c9f010ce79ed3aa65c3e544374c47914ba",

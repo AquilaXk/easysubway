@@ -4287,15 +4287,15 @@
         "decision": "APPROVED",
         "productionUseAllowed": true,
         "licenseEvidenceHash": "39978b3c3dd3fb64b7f15d739453b19ad0b51a0f216cea22d3efb77dbfebf398",
-        "snapshotId": "kric-station-convenience-standard-20260728",
-        "snapshotPath": "tools/datapack/sources/kric-station-convenience-standard-20260728.json",
-        "capturedAt": "2026-07-28T12:42:27.741Z",
-        "observedAt": "2026-07-28T12:42:27.741Z",
-        "freshUntil": "2026-07-29T12:42:27.741Z",
-        "rawSha256": "063975fd27b899204e7d4240cb4c56c9f010ce79ed3aa65c3e544374c47914ba",
+        "snapshotId": "kric-station-convenience-standard-20260728T184503338Z",
+        "snapshotPath": "tools/datapack/sources/kric-station-convenience-standard-20260728T184503338Z.json",
+        "capturedAt": "2026-07-28T18:45:03.338Z",
+        "observedAt": "2026-07-28T18:45:03.338Z",
+        "freshUntil": "2026-07-29T18:45:03.338Z",
+        "rawSha256": "aef4063a61ab3172361d8a44eceff6b1c709261ec4c5f139f27f0a1db9a3afe5",
         "contentSha256": "063975fd27b899204e7d4240cb4c56c9f010ce79ed3aa65c3e544374c47914ba",
         "schemaFingerprint": "6cf45df8488510187063c4b7396ca9628295d6961becdcf1de87f2ae521e8591",
-        "snapshotFileSha256": "2326de42740e6cc87c141225ff7a81df8fd82787538be192b9b4fcad78e8fd50",
+        "snapshotFileSha256": "cf03e3ed45813f66210c2be445e4f496469d81a59464e9a7fb51f08daffcf1a9",
         "absenceEvidenceMode": "EXHAUSTIVE_LIST"
       }
     },
@@ -4331,6 +4331,7 @@
         ]
       },
       "requiredForProductionPack": false,
+      "productionUseAllowed": false,
       "updateFrequency": "realtime",
       "observedDataUpdatedAt": "2026-06-22",
       "retrievedAt": "2026-06-22",
@@ -4550,6 +4551,7 @@
         ]
       },
       "requiredForProductionPack": false,
+      "productionUseAllowed": false,
       "updateFrequency": "realtime",
       "observedDataUpdatedAt": "2026-06-22",
       "retrievedAt": "2026-06-22",
@@ -5892,6 +5894,7 @@
         ]
       },
       "requiredForProductionPack": false,
+      "productionUseAllowed": false,
       "updateFrequency": "realtime",
       "observedDataUpdatedAt": "2026-06-22",
       "retrievedAt": "2026-06-22",

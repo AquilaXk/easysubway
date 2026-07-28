@@ -37,25 +37,25 @@
   },
   "sourceSnapshots": {
     "note": "기존 release source 중 movement·timetable·network identity는 유지하고, detailed location 3종을 KRIC stationCnvFacl standard로 교체했다. 서울 accessibility는 2026-07-28 full snapshot으로 교체했다.",
-    "order": "release snapshot 순서: molit-urban-rail-full-route → seoulmetro-station-line-info → seoulmetro-cyberstation-route-map → kric-station-elevator-movement → kric-wheelchair-lift-movement → kric-subway-timetable → kric-station-convenience-standard → seoul-metro-accessibility",
+    "order": "release snapshot 순서: molit-urban-rail-full-route → seoulmetro-station-line-info → seoulmetro-cyberstation-route-map → kric-station-elevator-movement → kric-wheelchair-lift-movement → kric-subway-timetable → seoul-metro-accessibility → kric-station-convenience-standard",
     "committedVerificationCommand": "node -e \"import('./tools/datapack/source-snapshot-policy.mjs').then(({validateLineage})=>{const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),h=validateLineage(s).headsBySource,e=require('./tools/datapack/release/hash-evidence.json');for(const n of s.filter(x=>h[x.sourceId]===x.snapshotId)){const p=e.perSourceEvidence.find(x=>x.snapshotId===n.snapshotId);console.log(n.sourceId,!!p&&c.createHash('sha256').update(JSON.stringify([n])).digest('hex')===p.perSourceSnapshotSetHash)}})\"",
     "timetableEvidenceCommand": "node -e \"const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json').find(n=>n.sourceId==='kric-subway-timetable'),i=require('./tools/datapack/source-inventory.json').sources.find(n=>n.id==='kric-subway-timetable').admissionEvidence,p=require('./tools/datapack/inputs/capital-pilot-production-source-input.json').scheduleProvenance;console.log(s.snapshotId===i.snapshotId&&s.snapshotId===p.sourceSnapshotId&&s.rawSha256===i.rawSha256&&s.schemaFingerprint===i.schemaFingerprint)\"",
     "specRowRawSha256Note": "build-spec sourceSnapshots[].rawSha256는 admissionEvidence.rawSha256(=raw 바이트 해시, fixture 주석 선례 'admission sample.rawSha256')를 기입. snapshot 객체 내부 rawSha256는 canonical(minified·key정렬) raw 해시로 값이 다르며 source-snapshots.json에 보존됨.",
     "governanceOverlayNote": "retained legacy root 5종과 timetable의 원천 identity를 유지하고 신규 접근성 snapshot 2종을 추가했다. build-spec의 freshnessExpiresAt·rawRetentionExpiresAt·governance policy binding은 현행 정책에서 파생하며 validator가 임의 연장을 차단한다."
   },
   "sourceSnapshotSetHash": {
-    "value": "a842038dd7d3fcf19f76916518b498a89bc44037b285b392cf46b02f0a2d60e8",
+    "value": "cd85827d6f90e7084f76ac63e376758eb72dd76f3247f46d5b9c77ec267f498e",
     "contract": "source별 head 8종의 byte-ordered JSON hash와 build spec·release request가 일치해야 한다.",
     "reproductionCommand": "node -e \"import('./tools/datapack/source-snapshot-policy.mjs').then(({validateLineage})=>{const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),h=validateLineage(s).headsBySource,r=s.filter(n=>h[n.sourceId]===n.snapshotId);console.log(c.createHash('sha256').update(JSON.stringify(r)).digest('hex'))})\""
   },
   "sourceInventorySha256": {
-    "value": "d221f900aab069a93b0658e6a656a2db9e6235ffc9aba837bdf1dd70c75a27fc",
+    "value": "5dea643022b27d48e92c47d9e95eeeab4fa3ab867c0934d1ed343c05e36b9dc5",
     "contract": "run-source-admission-pipeline.mjs의 공식 sha256(JSON.stringify(admittedInventory)) 계약. 현행 브랜치의 tools/datapack/source-inventory.json이 최종 admitted inventory이며 워크플로 빌드가 실제로 소비하는 인벤토리와 동일 파일.",
     "reproductionCommand": "node -e \"const c=require('crypto'),fs=require('fs');console.log(c.createHash('sha256').update(JSON.stringify(JSON.parse(fs.readFileSync('tools/datapack/source-inventory.json','utf8')))).digest('hex'))\""
   },
   "fixturePath": {
     "value": "tools/datapack/release/capital-production-canonical-pack.json",
-    "sha256": "0e6e08bc2e13d45828b5d3ee0d2aa3229b370b9a0a66b85618aa0fd30e966f41",
+    "sha256": "c80078a5401e3bbb7ff403a4ee58bdf0f46a362914c90ab4a53a8944629f82cc",
     "contract": "#2648에서 배포 중인 capital SQLite 전체를 lossless fixture로 고정하고, 2c72677b builder가 전체 ITX readmission chain과 최종 output identity를 검증한다.",
     "reproductionCommand": "shasum -a 256 tools/datapack/release/capital-production-canonical-pack.json"
   },
@@ -113,18 +113,18 @@
       "perSourceSnapshotSetHash": "06ba5b27632fb6c3218f16ebff4ade46ed81e598ad4969c95c5fdc180c17c828"
     },
     {
-      "sourceId": "kric-station-convenience-standard",
-      "snapshotId": "kric-station-convenience-standard-20260728",
-      "rawSha256": "e675ef676e08d5d6ffecfc5f15e31be43f36a6c381a9c41027f869bf2f34c738",
-      "adminReviewRecordHash": "96bf75ccd91ac4c519fb98e198804eef53423badfae334603082027173c2e407",
-      "perSourceSnapshotSetHash": "de21ba4d106838c5f11ec786a32a18020721bcd234ce92cd3a764b0b30a981d3"
-    },
-    {
       "sourceId": "seoul-metro-accessibility",
       "snapshotId": "seoul-metro-accessibility-20260728",
       "rawSha256": "93a6d2fd9f0d4e9a76ccbe85d2ac87bbcbfeb257bd1406810d78f424a6c756b5",
       "adminReviewRecordHash": "9ccbf78e88d905207134ca3ad08ef7e99fbbdff16c4503b13c4ed925a99b5303",
       "perSourceSnapshotSetHash": "43ce5aa3fb9e99ed22f990c9a58bf883911c11d662642ca76bde9feee2a41503"
+    },
+    {
+      "sourceId": "kric-station-convenience-standard",
+      "snapshotId": "kric-station-convenience-standard-20260728T184503338Z",
+      "rawSha256": "d7d8c1385d9a96b9344803604436e03b5f3a516cc3a9bd0c34311c07ff1952a6",
+      "adminReviewRecordHash": "96bf75ccd91ac4c519fb98e198804eef53423badfae334603082027173c2e407",
+      "perSourceSnapshotSetHash": "2bc25a164809cec41059602522ef3e558a1296a0a78e0f185bf53f2f1aaa2bd5"
     }
   ],
   "officialOdFareEvidence": {

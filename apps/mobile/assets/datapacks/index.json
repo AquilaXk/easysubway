@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "builtAt": "2026-07-28T15:42:48.571Z",
-  "qualityAsOf": "2026-07-28T15:35:25.704Z",
+  "builtAt": "2026-07-28T19:01:07.400Z",
+  "qualityAsOf": "2026-07-28T18:45:03.338Z",
   "freshnessExpiresAt": "2026-08-02T15:00:00.000Z",
-  "sourceSnapshotSetHash": "a842038dd7d3fcf19f76916518b498a89bc44037b285b392cf46b02f0a2d60e8",
+  "sourceSnapshotSetHash": "cd85827d6f90e7084f76ac63e376758eb72dd76f3247f46d5b9c77ec267f498e",
   "schemaIdentity": "catalog-schema-v1",
   "packs": [
     {
@@ -16,9 +16,9 @@
     {
       "id": "capital",
       "asset": "assets/datapacks/capital.sqlite.gz",
-      "sha256": "17f91a262e6061db4a074b38c16d42304562cec7214c964e45211d0939b2c2bb",
-      "sqliteSha256": "262956dcb41115307430c5dc29efb4c4edcec5e2e92253fc144c31a74df23c71",
-      "byteSize": 1463760
+      "sha256": "d7d71928bdc52bc360dc31f7c9cbc8b74be4627865c2995e2fb540023fb4cd1f",
+      "sqliteSha256": "db0dc881e265d2e0eb16f032fd93ee91fa921d450082c230cea619e268d321e8",
+      "byteSize": 1465088
     }
   ]
 }

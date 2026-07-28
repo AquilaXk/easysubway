@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const KRIC_SOURCE_ID = "kric-station-convenience-standard";
 const SEOUL_SOURCE_ID = "seoul-metro-accessibility";
@@ -26,16 +27,24 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
     }
     const stationName = stationLineIdentity(input, mapping).stationNameKo;
     const counts = new Map();
+    const seenProviderRecordHashes = new Set();
+    const supportedRows = [];
     for (const row of query.rows) {
       if (!KRIC_FACILITY_CODES.has(row.gubun)) throw new Error(`unknown KRIC facility code: ${row.gubun}`);
       const type = FACILITY_TYPES.get(row.gubun);
       if (!type) continue;
+      const providerRecordHash = hash(row);
+      if (seenProviderRecordHashes.has(providerRecordHash)) continue;
+      seenProviderRecordHashes.add(providerRecordHash);
+      supportedRows.push({ row, type, providerRecordHash });
+    }
+    for (const { row, type, providerRecordHash } of supportedRows
+      .sort((left, right) => codepointCompare(left.providerRecordHash, right.providerRecordHash))) {
       const number = (counts.get(type) ?? 0) + 1;
       counts.set(type, number);
-      const providerRecordHash = hash(row);
       facilityRows.push({
         sourceId: KRIC_SOURCE_ID,
-        id: `facility-${query.stationId}-${type.toLowerCase()}-kric-standard-${number}`,
+        id: `facility-${query.stationId}-${type.toLowerCase()}-kric-standard-${providerRecordHash}`,
         station: { sourceId: mapping.sourceId, sourceStationCode: mapping.sourceStationCode, lineId: mapping.lineId },
         type,
         name: `${stationName}역 ${type} ${number}`,
@@ -43,7 +52,7 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
         statusMeaning: "STATIC_LOCATION",
         operationalStatus: "UNKNOWN",
         installationStatus: "INSTALLED",
-        providerFacilityRef: `${query.railOprIsttCd}:${query.lnCd}:${query.stinCd}:${row.gubun}:${number}`,
+        providerFacilityRef: `${query.railOprIsttCd}:${query.lnCd}:${query.stinCd}:${row.gubun}:${providerRecordHash}`,
         provenanceKind: "OFFICIAL_SOURCE",
         floorFrom: String(row.stinFlor ?? ""),
         floorTo: String(row.stinFlor ?? ""),

@@ -41,22 +41,28 @@ export async function collectKricAccessibilitySnapshots({
     validateOperation(operation);
     const queries = [];
     for (const tuple of tuples) {
-      const rows = await requestRows({ operation, tuple, serviceKey, fetchImpl, requestTimeoutMs });
+      const { rows, rawResponseSha256 } = await requestRows({
+        operation, tuple, serviceKey, fetchImpl, requestTimeoutMs,
+      });
       const providerRecordHash = hash(rows);
       queries.push({
         ...tuple,
         status: rows.length === 0 ? "ABSENT_EXPLICIT_ZERO" : "PRESENT",
+        rawResponseSha256,
         providerRecordHash,
         rows,
       });
     }
-    const contentSha256 = hash(queries);
-    const date = capturedAt.slice(0, 10).replaceAll("-", "");
+    const contentSha256 = hash(queries.map(({ rawResponseSha256: _, ...query }) => query));
+    const rawSha256 = hash(queries.map(({
+      stationId, lineId, railOprIsttCd, lnCd, stinCd, rawResponseSha256,
+    }) => ({ stationId, lineId, railOprIsttCd, lnCd, stinCd, rawResponseSha256 })));
+    const timestamp = capturedAt.replaceAll(/[-:.]/g, "");
     snapshots.push({
       schemaVersion: 1,
       artifactKind: "kric-accessibility-snapshot",
       sourceId: operation.sourceId,
-      snapshotId: `${operation.sourceId}-${date}`,
+      snapshotId: `${operation.sourceId}-${timestamp}`,
       capturedAt,
       observedAt: capturedAt,
       freshUntil,
@@ -64,7 +70,7 @@ export async function collectKricAccessibilitySnapshots({
       absenceEvidenceMode: "EXHAUSTIVE_LIST",
       queryCount: queries.length,
       rowCount: queries.reduce((sum, query) => sum + query.rows.length, 0),
-      rawSha256: contentSha256,
+      rawSha256,
       contentSha256,
       schemaFingerprint: hash([...operation.responseFields].sort(compare)),
       queries,
@@ -288,11 +294,12 @@ async function requestRows({ operation, tuple, serviceKey, fetchImpl, requestTim
   } catch {
     throw new Error(`KRIC accessibility schema invalid: ${operation.sourceId}`);
   }
+  const rawResponseSha256 = hash(payload);
   const resultCode = payload?.resultCode ?? payload?.header?.resultCode;
   if (resultCode === "00" && Array.isArray(payload?.body)) {
     payload = payload.body;
   } else if (resultCode === "00" && Object.keys(payload).every((key) => ["resultCode", "resultMsg"].includes(key))) {
-    return [];
+    return { rows: [], rawResponseSha256 };
   } else {
     const safeCode = /^[A-Za-z0-9._-]{1,32}$/.test(resultCode ?? "") ? resultCode : "UNKNOWN";
     const safeKeys = Object.keys(payload ?? {}).filter((key) => /^[A-Za-z0-9._-]{1,32}$/.test(key))
@@ -308,9 +315,12 @@ async function requestRows({ operation, tuple, serviceKey, fetchImpl, requestTim
       throw new Error(`KRIC accessibility schema invalid: ${operation.sourceId}`);
     }
   }
-  return payload.map((row) => Object.fromEntries(
-    operation.responseFields.map((field) => [field, row[field]]),
-  ));
+  return {
+    rows: payload.map((row) => Object.fromEntries(
+      operation.responseFields.map((field) => [field, row[field]]),
+    )),
+    rawResponseSha256,
+  };
 }
 
 function tupleKey(tuple) {

@@ -11341,31 +11341,41 @@ test("공식 source ingest adapter는 source inventory가 뒷받침하지 않는
 });
 
 test("공식 source ingest adapter는 provenance 전용 source를 production row source로 선택하지 않는다", async () => {
-  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-provenance-only-${Date.now()}`);
-  const input = productionSourceIngestInput();
-  input.sourceIds.push("kric-station-info");
-  const inputPath = path.join(outputDir, "official-source-input.json");
-  const outputPath = path.join(outputDir, "catalog-fixture.json");
-  await rm(outputDir, { recursive: true, force: true });
-  await mkdir(outputDir, { recursive: true });
-  await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
+  for (const sourceId of [
+    "kric-station-info",
+    "kric-station-elevator",
+    "kric-station-escalator",
+    "kric-wheelchair-lift-location",
+  ]) {
+    const outputDir = path.join(tmpdir(), `easysubway-source-ingest-provenance-only-${sourceId}-${Date.now()}`);
+    const input = JSON.parse(await readFile(
+      path.join(root, "tools/datapack/inputs/capital-pilot-production-source-input.json"),
+      "utf8",
+    ));
+    input.sourceIds.push(sourceId);
+    const inputPath = path.join(outputDir, "official-source-input.json");
+    const outputPath = path.join(outputDir, "catalog-fixture.json");
+    await rm(outputDir, { recursive: true, force: true });
+    await mkdir(outputDir, { recursive: true });
+    await writeFile(inputPath, `${JSON.stringify(input, null, 2)}\n`);
 
-  await assert.rejects(
-    execFileAsync(
-      process.execPath,
-      [
-        "tools/datapack/import-official-sources.mjs",
-        "--inventory",
-        "tools/datapack/source-inventory.json",
-        "--input",
-        inputPath,
-        "--output",
-        outputPath,
-      ],
-      { cwd: root },
-    ),
-    /kric-station-info source inventory is provenance-only and cannot be selected for production rows/,
-  );
+    await assert.rejects(
+      execFileAsync(
+        process.execPath,
+        [
+          "tools/datapack/import-official-sources.mjs",
+          "--inventory",
+          "tools/datapack/source-inventory.json",
+          "--input",
+          inputPath,
+          "--output",
+          outputPath,
+        ],
+        { cwd: root },
+      ),
+      new RegExp(`${sourceId} source inventory is provenance-only and cannot be selected for production rows`),
+    );
+  }
 });
 
 test("공식 source ingest adapter는 selected source가 claim한 coverage evidence 누락을 거부한다", async () => {

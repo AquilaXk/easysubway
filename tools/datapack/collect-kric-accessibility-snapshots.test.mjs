@@ -128,7 +128,7 @@ test("KRIC accessibility snapshot은 tuple을 정렬하고 present/explicit-zero
   assert.deepEqual(snapshots[0].queries.map(({ status }) => status), ["PRESENT", "ABSENT_EXPLICIT_ZERO"]);
   assert.equal(snapshots[0].capturedAt, "2026-07-28T00:00:00.000Z");
   assert.equal(snapshots[0].observedAt, "2026-07-28T00:00:00.000Z");
-  assert.equal(snapshots[0].snapshotId, "kric-station-elevator-20260728");
+  assert.equal(snapshots[0].snapshotId, "kric-station-elevator-20260728T000000000Z");
   assert.match(snapshots[0].schemaFingerprint, /^[0-9a-f]{64}$/);
   assert.equal(snapshots[0].freshUntil, "2026-07-29T00:00:00.000Z");
   assert.doesNotMatch(JSON.stringify(snapshots), /super-secret|serviceKey/);
@@ -162,6 +162,30 @@ test("표준 편의정보 row는 request tuple envelope로 provenance를 보존�
 
   assert.equal(snapshots[0].queries[0].status, "PRESENT");
   assert.deepEqual(snapshots[0].queries[0].canonicalMappings, standardRoster[0].canonicalMappings);
+});
+
+test("소비하지 않는 provider 필드 drift는 raw hash만 바꾼다", async () => {
+  const tuple = roster[0];
+  const collect = (providerNotice) => collectKricAccessibilitySnapshots({
+    roster: [tuple],
+    operations: [operation],
+    serviceKey: "key",
+    now: new Date("2026-07-28T00:00:00.000Z"),
+    fetchImpl: async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        header: { resultCode: "00", resultMsg: "redacted" },
+        providerNotice,
+        body: [{ railOprIsttCd: tuple.railOprIsttCd, lnCd: tuple.lnCd, stinCd: tuple.stinCd, dtlLoc: "대합실" }],
+      }),
+    }),
+  });
+
+  const [left, right] = await Promise.all([collect("before"), collect("after")]);
+
+  assert.notEqual(left[0].rawSha256, right[0].rawSha256);
+  assert.equal(left[0].contentSha256, right[0].contentSha256);
 });
 
 test("duplicate station tuple은 호출 전에 거부한다", async () => {

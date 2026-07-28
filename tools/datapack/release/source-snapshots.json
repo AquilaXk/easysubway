@@ -539,5 +539,44 @@
     ],
     "governancePolicyVersion": "2026-07-15",
     "governancePolicySha256": "96fb678f2ec5da7f555d81d9d2009ac838e6145cc48ed2ae4757bce42c90ef70"
+  },
+  {
+    "schemaVersion": 1,
+    "artifactKind": "official-source-snapshot",
+    "snapshotId": "kric-station-convenience-standard-20260728T184503338Z",
+    "sourceId": "kric-station-convenience-standard",
+    "provider": "국가철도공단",
+    "retrievedAt": "2026-07-28T18:45:03.338Z",
+    "sourceUpdatedAt": "2026-07-28T18:45:03.338Z",
+    "rowCount": 2,
+    "coverageCount": 2,
+    "rawSha256": "d7d8c1385d9a96b9344803604436e03b5f3a516cc3a9bd0c34311c07ff1952a6",
+    "rawObjectUri": "s3://easysubway-datapack-sources/kric-station-convenience-standard/20260728T184503338Z.json",
+    "redactedRequestFingerprint": "c79ea74625e730ef2251c7eff62198049a442f9fe40573acc876b9549d39c634",
+    "schemaFingerprint": "8ed2824f779a7ced304e86b83b634ea21d353b45b5ea9d3ca276a9e1dbfca187",
+    "snapshotStatus": "LOCKED",
+    "schemaStatus": "PASS",
+    "licenseStatus": "PASS",
+    "fetchStatus": "SUCCESS",
+    "redistributionAllowed": true,
+    "credentialRedacted": true,
+    "previousSnapshotId": "kric-station-convenience-standard-20260728",
+    "diffSummary": {
+      "status": "CHANGED",
+      "rawHashChanged": true,
+      "schemaHashChanged": true,
+      "requestHashChanged": true,
+      "sourceUpdatedAtChanged": true,
+      "rowDelta": 0,
+      "coverageDelta": 0
+    },
+    "freshnessExpiresAt": "2026-10-26T18:45:03.338Z",
+    "rawRetentionExpiresAt": "2026-10-26T18:45:03.338Z",
+    "providerRecordHashes": [
+      "7315e6283b065026fecca74597c39ffe555bf835f9497e71056cf0d7abe2544c",
+      "679fdab93af1c3536c1284356fdf7e765a63839d4e53a95b4df8ba8fac6b2c5f"
+    ],
+    "governancePolicyVersion": "2026-07-15",
+    "governancePolicySha256": "96fb678f2ec5da7f555d81d9d2009ac838e6145cc48ed2ae4757bce42c90ef70"
   }
 ]

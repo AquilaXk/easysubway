@@ -67,13 +67,13 @@ async function main() {
   await validateRetentionPolicy(snapshot, args);
   validateSnapshot(snapshot);
 
-  if (args["raw-output"]) {
-    await writeFileWithParents(args["raw-output"], canonicalRaw);
-  }
-  await writeFileWithParents(requireArg(args, "output"), `${JSON.stringify(snapshot, null, 2)}\n`);
+  let snapshotSetUpdate;
   if (args["snapshot-set"]) {
     const snapshotSetPath = path.resolve(args["snapshot-set"]);
     const snapshots = JSON.parse(await readFile(snapshotSetPath, "utf8"));
+    if (snapshots.some(({ snapshotId }) => snapshotId === snapshot.snapshotId)) {
+      throw new Error(`snapshot ID already exists: ${snapshot.snapshotId}`);
+    }
     const requestedRemovals = args["remove-source-ids"] == null
       ? []
       : args["remove-source-ids"].split(",").map((sourceId) => sourceId.trim());
@@ -89,11 +89,16 @@ async function main() {
       throw new Error(`snapshot removal source must differ from refreshed source: ${snapshot.sourceId}`);
     }
     const next = snapshots
-      .filter(({ sourceId, snapshotId }) => !removedSourceIds.has(sourceId) && snapshotId !== snapshot.snapshotId)
+      .filter(({ sourceId }) => !removedSourceIds.has(sourceId))
       .concat(snapshot);
     validateLineage(next);
-    await writeFileWithParents(snapshotSetPath, `${JSON.stringify(next, null, 2)}\n`);
+    snapshotSetUpdate = [snapshotSetPath, `${JSON.stringify(next, null, 2)}\n`];
   }
+  if (args["raw-output"]) {
+    await writeFileWithParents(args["raw-output"], canonicalRaw);
+  }
+  await writeFileWithParents(requireArg(args, "output"), `${JSON.stringify(snapshot, null, 2)}\n`);
+  if (snapshotSetUpdate) await writeFileWithParents(...snapshotSetUpdate);
 }
 
 async function validateRetentionPolicy(snapshot, args) {

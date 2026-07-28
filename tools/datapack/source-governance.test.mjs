@@ -291,6 +291,21 @@ test("snapshot set refresh는 valid same-source parent lineage만 기록한다",
     const original = await readFile(snapshotSet, "utf8");
     await assert.rejects(
       buildSnapshot([
+        "--input", firstRaw,
+        "--output", secondOutput,
+        "--snapshot-id", "snapshot-a-2",
+        "--retrieved-at", "2026-07-02T03:00:00Z",
+        "--freshness-expires-at", "2026-09-30T03:00:00Z",
+        "--coverage-count", "1",
+        "--raw-object-uri", "s3://bucket/reused-snapshot-a-2.csv",
+        "--previous-snapshot", firstOutput,
+        "--snapshot-set", snapshotSet,
+      ]),
+      /snapshot ID already exists: snapshot-a-2/,
+    );
+    assert.equal(await readFile(snapshotSet, "utf8"), original);
+    await assert.rejects(
+      buildSnapshot([
         "--input", secondRaw,
         "--output", secondOutput,
         "--snapshot-id", "snapshot-a-3",

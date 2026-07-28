@@ -48,6 +48,22 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
   assert.equal(output.routeEdges[0].verificationStatus, "NOT_VERIFIED");
   assert.deepEqual(output.sourceIds, ["kric-station-convenience-standard", "seoul-metro-accessibility"]);
   assert.ok(output.coverageEvidence[0].sourceIds.includes("seoul-metro-accessibility"));
+  const sameTypeRows = [
+    { gubun: "EV", stinFlor: 1, dtlLoc: "대합실 A" },
+    { gubun: "EV", stinFlor: 2, dtlLoc: "대합실 B" },
+  ];
+  const facilitiesByDescription = (rows) => Object.fromEntries(materializeAccessibilitySourceInput({
+    input,
+    kricSnapshot: { ...kricSnapshot, queries: [{ ...kricSnapshot.queries[0], rows }] },
+    seoulSnapshot,
+  }).facilityRows.map(({ description, id, name, providerFacilityRef }) => [description, { id, name, providerFacilityRef }]));
+  assert.deepEqual(facilitiesByDescription(sameTypeRows), facilitiesByDescription(sameTypeRows.toReversed()));
+  const duplicated = materializeAccessibilitySourceInput({
+    input,
+    kricSnapshot: { ...kricSnapshot, queries: [{ ...kricSnapshot.queries[0], rows: [sameTypeRows[0], sameTypeRows[0]] }] },
+    seoulSnapshot,
+  });
+  assert.equal(duplicated.facilityRows.length, 1);
   const uncovered = materializeAccessibilitySourceInput({
     input, kricSnapshot, seoulSnapshot: { ...seoulSnapshot, stations: [] },
   });
