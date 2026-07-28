@@ -63,8 +63,37 @@ function sourceElementKeysOf(geometry) {
   );
 }
 
-export function buildRegionProvenance({ svg, geometryBytes, routeMapPositionRows }) {
+function packSourceElementKeys(sourceElementKeys) {
+  return Buffer.concat(
+    Object.values(sourceElementKeys).flat().map((key) => Buffer.from(key, "hex")),
+  ).toString("base64");
+}
+
+function unpackSourceElementKeys(value, region) {
+  if (typeof value !== "string") {
+    throw new Error(`${region} sourceElementKey evidence missing`);
+  }
+  const packed = Buffer.from(value, "base64");
+  if (packed.length % 32 !== 0 || packed.toString("base64") !== value) {
+    throw new Error(`${region} sourceElementKey evidence invalid`);
+  }
+  const keys = [];
+  for (let offset = 0; offset < packed.length; offset += 32) {
+    keys.push(packed.subarray(offset, offset + 32).toString("hex"));
+  }
+  return keys;
+}
+
+export function buildRegionProvenance({
+  expectedRegion,
+  svg,
+  geometryBytes,
+  routeMapPositionRows,
+}) {
   const geometry = JSON.parse(Buffer.from(geometryBytes).toString("utf8"));
+  if (geometry.region !== expectedRegion) {
+    throw new Error(`geometry region mismatch: ${geometry.region} != ${expectedRegion}`);
+  }
   const sourceSvgSha256 = sha256(svg);
   if (geometry.sourceSvgSha256 !== sourceSvgSha256) {
     throw new Error(
@@ -81,6 +110,7 @@ export function buildRegionProvenance({ svg, geometryBytes, routeMapPositionRows
   }
   const ink = inkBBoxOf(normalized, { excludeIds: FULL_CANVAS_DECOR_IDS });
   const rows = routeMapPositionRows.slice().sort(compareRows);
+  const sourceElementKeys = sourceElementKeysOf(geometry);
 
   return {
     sourceSvgSha256,
@@ -94,25 +124,29 @@ export function buildRegionProvenance({ svg, geometryBytes, routeMapPositionRows
     },
     extractorVersion: geometry.extractorVersion,
     geometrySha256: sha256(canonicalGeometryContent(geometry)),
-    sourceElementKeysSha256: sha256(canonicalJson(sourceElementKeysOf(geometry))),
+    sourceElementKeysBase64: packSourceElementKeys(sourceElementKeys),
+    sourceElementKeysSha256: sha256(canonicalJson(sourceElementKeys)),
     routeMapPositionsSha256: sha256(canonicalJson(rows)),
     labelSourceCount: (geometry.labels ?? []).filter(
       ({ classification }) => classification === "STATION_LABEL",
     ).length,
     stationNodeCount: (geometry.stationNodes ?? []).length,
-    generatorContractVersion: 2,
+    generatorContractVersion: 3,
   };
 }
 
 export function verifySourceElementKeyRotation(expected, actual) {
   for (const [region, next] of Object.entries(actual.regions ?? {})) {
     const previous = expected.regions?.[region];
-    if (
-      previous?.sourceElementKeysSha256 &&
-      previous.sourceSvgSha256 !== next.sourceSvgSha256 &&
-      previous.sourceElementKeysSha256 === next.sourceElementKeysSha256
-    ) {
-      throw new Error(`${region} sourceElementKey digest did not rotate with sourceSvgSha256`);
+    if (previous && previous.sourceSvgSha256 !== next.sourceSvgSha256) {
+      const previousKeys = new Set(
+        unpackSourceElementKeys(previous.sourceElementKeysBase64, `${region} previous`),
+      );
+      for (const key of unpackSourceElementKeys(next.sourceElementKeysBase64, region)) {
+        if (previousKeys.has(key)) {
+          throw new Error(`${region} sourceElementKey did not rotate with sourceSvgSha256: ${key}`);
+        }
+      }
     }
   }
 }
@@ -140,6 +174,7 @@ export function generateGeometryProvenanceManifest({
         )
         .all(item.region);
       regions[item.id] = buildRegionProvenance({
+        expectedRegion: item.region,
         svg: readFileSync(svgPath, "utf8"),
         geometryBytes: readFileSync(geometryPath),
         routeMapPositionRows: rows,
