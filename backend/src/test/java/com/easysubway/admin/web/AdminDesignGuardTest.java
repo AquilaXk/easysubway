@@ -109,12 +109,12 @@ class AdminDesignGuardTest {
 
 		Map<String, String> expectedProperties = new LinkedHashMap<>();
 		JsonNode primitives = colorSystem.path("primitives");
-		assertThat(primitives.size()).as("JSON primitive 수").isEqualTo(25);
+		assertThat(primitives.size()).as("JSON primitive 수").isEqualTo(27);
 		primitives.properties().forEach(entry ->
 			expectedProperties.put(primitiveProperty(entry.getKey()), entry.getValue().asText()));
 
 		JsonNode semantic = colorSystem.path("semantic");
-		assertThat(semantic.size()).as("JSON semantic 수").isEqualTo(31);
+		assertThat(semantic.size()).as("JSON semantic 수").isEqualTo(33);
 		semantic.properties().forEach(entry -> expectedProperties.put(
 			primitiveProperty(entry.getKey()), "var(" + primitiveProperty(entry.getValue().asText()) + ")"));
 
@@ -709,6 +709,203 @@ class AdminDesignGuardTest {
 			.doesNotContain("☰")
 			.contains("icon('menu')")
 			.contains("aria-label=\"주 메뉴 열기·닫기\"");
+	}
+
+	@Test
+	@DisplayName("데스크톱 사이드바는 뷰포트에 붙고 shell은 화면을 자르지 않는다")
+	void desktopSidebarIsFlushAndShellDoesNotClip() throws IOException {
+		String shell = read(CSS_SHELL);
+
+		assertThat(rule(shell, "\\.admin-shell"))
+			.contains("overflow: visible;");
+		assertThat(rule(shell, "\\.admin-sidebar"))
+			.contains("height: 100vh;")
+			.contains("height: 100dvh;")
+			.contains("margin: 0;")
+			.contains("border-left: 0;")
+			.contains("border-radius: 0;");
+	}
+
+	@Test
+	@DisplayName("접힌 workspace의 program 목록은 작성자 display 규칙보다 hidden 상태가 우선한다")
+	void collapsedWorkspaceProgramsStayHidden() throws IOException {
+		assertThat(rule(read(CSS_SHELL), "\\.admin-nav-workspace-programs\\[hidden\\]"))
+			.contains("display: none;");
+	}
+
+	@Test
+	@DisplayName("workspace 클릭은 버튼이 아니라 nav root를 기준으로 형제 그룹을 정리한다")
+	void workspaceToggleUsesCapturedNavigationRoot() throws IOException {
+		String appJs = read("backend/src/main/resources/static/js/admin/app.js");
+
+		assertThat(appJs)
+			.contains("var root = null;")
+			.contains("root = this.$el;")
+			.contains("return Array.from(root.children)")
+			.contains("workspace.dataset.persistent === 'true'")
+			.contains("candidate.dataset.persistent !== 'true'");
+	}
+
+	@Test
+	@DisplayName("관리자 화면은 잘리지 않는 활성 메뉴와 넓은 검색·동일한 제목 위계를 공유한다")
+	void adminPagesShareReferenceShellFamilyLook() throws IOException {
+		String shell = read(CSS_SHELL);
+		String data = read(CSS_DATA);
+		String shellTemplate = read("backend/src/main/resources/templates/admin/fragments/shell.html");
+
+		assertThat(rule(shell, "\\.admin-nav-item\\.is-active"))
+			.contains("border-left-color: var(--admin-sidebar-accent-border);")
+			.contains("background: var(--admin-sidebar-accent);")
+			.contains("color: var(--admin-accent-ink);")
+			.doesNotContain("min-height:")
+			.doesNotContain("margin:")
+			.doesNotContain("padding:")
+			.doesNotContain("border-radius:");
+		assertThat(shellTemplate)
+			.contains("th:if=\"${isPersistent}\" class=\"admin-nav-program-icon\"")
+			.doesNotContain("active == program.id or isPersistent");
+		assertThat(rule(shell, "(?m)^\\.admin-topbar-search"))
+			.contains("width: min(520px, 44vw);")
+			.contains("min-width: 360px;");
+		assertThat(rule(shell, "\\.admin-mobile-search svg"))
+			.contains("width: 22px;")
+			.contains("height: 22px;");
+		assertThat(rule(shell, "\\.admin-dashboard-page \\.admin-topbar-search"))
+			.doesNotContain("width: 230px;")
+			.doesNotContain("min-width: 230px;");
+		assertThat(shell)
+			.doesNotContain(".admin-dashboard-page .admin-topbar-actions")
+			.contains("grid-template-columns: minmax(0, 1fr) 44px auto;")
+			.contains("height: 60px;")
+			.doesNotContain("grid-column: 1 / -1;")
+			.doesNotContain("margin: 8px -12px 0;");
+		assertThat(data)
+			.doesNotContain("background: var(--admin-good-vivid);")
+			.doesNotContain("background: var(--admin-warn-vivid);")
+			.doesNotContain("color: var(--admin-good-vivid);")
+			.doesNotContain("color: var(--admin-warn-vivid);");
+		assertThat(rule(shell, "\\.admin-page-head h1"))
+			.contains("font-size: var(--admin-fs-page);")
+			.contains("letter-spacing: -0.04em;");
+		assertThat(rule(shell, "\\.admin-page-head p"))
+			.contains("display: none;");
+	}
+
+	@Test
+	@DisplayName("모바일 사이드바는 펼친 업무 탭을 구분선으로 묶는다")
+	void mobileSidebarSeparatesExpandedWorkspace() throws IOException {
+		assertThat(rule(read(CSS_SHELL),
+			"\\.admin-nav-workspace:not\\(\\.is-persistent\\):has\\(> \\.admin-nav-workspace-toggle\\[aria-expanded=\"true\"\\]\\)"))
+			.contains("border-block-color:")
+			.contains("background:");
+	}
+
+	@Test
+	@DisplayName("모바일 오프캔버스는 뷰포트 높이에 고정하고 메뉴 목록만 스크롤한다")
+	void mobileSidebarKeepsLongNavigationReachable() throws IOException {
+		String shell = read(CSS_SHELL);
+
+		assertThat(rule(shell, "\\.has-js \\.admin-sidebar"))
+			.contains("height: 100dvh;")
+			.contains("min-height: 0;")
+			.contains("max-height: 100dvh;")
+			.contains("overflow: hidden;");
+		assertThat(rule(shell, "\\.admin-nav-scroll"))
+			.contains("min-height: 0;")
+			.contains("overflow-y: auto;");
+	}
+
+	@Test
+	@DisplayName("모바일 상단 브랜드는 메뉴 버튼 옆에서 왼쪽 정렬하고 읽기 쉬운 크기를 쓴다")
+	void mobileTopbarBrandAlignsWithMenuButton() throws IOException {
+		String shell = read(CSS_SHELL);
+
+		assertThat(rule(shell, "\\.admin-topbar-mobile-brand"))
+			.contains("justify-content: flex-start;")
+			.contains("padding-left: 4px;");
+		assertThat(rule(shell, "\\.admin-topbar-mobile-brand \\.admin-topbar-brand"))
+			.contains("font-size: 16px;");
+	}
+
+	@Test
+	@DisplayName("모바일 로그인 브랜드는 중앙 위계를 유지하면서 제목 가까이에 배치한다")
+	void mobileLoginBrandUsesCompactCenteredLockup() throws IOException {
+		String components = read(CSS_COMPONENTS);
+
+		assertThat(rule(components, "\\.admin-login-page \\.login-brand-panel"))
+			.contains("margin-bottom: 12px;");
+		assertThat(rule(components, "\\.admin-login-page \\.login-brand-lockup img"))
+			.contains("width: 40px;")
+			.contains("height: 40px;");
+		assertThat(rule(components, "\\.admin-login-page \\.login-brand-lockup strong"))
+			.contains("font-size: 18px;");
+	}
+
+	@Test
+	@DisplayName("관리자 로그인은 분할 hero 없이 하나의 중앙 form 흐름을 사용한다")
+	void adminLoginUsesSingleCenteredFlow() throws IOException {
+		String components = read(CSS_COMPONENTS);
+
+		assertThat(rule(components, "\\.login-layout"))
+			.contains("grid-template-columns: 1fr;")
+			.contains("place-content: center;")
+			.doesNotContain("0.82fr")
+			.doesNotContain("1.18fr");
+		assertThat(rule(components, "\\.login-brand-panel"))
+			.contains("background: transparent;")
+			.contains("color: var(--admin-ink);");
+		assertThat(components)
+			.contains("justify-content: center;")
+			.contains("font-size: 20px;");
+	}
+
+	@Test
+	@DisplayName("모바일 상단바는 검색·알림·계정 아이콘만 한 행에 둔다")
+	void mobileTopbarUsesCompactIconActions() throws IOException {
+		String shellTemplate = read("backend/src/main/resources/templates/admin/fragments/shell.html");
+		String components = read(CSS_COMPONENTS);
+
+		assertThat(shellTemplate)
+			.contains("class=\"admin-user-menu-icon\"")
+			.contains("icon('account')");
+		assertThat(rule(components, "\\.admin-v3 \\.admin-user-menu-trigger"))
+			.contains("width: 44px;")
+			.contains("padding: 0;")
+			.contains("border: 0;");
+		assertThat(components)
+			.contains("position: fixed;\n\t\ttop: 60px;\n\t\tleft: 10px;\n\t\tright: 10px;")
+			.contains("width: auto;");
+		assertThat(components.lastIndexOf(".admin-alert-center .admin-alert-panel"))
+			.as("모바일 알림 override는 기본 패널 규칙 뒤에 온다")
+			.isGreaterThan(components.indexOf(".admin-alert-center .admin-alert-panel"));
+	}
+
+	@Test
+	@DisplayName("주간 요일은 간결하게 표시하고 확인 필요는 가로 스트립을 사용한다")
+	void dashboardWeeklyAndTriageKeepVisualBreathingRoom() throws IOException {
+		String data = read(CSS_DATA);
+
+		assertThat(rule(data, "\\.dashboard-week-days"))
+			.contains("margin: 14px 0 0;");
+		assertThat(rule(data, "\\.dashboard-triage-list"))
+			.contains("display: grid;")
+			.contains("grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));");
+	}
+
+	@Test
+	@DisplayName("관리자 productive UI는 다섯 단계 글자 크기와 두 단계 굵기를 사용한다")
+	void adminTypographyUsesProductiveRoleScale() throws IOException {
+		String tokens = read(CSS_TOKENS);
+
+		assertThat(tokens)
+			.contains("--admin-fs-page: 28px;")
+			.contains("--admin-fs-section: 20px;")
+			.contains("--admin-fs-body: 16px;")
+			.contains("--admin-fs-control: 14px;")
+			.contains("--admin-fs-meta: 12px;")
+			.contains("--admin-w-body: 400;")
+			.contains("--admin-w-strong: 600;")
+			.contains("--admin-w-title: 600;");
 	}
 
 	private static int count(Pattern pattern, String source) {
