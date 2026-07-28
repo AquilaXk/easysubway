@@ -3,7 +3,9 @@
   "region": "대구권",
   "generatedFrom": {
     "geometry": "tools/route-map/route-map-defs/easy-subway-daegu-v3-geometry.json",
-    "pack": "apps/mobile/assets/datapacks/capital.sqlite.gz"
+    "geometrySha256": "b4e8a5a7ddc60d4781ee4c0db36cd32677bfa493634933812334f758204337ec",
+    "pack": "apps/mobile/assets/datapacks/capital.sqlite.gz",
+    "packSha256": "0c2f12dd6c143ff9f477c1e072123c91510d43b2ae7259137acf5831286d9233"
   },
   "stationCount": 102,
   "unmatchedCount": 0,

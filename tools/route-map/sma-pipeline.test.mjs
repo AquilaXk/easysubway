@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { gunzipSync } from "node:zlib";
@@ -539,6 +540,39 @@ test("수도권 유지보수 도구의 기본 --svg/--geometry가 컴파일 정�
       stale,
       [],
       `${tool}: 기본 경로가 정본(${version})이 아닌 도식을 가리킨다 — 인자 없이 실행하면 구 도식을 감사한다`,
+    );
+  }
+});
+
+test("5권역 alignment fixture는 raw geometry·pack SHA-256과 결속된다", () => {
+  const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
+  const defs = path.join(import.meta.dirname, "route-map-defs");
+  const packPath = path.join(
+    import.meta.dirname,
+    "../../apps/mobile/assets/datapacks/capital.sqlite.gz",
+  );
+  for (const [fixtureName, geometryName] of [
+    ["seoul", "easy-subway-sma-v4"],
+    ["busan", "easy-subway-busan-v3"],
+    ["daegu", "easy-subway-daegu-v3"],
+    ["daejeon", "easy-subway-daejeon-v3"],
+    ["gwangju", "easy-subway-gwangju-v3"],
+  ]) {
+    const fixture = JSON.parse(
+      readFileSync(path.join(defs, `${fixtureName}-alignment-fixture.json`)),
+    );
+    const geometryPath = path.join(defs, `${geometryName}-geometry.json`);
+    assert.match(fixture.generatedFrom.geometrySha256, /^[a-f0-9]{64}$/);
+    assert.match(fixture.generatedFrom.packSha256, /^[a-f0-9]{64}$/);
+    assert.equal(
+      fixture.generatedFrom.geometrySha256,
+      sha256(readFileSync(geometryPath)),
+      `${fixtureName}: geometry drift`,
+    );
+    assert.equal(
+      fixture.generatedFrom.packSha256,
+      sha256(readFileSync(packPath)),
+      `${fixtureName}: pack drift`,
     );
   }
 });
