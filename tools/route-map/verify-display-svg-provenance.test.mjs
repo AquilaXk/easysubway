@@ -51,7 +51,7 @@ test("verifyDisplaySvgProvenance: canonical source bytes and display bundle byte
 
 test("Gwangju canonical SVG retains 광주송정역 text without duplicated station accessibility labels", () => {
   const svg = readFileSync(`${sourceDir}/easy-subway-gwangju-v3.svg`, "utf8");
-  const ariaLabels = [...svg.matchAll(/\baria-label="([^"]*)"/g)].map((match) => match[1]);
+  const ariaLabels = [...svg.matchAll(/(?:^|\s)aria-label="([^"]*)"/g)].map((match) => match[1]);
 
   assert.match(svg, />광주송정역\s*<\/tspan>/);
   assert.deepEqual(ariaLabels.filter((label) => label.includes("역역")), []);
