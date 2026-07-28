@@ -7,6 +7,7 @@ import { deriveRawRetentionExpiresAt } from "./source-governance-policy.mjs";
 import {
   buildSnapshotDiff,
   requiredCredentialFreeObjectUri,
+  validateLineage,
 } from "./source-snapshot-policy.mjs";
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
@@ -84,9 +85,13 @@ async function main() {
       if (!availableSourceIds.has(sourceId)) throw new Error(`snapshot removal source not found: ${sourceId}`);
     }
     const removedSourceIds = new Set(requestedRemovals);
+    if (removedSourceIds.has(snapshot.sourceId)) {
+      throw new Error(`snapshot removal source must differ from refreshed source: ${snapshot.sourceId}`);
+    }
     const next = snapshots
       .filter(({ sourceId, snapshotId }) => !removedSourceIds.has(sourceId) && snapshotId !== snapshot.snapshotId)
       .concat(snapshot);
+    validateLineage(next);
     await writeFileWithParents(snapshotSetPath, `${JSON.stringify(next, null, 2)}\n`);
   }
 }

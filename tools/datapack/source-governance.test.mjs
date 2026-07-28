@@ -251,7 +251,7 @@ test("snapshot producer는 previous snapshot에서 diff를 직접 생성한다",
   }
 });
 
-test("snapshot set refresh는 same-source parent lineage를 보존한다", async () => {
+test("snapshot set refresh는 valid same-source parent lineage만 기록한다", async () => {
   const workDir = path.join(tmpdir(), `easysubway-source-set-${process.pid}-${Date.now()}`);
   const firstRaw = path.join(workDir, "first.csv");
   const secondRaw = path.join(workDir, "second.csv");
@@ -288,12 +288,27 @@ test("snapshot set refresh는 same-source parent lineage를 보존한다", async
     const snapshots = JSON.parse(await readFile(snapshotSet, "utf8"));
     assert.deepEqual(snapshots.map(({ snapshotId }) => snapshotId), ["snapshot-a-1", "snapshot-a-2"]);
     assert.doesNotThrow(() => validateLineage(snapshots));
+    const original = await readFile(snapshotSet, "utf8");
+    await assert.rejects(
+      buildSnapshot([
+        "--input", secondRaw,
+        "--output", secondOutput,
+        "--snapshot-id", "snapshot-a-3",
+        "--retrieved-at", "2026-07-02T03:00:00Z",
+        "--freshness-expires-at", "2026-09-30T03:00:00Z",
+        "--coverage-count", "2",
+        "--raw-object-uri", "s3://bucket/snapshot-a-3.csv",
+        "--snapshot-set", snapshotSet,
+      ]),
+      /SOURCE_LINEAGE_BROKEN: source root/,
+    );
+    assert.equal(await readFile(snapshotSet, "utf8"), original);
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
 });
 
-test("snapshot set explicit removal은 trim하고 unknown source를 거부한다", async () => {
+test("snapshot set explicit removal은 다른 known source만 허용한다", async () => {
   const workDir = path.join(tmpdir(), `easysubway-source-remove-${process.pid}-${Date.now()}`);
   const rawPath = path.join(workDir, "raw.csv");
   const outputPath = path.join(workDir, "snapshot.json");
@@ -317,6 +332,19 @@ test("snapshot set explicit removal은 trim하고 unknown source를 거부한다
       JSON.parse(await readFile(snapshotSet, "utf8")).map(({ sourceId }) => sourceId),
       ["kric-station-elevator"],
     );
+    const currentSourceSet = await readFile(snapshotSet, "utf8");
+    await assert.rejects(
+      buildSnapshot([
+        ...buildArgs,
+        "--snapshot-id", "snapshot-a-2",
+        "--retrieved-at", "2026-07-02T03:00:00Z",
+        "--freshness-expires-at", "2026-09-30T03:00:00Z",
+        "--previous-snapshot", outputPath,
+        "--remove-source-ids", "kric-station-elevator",
+      ]),
+      /snapshot removal source must differ from refreshed source: kric-station-elevator/,
+    );
+    assert.equal(await readFile(snapshotSet, "utf8"), currentSourceSet);
 
     await writeFile(snapshotSet, `${JSON.stringify([{ snapshotId: "other-1", sourceId: "other" }])}\n`);
     await assert.rejects(
