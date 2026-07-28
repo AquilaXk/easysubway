@@ -141,16 +141,19 @@ export async function verifyProductionPackArtifactIdentity({ buildSpecPath, asse
   }
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const args = parseArgs(process.argv.slice(2));
-  verifyProductionPackArtifactIdentity({
+async function main(argv) {
+  const args = parseArgs(argv);
+  const report = await verifyProductionPackArtifactIdentity({
     buildSpecPath: requiredArg(args, "build-spec"),
     assetPath: requiredArg(args, "asset"),
     indexPath: requiredArg(args, "index"),
     packId: requiredArg(args, "pack-id"),
-  }).then((report) => {
-    process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
-  }).catch((error) => {
+  });
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  main(process.argv.slice(2)).catch((error) => {
     console.error(error.message);
     process.exitCode = 1;
   });

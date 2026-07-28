@@ -9,6 +9,7 @@ import { promisify } from "node:util";
 import test from "node:test";
 import { gunzipSync } from "node:zlib";
 import { normalizeUnverifiedNetworkEdgeStates } from "./build-datapack.mjs";
+import { verifyProductionPackArtifactIdentity } from "./verify-production-pack-artifact-identity.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -169,6 +170,12 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       provenanceComplete: 652,
       strictEligible: 652,
     });
+    assert.deepEqual(await verifyProductionPackArtifactIdentity({
+      buildSpecPath: "tools/datapack/release/candidate-build-spec.json",
+      assetPath,
+      indexPath,
+      packId: "capital",
+    }), report);
 
     const index = JSON.parse(await readFile(indexPath, "utf8"));
     index.packs[0].sha256 = "f".repeat(64);
