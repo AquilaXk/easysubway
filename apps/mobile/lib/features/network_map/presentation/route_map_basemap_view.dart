@@ -21,10 +21,7 @@ const TextStyle _attributionStyle = TextStyle(
 
 /// Native SVG 위의 Flutter attribution overlay painter.
 class RouteMapBasemapPainter extends CustomPainter {
-  RouteMapBasemapPainter({
-    this.attributionText,
-    this.attributionPainter,
-  });
+  RouteMapBasemapPainter({this.attributionText, this.attributionPainter});
 
   final String? attributionText;
   final TextPainter? attributionPainter;

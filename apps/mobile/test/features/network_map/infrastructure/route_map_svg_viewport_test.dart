@@ -21,11 +21,26 @@ void main() {
   );
 
   test('권역을 canonical literal .svg 자산으로만 매핑한다', () {
-    expect(routeMapSvgAssetForRegion('수도권'), 'assets/datapacks/metro_map_pack/basemap/seoul.svg');
-    expect(routeMapSvgAssetForRegion('부산'), 'assets/datapacks/metro_map_pack/basemap/busan.svg');
-    expect(routeMapSvgAssetForRegion('대구'), 'assets/datapacks/metro_map_pack/basemap/daegu.svg');
-    expect(routeMapSvgAssetForRegion('대전'), 'assets/datapacks/metro_map_pack/basemap/daejeon.svg');
-    expect(routeMapSvgAssetForRegion('광주'), 'assets/datapacks/metro_map_pack/basemap/gwangju.svg');
+    expect(
+      routeMapSvgAssetForRegion('수도권'),
+      'assets/datapacks/metro_map_pack/basemap/seoul.svg',
+    );
+    expect(
+      routeMapSvgAssetForRegion('부산'),
+      'assets/datapacks/metro_map_pack/basemap/busan.svg',
+    );
+    expect(
+      routeMapSvgAssetForRegion('대구'),
+      'assets/datapacks/metro_map_pack/basemap/daegu.svg',
+    );
+    expect(
+      routeMapSvgAssetForRegion('대전'),
+      'assets/datapacks/metro_map_pack/basemap/daejeon.svg',
+    );
+    expect(
+      routeMapSvgAssetForRegion('광주'),
+      'assets/datapacks/metro_map_pack/basemap/gwangju.svg',
+    );
     expect(routeMapSvgAssetForRegion('알 수 없음'), isNull);
   });
 
@@ -49,11 +64,19 @@ void main() {
     final calls = <MethodCall>[];
     const channelName =
         'com.easysubway.easysubway_mobile/route_map_viewport_webview/42';
-    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(const MethodChannel(channelName), (call) async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(const MethodChannel(channelName), (
+      call,
+    ) async {
       calls.add(call);
     });
-    addTearDown(() => messenger.setMockMethodCallHandler(const MethodChannel(channelName), null));
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(
+        const MethodChannel(channelName),
+        null,
+      ),
+    );
 
     final controller = RouteMapSvgViewportController(onUnavailable: () {});
     controller.attach(viewId: 42);
@@ -78,11 +101,19 @@ void main() {
     final calls = <MethodCall>[];
     const channelName =
         'com.easysubway.easysubway_mobile/route_map_viewport_webview/43';
-    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(const MethodChannel(channelName), (call) async {
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(const MethodChannel(channelName), (
+      call,
+    ) async {
       calls.add(call);
     });
-    addTearDown(() => messenger.setMockMethodCallHandler(const MethodChannel(channelName), null));
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(
+        const MethodChannel(channelName),
+        null,
+      ),
+    );
     final controller = RouteMapSvgViewportController(onUnavailable: () {});
     final latest = camera.copyWith(revision: 5, center: const Offset(61, 56));
 
@@ -90,19 +121,24 @@ void main() {
     await controller.attach(viewId: 43);
 
     expect(calls, hasLength(1));
-    expect(calls.single.arguments, routeMapSvgViewportCameraPayload(
-      camera: latest,
-      sourceOrigin: origin,
-    ));
+    expect(
+      calls.single.arguments,
+      routeMapSvgViewportCameraPayload(camera: latest, sourceOrigin: origin),
+    );
     controller.dispose();
   });
 
-  for (final method in ['assetLoadFailed', 'cameraApplyFailed', 'processGone']) {
+  for (final method in [
+    'assetLoadFailed',
+    'cameraApplyFailed',
+    'processGone',
+  ]) {
     test('$method는 unavailable을 알린다', () async {
       var unavailableCount = 0;
       const channelName =
           'com.easysubway.easysubway_mobile/route_map_viewport_webview/7';
-      final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
       final controller = RouteMapSvgViewportController(
         onUnavailable: () => unavailableCount++,
       );
@@ -121,7 +157,8 @@ void main() {
     var unavailableCount = 0;
     const channelName =
         'com.easysubway.easysubway_mobile/route_map_viewport_webview/7';
-    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     final controller = RouteMapSvgViewportController(
       onUnavailable: () => unavailableCount++,
     );
@@ -136,17 +173,23 @@ void main() {
     controller.dispose();
   });
 
-  testWidgets('unknown region은 widget unavailable callback을 호출한다', (tester) async {
+  testWidgets('unknown region은 widget unavailable callback을 호출한다', (
+    tester,
+  ) async {
     var unavailableCount = 0;
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: RouteMapSvgViewport(
-          region: '알 수 없음', camera: camera, sourceOrigin: origin,
-          onUnavailable: () => unavailableCount++,
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: RouteMapSvgViewport(
+            region: '알 수 없음',
+            camera: camera,
+            sourceOrigin: origin,
+            onUnavailable: () => unavailableCount++,
+          ),
         ),
-      ));
+      );
       await tester.pump();
       expect(unavailableCount, 1);
     } finally {
@@ -154,17 +197,23 @@ void main() {
     }
   });
 
-  testWidgets('unsupported platform은 widget unavailable callback을 호출한다', (tester) async {
+  testWidgets('unsupported platform은 widget unavailable callback을 호출한다', (
+    tester,
+  ) async {
     var unavailableCount = 0;
     debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
     try {
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: RouteMapSvgViewport(
-          region: '수도권', camera: camera, sourceOrigin: origin,
-          onUnavailable: () => unavailableCount++,
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: RouteMapSvgViewport(
+            region: '수도권',
+            camera: camera,
+            sourceOrigin: origin,
+            onUnavailable: () => unavailableCount++,
+          ),
         ),
-      ));
+      );
       await tester.pump();
       expect(unavailableCount, 1);
     } finally {
@@ -172,19 +221,25 @@ void main() {
     }
   });
 
-  testWidgets('첫 framePresented 전에는 숨기고 current revision ack 뒤 표시한다', (tester) async {
+  testWidgets('첫 framePresented 전에는 숨기고 current revision ack 뒤 표시한다', (
+    tester,
+  ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     const viewId = 91;
     const channelName =
         'com.easysubway.easysubway_mobile/route_map_viewport_webview/91';
     try {
-      await tester.pumpWidget(Directionality(
-        textDirection: TextDirection.ltr,
-        child: RouteMapSvgViewport(
-          region: '수도권', camera: camera, sourceOrigin: origin,
-          onUnavailable: () {},
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: RouteMapSvgViewport(
+            region: '수도권',
+            camera: camera,
+            sourceOrigin: origin,
+            onUnavailable: () {},
+          ),
         ),
-      ));
+      );
       final visibility = tester.widget<Visibility>(find.byType(Visibility));
       expect(visibility.visible, isFalse);
       expect(
@@ -207,20 +262,26 @@ void main() {
         'mimeType': 'image/svg+xml',
         'sourceWidth': 200.0,
         'sourceHeight': 200.0,
-        ...routeMapSvgViewportCameraPayload(camera: camera, sourceOrigin: origin),
+        ...routeMapSvgViewportCameraPayload(
+          camera: camera,
+          sourceOrigin: origin,
+        ),
       });
 
       androidView.onPlatformViewCreated!(viewId);
       await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
           .handlePlatformMessage(
-        channelName,
-        const StandardMethodCodec().encodeMethodCall(
-          MethodCall('framePresented', <String, Object>{'revision': 3}),
-        ),
-        (_) {},
-      );
+            channelName,
+            const StandardMethodCodec().encodeMethodCall(
+              MethodCall('framePresented', <String, Object>{'revision': 3}),
+            ),
+            (_) {},
+          );
       await tester.pump();
-      expect(tester.widget<Visibility>(find.byType(Visibility)).visible, isTrue);
+      expect(
+        tester.widget<Visibility>(find.byType(Visibility)).visible,
+        isTrue,
+      );
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

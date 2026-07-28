@@ -96,16 +96,17 @@ void main() {
     test('(A) direct SVG viewBox == shifted visible rect: ${entry.key}', () {
       final camera = entry.value;
       final expected = camera.visibleSourceRect.shift(origin);
-      final viewBox = routeMapSvgViewportCameraPayload(
-        camera: camera,
-        sourceOrigin: origin,
-      )['viewBox'] as List<double>;
-      expect(viewBox, <double>[
-        expected.left,
-        expected.top,
-        expected.width,
-        expected.height,
-      ], reason: '${entry.key} viewBox must preserve the shifted camera rect');
+      final viewBox =
+          routeMapSvgViewportCameraPayload(
+                camera: camera,
+                sourceOrigin: origin,
+              )['viewBox']
+              as List<double>;
+      expect(
+        viewBox,
+        <double>[expected.left, expected.top, expected.width, expected.height],
+        reason: '${entry.key} viewBox must preserve the shifted camera rect',
+      );
     });
   }
 

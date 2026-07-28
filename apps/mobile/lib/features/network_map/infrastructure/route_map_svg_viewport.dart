@@ -8,7 +8,8 @@ import 'package:flutter/widgets.dart';
 import '../domain/map_camera.dart';
 
 const _viewType = 'com.easysubway.easysubway_mobile/route_map_viewport_webview';
-const _channelPrefix = 'com.easysubway.easysubway_mobile/route_map_viewport_webview/';
+const _channelPrefix =
+    'com.easysubway.easysubway_mobile/route_map_viewport_webview/';
 
 const Map<String, String> kRouteMapSvgRegionToId = {
   '수도권': 'seoul',
@@ -45,7 +46,10 @@ bool _hasValidViewBox(MapCameraState camera, Offset sourceOrigin) {
 }
 
 class RouteMapSvgViewportController {
-  RouteMapSvgViewportController({required this.onUnavailable, this.onFramePresented});
+  RouteMapSvgViewportController({
+    required this.onUnavailable,
+    this.onFramePresented,
+  });
 
   final VoidCallback onUnavailable;
   final ValueChanged<int>? onFramePresented;
@@ -53,9 +57,7 @@ class RouteMapSvgViewportController {
   Map<String, Object>? _pendingCameraPayload;
   bool _unavailable = false;
 
-  Future<void> attach({
-    required int viewId,
-  }) async {
+  Future<void> attach({required int viewId}) async {
     _channel = MethodChannel('$_channelPrefix$viewId')
       ..setMethodCallHandler(_handleMethodCall);
     final pending = _pendingCameraPayload;
@@ -158,13 +160,15 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
         }
       },
     );
-    if (!_isSupported || routeMapSvgAssetForRegion(widget.region) == null ||
+    if (!_isSupported ||
+        routeMapSvgAssetForRegion(widget.region) == null ||
         !_hasValidViewBox(widget.camera, widget.sourceOrigin)) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _fail());
     }
   }
 
-  bool get _isSupported => !kIsWeb &&
+  bool get _isSupported =>
+      !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
 
@@ -173,7 +177,9 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.camera != widget.camera ||
         oldWidget.sourceOrigin != widget.sourceOrigin) {
-      unawaited(_controller.update(widget.camera, sourceOrigin: widget.sourceOrigin));
+      unawaited(
+        _controller.update(widget.camera, sourceOrigin: widget.sourceOrigin),
+      );
     }
   }
 
@@ -192,7 +198,9 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
   @override
   Widget build(BuildContext context) {
     final asset = routeMapSvgAssetForRegion(widget.region);
-    if (_failed || !_isSupported || asset == null ||
+    if (_failed ||
+        !_isSupported ||
+        asset == null ||
         !_hasValidViewBox(widget.camera, widget.sourceOrigin)) {
       return const SizedBox.expand();
     }
@@ -213,16 +221,16 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
         layoutDirection: TextDirection.ltr,
         creationParams: params,
         creationParamsCodec: const StandardMessageCodec(),
-        onPlatformViewCreated: (id) => unawaited(_controller.attach(
-          viewId: id)),
+        onPlatformViewCreated: (id) =>
+            unawaited(_controller.attach(viewId: id)),
       ),
       TargetPlatform.iOS => UiKitView(
         viewType: _viewType,
         layoutDirection: TextDirection.ltr,
         creationParams: params,
         creationParamsCodec: const StandardMessageCodec(),
-        onPlatformViewCreated: (id) => unawaited(_controller.attach(
-          viewId: id)),
+        onPlatformViewCreated: (id) =>
+            unawaited(_controller.attach(viewId: id)),
       ),
       _ => const SizedBox.expand(),
     };
