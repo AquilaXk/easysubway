@@ -310,7 +310,7 @@ void main() {
       };
       for (final entry in regions.entries) {
         final (designScale, nodeRadiusDesign, capsuleHalfDesign) = entry.value;
-        // 일반역: 중심에서 아래로 height/6. design px로 환산해 실측 반경과 비교.
+        // 일반역: 중심에서 위로 height/6. design px로 환산해 실측 반경과 비교.
         final regularOffsetDesign =
             fanMenuAnchorNodeHeight(
               memberPositions: const [],
