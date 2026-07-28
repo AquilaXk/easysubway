@@ -95,6 +95,17 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
   assert.throws(() => materializeAccessibilitySourceInput({
     input: {
       ...input,
+      facilityRows: [{
+        sourceId: "kric-station-convenience-standard", id: "facility-malformed",
+        providerRecordHash: "invalid", providerFacilityRef: "invalid",
+      }],
+    },
+    kricSnapshot,
+    seoulSnapshot,
+  }), /malformed facility identity fields: facility-malformed/);
+  assert.throws(() => materializeAccessibilitySourceInput({
+    input: {
+      ...input,
       facilityRows: [
         {
           sourceId: "kric-station-convenience-standard", id: "facility-collision",

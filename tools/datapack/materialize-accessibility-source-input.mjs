@@ -24,8 +24,10 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
     if (!/^[0-9a-f]{64}$/.test(row.providerRecordHash ?? "")
       || typeof row.providerFacilityRef !== "string"
       || !row.providerFacilityRef.endsWith(`:${row.providerRecordHash}`)
-      || typeof row.id !== "string" || row.id === "" || row.id.length > 120
-      || (facilityIdsByProviderRef.has(row.providerFacilityRef)
+      || typeof row.id !== "string" || row.id === "" || row.id.length > 120) {
+      throw new Error(`malformed facility identity fields: ${row.id ?? "<unknown>"}`);
+    }
+    if ((facilityIdsByProviderRef.has(row.providerFacilityRef)
         && facilityIdsByProviderRef.get(row.providerFacilityRef) !== row.id)
       || (providerRefsByFacilityId.has(row.id)
         && providerRefsByFacilityId.get(row.id) !== row.providerFacilityRef)) {
@@ -61,9 +63,11 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
       const providerFacilityRef = `${query.railOprIsttCd}:${query.lnCd}:${query.stinCd}:${row.gubun}:${providerRecordHash}`;
       const facilityId = facilityIdsByProviderRef.get(providerFacilityRef)
         ?? `facility-${query.stationId}-${type.toLowerCase()}-kric-standard-${providerRecordHash.slice(0, 16)}`;
-      if (facilityId.length > 120
-        || (providerRefsByFacilityId.has(facilityId)
-          && providerRefsByFacilityId.get(facilityId) !== providerFacilityRef)) {
+      if (facilityId.length > 120) {
+        throw new Error(`facility identity exceeds 120 characters: ${facilityId}`);
+      }
+      if (providerRefsByFacilityId.has(facilityId)
+          && providerRefsByFacilityId.get(facilityId) !== providerFacilityRef) {
         throw new Error("facility identity collision");
       }
       facilityIdsByProviderRef.set(providerFacilityRef, facilityId);

@@ -53,7 +53,7 @@
         {
           "refreshOn": "operations-contract-change",
           "files": [
-            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "bbd98ae9c01e1b8c3c7b7bc0a54fc453552e87016ba4dc725bf391d0ca1936b2"},
+            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "805cab6ee2c10b4a02793d1a316f80cf35a77066413eebcf1ffc5f3b1f6e2733"},
             {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
             {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "474095e635706a442d79e9c21e274e0aa6eb9e992f480783dbc7d16c66a0fc7e"},
@@ -102,7 +102,7 @@
             {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42"},
             {"path": ".github/workflows/release-artifacts.yml", "sha256": "7a40f47727818e79abe1156eee2dd105a0c499eda087708f419993759d404245"},
-            {"path": ".github/workflows/datapack-release.yml", "sha256": "82859a05abf9cf6f4a12d311c6aa67f83a64194d09be2773d771899888e56423"},
+            {"path": ".github/workflows/datapack-release.yml", "sha256": "928e8222edf41065a4ec9db11cda9821eaf53b153efc30d553b53bd96c599212"},
             {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
             {"path": "backend/build.gradle", "sha256": "cfefe1f4884d0f4b44f2875dc4e1bedabad358a7c9aab030c6504c87d8f21f2d"},
             {"path": "backend/Dockerfile", "sha256": "bb190eb507645836df69934a0ca6cf4dc7499bd508ed0a485e688eede70e615a"},
