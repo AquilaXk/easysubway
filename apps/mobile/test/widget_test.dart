@@ -7313,7 +7313,7 @@ void main() {
     expect(rotated.center, const Offset(430, 280));
   });
 
-  testWidgets('GPS 패널을 닫아도 같은 역의 현재 배율을 유지한다', (tester) async {
+  testWidgets('GPS 패널을 닫아도 현재 배율은 유지하고 초기 기준은 다시 계산한다', (tester) async {
     final repository = FakeStationSearchRepository(
       networkMapData: _gpsNetworkMapData(
         selectedRegion: '수도권',
@@ -7343,7 +7343,7 @@ void main() {
         .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
         .camera;
     expect(closed.scale, focused.scale);
-    expect(closed.initialScale, focused.initialScale);
+    expect(closed.initialScale, isNot(focused.initialScale));
   });
 
   testWidgets('GPS 패널과 팬 메뉴를 닫으면 다음 layout은 초기 카메라를 다시 계산한다', (tester) async {
