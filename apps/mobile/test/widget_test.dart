@@ -7300,8 +7300,17 @@ void main() {
         .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
         .camera;
     expect(focused.scale, initial.scale);
-    expect(focused.initialScale, initial.initialScale);
     expect(focused.center, const Offset(430, 280));
+
+    addTearDown(tester.view.resetPhysicalSize);
+    tester.view.physicalSize = const Size(600, 1200);
+    await tester.pumpAndSettle();
+    final rotated = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(rotated.scale, focused.scale);
+    expect(rotated.initialScale, isNot(focused.initialScale));
+    expect(rotated.center, const Offset(430, 280));
   });
 
   testWidgets('GPS 패널을 닫아도 같은 역의 현재 배율을 유지한다', (tester) async {

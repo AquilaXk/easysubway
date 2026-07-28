@@ -4630,6 +4630,13 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             widget.data.selectedRegion,
             initialFitScale: _containFitScale(initialCameraBounds, constraints),
           );
+          final initialCamera = _cameraForBounds(
+            widget.initialViewport ?? initialCameraBounds,
+            constraints,
+            sourceBounds: fullBounds,
+            contain: true,
+            minScale: minScale,
+          );
           final layoutKey =
               '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}:$readableScale';
           if (_layoutKey != layoutKey) {
@@ -4658,16 +4665,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                               : 0,
                         ),
                         minScale: math.min(previousCamera.scale, minScale),
+                        initialScale: initialCamera.initialScale,
                         revision: previousCamera.revision + 1,
                       )
                       .clamped(viewportMargin: 220)
-                : _cameraForBounds(
-                    widget.initialViewport ?? initialCameraBounds,
-                    constraints,
-                    sourceBounds: fullBounds,
-                    contain: true,
-                    minScale: minScale,
-                  );
+                : initialCamera;
           }
           var camera =
               _camera ??
