@@ -61,6 +61,7 @@ import { promisify } from "node:util";
 
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isMainModule } from "../lib/is-main-module.mjs";
+import { verifyProductionPackArtifactIdentity } from "./verify-production-pack-artifact-identity.mjs";
 import {
   parseMolitDaeguStationMappings,
   parseMolitDaejeonStationMappings,
@@ -130,6 +131,10 @@ const ALLOWED_FLAGS = new Set([
 const SPEC_ARTIFACT_KIND = "nationwide-candidate-pack-spec";
 const CANDIDATE_ARTIFACT_KIND = "production";
 const CANDIDATE_MANIFEST_CHANNEL = "candidate";
+const DEPLOYED_ARTIFACT_BUILD_SPEC_PATH = "tools/datapack/release/candidate-build-spec.json";
+const DEPLOYED_ARTIFACT_ASSET_PATH = "apps/mobile/assets/datapacks/capital.sqlite.gz";
+const DEPLOYED_ARTIFACT_INDEX_PATH = "apps/mobile/assets/datapacks/index.json";
+const DEPLOYED_ARTIFACT_PACK_ID = "capital";
 // 예약 TLD(.invalid, RFC 2606)라 어떤 게시 경로에서도 해석되지 않는다.
 const NON_PUBLISHABLE_HOST = "easysubway-datapack-candidate.invalid";
 const SIGNING_MODE = "EPHEMERAL_RSA_2048";
@@ -315,7 +320,14 @@ export async function runNationwideCandidateCoverageGate({
   // 않으므로 기본 allowlist가 그대로 적용되고, spec은 이 맵에 항목을 추가할 수 없다 — "spec 편집만으로
   // 임의 모듈을 실행시킬 수 없다"는 성질은 그대로다.
   materializers = PACK_DATA_MATERIALIZERS,
+  verifyDeployedArtifact = () => verifyProductionPackArtifactIdentity({
+    buildSpecPath: path.join(root, DEPLOYED_ARTIFACT_BUILD_SPEC_PATH),
+    assetPath: path.join(root, DEPLOYED_ARTIFACT_ASSET_PATH),
+    indexPath: path.join(root, DEPLOYED_ARTIFACT_INDEX_PATH),
+    packId: DEPLOYED_ARTIFACT_PACK_ID,
+  }),
 }) {
+  await verifyDeployedArtifact();
   validateNationwideCandidateCoverageSpec(spec, inventory, materializers);
   // 승계 원본도 입력 해시 축에 넣는다. 경로·pack 정체성만 기록하면 원본 좌표 같은 값 drift가
   // evidence를 바이트 동일하게 통과시킨다(구조 drift만 잡히는 상태) — 파일 바이트로 결속한다.

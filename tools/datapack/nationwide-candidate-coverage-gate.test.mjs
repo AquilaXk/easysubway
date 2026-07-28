@@ -1399,6 +1399,34 @@ test("candidate spec validation seam은 production 채널을 거부한다", asyn
   );
 });
 
+test("배포 artifact identity는 SUPPORTED 판정 전에 검증한다", async () => {
+  const spec = await readJson(SPEC_PATH);
+  const inventory = await readJson(INVENTORY_PATH);
+  spec.packDataInclusions = [{
+    ...spec.packDataInclusions[0],
+    materializer: "test://supported-judgment",
+  }];
+
+  await assert.rejects(
+    runNationwideCandidateCoverageGate({
+      spec,
+      specInput: { path: SPEC_PATH, sha256: "a".repeat(64) },
+      targetsInput: { path: TARGETS_PATH, sha256: "b".repeat(64) },
+      inventory,
+      inventoryInput: { path: INVENTORY_PATH, sha256: "c".repeat(64) },
+      resolutionPlanInput: { path: RESOLUTION_PLAN_PATH, sha256: "d".repeat(64) },
+      resolutionsInput: { path: RESOLUTIONS_PATH, sha256: "e".repeat(64) },
+      workDir: path.join(tmpdir(), "nationwide-candidate-gate-artifact-ordering"),
+      verifyDeployedArtifact: async () => { throw new Error("deployed artifact identity mismatch"); },
+      materializers: new Map([["test://supported-judgment", {
+        inputs: { paths: ["stationMapPath"], linePaths: ["topologySnapshotPath", "timetableSnapshotPath"] },
+        materialize: () => { throw new Error("SUPPORTED judgment reached"); },
+      }]]),
+    }),
+    /deployed artifact identity mismatch/,
+  );
+});
+
 test("declared transition seam은 실제 SUPPORTED non-transition을 거부한다", async () => {
   const spec = await readJson(SPEC_PATH);
   const evidence = await readJson(EVIDENCE_PATH);
