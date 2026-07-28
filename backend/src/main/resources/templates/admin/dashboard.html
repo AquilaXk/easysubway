@@ -60,7 +60,7 @@
 			</div>
 			<div class="dashboard-api-health">
 					<span>최근 7일 API 정상률</span>
-				<strong th:text="${dashboard.apiNormalRateLabel}">—</strong>
+				<strong th:insert="~{admin/fragments/missing-value :: value(${dashboard.apiNormalRateLabel}, '집계 없음')}">—</strong>
 				<progress th:if="${dashboard.apiDataAvailable}" max="100" th:value="${dashboard.apiNormalRate}" aria-label="API 정상률"></progress>
 				<div th:if="${dashboard.apiDataAvailable}" class="dashboard-api-meta">
 					<span th:text="|오류율 ${dashboard.apiErrorRate}|">오류율 0.0%</span>

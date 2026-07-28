@@ -66,6 +66,7 @@ class AdminDashboardPageTest {
 			.doesNotContainPattern("class=\"is-warn\"[^>]*>\\s*<dt>데이터</dt>")
 			.containsPattern("class=\"\\s*is-waiting\"[^>]*>\\s*<dt>지표 집계</dt>\\s*<dd[^>]*>대기</dd>")
 			.contains("최근 7일 API 정상률")
+			.containsPattern("최근 7일 API 정상률</span>\\s*<strong><span aria-hidden=\\\"true\\\">—</span><span class=\\\"sr-only\\\">집계 없음</span></strong>")
 			.contains("id=\"dashboard-weekly-operations\"")
 			.contains("data-weekday=\"월\"")
 			.contains("data-weekday=\"화\"")
