@@ -3528,17 +3528,24 @@ void main() {
       final path = offline['path'] as String;
       expect(map['source_url'], isA<String>());
       expect(validSourceScheme(map['source_url'] as String), isTrue);
-      // [#2068] 하이브리드 바탕층 전환: 오너 자작 SVG를 build-time 컴파일한
-      // vector_graphics 바이너리(.vec)를 basemap/으로 번들한다. offline 블록은
-      // 이제 실제 번들 .vec를 가리키고 included=true다.
+      // [#2571] canonical SVG를 변환 없이 native viewport에 직접 표시한다.
       expect(offline['included'], isTrue);
       expect(path, startsWith('assets/datapacks/metro_map_pack/basemap/'));
       final extension = path.split('.').last.toLowerCase();
-      expect(extension, 'vec');
-      expect(offline['type'], 'vector-graphics-vec');
-      // 가리키는 .vec가 실제로 번들에 존재해야 한다(offline included 계약 강화).
+      expect(extension, 'svg');
+      expect(offline['type'], 'svg');
+      expect(offline['mime_type'], 'image/svg+xml');
       expect(File(path).existsSync(), isTrue, reason: '$path가 번들에 없다');
       final license = map['license'] as Map<String, Object?>;
+      expect((license['changes'] as String), contains('canonical SVG'));
+      expect(
+        (license['changes'] as String),
+        isNot(contains('build-time compiled')),
+      );
+      expect(
+        (license['changes'] as String),
+        isNot(contains('vector-graphics')),
+      );
       expect(license['name'], isA<String>());
       expect(license['spdx'], isA<String>());
       expect(validSourceScheme(license['url'] as String), isTrue);

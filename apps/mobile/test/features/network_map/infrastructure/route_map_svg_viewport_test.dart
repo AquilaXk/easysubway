@@ -217,13 +217,19 @@ void main() {
     }
   });
 
-  testWidgets('첫 framePresented 전에는 숨기고 current revision ack 뒤 표시한다', (
+  testWidgets('camera revision ack 전에는 native SVG와 overlay를 함께 숨긴다', (
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     const viewId = 91;
     const channelName =
         'com.easysubway.easysubway_mobile/route_map_viewport_webview/91';
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      const MethodChannel(channelName),
+      (_) async => null,
+    );
     try {
       await tester.pumpWidget(
         Directionality(
@@ -233,6 +239,7 @@ void main() {
             camera: camera,
             sourceOrigin: origin,
             onUnavailable: () {},
+            overlay: const SizedBox(key: Key('synchronizedOverlay')),
           ),
         ),
       );
@@ -265,20 +272,70 @@ void main() {
       });
 
       androidView.onPlatformViewCreated!(viewId);
-      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-          .handlePlatformMessage(
-            channelName,
-            const StandardMethodCodec().encodeMethodCall(
-              MethodCall('framePresented', <String, Object>{'revision': 3}),
-            ),
-            (_) {},
-          );
+      await messenger.handlePlatformMessage(
+        channelName,
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('framePresented', <String, Object>{'revision': 3}),
+        ),
+        (_) {},
+      );
       await tester.pump();
       expect(
         tester.widget<Visibility>(find.byType(Visibility)).visible,
         isTrue,
       );
+
+      final nextCamera = camera.copyWith(revision: 4);
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: RouteMapSvgViewport(
+            region: '수도권',
+            camera: nextCamera,
+            sourceOrigin: origin,
+            onUnavailable: () {},
+            overlay: const SizedBox(key: Key('synchronizedOverlay')),
+          ),
+        ),
+      );
+      expect(
+        tester.widget<Visibility>(find.byType(Visibility)).visible,
+        isFalse,
+      );
+
+      await messenger.handlePlatformMessage(
+        channelName,
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('framePresented', <String, Object>{'revision': 3}),
+        ),
+        (_) {},
+      );
+      await tester.pump();
+      expect(
+        tester.widget<Visibility>(find.byType(Visibility)).visible,
+        isFalse,
+      );
+
+      await messenger.handlePlatformMessage(
+        channelName,
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('framePresented', <String, Object>{'revision': 4}),
+        ),
+        (_) {},
+      );
+      await tester.pump();
+      final synchronizedVisibility = tester.widget<Visibility>(
+        find.ancestor(
+          of: find.byKey(const Key('synchronizedOverlay')),
+          matching: find.byType(Visibility),
+        ),
+      );
+      expect(synchronizedVisibility.visible, isTrue);
     } finally {
+      messenger.setMockMethodCallHandler(
+        const MethodChannel(channelName),
+        null,
+      );
       debugDefaultTargetPlatformOverride = null;
     }
   });

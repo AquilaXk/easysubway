@@ -79,6 +79,7 @@ private class RouteMapViewportPlatformView(
     private var fontUrls = emptySet<String>()
     private var documentReady = false
     private var fontReadinessAttempts = 0
+    private var isDisposed = false
 
     init {
         channel.setMethodCallHandler { call, result ->
@@ -106,10 +107,11 @@ private class RouteMapViewportPlatformView(
             }
         }
         // The Dart per-view MethodChannel is attached immediately after creation.
-        mainHandler.post { load() }
+        mainHandler.post { if (!isDisposed) load() }
     }
 
     private fun load(assetPathOverride: String? = null) {
+        if (isDisposed) return
         documentReady = false
         fontReadinessAttempts = 0
         fontUrls = emptySet()
@@ -376,6 +378,8 @@ private class RouteMapViewportPlatformView(
     override fun getView(): View = container
 
     override fun dispose() {
+        isDisposed = true
+        mainHandler.removeCallbacksAndMessages(null)
         channel.setMethodCallHandler(null)
         destroyWebView()
         container.removeAllViews()

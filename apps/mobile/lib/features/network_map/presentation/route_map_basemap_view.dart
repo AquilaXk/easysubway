@@ -72,6 +72,7 @@ class RouteMapBasemapView extends StatefulWidget {
     this.sourceOrigin = Offset.zero,
     this.attributionText,
     this.onUnavailable,
+    this.overlay,
     super.key,
   });
 
@@ -84,6 +85,7 @@ class RouteMapBasemapView extends StatefulWidget {
 
   final String? attributionText;
   final VoidCallback? onUnavailable;
+  final Widget? overlay;
 
   @override
   State<RouteMapBasemapView> createState() => _RouteMapBasemapViewState();
@@ -123,26 +125,27 @@ class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
   @override
   Widget build(BuildContext context) {
     _ensureAttributionPainter();
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        RouteMapSvgViewport(
-          key: ValueKey(widget.region),
-          region: widget.region,
-          camera: widget.camera,
-          sourceOrigin: widget.sourceOrigin,
-          onUnavailable: widget.onUnavailable ?? () {},
-        ),
-        IgnorePointer(
-          child: CustomPaint(
-            size: widget.camera.viewportSize,
-            painter: RouteMapBasemapPainter(
-              attributionText: widget.attributionText,
-              attributionPainter: _attributionPainter,
+    return RouteMapSvgViewport(
+      key: ValueKey(widget.region),
+      region: widget.region,
+      camera: widget.camera,
+      sourceOrigin: widget.sourceOrigin,
+      onUnavailable: widget.onUnavailable ?? () {},
+      overlay: Stack(
+        fit: StackFit.expand,
+        children: [
+          IgnorePointer(
+            child: CustomPaint(
+              size: widget.camera.viewportSize,
+              painter: RouteMapBasemapPainter(
+                attributionText: widget.attributionText,
+                attributionPainter: _attributionPainter,
+              ),
             ),
           ),
-        ),
-      ],
+          ?widget.overlay,
+        ],
+      ),
     );
   }
 }

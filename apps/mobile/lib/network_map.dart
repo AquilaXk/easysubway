@@ -5262,28 +5262,23 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     final lineColors = _structuredLineColorsCache!;
     final labelTextByStationId = _structuredLabelTextCache!;
     final lineBadgeLabelByLineId = _structuredLineBadgeLabelCache!;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        RouteMapBasemapView(
-          key: ValueKey(_layoutKey),
-          region: _displayRegionName(widget.data.selectedRegion),
-          camera: camera,
-          sourceOrigin: sourceOrigin,
-          attributionText: attribution,
-          onUnavailable: _markRouteMapBasemapUnavailable,
-        ),
-        StructuredRouteMapView(
-          map: map,
-          camera: camera,
-          lineColors: lineColors,
-          labelTextByStationId: labelTextByStationId,
-          lineBadgeLabelByLineId: lineBadgeLabelByLineId,
-          drawLines: false,
-          drawStationSymbols: false,
-          sourceOrigin: sourceOrigin,
-        ),
-      ],
+    return RouteMapBasemapView(
+      key: ValueKey(_layoutKey),
+      region: _displayRegionName(widget.data.selectedRegion),
+      camera: camera,
+      sourceOrigin: sourceOrigin,
+      attributionText: attribution,
+      onUnavailable: _markRouteMapBasemapUnavailable,
+      overlay: StructuredRouteMapView(
+        map: map,
+        camera: camera,
+        lineColors: lineColors,
+        labelTextByStationId: labelTextByStationId,
+        lineBadgeLabelByLineId: lineBadgeLabelByLineId,
+        drawLines: false,
+        drawStationSymbols: false,
+        sourceOrigin: sourceOrigin,
+      ),
     );
   }
 

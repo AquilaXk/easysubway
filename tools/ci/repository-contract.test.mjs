@@ -143,6 +143,10 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   assert.match(android, /settings\.blockNetworkLoads = true/);
   assert.match(android, /settings\.allowContentAccess = false/);
   assert.match(android, /settings\.allowFileAccess = true/);
+  assert.match(android, /private var isDisposed = false/);
+  assert.match(android, /mainHandler\.post \{ if \(!isDisposed\) load\(\) \}/);
+  assert.match(android, /private fun load\([\s\S]*if \(isDisposed\) return/);
+  assert.match(android, /isDisposed = true[\s\S]*mainHandler\.removeCallbacksAndMessages\(null\)/);
   assert.match(
     android,
     /if \(Build\.VERSION\.SDK_INT >= Build\.VERSION_CODES\.O\)[\s\S]*Api26RouteMapWebViewClient\(\)[\s\S]*else[\s\S]*RouteMapWebViewClient\(\)/,
