@@ -48,8 +48,8 @@
 	gap: 8px;
 }
 
-.dashboard-refresh-form {
-	margin: 0;
+.dashboard-snapshot-form {
+	margin: 0 0 16px;
 }
 
 .admin-v3 .dashboard-refresh {

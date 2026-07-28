@@ -127,6 +127,7 @@ class AdminOverviewPageController {
 			usage.totalActiveUsers(),
 			usage.apiErrorRatePercent(),
 			quality.totalFacilities(),
+			usage.totalApiRequests() > 0,
 			apiNormalRateLabel(usage),
 			apiNormalRate(usage),
 			health.status(),
@@ -134,7 +135,7 @@ class AdminOverviewPageController {
 		));
 		model.addAttribute("snapshotStatus", snapshotStatus);
 		model.addAttribute("snapshotBasisTime",
-			(snapshotStatus == null ? LocalDateTime.now() : snapshotStatus.ranAt()).format(SNAPSHOT_TIME_FORMAT));
+			LocalDateTime.now().format(SNAPSHOT_TIME_FORMAT));
 		// 데이터팩 출시 준비: 권한 있을 때만 조회. 상세 표의 차단 요인 행은 0건을 숨기고 비-0만 노출한다(#2349).
 		DatapackReleaseBlockerSummaryUseCase.DatapackReleaseBlockerSummary datapackSummary = null;
 		if (AdminAuthorization.hasPermission(authentication, AdminPermission.DATAPACK_READ)) {
@@ -397,6 +398,7 @@ class AdminOverviewPageController {
 		long activeUsers,
 		String apiErrorRate,
 		long totalFacilities,
+		boolean apiDataAvailable,
 		String apiNormalRateLabel,
 		double apiNormalRate,
 		String healthStatus,

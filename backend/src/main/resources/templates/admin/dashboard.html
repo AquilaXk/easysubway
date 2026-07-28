@@ -29,17 +29,7 @@
 				<h2 id="dashboard-current-title">현재 운영 상태</h2>
 				<div class="dashboard-current-actions">
 					<p class="dashboard-basis-time"><time th:text="${snapshotBasisTime}">—</time> 기준</p>
-					<form th:if="${adminProgramIds.contains('a-batches')}"
-					      class="dashboard-refresh-form" data-dashboard-refresh-form method="post"
-					      th:action="@{/admin/dashboard/metrics/snapshot}">
-						<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
-						<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
-						<button type="submit" class="dashboard-refresh" aria-label="운영 상태 새로고침">
-							<svg th:replace="~{admin/fragments/icon :: icon('refresh')}"></svg>
-						</button>
-					</form>
-					<a th:unless="${adminProgramIds.contains('a-batches')}" class="dashboard-refresh"
-					   th:href="@{/admin/dashboard/page}" aria-label="운영 상태 새로고침">
+					<a class="dashboard-refresh" th:href="@{/admin/dashboard/page}" aria-label="운영 상태 새로고침">
 						<svg th:replace="~{admin/fragments/icon :: icon('refresh')}"></svg>
 					</a>
 				</div>
@@ -63,18 +53,17 @@
 						<dd th:text="|${dashboard.totalFacilities}건|">0건</dd>
 					</div>
 					<div th:classappend="${snapshotStatus == null ? ' is-waiting' : (snapshotStatus.success ? ' is-good' : ' is-bad')}">
-						<dt>배치</dt>
+						<dt>지표 집계</dt>
 						<dd th:text="${snapshotStatus == null ? '대기' : (snapshotStatus.success ? '정상' : '실패')}">대기</dd>
 					</div>
 				</dl>
 			</div>
 			<div class="dashboard-api-health">
 					<span>최근 7일 API 정상률</span>
-				<strong th:text="${snapshotStatus == null ? '집계 대기' : dashboard.apiNormalRateLabel}">집계 대기</strong>
-				<progress th:if="${snapshotStatus != null}" max="100" th:value="${dashboard.apiNormalRate}" aria-label="API 정상률"></progress>
-				<div th:if="${snapshotStatus != null}" class="dashboard-api-meta">
+				<strong th:text="${dashboard.apiNormalRateLabel}">—</strong>
+				<progress th:if="${dashboard.apiDataAvailable}" max="100" th:value="${dashboard.apiNormalRate}" aria-label="API 정상률"></progress>
+				<div th:if="${dashboard.apiDataAvailable}" class="dashboard-api-meta">
 					<span th:text="|오류율 ${dashboard.apiErrorRate}|">오류율 0.0%</span>
-					<span th:text="${snapshotStatus.success ? '지표 집계 정상' : '지표 집계 실패'}">지표 집계 정상</span>
 				</div>
 			</div>
 		</section>
@@ -132,6 +121,13 @@
 	<details class="dashboard-operations-details">
 		<summary>상세 운영 지표 보기</summary>
 		<div class="dashboard-operations-details-body">
+		<form th:if="${adminProgramIds.contains('a-batches')}"
+		      class="dashboard-snapshot-form" data-dashboard-snapshot-form method="post"
+		      th:action="@{/admin/dashboard/metrics/snapshot}">
+			<input type="hidden" name="commandToken" th:value="${commandTokens.next()}">
+			<input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}">
+			<button type="submit" class="admin-btn outline">지표 다시 집계</button>
+		</form>
 	<!-- 핵심 지표 패널(#2281 V6-09): 시점·비율 대표 KPI만 headline으로 노출하고 누계 총량 지표는
 	     disclosure로 격하해 urgent state를 먼저 식별하게 한다. 각 셀 = 흐린 라벨 + 큰 숫자(tabular-nums)
 	     + 파랑 스파크라인 + 상태 3색 델타. 셀 전체가 해당 화면으로 이동(a 태그 유지).

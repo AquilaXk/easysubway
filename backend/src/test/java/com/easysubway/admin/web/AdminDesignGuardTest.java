@@ -109,12 +109,12 @@ class AdminDesignGuardTest {
 
 		Map<String, String> expectedProperties = new LinkedHashMap<>();
 		JsonNode primitives = colorSystem.path("primitives");
-		assertThat(primitives.size()).as("JSON primitive 수").isEqualTo(27);
+		assertThat(primitives.size()).as("JSON primitive 수").isEqualTo(25);
 		primitives.properties().forEach(entry ->
 			expectedProperties.put(primitiveProperty(entry.getKey()), entry.getValue().asText()));
 
 		JsonNode semantic = colorSystem.path("semantic");
-		assertThat(semantic.size()).as("JSON semantic 수").isEqualTo(33);
+		assertThat(semantic.size()).as("JSON semantic 수").isEqualTo(31);
 		semantic.properties().forEach(entry -> expectedProperties.put(
 			primitiveProperty(entry.getKey()), "var(" + primitiveProperty(entry.getValue().asText()) + ")"));
 
@@ -234,7 +234,7 @@ class AdminDesignGuardTest {
 			.contains("width: 44px;")
 			.contains("height: 44px;");
 		assertThat(dashboardCharts)
-			.contains("document.querySelector('[data-dashboard-refresh-form]')")
+			.contains("document.querySelector('[data-dashboard-snapshot-form]')")
 			.contains("tokenColor('--admin-chart-series')")
 			.doesNotContain("tokenColor('--admin-good')")
 			.doesNotContain("tokenColor('--admin-warn')")
