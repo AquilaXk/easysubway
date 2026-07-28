@@ -4330,7 +4330,7 @@
           "accessibility_facilities"
         ]
       },
-      "requiredForProductionPack": true,
+      "requiredForProductionPack": false,
       "updateFrequency": "realtime",
       "observedDataUpdatedAt": "2026-06-22",
       "retrievedAt": "2026-06-22",
@@ -4370,11 +4370,11 @@
           "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
         },
         "facility": {
-          "status": "SUPPORTED",
-          "productionUseAllowed": true,
-          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "PROVIDER_RESULT_30_20260728",
           "updateFrequency": "realtime",
-          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+          "unsupportedNotes": "detailed endpoint returned provider resultCode 30 on 2026-07-28; standard stationCnvFacl is the production source"
         }
       },
       "admissionEvidence": {
@@ -4549,7 +4549,7 @@
           "accessibility_facilities"
         ]
       },
-      "requiredForProductionPack": true,
+      "requiredForProductionPack": false,
       "updateFrequency": "realtime",
       "observedDataUpdatedAt": "2026-06-22",
       "retrievedAt": "2026-06-22",
@@ -4588,11 +4588,11 @@
           "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
         },
         "facility": {
-          "status": "SUPPORTED",
-          "productionUseAllowed": true,
-          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "PROVIDER_RESULT_30_20260728",
           "updateFrequency": "realtime",
-          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+          "unsupportedNotes": "detailed endpoint returned provider resultCode 30 on 2026-07-28; standard stationCnvFacl is the production source"
         }
       },
       "admissionEvidence": {
@@ -5891,7 +5891,7 @@
           "accessibility_facilities"
         ]
       },
-      "requiredForProductionPack": true,
+      "requiredForProductionPack": false,
       "updateFrequency": "realtime",
       "observedDataUpdatedAt": "2026-06-22",
       "retrievedAt": "2026-06-22",
@@ -5929,11 +5929,11 @@
           "unsupportedNotes": "source does not provide realtime arrival data for production live ETA"
         },
         "facility": {
-          "status": "SUPPORTED",
-          "productionUseAllowed": true,
-          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "PROVIDER_RESULT_30_20260728",
           "updateFrequency": "realtime",
-          "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
+          "unsupportedNotes": "detailed endpoint returned provider resultCode 30 on 2026-07-28; standard stationCnvFacl is the production source"
         }
       },
       "admissionEvidence": {

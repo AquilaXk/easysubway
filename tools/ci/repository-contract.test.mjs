@@ -10193,7 +10193,7 @@ test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 
       }))
       .sort((left, right) => codepointCompare(left.stationId, right.stationId)),
     [
-      { stationId: "station-sadang", evidenceKind: "EXISTS", operationalStatus: "AVAILABLE", strictRouteEligible: false, strictRouteEligibleReason: "OPERATION_STATUS_NOT_AVAILABLE" },
+      { stationId: "station-sadang", evidenceKind: "EXISTS", operationalStatus: "AVAILABLE", strictRouteEligible: false, strictRouteEligibleReason: "STATUS_PROBE_NOT_ROUTE_EVIDENCE" },
       { stationId: "station-sangnoksu", evidenceKind: "NOT_EXISTS", operationalStatus: "NOT_COVERED", strictRouteEligible: false, strictRouteEligibleReason: "NO_OFFICIAL_STATUS_FEED" },
     ],
   );
@@ -19954,4 +19954,31 @@ test("error_events 스키마는 허용 컬럼만 갖고 민감 원문 컬럼을 
     read("backend/src/main/resources/db/migration/h2/V69__admin_error_events_permission.sql"),
     /admin\.errors\.read/,
   );
+});
+
+test("#2609 accessibility release canonical pins는 tracked source와 exact-match한다", () => {
+  const digest = (value) => createHash("sha256").update(value).digest("hex");
+  const specBytes = readFileSync(path.join(root, "tools/datapack/release/candidate-build-spec.json"));
+  const inventoryBytes = readFileSync(path.join(root, "tools/datapack/source-inventory.json"));
+  const spec = JSON.parse(specBytes);
+  const inventory = JSON.parse(inventoryBytes);
+  const snapshots = JSON.parse(read("tools/datapack/release/source-snapshots.json"));
+  const request = JSON.parse(read("tools/datapack/release/release-request.json"));
+  const pack = JSON.parse(read("tools/datapack/release/capital-production-canonical-pack.json")).packs[0];
+
+  assert.equal(spec.sourceInventorySha256, digest(JSON.stringify(inventory)));
+  assert.equal(spec.networkEdgeEvidence.sourceInventory.sha256, digest(inventoryBytes));
+  assert.equal(spec.sourceSnapshotSetHash, digest(JSON.stringify(snapshots)));
+  assert.deepEqual(spec.sourceSnapshots.map(({ snapshotId }) => snapshotId), snapshots.map(({ snapshotId }) => snapshotId));
+  assert.equal(request.buildSpecSha256, digest(specBytes));
+  assert.equal(request.sourceSnapshotSetHash, spec.sourceSnapshotSetHash);
+
+  const accessibilitySnapshots = new Set([
+    ...pack.facilities.map(({ sourceSnapshotId }) => sourceSnapshotId),
+    ...pack.stationFacilityEvidence.map(({ sourceSnapshotId }) => sourceSnapshotId),
+  ]);
+  assert.deepEqual([...accessibilitySnapshots].sort(), [
+    "kric-station-convenience-standard-20260728",
+    "seoul-metro-accessibility-20260728",
+  ]);
 });

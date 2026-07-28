@@ -111,7 +111,7 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
       confidence: 100,
       verifiedAt: seoulSnapshot.observedAt,
       retrievedAt: seoulSnapshot.capturedAt,
-      strictRouteEligibleReason: station ? "OPERATION_STATUS_NOT_AVAILABLE" : "NO_OFFICIAL_STATUS_FEED",
+      strictRouteEligibleReason: station ? "STATUS_PROBE_NOT_ROUTE_EVIDENCE" : "NO_OFFICIAL_STATUS_FEED",
       note: station ? "서울교통공사 전체 승강기 운행상황 snapshot 실측." : "서울교통공사 운행상황 feed의 구조적 미커버.",
     };
   });

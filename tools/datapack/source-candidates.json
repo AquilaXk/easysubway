@@ -3374,7 +3374,7 @@
       },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
-      "admissionStatus": "admitted_to_production_inventory",
+      "admissionStatus": "superseded_by_standard_operation",
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
@@ -3418,7 +3418,7 @@
           "note": "현재 공식 KRIC LINK operation은 provider 권한 승인 전까지 row schema를 검증할 수 없다."
         }
       },
-      "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
+      "nextAction": "상세 operation은 provider result 30 해소 전까지 candidate로 보존하고 production은 stationCnvFacl standard operation만 소비한다.",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -3437,15 +3437,15 @@
           "rateLimitStatus": "NOT_APPLICABLE"
         },
         "facility": {
-          "status": "SUPPORTED",
-          "productionUseAllowed": true,
-          "coverageStatus": "PROVIDER_DOCUMENTED_CAPITAL_PILOT",
-          "updateFrequency": "provider documented; production cadence admitted for capital pilot",
-          "unsupportedNotes": "production use admitted for capital pilot facility records"
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "PROVIDER_RESULT_30_20260728",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "stationCnvFacl standard operation supersedes this detailed operation for production"
         }
       },
       "productionInventoryReferenceId": "kric-station-elevator",
-      "productionInventoryRelationship": "same_dataset_inventory_entry_admitted_for_capital_pack"
+      "productionInventoryRelationship": "candidate_only_standard_operation_supersedes_production_use"
     },
     {
       "id": "kric-station-elevator-movement",
@@ -3619,7 +3619,7 @@
       },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
-      "admissionStatus": "admitted_to_production_inventory",
+      "admissionStatus": "superseded_by_standard_operation",
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
@@ -3653,7 +3653,7 @@
         ],
         "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
-      "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
+      "nextAction": "상세 operation은 provider result 30 해소 전까지 candidate로 보존하고 production은 stationCnvFacl standard operation만 소비한다.",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -3672,15 +3672,15 @@
           "rateLimitStatus": "NOT_APPLICABLE"
         },
         "facility": {
-          "status": "SUPPORTED",
-          "productionUseAllowed": true,
-          "coverageStatus": "PROVIDER_DOCUMENTED_CAPITAL_PILOT",
-          "updateFrequency": "provider documented; production cadence admitted for capital pilot",
-          "unsupportedNotes": "production use admitted for capital pilot facility records"
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "PROVIDER_RESULT_30_20260728",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "stationCnvFacl standard operation supersedes this detailed operation for production"
         }
       },
       "productionInventoryReferenceId": "kric-station-escalator",
-      "productionInventoryRelationship": "same_dataset_inventory_entry_admitted_for_capital_pack"
+      "productionInventoryRelationship": "candidate_only_standard_operation_supersedes_production_use"
     },
     {
       "id": "kric-station-info",
@@ -5412,7 +5412,7 @@
       },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
-      "admissionStatus": "admitted_to_production_inventory",
+      "admissionStatus": "superseded_by_standard_operation",
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
@@ -5444,7 +5444,7 @@
         ],
         "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
-      "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
+      "nextAction": "상세 operation은 provider result 30 해소 전까지 candidate로 보존하고 production은 stationCnvFacl standard operation만 소비한다.",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -5463,15 +5463,15 @@
           "rateLimitStatus": "NOT_APPLICABLE"
         },
         "facility": {
-          "status": "SUPPORTED",
-          "productionUseAllowed": true,
-          "coverageStatus": "PROVIDER_DOCUMENTED_CAPITAL_PILOT",
-          "updateFrequency": "provider documented; production cadence admitted for capital pilot",
-          "unsupportedNotes": "production use admitted for capital pilot facility records"
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "PROVIDER_RESULT_30_20260728",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "stationCnvFacl standard operation supersedes this detailed operation for production"
         }
       },
       "productionInventoryReferenceId": "kric-wheelchair-lift-location",
-      "productionInventoryRelationship": "same_dataset_inventory_entry_admitted_for_capital_pack"
+      "productionInventoryRelationship": "candidate_only_standard_operation_supersedes_production_use"
     },
     {
       "id": "kric-wheelchair-lift-movement",

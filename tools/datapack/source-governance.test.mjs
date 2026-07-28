@@ -279,7 +279,7 @@ test("tracked production legacy root는 승인 bytes를 바꾸지 않고 검증�
     "utf8",
   ));
 
-  assert.equal(snapshots.filter((entry) => entry.coverageCount == null).length, 9);
+  assert.equal(snapshots.filter((entry) => entry.coverageCount == null).length, 5);
   assert.doesNotThrow(() => validateLineage(snapshots));
 });
 

@@ -186,6 +186,15 @@ test("provider resultCode 00 no-data envelope는 explicit-zero로 보존한다",
   assert.equal(snapshots[0].queries[0].status, "ABSENT_EXPLICIT_ZERO");
 });
 
+test("resultCode가 없는 bare array는 absence evidence로 인정하지 않는다", async () => {
+  await assert.rejects(() => collectKricAccessibilitySnapshots({
+    roster: roster.slice(0, 1),
+    operations: [operation],
+    serviceKey: "key",
+    fetchImpl: async () => ({ ok: true, status: 200, json: async () => [] }),
+  }), /KRIC accessibility provider result invalid/);
+});
+
 test("provider resultCode 00 body array envelope는 표준 rows로 검증한다", async () => {
   const tuple = roster[0];
   const snapshots = await collectKricAccessibilitySnapshots({
@@ -241,6 +250,8 @@ function response(status, body, resultCode = "00") {
   return {
     ok: status >= 200 && status < 300,
     status,
-    json: async () => resultCode === "00" ? body : { resultCode, resultMsg: "redacted" },
+    json: async () => resultCode === "00"
+      ? { header: { resultCode, resultMsg: "redacted" }, body }
+      : { resultCode, resultMsg: "redacted" },
   };
 }

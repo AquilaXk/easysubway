@@ -57,7 +57,7 @@ export function buildAccessibilitySourceCoverageReport({
       violations.artifactIdentity.push(`${artifact.artifactId}:SQLITE_SHA256_INVALID`);
     }
     for (const claim of artifact.claims ?? []) {
-      validateClaim(artifact, claim, sources, violations);
+      validateClaim(artifact, claim, sources, snapshotsByIdentity, violations);
       if (!claim.sourceId) continue;
       const key = `${claim.sourceId}\0${claim.domain}`;
       const entry = providerDomains.get(key) ?? {
@@ -165,16 +165,17 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
       JOIN station_lines ON station_lines.station_id = stations.id
       ORDER BY stations.id
     `).all().map(({ id }) => id);
-    const claims = tableExists(database, "station_facility_evidence")
+    const evidenceClaims = tableExists(database, "station_facility_evidence")
       ? database.prepare(`
-          SELECT station_id, line_id, evidence_kind, source_id, source_snapshot_id,
+          SELECT station_id, line_id, facility_type, evidence_kind, source_id, source_snapshot_id,
                  provider_record_hash, evidence_hash
           FROM station_facility_evidence
           ORDER BY station_id, line_id, facility_type
         `).all().map((row) => ({
           stationId: row.station_id,
           lineId: row.line_id,
-          domain: "FACILITY",
+          facilityType: row.facility_type,
+          domain: "STATION_FACILITY_EVIDENCE",
           evidenceKind: row.evidence_kind,
           sourceId: row.source_id,
           sourceSnapshotId: row.source_snapshot_id,
@@ -182,6 +183,60 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
           evidenceHash: row.evidence_hash,
         }))
       : [];
+    const facilityClaims = tableExists(database, "facilities")
+      ? database.prepare(tableHasColumns(database, "facilities", ["source_id", "source_snapshot_id", "provider_record_hash", "evidence_hash"])
+        ? `
+          SELECT id, station_id, type, source_id, source_snapshot_id,
+                 provider_record_hash, evidence_hash
+          FROM facilities
+          WHERE source_id <> ''
+          ORDER BY station_id, type, id
+        `
+        : `SELECT id, station_id, type, '' AS source_id, '' AS source_snapshot_id,
+                  '' AS provider_record_hash, '' AS evidence_hash
+           FROM facilities ORDER BY station_id, type, id`).all().map((row) => ({
+          claimId: row.id,
+          stationId: row.station_id,
+          lineId: "",
+          facilityType: row.type,
+          domain: "FACILITY",
+          evidenceKind: "EXISTS",
+          sourceId: row.source_id,
+          sourceSnapshotId: row.source_snapshot_id,
+          providerRecordHash: row.provider_record_hash,
+          evidenceHash: row.evidence_hash,
+        }))
+      : [];
+    const edgeClaims = tableExists(database, "network_edges")
+      ? database.prepare(tableHasColumns(database, "network_edges", ["source_id", "source_snapshot_id", "provider_record_hash", "evidence_hash"])
+        ? `
+          SELECT id, from_node_id, to_node_id, edge_type, accessibility_status,
+                 source_id, source_snapshot_id, provider_record_hash, evidence_hash
+          FROM network_edges
+          WHERE source_id <> '' AND edge_type <> 'RIDE'
+          ORDER BY id
+        `
+        : `SELECT id, from_node_id, to_node_id, edge_type, accessibility_status,
+                  '' AS source_id, '' AS source_snapshot_id, '' AS provider_record_hash,
+                  '' AS evidence_hash
+           FROM network_edges WHERE edge_type <> 'RIDE' ORDER BY id`).all().map((row) => {
+          const nodeId = [row.from_node_id, row.to_node_id].find((value) => String(value).includes(":"))
+            ?? row.from_node_id;
+          return {
+            claimId: row.id,
+            stationId: String(nodeId).split(":")[0],
+            lineId: String(nodeId).split(":")[1] ?? "",
+            facilityType: row.edge_type,
+            domain: "NETWORK_EDGE",
+            evidenceKind: row.accessibility_status === "NO_OFFICIAL_FEED" ? "NOT_EXISTS" : "EXISTS",
+            sourceId: row.source_id,
+            sourceSnapshotId: row.source_snapshot_id,
+            providerRecordHash: row.provider_record_hash,
+            evidenceHash: row.evidence_hash,
+          };
+        })
+      : [];
+    const claims = [...evidenceClaims, ...facilityClaims, ...edgeClaims];
     return { artifactId, sqliteSha256, searchableStationIds, claims };
   } finally {
     database.close();
@@ -190,6 +245,11 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
 
 function tableExists(database, table) {
   return Boolean(database.prepare("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?").get(table));
+}
+
+function tableHasColumns(database, table, columns) {
+  const available = new Set(database.prepare(`PRAGMA table_info(${table})`).all().map(({ name }) => name));
+  return columns.every((column) => available.has(column));
 }
 
 function resolvePackPath(root, pack) {
@@ -253,16 +313,22 @@ function validateSource(source, snapshotsByIdentity, evaluatedMillis, violations
   }
 }
 
-function validateClaim(artifact, claim, sources, violations) {
+function validateClaim(artifact, claim, sources, snapshotsByIdentity, violations) {
   const claimId = `${artifact.artifactId}:${claim.stationId}|${claim.lineId}|${claim.domain}`;
   const source = sources.get(claim.sourceId);
   const evidence = source?.accessibilityAdmissionEvidence;
-  if (!source
+  const provenanceMissing = !source
     || !claim.sourceId
     || claim.sourceSnapshotId !== evidence?.snapshotId
     || !sha256(claim.providerRecordHash)
-    || !sha256(claim.evidenceHash)) {
+    || !sha256(claim.evidenceHash);
+  if (provenanceMissing) {
     violations.provenance.push(`${claimId}:PROVENANCE_MISSING`);
+  } else {
+    const snapshot = snapshotsByIdentity.get(`${claim.sourceId}\0${claim.sourceSnapshotId}`);
+    if (!claimMatchesSnapshot(snapshot, claim)) {
+      violations.provenance.push(`${claimId}:CLAIM_SNAPSHOT_BINDING_MISMATCH`);
+    }
   }
   if (placeholderHash(claim.providerRecordHash) || placeholderHash(claim.evidenceHash)) {
     violations.placeholder.push(`${claimId}:EVIDENCE_HASH_PLACEHOLDER`);
@@ -271,6 +337,59 @@ function validateClaim(artifact, claim, sources, violations) {
     && !ABSENCE_EVIDENCE_MODES.has(evidence?.absenceEvidenceMode)) {
     violations.absenceEvidence.push(`${claimId}:ABSENCE_EVIDENCE_MISSING`);
   }
+}
+
+function claimMatchesSnapshot(snapshot, claim) {
+  if (!snapshot) return false;
+  if (Array.isArray(snapshot.claimBindings)) {
+    return snapshot.claimBindings.some((binding) => [
+      "stationId", "lineId", "facilityType", "providerRecordHash", "evidenceHash",
+    ].every((field) => binding[field] === claim[field]));
+  }
+  if (snapshot.artifactKind === "kric-accessibility-snapshot") {
+    const code = { ELEVATOR: "EV", ESCALATOR: "ES", WHEELCHAIR_LIFT: "WCLF" }[claim.facilityType];
+    if (!code) return false;
+    return (snapshot.queries ?? []).filter((query) => query.stationId === claim.stationId
+      && (!claim.lineId || query.lineId === claim.lineId)).some((query) => {
+      const tuple = { railOprIsttCd: query.railOprIsttCd, lnCd: query.lnCd, stinCd: query.stinCd };
+      const rows = (query.rows ?? []).filter(({ gubun }) => gubun === code);
+      if (rows.length > 0) return rows.some((row) => {
+        const providerRecordHash = digest(JSON.stringify(row));
+        return providerRecordHash === claim.providerRecordHash
+          && digest(JSON.stringify({ snapshotId: snapshot.snapshotId, query: tuple, providerRecordHash })) === claim.evidenceHash;
+      });
+      return claim.evidenceKind === "NOT_EXISTS"
+        && query.providerRecordHash === claim.providerRecordHash
+        && digest(JSON.stringify({
+          snapshotId: snapshot.snapshotId,
+          query: tuple,
+          type: claim.facilityType,
+          evidenceKind: "NOT_EXISTS",
+        })) === claim.evidenceHash;
+    });
+  }
+  if (snapshot.artifactKind === "seoul-accessibility-snapshot") {
+    const stationHashes = new Set((snapshot.stations ?? []).map((station) => digest(JSON.stringify(station))));
+    const lineNumber = claim.lineId.match(/(\d+)$/)?.[1];
+    const absentHash = lineNumber
+      ? digest(JSON.stringify({ stationId: claim.stationId, lineName: `${lineNumber}호선`, status: "NOT_COVERED" }))
+      : null;
+    if (!stationHashes.has(claim.providerRecordHash) && claim.providerRecordHash !== absentHash) return false;
+    const expectedEvidenceHash = claim.domain === "NETWORK_EDGE"
+      ? digest(JSON.stringify({
+        edgeId: claim.claimId,
+        sourceSnapshotId: snapshot.snapshotId,
+        providerRecordHash: claim.providerRecordHash,
+      }))
+      : digest(JSON.stringify({
+        snapshotId: snapshot.snapshotId,
+        stationId: claim.stationId,
+        lineId: claim.lineId,
+        providerRecordHash: claim.providerRecordHash,
+      }));
+    return expectedEvidenceHash === claim.evidenceHash;
+  }
+  return false;
 }
 
 function sha256(value) {

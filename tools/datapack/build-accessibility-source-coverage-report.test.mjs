@@ -27,7 +27,7 @@ test("selectable artifact의 모든 claim이 fresh official snapshot에 결속�
   ]);
   assert.deepEqual(report.providerDomainMatrix, [{
     sourceId: "official-accessibility",
-    domain: "FACILITY",
+    domain: "STATION_FACILITY_EVIDENCE",
     artifactIds: ["bundled-capital", "remote-capital"],
     claimCount: 2,
     status: "ADMITTED",
@@ -80,12 +80,29 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
       station_id TEXT, line_id TEXT, facility_type TEXT, evidence_kind TEXT,
       source_id TEXT, source_snapshot_id TEXT, provider_record_hash TEXT, evidence_hash TEXT
     );
+    CREATE TABLE facilities (
+      id TEXT, station_id TEXT, type TEXT, source_id TEXT, source_snapshot_id TEXT,
+      provider_record_hash TEXT, evidence_hash TEXT
+    );
+    CREATE TABLE network_edges (
+      id TEXT, from_node_id TEXT, to_node_id TEXT, edge_type TEXT,
+      accessibility_status TEXT, stair_access_state TEXT, source_id TEXT,
+      source_snapshot_id TEXT, provider_record_hash TEXT, evidence_hash TEXT
+    );
   `);
   database.prepare("INSERT INTO stations VALUES (?)").run("station-a");
   database.prepare("INSERT INTO station_lines VALUES (?, ?)").run("station-a", "line-a");
   database.prepare("INSERT INTO station_facility_evidence VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
     "station-a", "line-a", "ELEVATOR", "VERIFIED_PRESENT", "official-accessibility",
     "official-accessibility-20260728", hash("record"), hash("evidence"),
+  );
+  database.prepare("INSERT INTO facilities VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+    "facility-a", "station-a", "ELEVATOR", "official-accessibility",
+    "official-accessibility-20260728", hash("facility-record"), hash("facility-evidence"),
+  );
+  database.prepare("INSERT INTO network_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    "edge-entry-a", "station-a", "station-a:line-a", "ENTRY", "UNKNOWN", "UNKNOWN",
+    "official-accessibility", "official-accessibility-20260728", hash("edge-record"), hash("edge-evidence"),
   );
   database.close();
   const sqliteBytes = await readFile(sqlitePath);
@@ -119,14 +136,49 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
     claims: [{
       stationId: "station-a",
       lineId: "line-a",
-      domain: "FACILITY",
+      facilityType: "ELEVATOR",
+      domain: "STATION_FACILITY_EVIDENCE",
       evidenceKind: "VERIFIED_PRESENT",
       sourceId: "official-accessibility",
       sourceSnapshotId: "official-accessibility-20260728",
       providerRecordHash: hash("record"),
       evidenceHash: hash("evidence"),
+    }, {
+      claimId: "facility-a",
+      stationId: "station-a",
+      lineId: "",
+      facilityType: "ELEVATOR",
+      domain: "FACILITY",
+      evidenceKind: "EXISTS",
+      sourceId: "official-accessibility",
+      sourceSnapshotId: "official-accessibility-20260728",
+      providerRecordHash: hash("facility-record"),
+      evidenceHash: hash("facility-evidence"),
+    }, {
+      claimId: "edge-entry-a",
+      stationId: "station-a",
+      lineId: "line-a",
+      facilityType: "ENTRY",
+      domain: "NETWORK_EDGE",
+      evidenceKind: "EXISTS",
+      sourceId: "official-accessibility",
+      sourceSnapshotId: "official-accessibility-20260728",
+      providerRecordHash: hash("edge-record"),
+      evidenceHash: hash("edge-evidence"),
     }],
   }]);
+});
+
+test("snapshot content에서 재계산할 수 없는 임의 claim hash는 NO_GO다", () => {
+  const input = validInput();
+  input.artifacts[0].claims[0].evidenceHash = hash("arbitrary-but-shaped");
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(report.decision, "NO_GO");
+  assert.deepEqual(report.violations.provenance, [
+    "bundled-capital:station-a|line-a|STATION_FACILITY_EVIDENCE:CLAIM_SNAPSHOT_BINDING_MISMATCH",
+  ]);
 });
 
 for (const { name, mutate, partition, expected } of [
@@ -158,7 +210,7 @@ for (const { name, mutate, partition, expected } of [
     name: "claim provenance missing",
     mutate: (input) => { input.artifacts[0].claims[0].sourceId = ""; },
     partition: "provenance",
-    expected: "bundled-capital:station-a|line-a|FACILITY:PROVENANCE_MISSING",
+    expected: "bundled-capital:station-a|line-a|STATION_FACILITY_EVIDENCE:PROVENANCE_MISSING",
   },
   {
     name: "row absence without completeness evidence",
@@ -167,13 +219,13 @@ for (const { name, mutate, partition, expected } of [
       delete input.inventory.sources[0].accessibilityAdmissionEvidence.absenceEvidenceMode;
     },
     partition: "absenceEvidence",
-    expected: "bundled-capital:station-a|line-a|FACILITY:ABSENCE_EVIDENCE_MISSING",
+    expected: "bundled-capital:station-a|line-a|STATION_FACILITY_EVIDENCE:ABSENCE_EVIDENCE_MISSING",
   },
   {
     name: "placeholder evidence hash",
     mutate: (input) => { input.artifacts[0].claims[0].evidenceHash = "a".repeat(64); },
     partition: "placeholder",
-    expected: "bundled-capital:station-a|line-a|FACILITY:EVIDENCE_HASH_PLACEHOLDER",
+    expected: "bundled-capital:station-a|line-a|STATION_FACILITY_EVIDENCE:EVIDENCE_HASH_PLACEHOLDER",
   },
   {
     name: "duplicate artifact identity",
@@ -203,12 +255,13 @@ function validInput() {
   const claim = (stationId) => ({
     stationId,
     lineId: "line-a",
-    domain: "FACILITY",
+    facilityType: "ELEVATOR",
+    domain: "STATION_FACILITY_EVIDENCE",
     evidenceKind: "VERIFIED_PRESENT",
     sourceId,
     sourceSnapshotId: snapshotId,
     providerRecordHash: hash(`${stationId}-record`),
-    evidenceHash: contentSha256,
+    evidenceHash: hash(`${stationId}-evidence`),
   });
   return {
     evaluatedAt: EVALUATED_AT,
@@ -256,6 +309,13 @@ function validInput() {
       contentSha256,
       schemaFingerprint,
       snapshotFileSha256,
+      claimBindings: ["station-a", "station-b"].map((stationId) => ({
+        stationId,
+        lineId: "line-a",
+        facilityType: "ELEVATOR",
+        providerRecordHash: hash(`${stationId}-record`),
+        evidenceHash: hash(`${stationId}-evidence`),
+      })),
     }],
   };
 }

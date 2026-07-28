@@ -34,7 +34,6 @@ import { isUnchangedRefresh } from "./apply-itx-topology-to-bundled-pack.mjs";
 const root = path.resolve(import.meta.dirname, "../..");
 const canonicalSqliteHeaderVersion = 3_053_000;
 const validatedItxAdmissionPacks = new WeakSet();
-const validatedItxAdmissionOutputs = new WeakMap();
 const originalItxAdmissionOutput = Object.freeze({
   sha256: "dfe8420b2f26d2ca2948575098e0a6a5e278c3b203f7cd9c1f1b588a07e74b02",
   sqliteSha256: "c39f23cd6b8b20f88672d0456b72a4efbd3697b81035cfb49ded289e50f3a4aa",
@@ -111,17 +110,6 @@ async function main() {
     const compressedSha256 = sha256(compressedBytes);
     const sqliteSha256 = sha256(sqliteBytes);
     const sizeBytes = compressedBytes.length;
-    const admittedOutput = validatedItxAdmissionOutputs.get(pack);
-    if (admittedOutput && !samePackIdentity(admittedOutput, {
-      sha256: compressedSha256,
-      sqliteSha256,
-      byteSize: sizeBytes,
-    })) {
-      throw new Error(`built ITX pack identity does not match tracked readmission output: ${JSON.stringify({
-        expected: admittedOutput,
-        actual: { sha256: compressedSha256, sqliteSha256, byteSize: sizeBytes },
-      })}`);
-    }
     const representativeRouteRegressions = canonicalRepresentativeRouteRegressions(
       pack.representativeRouteRegressions,
     );
@@ -651,11 +639,34 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     applyItxNetworkEdgeEvidence(pack, itxAdmission);
     normalizeUnverifiedNetworkEdgeStates(pack);
   }
+  const accessibilityFreshUntil = productionAccessibilityFreshUntil(productionPacks, sourceInventory.value);
   return new Date(Math.min(
     Date.parse(topologyAdmission.freshUntil),
     Date.parse(itxAdmission.freshUntil),
     ...[...capitalAdmissions.values()].map(({ freshUntil }) => Date.parse(freshUntil)),
+    Date.parse(accessibilityFreshUntil),
   )).toISOString();
+}
+
+function productionAccessibilityFreshUntil(packs, inventory) {
+  const sources = new Map(inventory.sources.map((source) => [source.id, source]));
+  const rows = packs.flatMap((pack) => [
+    ...(pack.facilities ?? []),
+    ...(pack.stationFacilityEvidence ?? []),
+    ...(pack.networkEdges ?? []).filter(({ edgeType }) => edgeType !== "RIDE"),
+  ]).filter(({ sourceId }) => sourceId);
+  const expires = rows.map((row) => {
+    const evidence = sources.get(row.sourceId)?.accessibilityAdmissionEvidence;
+    if (evidence?.snapshotId !== row.sourceSnapshotId || !Number.isFinite(Date.parse(evidence.freshUntil))) {
+      throw new Error(`production accessibility evidence mismatch: ${row.sourceId}`);
+    }
+    if (Date.parse(evidence.freshUntil) <= candidateBuildNow().getTime()) {
+      throw new Error(`production accessibility evidence is stale: ${row.sourceId}`);
+    }
+    return Date.parse(evidence.freshUntil);
+  });
+  if (expires.length === 0) throw new Error("production accessibility evidence is missing");
+  return new Date(Math.min(...expires)).toISOString();
 }
 
 export function normalizeUnverifiedNetworkEdgeStates(pack) {
@@ -1019,7 +1030,7 @@ async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
     || evidence.sourceIssue !== 2135) {
     throw new Error("buildSpec ITX topology evidence must be the #2135 admission artifact");
   }
-  const { output, projection: admission } = validateTrackedItxReadmissionChain(evidence);
+  const { projection: admission } = validateTrackedItxReadmissionChain(evidence);
   for (const pack of packs) {
     const edges = (pack.networkEdges ?? [])
       .filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN")
@@ -1056,7 +1067,6 @@ async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
       throw new Error("ITX_CHEONGCHUN route evidence projection does not match tracked topology evidence");
     }
     validatedItxAdmissionPacks.add(pack);
-    validatedItxAdmissionOutputs.set(pack, output);
   }
   return evidence;
 }

@@ -287,18 +287,16 @@ async function requestRows({ operation, tuple, serviceKey, fetchImpl, requestTim
   } catch {
     throw new Error(`KRIC accessibility schema invalid: ${operation.sourceId}`);
   }
-  if (!Array.isArray(payload)) {
-    const resultCode = payload?.resultCode ?? payload?.header?.resultCode;
-    if (resultCode === "00" && Array.isArray(payload?.body)) {
-      payload = payload.body;
-    } else if (resultCode === "00" && Object.keys(payload).every((key) => ["resultCode", "resultMsg"].includes(key))) {
-      return [];
-    } else {
-      const safeCode = /^[A-Za-z0-9._-]{1,32}$/.test(resultCode ?? "") ? resultCode : "UNKNOWN";
-      const safeKeys = Object.keys(payload ?? {}).filter((key) => /^[A-Za-z0-9._-]{1,32}$/.test(key)).sort().slice(0, 12);
-      const safeBodyKeys = Object.keys(payload?.body ?? {}).filter((key) => /^[A-Za-z0-9._-]{1,32}$/.test(key)).sort().slice(0, 12);
-      throw new Error(`KRIC accessibility provider result invalid: ${operation.sourceId}/${safeCode}; keys=${safeKeys.join(",")}; bodyKeys=${safeBodyKeys.join(",")}`);
-    }
+  const resultCode = payload?.resultCode ?? payload?.header?.resultCode;
+  if (resultCode === "00" && Array.isArray(payload?.body)) {
+    payload = payload.body;
+  } else if (resultCode === "00" && Object.keys(payload).every((key) => ["resultCode", "resultMsg"].includes(key))) {
+    return [];
+  } else {
+    const safeCode = /^[A-Za-z0-9._-]{1,32}$/.test(resultCode ?? "") ? resultCode : "UNKNOWN";
+    const safeKeys = Object.keys(payload ?? {}).filter((key) => /^[A-Za-z0-9._-]{1,32}$/.test(key)).sort().slice(0, 12);
+    const safeBodyKeys = Object.keys(payload?.body ?? {}).filter((key) => /^[A-Za-z0-9._-]{1,32}$/.test(key)).sort().slice(0, 12);
+    throw new Error(`KRIC accessibility provider result invalid: ${operation.sourceId}/${safeCode}; keys=${safeKeys.join(",")}; bodyKeys=${safeBodyKeys.join(",")}`);
   }
   const tupleIdentityFields = operation.tupleIdentityFields ?? ["railOprIsttCd", "lnCd", "stinCd"];
   for (const row of payload) {

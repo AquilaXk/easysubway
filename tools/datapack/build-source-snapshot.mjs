@@ -70,6 +70,16 @@ async function main() {
     await writeFileWithParents(args["raw-output"], canonicalRaw);
   }
   await writeFileWithParents(requireArg(args, "output"), `${JSON.stringify(snapshot, null, 2)}\n`);
+  if (args["snapshot-set"]) {
+    const snapshotSetPath = path.resolve(args["snapshot-set"]);
+    const snapshots = JSON.parse(await readFile(snapshotSetPath, "utf8"));
+    const replacedSourceIds = new Set([
+      snapshot.sourceId,
+      ...(args["remove-source-ids"] ?? "").split(",").filter(Boolean),
+    ]);
+    const next = snapshots.filter(({ sourceId }) => !replacedSourceIds.has(sourceId)).concat(snapshot);
+    await writeFileWithParents(snapshotSetPath, `${JSON.stringify(next, null, 2)}\n`);
+  }
 }
 
 async function validateRetentionPolicy(snapshot, args) {
