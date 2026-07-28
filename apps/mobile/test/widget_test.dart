@@ -3606,6 +3606,7 @@ void main() {
   testWidgets('SVG 바탕 실패는 지도 상호작용 전체를 unavailable surface로 교체한다', (
     tester,
   ) async {
+    debugRouteMapSvgViewportPresentImmediately = false;
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     const viewId = 2570;
     const channelName =
@@ -3733,6 +3734,7 @@ void main() {
   testWidgets(
     '광주송정역 native visual layer는 중복 semantics 없이 station action을 유지한다',
     (tester) async {
+      debugRouteMapSvgViewportPresentImmediately = false;
       debugDefaultTargetPlatformOverride = TargetPlatform.android;
       const viewId = 2571;
       const channelName =

@@ -129,6 +129,19 @@ void main() {
     controller.dispose();
   });
 
+  test('attach 전 setCamera MissingPlugin은 unavailable을 알린다', () async {
+    var unavailableCount = 0;
+    final controller = RouteMapSvgViewportController(
+      onUnavailable: () => unavailableCount++,
+    );
+
+    await controller.update(camera, sourceOrigin: origin);
+    await controller.attach(viewId: 44);
+
+    expect(unavailableCount, 1);
+    controller.dispose();
+  });
+
   for (final method in [
     'assetLoadFailed',
     'cameraApplyFailed',

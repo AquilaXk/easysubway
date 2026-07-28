@@ -113,6 +113,8 @@ class RouteMapSvgViewportController {
       await channel.invokeMethod<void>('setCamera', payload);
     } on PlatformException {
       _fail();
+    } on MissingPluginException {
+      _fail();
     }
   }
 
