@@ -11492,36 +11492,20 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
         },
       },
       {
-        id: "kric-station-elevator",
+        id: "kric-station-convenience-standard",
         coverageScope: {
-          regionIds: ["capital", "busan", "daegu", "gwangju", "daejeon"],
-          operatorIds: [
-            "seoul-metro",
-            "korail",
-            "incheon-transit",
-            "busan-transportation",
-            "daegu-transportation",
-            "gwangju-metropolitan-rapid-transit",
-            "daejeon-transportation",
-          ],
+          regionIds: ["capital"],
+          operatorIds: ["seoul-metro", "korail"],
           sourceDomains: ["accessibility_facilities"],
         },
       },
       {
         id: "kric-station-elevator-movement",
-        coverageScope: generated.packs[0].sourceInventory[2].coverageScope,
-      },
-      {
-        id: "kric-station-escalator",
-        coverageScope: generated.packs[0].sourceInventory[2].coverageScope,
-      },
-      {
-        id: "kric-wheelchair-lift-location",
-        coverageScope: generated.packs[0].sourceInventory[2].coverageScope,
+        coverageScope: generated.packs[0].sourceInventory[3].coverageScope,
       },
       {
         id: "kric-wheelchair-lift-movement",
-        coverageScope: generated.packs[0].sourceInventory[2].coverageScope,
+        coverageScope: generated.packs[0].sourceInventory[3].coverageScope,
       },
     ],
   );
@@ -11531,10 +11515,8 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
       operatorId: "seoul-metro",
       sourceDomain: "accessibility_facilities",
       sourceIds: [
-        "kric-station-elevator",
+        "kric-station-convenience-standard",
         "kric-station-elevator-movement",
-        "kric-station-escalator",
-        "kric-wheelchair-lift-location",
         "kric-wheelchair-lift-movement",
       ],
     },
@@ -15225,10 +15207,8 @@ function productionSourceIngestInput() {
   input.sourceIds = [
     "molit-urban-rail-full-route",
     "seoulmetro-station-line-info",
-    "kric-station-elevator",
+    "kric-station-convenience-standard",
     "kric-station-elevator-movement",
-    "kric-station-escalator",
-    "kric-wheelchair-lift-location",
     "kric-wheelchair-lift-movement",
   ];
   input.supportedV1Scope = {
@@ -15284,42 +15264,42 @@ function productionSourceIngestInput() {
   delete input.routeRegressionScope;
   input.facilityRows = [
     [
-      "kric-station-elevator",
+      "kric-station-convenience-standard",
       "facility-sangnoksu-elevator-kric-1",
       "ELEVATOR",
       "상록수 엘리베이터 설치 정보",
       "MOLIT-SEOUL-4-448",
     ],
     [
-      "kric-station-escalator",
+      "kric-station-convenience-standard",
       "facility-sangnoksu-escalator-kric-1",
       "ESCALATOR",
       "상록수 에스컬레이터 설치 정보",
       "MOLIT-SEOUL-4-448",
     ],
     [
-      "kric-wheelchair-lift-location",
+      "kric-station-convenience-standard",
       "facility-sangnoksu-wheelchair-lift-kric-1",
       "WHEELCHAIR_LIFT",
       "상록수 휠체어리프트 설치 정보",
       "MOLIT-SEOUL-4-448",
     ],
     [
-      "kric-station-elevator",
+      "kric-station-convenience-standard",
       "facility-sadang-elevator-kric-1",
       "ELEVATOR",
       "사당 엘리베이터 설치 정보",
       "MOLIT-SEOUL-4-433",
     ],
     [
-      "kric-station-escalator",
+      "kric-station-convenience-standard",
       "facility-sadang-escalator-kric-1",
       "ESCALATOR",
       "사당 에스컬레이터 설치 정보",
       "MOLIT-SEOUL-4-433",
     ],
     [
-      "kric-wheelchair-lift-location",
+      "kric-station-convenience-standard",
       "facility-sadang-wheelchair-lift-kric-1",
       "WHEELCHAIR_LIFT",
       "사당 휠체어리프트 설치 정보",
@@ -15429,10 +15409,8 @@ function productionSourceIngestInput() {
       operatorId: "seoul-metro",
       sourceDomain: "accessibility_facilities",
       sourceIds: [
-        "kric-station-elevator",
+        "kric-station-convenience-standard",
         "kric-station-elevator-movement",
-        "kric-station-escalator",
-        "kric-wheelchair-lift-location",
         "kric-wheelchair-lift-movement",
       ],
       evidence: "국가철도공단 접근성 시설 위치와 이동동선 source inventory coverageScope",
@@ -15958,10 +15936,10 @@ function makeProductionSourceFixtureStrictCoverageValid(fixture) {
   const pack = fixture.packs[0];
   for (const edge of pack.networkEdges.filter((row) => ["ENTRY", "EXIT"].includes(row.edgeType))) {
     edge.accessibilityStatus = "AVAILABLE";
-    edge.sourceId = "kric-station-elevator";
-    edge.sourceSnapshotId = "kric-station-elevator-snapshot-20260622";
-    edge.providerRecordHash = sha256(`provider:${edge.id}:kric-station-elevator`);
-    edge.evidenceHash = sha256(`evidence:${edge.id}:kric-station-elevator:2026-06-22T00:00:00.000Z`);
+    edge.sourceId = "kric-station-elevator-movement";
+    edge.sourceSnapshotId = "kric-station-elevator-movement-snapshot-20260622";
+    edge.providerRecordHash = sha256(`provider:${edge.id}:kric-station-elevator-movement`);
+    edge.evidenceHash = sha256(`evidence:${edge.id}:kric-station-elevator-movement:2026-06-22T00:00:00.000Z`);
     edge.lastVerifiedAt = "2026-06-22T00:00:00.000Z";
   }
   for (const evidence of pack.stationFacilityEvidence) {
