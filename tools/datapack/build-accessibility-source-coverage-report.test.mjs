@@ -99,6 +99,11 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
       accessibility_status TEXT, stair_access_state TEXT, source_id TEXT,
       source_snapshot_id TEXT, provider_record_hash TEXT, evidence_hash TEXT
     );
+    CREATE TABLE internal_route_edges (
+      id TEXT, from_node_id TEXT, to_node_id TEXT, edge_type TEXT,
+      accessibility_status TEXT, source_id TEXT, source_snapshot_id TEXT,
+      provider_record_hash TEXT, evidence_hash TEXT
+    );
   `);
   database.prepare("INSERT INTO stations VALUES (?)").run("station-a");
   database.prepare("INSERT INTO station_lines VALUES (?, ?)").run("station-a", "line-a");
@@ -119,6 +124,14 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
   );
   database.prepare("INSERT INTO network_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
     "edge-without-provenance", "station-a", "station-a:line-a", "EXIT", "UNKNOWN", "UNKNOWN",
+    "", "", "", "",
+  );
+  database.prepare("INSERT INTO internal_route_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    "internal-edge-without-provenance", "station-a", "station-a:line-a", "WALK", "AVAILABLE",
+    "", "", "", "",
+  );
+  database.prepare("INSERT INTO internal_route_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    "internal-edge-unknown", "station-a", "station-a:line-a", "WALK", "UNKNOWN",
     "", "", "", "",
   );
   database.close();
@@ -198,6 +211,17 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
       stationId: "station-a",
       lineId: "line-a",
       facilityType: "EXIT",
+      domain: "NETWORK_EDGE",
+      evidenceKind: "EXISTS",
+      sourceId: "",
+      sourceSnapshotId: "",
+      providerRecordHash: "",
+      evidenceHash: "",
+    }, {
+      claimId: "internal-edge-without-provenance",
+      stationId: "station-a",
+      lineId: "line-a",
+      facilityType: "WALK",
       domain: "NETWORK_EDGE",
       evidenceKind: "EXISTS",
       sourceId: "",

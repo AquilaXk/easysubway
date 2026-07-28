@@ -76,6 +76,7 @@ function applyEvidence(sqlitePath, pack) {
       row.strictRouteEligibleReason,
     );
     syncAccessibilityEdges(database, pack);
+    normalizeUnprovenInternalRouteEdges(database, { check: false });
 
     database.exec("COMMIT");
   } catch (error) {
@@ -181,6 +182,7 @@ function assertEvidence(sqlitePath, pack) {
       throw new StaleAccessibilityEvidenceError("bundled facility quality record is stale");
     }
     assertAccessibilityEdges(database, pack);
+    normalizeUnprovenInternalRouteEdges(database, { check: true });
   } finally {
     database.close();
   }
@@ -212,6 +214,10 @@ export function syncCanonicalFixture(canonical, reviewedPack) {
   pack.networkEdges = (pack.networkEdges ?? [])
     .filter((edge) => !isAccessibilityRouteEdge(edge))
     .concat(accessibilityRouteEdges(reviewedPack));
+  pack.internalRouteEdges = (pack.internalRouteEdges ?? []).map((edge) =>
+    edge.accessibilityStatus !== "UNKNOWN" && !completeInternalRouteEdgeProvenance(edge)
+      ? { ...edge, accessibilityStatus: "UNKNOWN" }
+      : edge);
   const freshSources = reviewedPack.sourceInventory.filter(({ id }) =>
     ["kric-station-convenience-standard", "seoul-metro-accessibility"].includes(id));
   pack.sourceInventory = pack.sourceInventory
@@ -320,6 +326,37 @@ export function stripLegacyCoreClaims(database, { check }) {
   return stale;
 }
 
+export function normalizeUnprovenInternalRouteEdges(database, { check }) {
+  const columns = new Set(database.prepare("PRAGMA table_info(internal_route_edges)").all().map(({ name }) => name));
+  const hasProvenance = ["source_id", "source_snapshot_id", "provider_record_hash", "evidence_hash"]
+    .every((name) => columns.has(name));
+  const stale = database.prepare(hasProvenance ? `
+      SELECT id, source_id AS sourceId, source_snapshot_id AS sourceSnapshotId,
+             provider_record_hash AS providerRecordHash, evidence_hash AS evidenceHash
+      FROM internal_route_edges
+      WHERE accessibility_status <> 'UNKNOWN'
+    ` : `
+      SELECT id, '' AS sourceId, '' AS sourceSnapshotId, '' AS providerRecordHash, '' AS evidenceHash
+      FROM internal_route_edges
+      WHERE accessibility_status <> 'UNKNOWN'
+    `).all().filter((row) => !completeInternalRouteEdgeProvenance(row));
+  if (check && stale.length > 0) {
+    throw new StaleAccessibilityEvidenceError("bundled internal route accessibility evidence is stale");
+  }
+  if (!check) {
+    const update = database.prepare("UPDATE internal_route_edges SET accessibility_status = 'UNKNOWN' WHERE id = ?");
+    for (const { id } of stale) update.run(id);
+  }
+  return stale.length > 0;
+}
+
+function completeInternalRouteEdgeProvenance(edge) {
+  return Boolean(edge.sourceId)
+    && Boolean(edge.sourceSnapshotId)
+    && /^[0-9a-f]{64}$/.test(edge.providerRecordHash ?? "")
+    && /^[0-9a-f]{64}$/.test(edge.evidenceHash ?? "");
+}
+
 async function stripLegacyCore({ check }) {
   const packPath = path.join(root, "apps/mobile/assets/datapacks/core.sqlite.gz");
   const indexPath = path.join(root, "apps/mobile/assets/datapacks/index.json");
@@ -331,7 +368,9 @@ async function stripLegacyCore({ check }) {
     const database = new DatabaseSync(sqlitePath);
     let stale;
     try {
-      stale = stripLegacyCoreClaims(database, { check });
+      const claimsStale = stripLegacyCoreClaims(database, { check });
+      const edgeStale = normalizeUnprovenInternalRouteEdges(database, { check });
+      stale = claimsStale || edgeStale;
     } finally {
       database.close();
     }

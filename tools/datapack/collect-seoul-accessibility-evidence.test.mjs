@@ -216,6 +216,17 @@ test("collector pagination은 다중 page만 허용하고 불완전·빈 전수�
   await assert.rejects(collect([response(2, [row("사당")]), response(3, [row("서울역")])]), /invalid: totalCount/);
   await assert.rejects(collect([response(1, [row("사당"), row("서울역")])]), /invalid: pagination/);
   await assert.rejects(collect([response(2, [row("사당")]), response(2, [])]), /invalid: pagination/);
+  await assert.rejects(
+    collect([response(2, [row("사당")]), response(2, [row("사당")])]),
+    /invalid: pagination/,
+  );
+  await assert.rejects(
+    collect([
+      response(4, [row("사당"), row("서울역")]),
+      response(4, [row("서울역"), row("사당")]),
+    ]),
+    /invalid: pagination/,
+  );
   await assert.rejects(collect([response(0, [])]), /invalid: emptyExhaustiveList/);
 });
 

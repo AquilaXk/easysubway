@@ -173,6 +173,7 @@ export async function collectSeoulAccessibility({
   }
   const collected = [];
   const rawPages = [];
+  const rowIdentities = new Set();
   let receivedCount = 0;
   let pageNo = 1;
   let totalCount;
@@ -216,6 +217,11 @@ export async function collectSeoulAccessibility({
       throw new Error(`${INVALID_RESPONSE}: totalCount`);
     }
     totalCount = pageTotal;
+    for (const row of rows) {
+      const rowIdentity = hash(row);
+      if (rowIdentities.has(rowIdentity)) throw new Error(`${INVALID_RESPONSE}: pagination`);
+      rowIdentities.add(rowIdentity);
+    }
     rawPages.push({ pageNo, totalCount: pageTotal, rawSha256: hashText(raw) });
     const normalizedRows = normalizeAccessibilityRows(rows);
     collected.push(...normalizedRows);

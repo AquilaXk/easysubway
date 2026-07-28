@@ -228,24 +228,23 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
         : `SELECT id, from_node_id, to_node_id, edge_type, accessibility_status,
                   '' AS source_id, '' AS source_snapshot_id, '' AS provider_record_hash,
                   '' AS evidence_hash
-           FROM network_edges WHERE edge_type <> 'RIDE' ORDER BY id`).all().map((row) => {
-          const nodeId = [row.from_node_id, row.to_node_id].find((value) => String(value).includes(":"))
-            ?? row.from_node_id;
-          return {
-            claimId: row.id,
-            stationId: String(nodeId).split(":")[0],
-            lineId: String(nodeId).split(":")[1] ?? "",
-            facilityType: row.edge_type,
-            domain: "NETWORK_EDGE",
-            evidenceKind: row.accessibility_status === "NO_OFFICIAL_FEED" ? "NOT_EXISTS" : "EXISTS",
-            sourceId: row.source_id,
-            sourceSnapshotId: row.source_snapshot_id,
-            providerRecordHash: row.provider_record_hash,
-            evidenceHash: row.evidence_hash,
-          };
-        })
+           FROM network_edges WHERE edge_type <> 'RIDE' ORDER BY id`).all().map(routeEdgeClaim)
       : [];
-    const claims = [...evidenceClaims, ...facilityClaims, ...edgeClaims].map((claim) => {
+    const internalEdgeClaims = tableExists(database, "internal_route_edges")
+      ? database.prepare(tableHasColumns(database, "internal_route_edges", ["source_id", "source_snapshot_id", "provider_record_hash", "evidence_hash"])
+        ? `
+          SELECT id, from_node_id, to_node_id, edge_type, accessibility_status,
+                 source_id, source_snapshot_id, provider_record_hash, evidence_hash
+          FROM internal_route_edges
+          WHERE accessibility_status <> 'UNKNOWN'
+          ORDER BY id
+        `
+        : `SELECT id, from_node_id, to_node_id, edge_type, accessibility_status,
+                  '' AS source_id, '' AS source_snapshot_id, '' AS provider_record_hash,
+                  '' AS evidence_hash
+           FROM internal_route_edges WHERE accessibility_status <> 'UNKNOWN' ORDER BY id`).all().map(routeEdgeClaim)
+      : [];
+    const claims = [...evidenceClaims, ...facilityClaims, ...edgeClaims, ...internalEdgeClaims].map((claim) => {
       const stationName = stationNames.get(claim.stationId);
       return stationName ? { ...claim, stationName } : claim;
     });
@@ -253,6 +252,23 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
   } finally {
     database.close();
   }
+}
+
+function routeEdgeClaim(row) {
+  const nodeId = [row.from_node_id, row.to_node_id].find((value) => String(value).includes(":"))
+    ?? row.from_node_id;
+  return {
+    claimId: row.id,
+    stationId: String(nodeId).split(":")[0],
+    lineId: String(nodeId).split(":")[1] ?? "",
+    facilityType: row.edge_type,
+    domain: "NETWORK_EDGE",
+    evidenceKind: row.accessibility_status === "NO_OFFICIAL_FEED" ? "NOT_EXISTS" : "EXISTS",
+    sourceId: row.source_id,
+    sourceSnapshotId: row.source_snapshot_id,
+    providerRecordHash: row.provider_record_hash,
+    evidenceHash: row.evidence_hash,
+  };
 }
 
 function tableExists(database, table) {

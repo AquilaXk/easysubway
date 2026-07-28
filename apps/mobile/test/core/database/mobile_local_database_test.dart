@@ -508,7 +508,7 @@ void main() {
       internalRouteEdges
           .map((row) => row.read<String>('accessibility_status'))
           .toSet(),
-      {'AVAILABLE'},
+      {'UNKNOWN'},
     );
     // [2026-07-11 #1950] 정본이 오너 자작 도식으로 교체되어 좌표가 바뀐다. 정확한
     // 폴리곤 대신 구조(닫힌 4점 사각형)를 검증한다(좌표 회귀는 route-map 게이트가 강제).

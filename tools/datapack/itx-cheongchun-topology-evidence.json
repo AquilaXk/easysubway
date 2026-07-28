@@ -28,10 +28,10 @@
     "inputSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
     "inputSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
     "inputByteSize": 359319,
-    "outputSha256": "f30f407106fc82b98bb50667a81bfa5eff9532e0b28e3bf690a19577cead1ac6",
-    "outputSqliteSha256": "2fa64f099ec8f5c0a5a6bcc07d87108bd6f492fa1b87c3827795d212c14a166a",
-    "byteSize": 1463747,
-    "byteSizeDelta": 1104428
+    "outputSha256": "f6c07725bc3048ada02a994abc397161610eeb1b42803c21f2733f768d5ced47",
+    "outputSqliteSha256": "352169ed11ca77ed01fb337cf839b97cda7f254fd75f14e251146103d72416ac",
+    "byteSize": 1463744,
+    "byteSizeDelta": 1104425
   },
   "readmissions": [
     {
@@ -4615,6 +4615,115 @@
         "byteSize": 1463747
       },
       "byteSizeDelta": -948,
+      "itxSubgraph": {
+        "unchanged": true,
+        "edgeCount": 48,
+        "edgesSha256": "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+        "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
+      },
+      "rowDiff": []
+    },
+    {
+      "readmittedAt": "2026-07-28T21:23:15.946Z",
+      "provenance": "PR #2665 final Codex Review: provenance-incomplete internal route availability normalized to UNKNOWN; ITX subgraph unchanged",
+      "previousPack": {
+        "sha256": "f30f407106fc82b98bb50667a81bfa5eff9532e0b28e3bf690a19577cead1ac6",
+        "sqliteSha256": "2fa64f099ec8f5c0a5a6bcc07d87108bd6f492fa1b87c3827795d212c14a166a",
+        "byteSize": 1463747
+      },
+      "newPack": {
+        "sha256": "2e05e0a1b81007a24378c6363ba574aa37923c54f9858757473eb3f231bd42cb",
+        "sqliteSha256": "438265db1ecffb6ac7222546e49c61fde81e95ca5a8703d2036612fe6478a5f3",
+        "byteSize": 1464465
+      },
+      "byteSizeDelta": 718,
+      "itxSubgraph": {
+        "unchanged": true,
+        "edgeCount": 48,
+        "edgesSha256": "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+        "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
+      },
+      "rowDiff": [
+        {
+          "table": "internal_route_edges",
+          "previousRowCount": 1,
+          "newRowCount": 1,
+          "rowsRemoved": 0,
+          "rowsAdded": 0,
+          "rowsChanged": 1,
+          "detail": {
+            "removed": [],
+            "added": [],
+            "changed": [
+              {
+                "previous": {
+                  "id": "edge-sangnoksu-concourse-exit-1",
+                  "from_node_id": "station-sangnoksu",
+                  "to_node_id": "station-sangnoksu:seoul-4",
+                  "edge_type": "WALK",
+                  "distance_meters": 120,
+                  "duration_seconds": 90,
+                  "includes_stairs": 0,
+                  "requires_elevator": 0,
+                  "requires_escalator": 0,
+                  "slope_level": 1,
+                  "width_level": 2,
+                  "reliability_score": 90,
+                  "accessibility_status": "AVAILABLE",
+                  "source_id": "",
+                  "source_snapshot_id": "",
+                  "provider_record_hash": "",
+                  "provenance_kind": "UNKNOWN",
+                  "verification_status": "UNKNOWN",
+                  "facility_id": null,
+                  "last_verified_at": 0,
+                  "evidence_hash": "",
+                  "instruction": "1번 출구 방향으로 이동"
+                },
+                "new": {
+                  "id": "edge-sangnoksu-concourse-exit-1",
+                  "from_node_id": "station-sangnoksu",
+                  "to_node_id": "station-sangnoksu:seoul-4",
+                  "edge_type": "WALK",
+                  "distance_meters": 120,
+                  "duration_seconds": 90,
+                  "includes_stairs": 0,
+                  "requires_elevator": 0,
+                  "requires_escalator": 0,
+                  "slope_level": 1,
+                  "width_level": 2,
+                  "reliability_score": 90,
+                  "accessibility_status": "UNKNOWN",
+                  "source_id": "",
+                  "source_snapshot_id": "",
+                  "provider_record_hash": "",
+                  "provenance_kind": "UNKNOWN",
+                  "verification_status": "UNKNOWN",
+                  "facility_id": null,
+                  "last_verified_at": 0,
+                  "evidence_hash": "",
+                  "instruction": "1번 출구 방향으로 이동"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "readmittedAt": "2026-07-28T21:27:23.357Z",
+      "provenance": "PR #2665 clean canonical builder identity after internal route fail-closed normalization; ITX subgraph unchanged",
+      "previousPack": {
+        "sha256": "2e05e0a1b81007a24378c6363ba574aa37923c54f9858757473eb3f231bd42cb",
+        "sqliteSha256": "438265db1ecffb6ac7222546e49c61fde81e95ca5a8703d2036612fe6478a5f3",
+        "byteSize": 1464465
+      },
+      "newPack": {
+        "sha256": "f6c07725bc3048ada02a994abc397161610eeb1b42803c21f2733f768d5ced47",
+        "sqliteSha256": "352169ed11ca77ed01fb337cf839b97cda7f254fd75f14e251146103d72416ac",
+        "byteSize": 1463744
+      },
+      "byteSizeDelta": -721,
       "itxSubgraph": {
         "unchanged": true,
         "edgeCount": 48,

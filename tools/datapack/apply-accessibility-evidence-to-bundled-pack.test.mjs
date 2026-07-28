@@ -9,10 +9,54 @@ import {
   accessibilityIndexMetadata,
   applyEvidenceIfStale,
   assertAccessibilityEdges,
+  normalizeUnprovenInternalRouteEdges,
   stripLegacyCoreClaims,
   syncAccessibilityEdges,
   syncCanonicalFixture,
 } from "./apply-accessibility-evidence-to-bundled-pack.mjs";
+
+test("unproven internal route availability fails check and normalizes to unknown", () => {
+  const database = new DatabaseSync(":memory:");
+  database.exec(`
+    CREATE TABLE internal_route_edges (
+      id TEXT PRIMARY KEY, accessibility_status TEXT, source_id TEXT,
+      source_snapshot_id TEXT, provider_record_hash TEXT, evidence_hash TEXT
+    );
+    INSERT INTO internal_route_edges VALUES
+      ('stale', 'AVAILABLE', '', '', '', ''),
+      ('unknown', 'UNKNOWN', '', '', '', ''),
+      ('proven', 'AVAILABLE', 'source', 'snapshot', '${"a".repeat(64)}', '${"b".repeat(64)}');
+  `);
+
+  assert.throws(
+    () => normalizeUnprovenInternalRouteEdges(database, { check: true }),
+    /bundled internal route accessibility evidence is stale/,
+  );
+  assert.equal(normalizeUnprovenInternalRouteEdges(database, { check: false }), true);
+  assert.deepEqual(
+    database.prepare("SELECT id, accessibility_status AS status FROM internal_route_edges ORDER BY id").all()
+      .map((row) => ({ ...row })),
+    [
+      { id: "proven", status: "AVAILABLE" },
+      { id: "stale", status: "UNKNOWN" },
+      { id: "unknown", status: "UNKNOWN" },
+    ],
+  );
+  assert.doesNotThrow(() => normalizeUnprovenInternalRouteEdges(database, { check: true }));
+  database.close();
+
+  const legacy = new DatabaseSync(":memory:");
+  legacy.exec(`
+    CREATE TABLE internal_route_edges (id TEXT PRIMARY KEY, accessibility_status TEXT);
+    INSERT INTO internal_route_edges VALUES ('legacy', 'AVAILABLE');
+  `);
+  assert.equal(normalizeUnprovenInternalRouteEdges(legacy, { check: false }), true);
+  assert.equal(
+    legacy.prepare("SELECT accessibility_status AS status FROM internal_route_edges").get().status,
+    "UNKNOWN",
+  );
+  legacy.close();
+});
 
 test("core-only strips facility quality targets and check rejects leftovers", () => {
   const database = new DatabaseSync(":memory:");
@@ -95,6 +139,14 @@ test("canonical and SQLite refresh the reviewed ENTRY/EXIT identity together", (
       { targetType: "station_exit", targetId: "exit-sadang-1", qualityLevel: "FIELD_VERIFIED" },
     ],
     networkEdges: [{ ...reviewedEdge, sourceSnapshotId: "stale" }],
+    internalRouteEdges: [{
+      id: "unproven-internal-edge",
+      accessibilityStatus: "AVAILABLE",
+      sourceId: "",
+      sourceSnapshotId: "",
+      providerRecordHash: "",
+      evidenceHash: "",
+    }],
     sourceInventory: [{ id: "seoul-metro-official-od-fares" }],
     officialOdFareQuotes,
     routeServiceArtifactEvidence,
@@ -108,6 +160,7 @@ test("canonical and SQLite refresh the reviewed ENTRY/EXIT identity together", (
     sourceInventory: [],
   });
   assert.deepEqual(synced.packs[0].networkEdges, [reviewedEdge]);
+  assert.equal(synced.packs[0].internalRouteEdges[0].accessibilityStatus, "UNKNOWN");
   assert.deepEqual(synced.packs[0].officialOdFareQuotes, officialOdFareQuotes);
   assert.deepEqual(synced.packs[0].routeServiceArtifactEvidence, routeServiceArtifactEvidence);
   assert.deepEqual(synced.packs[0].sourceInventory, [{ id: "seoul-metro-official-od-fares" }]);
