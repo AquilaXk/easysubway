@@ -123,7 +123,7 @@ test("collector rejects API-level error envelopes without exposing the provider 
       }),
     }),
     (error) => {
-      assert.equal(error.message, "Seoul accessibility API response invalid");
+      assert.equal(error.message, "Seoul accessibility API response invalid: envelope");
       assert.doesNotMatch(error.message, /secret|provider message/);
       return true;
     },
@@ -146,37 +146,32 @@ test("collector rejects malformed items with a fixed credential-free error", asy
       }),
     }),
     (error) => {
-      assert.equal(error.message, "Seoul accessibility API response invalid");
+      assert.equal(error.message, "Seoul accessibility API response invalid: items");
       assert.doesNotMatch(error.message, /secret|rows\.map/);
       return true;
     },
   );
 });
 
-test("collector accepts only the documented success schema", async () => {
+test("full-scope collector는 station filter 없이 pagination total을 보존한다", async () => {
   const requestUrls = [];
   const rows = await collectSeoulAccessibility({
     endpoint: "https://apis.data.go.kr/example",
     serviceKey: "secret",
     fetchImpl: async (url) => {
       requestUrls.push(new URL(url));
-      const stationName = new URL(url).searchParams.get("stnNm");
       return {
         ok: true,
         json: async () => ({
           response: {
             header: { resultCode: "00" },
             body: {
-              items: {
-                item: [
-                  {
-                    lineNm: "4호선",
-                    stnNm: stationName,
-                    oprtngSitu: stationName === "상록수" ? "S" : "M",
-                    dtlPstn: stationName === "상록수" ? "1번 출구-대합실" : "대합실-승강장",
-                  },
-                ],
-              },
+              totalCount: 3,
+              items: { item: [
+                { lineNm: "1호선", stnNm: "서울역", oprtngSitu: "M", dtlPstn: "대합실-승강장" },
+                { lineNm: "4호선", stnNm: "사당", oprtngSitu: "S", dtlPstn: "출입구-대합실" },
+                { lineNm: "4호선", stnNm: "폐기", oprtngSitu: "D", dtlPstn: "삭제 시설" },
+              ] },
             },
           },
         }),
@@ -184,22 +179,12 @@ test("collector accepts only the documented success schema", async () => {
     },
   });
 
-  assert.deepEqual(rows, [
-    { stationName: "상록수", lineName: "4호선", operational: false, situationCode: "S", situation: "보수중", pathDescription: "1번 출구-대합실" },
-    { stationName: "사당", lineName: "4호선", operational: true, situationCode: "M", situation: "사용가능", pathDescription: "대합실-승강장" },
-  ]);
-  assert.deepEqual(
-    requestUrls.map((url) => ({
-      lineName: url.searchParams.get("lineNm"),
-      stationName: url.searchParams.get("stnNm"),
-      pageNo: url.searchParams.get("pageNo"),
-      numOfRows: url.searchParams.get("numOfRows"),
-    })),
-    [
-      { lineName: "4호선", stationName: "상록수", pageNo: "1", numOfRows: "1000" },
-      { lineName: "4호선", stationName: "사당", pageNo: "1", numOfRows: "1000" },
-    ],
-  );
+  assert.equal(rows.length, 2);
+  assert.equal(requestUrls.length, 1);
+  assert.equal(requestUrls[0].searchParams.has("lineNm"), false);
+  assert.equal(requestUrls[0].searchParams.has("stnNm"), false);
+  assert.equal(requestUrls[0].searchParams.get("pageNo"), "1");
+  assert.equal(requestUrls[0].searchParams.get("numOfRows"), "1000");
 });
 
 test("collector keeps only station, location and operation evidence", () => {
@@ -249,29 +234,6 @@ test("normalizer drops deleted (D) facility rows without failing", () => {
   );
 });
 
-test("collector rejects rows outside the requested pilot station-line", async () => {
-  await assert.rejects(
-    collectSeoulAccessibility({
-      endpoint: "https://apis.data.go.kr/example",
-      serviceKey: "secret",
-      fetchImpl: async () => ({
-        ok: true,
-        json: async () => ({
-          response: {
-            header: { resultCode: "00" },
-            body: {
-              items: {
-                item: [{ lineNm: "2호선", stnNm: "상록수", oprtngSitu: "M", dtlPstn: "출입구-대합실" }],
-              },
-            },
-          },
-        }),
-      }),
-    }),
-    /Seoul accessibility API response invalid/,
-  );
-});
-
 test("normalizer rejects undocumented operation codes", () => {
   assert.throws(
     () =>
@@ -279,6 +241,22 @@ test("normalizer rejects undocumented operation codes", () => {
         { lineNm: "4호선", stnNm: "상록수", oprtngSitu: "Y", dtlPstn: "1번 출구-대합실" },
       ]),
     /Seoul accessibility API response invalid/,
+  );
+});
+
+test("normalizer preserves provider rows with a missing operation state as unverified", () => {
+  assert.deepEqual(
+    normalizeAccessibilityRows([
+      { lineNm: "4호선", stnNm: "사당", dtlPstn: "대합실-승강장" },
+    ]),
+    [{
+      stationName: "사당",
+      lineName: "4호선",
+      operational: null,
+      situationCode: null,
+      situation: "PROVIDER_STATUS_MISSING",
+      pathDescription: "대합실-승강장",
+    }],
   );
 });
 
@@ -292,14 +270,13 @@ test("normalizer rejects malformed and incomplete evidence rows", () => {
     { ...valid, stnNm: 123 },
     { ...valid, dtlPstn: undefined },
     { ...valid, dtlPstn: 123 },
-    { ...valid, oprtngSitu: undefined },
     { ...valid, oprtngSitu: 123 },
   ]) {
     assert.throws(() => normalizeAccessibilityRows([row]), /Seoul accessibility API response invalid/);
   }
 });
 
-test("snapshot contains sanitized evidence for both pilot stations", () => {
+test("snapshot contains sorted full-scope evidence and hashes", () => {
   const snapshot = buildAccessibilitySnapshot(
     [
       { stationName: "사당", lineName: "4호선", operational: true, situationCode: "M", situation: "사용가능", pathDescription: "대합실-승강장" },
@@ -308,37 +285,20 @@ test("snapshot contains sanitized evidence for both pilot stations", () => {
     "2026-07-10T00:00:00.000Z",
   );
 
-  assert.deepEqual(snapshot, {
-    sourceId: "seoul-metro-accessibility",
-    retrievedAt: "2026-07-10T00:00:00.000Z",
-    stations: [
-      {
-        stationName: "상록수",
-        lineName: "4호선",
-        facilities: [{ operational: false, situationCode: "S", situation: "보수중", pathDescription: "1번 출구-대합실" }],
-      },
-      {
-        stationName: "사당",
-        lineName: "4호선",
-        facilities: [{ operational: true, situationCode: "M", situation: "사용가능", pathDescription: "대합실-승강장" }],
-      },
-    ],
-  });
+  assert.equal(snapshot.sourceId, "seoul-metro-accessibility");
+  assert.equal(snapshot.snapshotId, "seoul-metro-accessibility-20260710");
+  assert.equal(snapshot.observedAt, "2026-07-10T00:00:00.000Z");
+  assert.match(snapshot.schemaFingerprint, /^[0-9a-f]{64}$/);
+  assert.equal(snapshot.capturedAt, "2026-07-10T00:00:00.000Z");
+  assert.equal(snapshot.freshUntil, "2026-07-11T00:00:00.000Z");
+  assert.equal(snapshot.rowCount, 2);
+  assert.match(snapshot.rawSha256, /^[0-9a-f]{64}$/);
+  assert.equal(snapshot.contentSha256, snapshot.rawSha256);
+  assert.deepEqual(snapshot.stations.map(({ stationName }) => stationName), ["사당", "상록수"]);
   assert.doesNotMatch(JSON.stringify(snapshot), /serviceKey|https?:\/\//);
 });
 
-test("snapshot rejects missing pilot station evidence", () => {
-  assert.throws(
-    () =>
-      buildAccessibilitySnapshot(
-        [{ stationName: "사당", lineName: "4호선", operational: true, situationCode: "M", situation: "사용가능", pathDescription: "대합실-승강장" }],
-        "2026-07-10T00:00:00.000Z",
-      ),
-    /accessibility evidence missing for 상록수/,
-  );
-});
-
-test("snapshot rejects pilot facilities without a boolean status, situation code and path", () => {
+test("snapshot rejects facilities without a verified or provider-missing status tuple", () => {
   const validSadang = {
     stationName: "사당",
     lineName: "4호선",
@@ -347,26 +307,24 @@ test("snapshot rejects pilot facilities without a boolean status, situation code
     situation: "사용가능",
     pathDescription: "대합실-승강장",
   };
-  const validSangnoksu = {
-    stationName: "상록수",
-    lineName: "4호선",
-    operational: false,
-    situationCode: "S",
-    situation: "보수중",
-    pathDescription: "1번 출구-대합실",
-  };
-  for (const sangnoksu of [
-    { ...validSangnoksu, operational: undefined },
-    { ...validSangnoksu, operational: "Y" },
-    { ...validSangnoksu, situationCode: undefined },
-    { ...validSangnoksu, situationCode: "Y" },
-    { ...validSangnoksu, situation: undefined },
-    { ...validSangnoksu, pathDescription: undefined },
-    { ...validSangnoksu, pathDescription: 123 },
-    { ...validSangnoksu, stationName: undefined },
+  assert.doesNotThrow(() => buildAccessibilitySnapshot([{
+    ...validSadang,
+    operational: null,
+    situationCode: null,
+    situation: "PROVIDER_STATUS_MISSING",
+  }], "2026-07-10T00:00:00.000Z"));
+  for (const row of [
+    { ...validSadang, operational: undefined },
+    { ...validSadang, operational: "Y" },
+    { ...validSadang, situationCode: undefined },
+    { ...validSadang, situationCode: "Y" },
+    { ...validSadang, situation: undefined },
+    { ...validSadang, pathDescription: undefined },
+    { ...validSadang, pathDescription: 123 },
+    { ...validSadang, stationName: undefined },
   ]) {
     assert.throws(
-      () => buildAccessibilitySnapshot([sangnoksu, validSadang], "2026-07-10T00:00:00.000Z"),
+      () => buildAccessibilitySnapshot([row], "2026-07-10T00:00:00.000Z"),
       /Seoul accessibility API response invalid/,
     );
   }
@@ -397,7 +355,6 @@ test("invalid provider evidence never reaches the output write", async () => {
       { ...valid, stnNm: 123 },
       { ...valid, dtlPstn: undefined },
       { ...valid, dtlPstn: 123 },
-      { ...valid, oprtngSitu: undefined },
       { ...valid, oprtngSitu: 123 },
       { ...valid, oprtngSitu: "Y" },
     ].map((row) => jsonResponse([row])),
@@ -508,7 +465,7 @@ test("CLI requires the service key before collection", async () => {
   await assert.rejects(
     execFileAsync(
       process.execPath,
-      [collectorPath, "--output", "unused.json"],
+      [collectorPath, "--output", "unused.json", "--output-root", tmpdir()],
       { env: {} },
     ),
     /DATA_GO_KR_SERVICE_KEY env is required/,

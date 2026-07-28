@@ -992,7 +992,8 @@ function accessibilityStatusEvidenceRows(input, stationLineKeys, isProductionPac
       retrievedAt: productionString(row.retrievedAt, isProductionPack, "accessibilityStatusEvidence.retrievedAt"),
       // 검증된 비가용/부재 상태는 strict route(보장) 대상이 아니다 — 항상 ineligible.
       strictRouteEligible: false,
-      strictRouteEligibleReason: evidenceKind === "NOT_EXISTS" ? "NO_OFFICIAL_STATUS_FEED" : "OPERATION_STATUS_NOT_AVAILABLE",
+      strictRouteEligibleReason: row.strictRouteEligibleReason
+        ?? (evidenceKind === "NOT_EXISTS" ? "NO_OFFICIAL_STATUS_FEED" : "OPERATION_STATUS_NOT_AVAILABLE"),
     };
   });
 }

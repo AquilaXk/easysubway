@@ -4197,17 +4197,18 @@
           "capital"
         ],
         "operatorIds": [
-          "seoul-metro"
+          "seoul-metro",
+          "korail"
         ],
         "sourceDomains": [
           "accessibility_facilities"
         ]
       },
-      "requiredForProductionPack": false,
-      "productionUseAllowed": false,
-      "updateFrequency": "provider documented; production cadence not admitted",
-      "observedDataUpdatedAt": "2026-07-12",
-      "retrievedAt": "2026-07-12",
+      "requiredForProductionPack": true,
+      "productionUseAllowed": true,
+      "updateFrequency": "daily",
+      "observedDataUpdatedAt": "2026-07-28",
+      "retrievedAt": "2026-07-28",
       "license": {
         "type": "KOGL-1",
         "name": "공공누리 1유형",
@@ -4244,11 +4245,11 @@
           "unsupportedNotes": "source is not admitted as production realtime arrival data"
         },
         "facility": {
-          "status": "CANDIDATE",
-          "productionUseAllowed": false,
-          "coverageStatus": "CONSUMER_EVIDENCE_REQUIRED",
-          "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "inventory provenance admission only; consumer-specific coverage and quality evidence is still required before production use"
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "daily",
+          "unsupportedNotes": "production use is limited to official EV/ES/WCLF facility codes in the fresh exhaustive query snapshot"
         }
       },
       "admissionEvidence": {
@@ -4275,11 +4276,27 @@
         "quotaEvidence": {
           "defaultDailyLimit": "unlimited",
           "portal": "KRIC 레일포털",
-          "productionUseAllowed": false,
+          "productionUseAllowed": true,
           "unlockStatus": "not_required"
         },
-        "productionUseNoteKo": "오너 admin review(2026-07-13)로 inventory provenance에만 승격했다. consumer별 coverage·약관·품질 evidence가 확인되기 전에는 production pack과 runtime 호출에 사용하지 않는다.",
+        "productionUseNoteKo": "2026-07-13 review는 inventory provenance만 승인했다. #2609 accessibilityReview가 fresh snapshot·license·quality 근거를 별도로 승인했으며 static derived facility에만 production use를 허용한다.",
         "sourceInventorySha256": "d9be49ab573a6437fb069ae7ebe1c8e988253501387b456e31344fd6a835536e"
+      },
+      "accessibilityAdmissionEvidence": {
+        "issue": 2609,
+        "decision": "APPROVED",
+        "productionUseAllowed": true,
+        "licenseEvidenceHash": "39978b3c3dd3fb64b7f15d739453b19ad0b51a0f216cea22d3efb77dbfebf398",
+        "snapshotId": "kric-station-convenience-standard-20260728",
+        "snapshotPath": "tools/datapack/sources/kric-station-convenience-standard-20260728.json",
+        "capturedAt": "2026-07-28T12:42:27.741Z",
+        "observedAt": "2026-07-28T12:42:27.741Z",
+        "freshUntil": "2026-07-29T12:42:27.741Z",
+        "rawSha256": "063975fd27b899204e7d4240cb4c56c9f010ce79ed3aa65c3e544374c47914ba",
+        "contentSha256": "063975fd27b899204e7d4240cb4c56c9f010ce79ed3aa65c3e544374c47914ba",
+        "schemaFingerprint": "6cf45df8488510187063c4b7396ca9628295d6961becdcf1de87f2ae521e8591",
+        "snapshotFileSha256": "2326de42740e6cc87c141225ff7a81df8fd82787538be192b9b4fcad78e8fd50",
+        "absenceEvidenceMode": "EXHAUSTIVE_LIST"
       }
     },
     {
@@ -6732,9 +6749,10 @@
         ]
       },
       "requiredForProductionPack": true,
+      "productionUseAllowed": true,
       "updateFrequency": "realtime",
-      "observedDataUpdatedAt": "2026-07-12",
-      "retrievedAt": "2026-07-12",
+      "observedDataUpdatedAt": "2026-07-28",
+      "retrievedAt": "2026-07-28",
       "license": {
         "type": "PUBLIC_DATA_FREE_USE",
         "name": "공공데이터포털 이용허락범위 제한 없음",
@@ -6818,6 +6836,18 @@
           "productionUseAllowed": true
         },
         "productionUseNoteKo": "capital 팩 production inventory 소비 대상으로 승격(교통약자 승강기 실시간 운행상황). strict route 보장은 별도 계약으로 유지."
+      },
+      "accessibilityAdmissionEvidence": {
+        "snapshotId": "seoul-metro-accessibility-20260728",
+        "snapshotPath": "tools/datapack/sources/seoul-metro-accessibility-20260728.json",
+        "capturedAt": "2026-07-28T12:42:43.944Z",
+        "observedAt": "2026-07-28T12:42:43.944Z",
+        "freshUntil": "2026-07-29T12:42:43.944Z",
+        "rawSha256": "bedfd9067948539b6285dba3ad24cd1ae0dac0166095466fb7f4b2df4e31b8aa",
+        "contentSha256": "bedfd9067948539b6285dba3ad24cd1ae0dac0166095466fb7f4b2df4e31b8aa",
+        "schemaFingerprint": "89175633c9f84c1593c92cfcb89dc25a64030d970be6c8970d51097dc7075982",
+        "snapshotFileSha256": "dac597d070dd4f4296340d2f2a272bc52ae5d47042e09e3349b933449ed04f40",
+        "absenceEvidenceMode": "EXHAUSTIVE_LIST"
       }
     },
     {

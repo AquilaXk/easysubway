@@ -1,11 +1,10 @@
 #!/usr/bin/env node
 import { constants as fileSystemConstants } from "node:fs";
+import { createHash } from "node:crypto";
 import { lstat, mkdir, open, realpath } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const PILOT_STATIONS = ["상록수", "사당"];
-const PILOT_LINE_NAME = "4호선";
 const DEFAULT_ENDPOINT = "https://apis.data.go.kr/B553766/wksn/getWksnElvtr";
 const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const INVALID_RESPONSE = "Seoul accessibility API response invalid";
@@ -30,26 +29,25 @@ export function normalizeAccessibilityRows(rows) {
   const normalized = [];
   for (const row of rows) {
     if (!row || typeof row !== "object" || Array.isArray(row)) {
-      throw new Error(INVALID_RESPONSE);
+      throw new Error(`${INVALID_RESPONSE}: row`);
     }
     const { lineNm, stnNm, oprtngSitu, dtlPstn } = row;
-    if (
-      typeof stnNm !== "string" ||
-      stnNm.trim() === "" ||
-      typeof lineNm !== "string" ||
-      lineNm.trim() === "" ||
-      typeof dtlPstn !== "string" ||
-      dtlPstn.trim() === "" ||
-      typeof oprtngSitu !== "string"
-    ) {
-      throw new Error(INVALID_RESPONSE);
+    for (const [field, value] of Object.entries({ lineNm, stnNm, dtlPstn })) {
+      if (typeof value !== "string" || value.trim() === "") {
+        throw new Error(`${INVALID_RESPONSE}: requiredField:${field}`);
+      }
+    }
+    if (oprtngSitu !== undefined && oprtngSitu !== null && typeof oprtngSitu !== "string") {
+      throw new Error(`${INVALID_RESPONSE}: requiredField:oprtngSitu`);
     }
     if (oprtngSitu === REMOVED_OPERATION_SITUATION) {
       continue;
     }
-    const state = OPERATION_SITUATION_STATES.get(oprtngSitu);
+    const state = !oprtngSitu?.trim()
+      ? { operational: null, situationCode: null, situation: "PROVIDER_STATUS_MISSING" }
+      : OPERATION_SITUATION_STATES.get(oprtngSitu);
     if (!state) {
-      throw new Error(INVALID_RESPONSE);
+      throw new Error(`${INVALID_RESPONSE}: operationState`);
     }
     normalized.push({
       stationName: stnNm,
@@ -73,9 +71,14 @@ export function buildAccessibilitySnapshot(rows, retrievedAt) {
         row.stationName.trim() === "" ||
         typeof row.lineName !== "string" ||
         row.lineName.trim() === "" ||
-        typeof row.operational !== "boolean" ||
-        typeof row.situationCode !== "string" ||
-        !OPERATION_SITUATION_STATES.has(row.situationCode) ||
+        !(
+          (typeof row.operational === "boolean" &&
+            typeof row.situationCode === "string" &&
+            OPERATION_SITUATION_STATES.has(row.situationCode)) ||
+          (row.operational === null &&
+            row.situationCode === null &&
+            row.situation === "PROVIDER_STATUS_MISSING")
+        ) ||
         typeof row.situation !== "string" ||
         row.situation.trim() === "" ||
         typeof row.pathDescription !== "string" ||
@@ -84,23 +87,43 @@ export function buildAccessibilitySnapshot(rows, retrievedAt) {
   ) {
     throw new Error(INVALID_RESPONSE);
   }
-  const stations = PILOT_STATIONS.map((stationName) => ({
-    stationName,
-    lineName: PILOT_LINE_NAME,
-    facilities: rows
-      .filter((row) => row.stationName === stationName && row.lineName === PILOT_LINE_NAME)
-      .map(({ operational, situationCode, situation, pathDescription }) => ({
-        operational,
-        situationCode,
-        situation,
-        pathDescription,
-      })),
-  }));
-  const missing = stations.find(({ facilities }) => facilities.length === 0);
-  if (missing) {
-    throw new Error(`accessibility evidence missing for ${missing.stationName}`);
+  const stationsByIdentity = new Map();
+  for (const row of rows) {
+    const key = `${row.lineName}\0${row.stationName}`;
+    const station = stationsByIdentity.get(key) ?? {
+      stationName: row.stationName,
+      lineName: row.lineName,
+      facilities: [],
+    };
+    station.facilities.push({
+      operational: row.operational,
+      situationCode: row.situationCode,
+      situation: row.situation,
+      pathDescription: row.pathDescription,
+    });
+    stationsByIdentity.set(key, station);
   }
-  return { sourceId: "seoul-metro-accessibility", retrievedAt, stations };
+  const stations = [...stationsByIdentity.values()].sort((left, right) => (
+    compare(`${left.lineName}\0${left.stationName}`, `${right.lineName}\0${right.stationName}`)
+  ));
+  const contentSha256 = hash(stations);
+  return {
+    schemaVersion: 1,
+    artifactKind: "seoul-accessibility-snapshot",
+    sourceId: "seoul-metro-accessibility",
+    snapshotId: `seoul-metro-accessibility-${retrievedAt.slice(0, 10).replaceAll("-", "")}`,
+    retrievedAt,
+    capturedAt: retrievedAt,
+    observedAt: retrievedAt,
+    freshUntil: new Date(Date.parse(retrievedAt) + 86_400_000).toISOString(),
+    credentialRedacted: true,
+    absenceEvidenceMode: "EXHAUSTIVE_LIST",
+    rowCount: rows.length,
+    rawSha256: contentSha256,
+    contentSha256,
+    schemaFingerprint: hash(["dtlPstn", "lineNm", "oprtngSitu", "stnNm"]),
+    stations,
+  };
 }
 
 export async function collectSeoulAccessibility({
@@ -114,19 +137,24 @@ export async function collectSeoulAccessibility({
     throw new Error("HTTPS endpoint is required");
   }
   const collected = [];
-  for (const stationName of PILOT_STATIONS) {
+  let receivedCount = 0;
+  let pageNo = 1;
+  let totalCount;
+  while (totalCount === undefined || receivedCount < totalCount) {
     const url = new URL(endpointUrl);
     url.searchParams.set("serviceKey", serviceKey);
-    url.searchParams.set("pageNo", "1");
+    url.searchParams.set("pageNo", String(pageNo));
     url.searchParams.set("numOfRows", "1000");
     url.searchParams.set("dataType", "JSON");
-    url.searchParams.set("lineNm", PILOT_LINE_NAME);
-    url.searchParams.set("stnNm", stationName);
     let response;
-    try {
-      response = await fetchImpl(url, { signal: AbortSignal.timeout(requestTimeoutMs) });
-    } catch {
-      throw new Error("Seoul accessibility API request failed");
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      try {
+        response = await fetchImpl(url, { signal: AbortSignal.timeout(requestTimeoutMs) });
+      } catch {
+        if (attempt === 0) continue;
+        throw new Error("Seoul accessibility API request failed");
+      }
+      if (response.ok || response.status < 500 || attempt === 1) break;
     }
     if (!response.ok) {
       throw new Error(`Seoul accessibility API HTTP ${response.status}`);
@@ -138,21 +166,25 @@ export async function collectSeoulAccessibility({
       throw new Error(INVALID_RESPONSE);
     }
     if (payload?.response?.header?.resultCode !== "00") {
-      throw new Error(INVALID_RESPONSE);
+      throw new Error(`${INVALID_RESPONSE}: envelope`);
     }
-    const rows = payload.response?.body?.items?.item;
+    const body = payload.response?.body;
+    const rows = body?.items?.item;
     if (!Array.isArray(rows)) {
-      throw new Error(INVALID_RESPONSE);
+      throw new Error(`${INVALID_RESPONSE}: items`);
     }
+    const pageTotal = Number(body.totalCount);
+    if (!Number.isSafeInteger(pageTotal) || pageTotal < 0 || (totalCount !== undefined && pageTotal !== totalCount)) {
+      throw new Error(`${INVALID_RESPONSE}: totalCount`);
+    }
+    totalCount = pageTotal;
     const normalizedRows = normalizeAccessibilityRows(rows);
-    if (
-      normalizedRows.some(
-        (row) => row.stationName !== stationName || row.lineName !== PILOT_LINE_NAME,
-      )
-    ) {
-      throw new Error(INVALID_RESPONSE);
-    }
     collected.push(...normalizedRows);
+    receivedCount += rows.length;
+    if (receivedCount > totalCount || (receivedCount < totalCount && rows.length === 0)) {
+      throw new Error(`${INVALID_RESPONSE}: pagination`);
+    }
+    pageNo += 1;
   }
   return collected;
 }
@@ -254,15 +286,34 @@ function isPathWithin(root, candidate) {
   );
 }
 
+function hash(value) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function compare(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 async function main() {
-  if (process.argv.length !== 4 || process.argv[2] !== "--output") {
-    throw new Error("usage: collect-seoul-accessibility-evidence.mjs --output <path>");
+  if (
+    process.argv.length !== 6 ||
+    process.argv[2] !== "--output" ||
+    process.argv[4] !== "--output-root"
+  ) {
+    throw new Error(
+      "usage: collect-seoul-accessibility-evidence.mjs --output <path> --output-root <path>",
+    );
   }
   const serviceKey = process.env.DATA_GO_KR_SERVICE_KEY;
   if (!serviceKey) {
     throw new Error("DATA_GO_KR_SERVICE_KEY env is required");
   }
-  await writeSeoulAccessibilityEvidence({ endpoint: DEFAULT_ENDPOINT, serviceKey, output: process.argv[3] });
+  await writeSeoulAccessibilityEvidence({
+    endpoint: DEFAULT_ENDPOINT,
+    serviceKey,
+    output: process.argv[3],
+    outputRoot: process.argv[5],
+  });
 }
 
 if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1])) {

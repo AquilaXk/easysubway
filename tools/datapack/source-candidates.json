@@ -3260,11 +3260,18 @@
         "liveSampleNote": "2026-07-12 workflow run 29201342431 (head e451fbdf352fef74dc376c9f16d476aca287b492)은 backend-only secret 경로에서 credentialRedacted=true, format=json, rowCount=9인 sanitized sample artifact를 생성했고 sample↔hashes 정합과 validator를 통과했다(source candidate sample evidence valid). raw response와 credential은 artifact 또는 mobile/offline pack에 포함하지 않는다.",
         "missingEvidence": [
           "credentialFreeRawArchive",
-          "licenseCommercialRedistributionEvidence",
-          "primarySourceDecisionEvidence",
-          "providerTermsOrQuotaApproval",
           "rawObjectUri"
         ],
+        "fullSnapshot": {
+          "snapshotId": "kric-station-convenience-standard-20260728",
+          "snapshotPath": "tools/datapack/sources/kric-station-convenience-standard-20260728.json",
+          "capturedAt": "2026-07-28T12:42:27.741Z",
+          "freshUntil": "2026-07-29T12:42:27.741Z",
+          "queryCount": 2,
+          "rowCount": 27,
+          "contentSha256": "063975fd27b899204e7d4240cb4c56c9f010ce79ed3aa65c3e544374c47914ba",
+          "credentialRedacted": true
+        },
         "adminReview": {
           "artifactKind": "source-admission-admin-review-summary",
           "decision": "APPROVED",
@@ -3274,9 +3281,17 @@
           "productionUseAllowed": false,
           "sampleEvidenceHash": "561610c243d8e4abf9a8760073eb0d49b403423471c623eb310f3419d06c8ce3",
           "adminReviewRecordHash": "96bf75ccd91ac4c519fb98e198804eef53423badfae334603082027173c2e407"
+        },
+        "accessibilityReview": {
+          "issue": 2609,
+          "decision": "APPROVED",
+          "approvedAt": "2026-07-28T12:42:27Z",
+          "scope": "STATIC_FACILITY_DERIVED_DATAPACK",
+          "productionUseAllowed": true,
+          "licenseEvidenceHash": "39978b3c3dd3fb64b7f15d739453b19ad0b51a0f216cea22d3efb77dbfebf398"
         }
       },
-      "nextAction": "source admin review와 inventory provenance 승격 완료(오너 승인 2026-07-13). #1701에서 coverage·품질·provider operation 승인 근거를 확인하기 전에는 productionUseAllowed=false를 유지한다",
+      "nextAction": "#2609 fresh snapshot의 EV/ES/WCLF 공식 code만 static facility materialization에 사용한다. movement/operation eligibility는 별도 evidence 전까지 금지한다",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -3295,11 +3310,11 @@
           "unsupportedNotes": "candidate does not provide realtime arrival data for production live ETA"
         },
         "facility": {
-          "status": "CANDIDATE",
-          "productionUseAllowed": false,
-          "coverageStatus": "ADMISSION_EVIDENCE_REQUIRED",
-          "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "candidate facility coverage has validated live sample provenance but requires remaining admission evidence before production use"
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SOURCE_INVENTORY_COVERED",
+          "updateFrequency": "daily",
+          "unsupportedNotes": "production use is limited to official EV/ES/WCLF codes in credential-redacted exhaustive query snapshots"
         }
       },
       "productionInventoryReferenceId": "kric-station-convenience-standard",
