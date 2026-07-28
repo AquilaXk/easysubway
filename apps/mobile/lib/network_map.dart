@@ -50,6 +50,10 @@ abstract interface class NetworkMapRepository {
 }
 
 abstract interface class NetworkMapViewportRepository {
+  Future<String?> loadSelectedRegion();
+
+  Future<void> saveSelectedRegion(String region);
+
   Future<Rect?> loadViewport(String region);
 
   Future<void> saveViewport({required String region, required Rect viewport});
@@ -942,7 +946,20 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   }
 
   Future<_NetworkMapLoadResult> _loadMap() async {
-    final data = await widget.repository.getNetworkMap(region: _selectedRegion);
+    var requestedRegion = _selectedRegion;
+    final viewportRepository = widget.viewportRepository;
+    if (requestedRegion == null && viewportRepository != null) {
+      try {
+        requestedRegion = await viewportRepository.loadSelectedRegion();
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '노선도 최근 지역 불러오기 중 예외가 발생했습니다.',
+        );
+      }
+    }
+    final data = await widget.repository.getNetworkMap(region: requestedRegion);
     // #2082/#2083 후속: 저장된(persisted) 지역이 있는 사용자는 세션 중
     // 지역 선택기를 조작하지 않는 한 _selectedRegion이 계속 null이라, 로드된
     // 실제 지역(data.selectedRegion)을 여기서 동기화해둔다. 사용자가 이미
@@ -954,19 +971,49 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     if (mounted) {
       _notifyRegionLabelChanged();
     }
-    final viewport = await widget.viewportRepository?.loadViewport(
-      _displayRegionName(data.selectedRegion),
-    );
+    await _saveSelectedRegion(data.selectedRegion);
+    final viewport = await _loadSavedViewport(data.selectedRegion);
     return _NetworkMapLoadResult(data: data, initialViewport: viewport);
   }
 
-  Future<_NetworkMapLoadResult> _loadMapForRegion(String region) async {
+  Future<_NetworkMapLoadResult> _loadMapForRegion(
+    String region, {
+    bool loadStoredViewport = true,
+  }) async {
     final data = await widget.repository.getNetworkMap(region: region);
     _cacheAvailableRegionLabels(data.regions);
-    final viewport = await widget.viewportRepository?.loadViewport(
-      _displayRegionName(data.selectedRegion),
-    );
+    await _saveSelectedRegion(data.selectedRegion);
+    final viewport = loadStoredViewport
+        ? await _loadSavedViewport(data.selectedRegion)
+        : null;
     return _NetworkMapLoadResult(data: data, initialViewport: viewport);
+  }
+
+  Future<void> _saveSelectedRegion(String region) async {
+    try {
+      await widget.viewportRepository?.saveSelectedRegion(region);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 최근 지역 저장 중 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  Future<Rect?> _loadSavedViewport(String region) async {
+    try {
+      return await widget.viewportRepository?.loadViewport(
+        _displayRegionName(region),
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 최근 화면 위치 불러오기 중 예외가 발생했습니다.',
+      );
+      return null;
+    }
   }
 
   void _cacheAvailableRegionLabels(List<NetworkMapRegion> regions) {

@@ -7653,6 +7653,74 @@ void main() {
     expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
   });
 
+  testWidgets('저장 지역을 복원하고 없는 지역은 기본 지역 카메라로 복구한다', (tester) async {
+    const fallbackViewport = Rect.fromLTWH(20, 30, 400, 240);
+    final viewportRepository = FakeNetworkMapViewportRepository(
+      viewports: const {'부산': fallbackViewport},
+      selectedRegion: '삭제된 지역',
+    );
+    final repository = FakeStationSearchRepository(
+      networkMapData: _gpsNetworkMapData(
+        selectedRegion: '부산',
+        regions: const ['부산'],
+      ),
+    );
+
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        networkMapViewportRepository: viewportRepository,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNetworkMapRegions, ['삭제된 지역']);
+    expect(viewportRepository.selectedRegion, '부산');
+    expect(viewportRepository.loadedRegions, ['부산']);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
+  });
+
+  testWidgets('지역 preference 실패는 성공한 지도를 가리지 않는다', (tester) async {
+    final errors = <FlutterErrorDetails>[];
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = errors.add;
+    addTearDown(() => FlutterError.onError = previousOnError);
+
+    for (final viewportRepository in [
+      FakeNetworkMapViewportRepository(
+        loadSelectedRegionError: StateError('load region'),
+      ),
+      FakeNetworkMapViewportRepository(
+        saveSelectedRegionError: StateError('save region'),
+      ),
+      FakeNetworkMapViewportRepository(
+        loadViewportError: StateError('load viewport'),
+      ),
+    ]) {
+      await tester.pumpWidget(
+        buildEasySubwayTestApp(
+          repository: FakeStationSearchRepository(
+            networkMapRegionNames: const ['수도권'],
+          ),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          networkMapViewportRepository: viewportRepository,
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(RouteMapBasemapView), findsOneWidget);
+      expect(find.text('노선도를 불러오지 못했어요'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+    expect(errors, hasLength(3));
+  });
+
   testWidgets('노선도 좌측 메뉴에서 설정 화면으로 들어갈 수 있다', (tester) async {
     await tester.pumpWidget(
       buildEasySubwayTestApp(
@@ -21801,15 +21869,43 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
 }
 
 class FakeNetworkMapViewportRepository implements NetworkMapViewportRepository {
-  FakeNetworkMapViewportRepository({Map<String, Rect>? viewports})
-    : savedViewports = {...?viewports};
+  FakeNetworkMapViewportRepository({
+    Map<String, Rect>? viewports,
+    this.selectedRegion,
+    this.loadSelectedRegionError,
+    this.saveSelectedRegionError,
+    this.loadViewportError,
+  }) : savedViewports = {...?viewports};
 
   final Map<String, Rect> savedViewports;
   final loadedRegions = <String>[];
+  String? selectedRegion;
+  final Object? loadSelectedRegionError;
+  final Object? saveSelectedRegionError;
+  final Object? loadViewportError;
+
+  @override
+  Future<String?> loadSelectedRegion() async {
+    if (loadSelectedRegionError case final error?) {
+      throw error;
+    }
+    return selectedRegion;
+  }
+
+  @override
+  Future<void> saveSelectedRegion(String region) async {
+    if (saveSelectedRegionError case final error?) {
+      throw error;
+    }
+    selectedRegion = region;
+  }
 
   @override
   Future<Rect?> loadViewport(String region) async {
     loadedRegions.add(region);
+    if (loadViewportError case final error?) {
+      throw error;
+    }
     return savedViewports[region];
   }
 
