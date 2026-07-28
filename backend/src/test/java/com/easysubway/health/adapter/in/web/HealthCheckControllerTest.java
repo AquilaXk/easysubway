@@ -2,6 +2,7 @@ package com.easysubway.health.adapter.in.web;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -133,26 +134,38 @@ class HealthCheckControllerTest {
 	@Test
 	@DisplayName("제품 소개 페이지를 인증 없이 노출한다")
 	void productLandingPageIsPublic() {
-		ResponseEntity<String> response = restTemplate.getForEntity(
-			"http://127.0.0.1:" + port + "/",
-			String.class
-		);
+		for (String path : List.of("/", "/index.html")) {
+			ResponseEntity<String> response = restTemplate.getForEntity(
+				"http://127.0.0.1:" + port + path,
+				String.class
+			);
 
-		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
-		assertThat(response.getHeaders().getContentType()).isNotNull();
-		assertThat(response.getHeaders().getContentType().isCompatibleWith(MediaType.TEXT_HTML)).isTrue();
-		assertThat(response.getBody()).contains(
-			"쉬운 지하철",
-			"빠른 길보다,",
-			"갈 수 있는 길.",
-			"Android 출시 준비 중",
-			"https://github.com/AquilaXk/easysubway",
-			"/privacy",
-			"/terms",
-			"/location-terms",
-			"mailto:aquila@aquilaxk.site",
-			"mailto:support@aquilaxk.site"
-		);
+			assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+			assertThat(response.getHeaders().getContentType()).isNotNull();
+			assertThat(response.getHeaders().getContentType().isCompatibleWith(MediaType.TEXT_HTML)).isTrue();
+			assertThat(response.getBody()).contains(
+				"쉬운 지하철",
+				"빠른 길보다,",
+				"갈 수 있는 길.",
+				"Android 출시 준비 중",
+				"아래 기능을 Android 앱에 담아 출시를 준비하고 있습니다.",
+				"https://github.com/AquilaXk/easysubway",
+				"/privacy",
+				"/terms",
+				"/location-terms",
+				"mailto:aquila@aquilaxk.site",
+				"mailto:support@aquilaxk.site"
+			);
+		}
+	}
+
+	@Test
+	@DisplayName("제품 소개 페이지는 GET 이외 요청을 차단한다")
+	void productLandingPageRejectsNonGetRequests() throws Exception {
+		for (String path : List.of("/", "/index.html")) {
+			mockMvc.perform(post(path))
+				.andExpect(status().isForbidden());
+		}
 	}
 
 	@Test

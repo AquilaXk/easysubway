@@ -423,9 +423,8 @@ public class SecurityConfig {
 					"/api/v1/trains/stations",
 					"/api/v1/trains/search"
 				).permitAll()
+				.requestMatchers(HttpMethod.GET, "/", "/index.html").permitAll()
 				.requestMatchers(
-					"/",
-					"/index.html",
 					"/api/health",
 					"/actuator/health",
 					"/actuator/health/liveness",
