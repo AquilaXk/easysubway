@@ -17,7 +17,7 @@ import '../domain/station_line.dart';
 import '../domain/station_models.dart';
 import '../domain/station_repositories.dart';
 import 'station_detail_route_actions.dart';
-import 'station_exit_card.dart';
+import 'station_exit_section.dart';
 import 'station_facility_card.dart';
 import 'station_facility_status_summary.dart';
 import 'station_info_basis_disclosure.dart';
@@ -258,13 +258,13 @@ class _StationDetailContent extends StatelessWidget {
       if (hasExits) ...[
         const _StationDetailSectionTitle(title: '출구 정보'),
         const SizedBox(height: 8),
-        for (final exit in exits)
-          StationExitCard(
-            station: detail,
-            exit: exit,
-            mapLauncher: mapLauncher,
-            locationProvider: locationProvider,
-          ),
+        StationExitSection(
+          key: ValueKey('stationExitSection-${detail.id}'),
+          station: detail,
+          exits: exits,
+          mapLauncher: mapLauncher,
+          locationProvider: locationProvider,
+        ),
         const SizedBox(height: 12),
       ],
       if (hasFacilities) ...[

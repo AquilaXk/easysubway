@@ -37,31 +37,27 @@ const BOUND_EVIDENCE_REFERENCES = {
     verificationCommentUrl:
       "https://github.com/AquilaXk/easysubway/issues/1018#issuecomment-5018496643",
   },
-  // reviewedFormSha256/reviewedFormCommit은 Play Console Data Safety 폼과 현행 tracked
-  // play-store-submission-content.json을 전수 대조 재검증한 시점의 파일 원문에 결속된
-  // 고정값이다(git show fa82ce6e:apps/mobile/release/play-store-submission-content.json
-  // | shasum -a 256). 2026-07-20 재검증(오너 위임 하에 Console 5단계 전체를 현행 tracked
-  // 폼과 대조): Console에 노출되는 답변과 현행 tracked 내용이 완전 일치, Console 답변 변경
-  // 0건·미저장 변경 0건이라 '저장' 비활성 — Console 재제출 이벤트는 불가·불필요였다.
-  // 2026-07-18 검토(7ca86806) 이후의 tracked 변경(2026-07-19 train_search 참조 추가,
-  // 2026-07-20 PR #2366 집계 플래그 5건 명시)은 전부 Console 폼에 노출되지 않는 tracked
-  // 전용 변경(집계 플래그·inventory 참조 id·dataRetention 목록)이라, 노출 답변 무변경이
-  // 확인된 이상 sha만 현행 revision(fa82ce6e)으로 재고정한다. 재검증 상세 로그는 local-only
-  // evidence(.codex/evidence/release/privacy-consistency/1018-console-reverify-20260720/).
+  // reviewedFormSha256/reviewedFormCommit은 Play Console Data Safety 5단계와 현행 tracked
+  // play-store-submission-content.json을 전수 대조한 파일 원문에 결속한다. 2026-07-28
+  // 읽기 전용 재검증에서 Console 노출 답변 변경·미저장 변경이 모두 0건이라 저장 버튼이
+  // 비활성이었고, 공개 역·출구 좌표는 사용자/기기 위치가 아니어서 재제출이 불필요했다.
   // 이후 파일이 다시 바뀌면 현재 tracked sha256이 이 값과 달라지고
   // evaluatePlayConsoleProvenanceConsistency가 그 차이를 STALE로 fail-closed 판정한다 —
   // Console이 실제로 검토한 적 없는 내용을 검토된 것처럼 위조하지 않는다.
   playConsoleDataSafetyForm: {
     inventorySource: INVENTORY_FILE,
     formSource: PLAY_FORM_FILE,
-    reviewedFormCommit: "fa82ce6e",
-    reviewedFormSha256: "9ac24f19d8ab31389e75767050cf596f07142b541a53bb98ce8c1cf8ae9ad837",
-    reverifiedAt: "2026-07-20",
+    reviewedFormCommit: "be0cd11b",
+    reviewedFormSha256: "5f33fad2eac1f21924ba32165f6be414cb990410bca9bf454749a4ea0be51408",
+    reverifiedAt: "2026-07-28",
     recordedResult: "REVERIFIED_CONSOLE_MATCHES_TRACKED_NO_RESUBMISSION_REQUIRED",
-    // 이력: 최초 재제출·검토는 2026-07-18(7ca86806). 이후 tracked 전용 변경만 있었고
-    // Console 노출 답변은 그대로여서 2026-07-20 재검증으로 sha만 현행 revision에 재고정했다.
+    verificationCommentUrl:
+      "https://github.com/AquilaXk/easysubway/issues/2655#issuecomment-5099559760",
+    priorReverifiedAt: "2026-07-20",
+    priorReviewedFormCommit: "fa82ce6e",
+    priorReviewedFormSha256: "9ac24f19d8ab31389e75767050cf596f07142b541a53bb98ce8c1cf8ae9ad837",
     priorResubmittedAt: "2026-07-18",
-    priorReviewedFormCommit: "7ca86806",
+    priorResubmittedFormCommit: "7ca86806",
   },
 };
 
@@ -120,17 +116,25 @@ const POLICY_BOUNDARIES = [
   {
     id: "external_map_user_initiated",
     descriptionKo:
-      "외부 지도 도보 길안내는 사용자가 직접 누를 때만 좌표를 전달하고 서버에 저장하지 않는 user-initiated 예외 경계",
-    inventoryFact({ preciseLocation }) {
+      "내장 지도는 공개 좌표만 자동 전달하고, 현재 위치는 사용자가 도보 길안내를 누를 때만 전달하는 경계",
+    inventoryFact({ preciseLocation, embeddedMapPreview }) {
       const exception = preciseLocation?.userInitiatedSharingException;
       return Boolean(
         exception?.applies === true
-          && exception?.consoleThirdPartySharingDeclared === false,
+          && exception?.consoleThirdPartySharingDeclared === false
+          && embeddedMapPreview?.provider === "kakao-map"
+          && embeddedMapPreview?.loadTrigger === "station_exit_section_visible"
+          && embeddedMapPreview?.currentLocationShared === false
+          && embeddedMapPreview?.serverStored === false
+          && embeddedMapPreview?.tracking === false
+          && embeddedMapPreview?.googlePlayLocationClassification?.included === false,
       );
     },
     anchors: [
-      "출구 도보 길안내를 명시적으로 누른 경우에만",
-      "쉬운 지하철 서버에는 저장하지 않습니다",
+      "출구 정보가 표시되면 카카오맵 미리보기를 자동으로 불러오며",
+      "공개 역·출구 좌표와 지도 화면 범위를 카카오에 전달하지만 현재 위치는 사용하지 않습니다",
+      "출구 도보 길안내를 명시적으로 누르면",
+      "쉬운 지하철 서버에 저장하지 않습니다",
     ],
   },
   {
@@ -297,6 +301,7 @@ function buildPolicyBoundaryContext(inventory, items) {
     gatewayKeys: inventory.routeV2GatewayRateLimit?.keys ?? [],
     routeV2Integrity: items.get("route_v2_itx_integrity"),
     preciseLocation: items.get("precise_location"),
+    embeddedMapPreview: inventory.embeddedMapPreview,
   };
 }
 
@@ -352,7 +357,7 @@ export function buildPrivacyConsistencyEvidence({
   repoRoot = process.cwd(),
   generatedAt = new Date().toISOString(),
   provenance = "final-candidate",
-  // 프로덕션/CLI 경로는 항상 기본값(2026-07-20 재검증 시점의 현행 revision fa82ce6e에
+  // 프로덕션/CLI 경로는 항상 기본값(2026-07-28 재검증 시점의 현행 revision be0cd11b에
   // 고정된 hash)을 쓴다. 이 파라미터는 evaluatePlayConsoleProvenanceConsistency 로직을
   // git 이력에 결합하지 않고 독립적으로 단위 테스트하기 위한 테스트 전용 override다.
   reviewedPlayFormSha256 = BOUND_EVIDENCE_REFERENCES.playConsoleDataSafetyForm.reviewedFormSha256,

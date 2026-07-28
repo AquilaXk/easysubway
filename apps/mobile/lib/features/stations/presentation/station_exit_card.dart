@@ -8,6 +8,7 @@ import '../../../mobile_error_reporter.dart';
 import '../domain/station_models.dart';
 import '../domain/station_repositories.dart';
 import 'station_detail_info_row.dart';
+import 'station_exit_map_target.dart';
 
 const _currentLocationDisabledMessage =
     '휴대전화의 위치 기능을 켜 주세요. 가까운 역을 찾는 데 필요합니다.';
@@ -41,7 +42,7 @@ class _StationExitCardState extends State<StationExitCard> {
     final textTheme = Theme.of(context).textTheme;
     final station = widget.station;
     final exit = widget.exit;
-    final mapTarget = _stationExitMapTarget(station: station, exit: exit);
+    final mapTarget = stationExitMapTarget(station: station, exit: exit);
     final walkingRouteStart = _walkingRouteStart;
     final distanceMeters = walkingRouteStart == null || mapTarget == null
         ? null
@@ -316,7 +317,7 @@ class _StationExitCardState extends State<StationExitCard> {
   }
 
   Future<void> _openExitMap(BuildContext context) async {
-    final mapTarget = _stationExitMapTarget(
+    final mapTarget = stationExitMapTarget(
       station: widget.station,
       exit: widget.exit,
     );
@@ -340,7 +341,7 @@ class _StationExitCardState extends State<StationExitCard> {
     if (_isOpeningWalkingRoute || _isLoadingLocation) {
       return;
     }
-    final mapTarget = _stationExitMapTarget(
+    final mapTarget = stationExitMapTarget(
       station: widget.station,
       exit: widget.exit,
     );
@@ -405,48 +406,6 @@ String _exitWalkingLocationExceptionMessage(CurrentLocationException error) {
     return '휴대전화의 위치 기능을 켜 주세요. 출구까지 안내하는 데 필요합니다.';
   }
   return error.message;
-}
-
-class _StationExitMapTarget {
-  const _StationExitMapTarget({
-    required this.target,
-    required this.usesStationFallback,
-  });
-
-  final KakaoMapTarget target;
-  final bool usesStationFallback;
-}
-
-_StationExitMapTarget? _stationExitMapTarget({
-  required StationDetail station,
-  required StationExitInfo exit,
-}) {
-  final exitLatitude = exit.latitude;
-  final exitLongitude = exit.longitude;
-  if (exitLatitude != null && exitLongitude != null) {
-    return _StationExitMapTarget(
-      target: KakaoMapTarget(
-        label: '${station.nameKo}역 ${exit.name}',
-        latitude: exitLatitude,
-        longitude: exitLongitude,
-      ),
-      usesStationFallback: false,
-    );
-  }
-
-  final stationLatitude = station.latitude;
-  final stationLongitude = station.longitude;
-  if (stationLatitude == null || stationLongitude == null) {
-    return null;
-  }
-  return _StationExitMapTarget(
-    target: KakaoMapTarget(
-      label: '${station.nameKo}역',
-      latitude: stationLatitude,
-      longitude: stationLongitude,
-    ),
-    usesStationFallback: true,
-  );
 }
 
 String _exitDistanceLabel(

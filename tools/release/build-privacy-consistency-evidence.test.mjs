@@ -92,15 +92,10 @@ test("aggregate flag가 모두 명시적 boolean이고 provenance가 검토 revi
   assert.match(evidence.inputs.privacyPolicy.sha256, /^[0-9a-f]{64}$/);
 });
 
-// 2026-07-20 재검증(오너 위임 하에 Play Console 5단계 전체를 현행 tracked 폼과 대조):
-// Console 노출 답변과 현행 tracked 내용이 완전 일치, Console 답변 변경 0건이라 재제출
-// 이벤트가 불필요했다. 2026-07-18 검토(7ca86806) 이후의 tracked 변경(train_search 참조
-// 추가·PR #2366 집계 flag 5건 명시)은 전부 Console에 노출되지 않는 tracked 전용 변경이라,
-// sha만 현행 revision(fa82ce6e)으로 재고정했다. 그 결과 현재 tracked 파일 sha256이
-// reviewedFormSha256과 같아져 provenance는 consistent이고, 과거 review가 지적한 5개
-// dataType 집계 flag도 이미 보정돼 answerMatrix 모순 0·정책 anchor·boundary fact 모두
-// 일치한다 — 즉 현재 tracked 원본은 세 판정 전부 결함 0으로 전체 status가 SATISFIED다.
-test("현재 tracked 원본에 대해 실행하면 provenance 재고정으로 세 판정 전부 결함 0인 SATISFIED를 산출한다", () => {
+// 2026-07-28 Play Console 5단계를 현행 tracked 원본과 읽기 전용으로 대조했다. Console
+// 노출 답변 변경 0건·미저장 변경 0건으로 저장 버튼이 비활성이라 재제출은 없었고, 공개
+// 역·출구 좌표는 사용자 또는 기기 위치가 아니므로 기존 Location 답변도 그대로다.
+test("현재 tracked 원본은 2026-07-28 Play Console 재검증 revision과 일치한다", () => {
   const evidence = buildPrivacyConsistencyEvidence({
     candidate: candidate(),
     repoRoot: REPO_ROOT,
@@ -111,7 +106,7 @@ test("현재 tracked 원본에 대해 실행하면 provenance 재고정으로 �
   assert.equal(evidence.playConsoleProvenanceConsistency.matchesReviewedRevision, true);
   assert.equal(
     evidence.playConsoleProvenanceConsistency.reviewedFormSha256,
-    "9ac24f19d8ab31389e75767050cf596f07142b541a53bb98ce8c1cf8ae9ad837",
+    "5f33fad2eac1f21924ba32165f6be414cb990410bca9bf454749a4ea0be51408",
   );
   assert.equal(
     evidence.playConsoleProvenanceConsistency.currentFormSha256,
@@ -131,7 +126,6 @@ test("현재 tracked 원본에 대해 실행하면 provenance 재고정으로 �
   assert.equal(evidence.checks.inventoryPolicyConsistent, "SATISFIED");
   assert.equal(evidence.policyBoundaryConsistency.consistent, true);
 
-  // 세 판정 전부 결함 0이라 전체 status는 SATISFIED다.
   assert.equal(evidence.status, "SATISFIED");
 });
 
@@ -151,6 +145,28 @@ test("reviewedPlayFormSha256이 현재 폼 sha256과 다르면 다른 판정이 
   assert.equal(evidence.policyBoundaryConsistency.consistent, true);
   assert.equal(evidence.playConsoleProvenanceConsistency.consistent, false);
   assert.equal(evidence.checks.playConsoleProvenanceCurrent, "STALE");
+  assert.equal(evidence.status, "BLOCKED_PRIVACY_CONSISTENCY");
+});
+
+test("embedded preview가 현재 위치를 공유하면 외부 지도 privacy boundary를 거부한다", async () => {
+  const repoRoot = await fixtureRepoRoot({
+    mutateInventory(inventory) {
+      inventory.embeddedMapPreview.currentLocationShared = true;
+    },
+  });
+  const reviewedPlayFormSha256 = await sha256File(path.join(repoRoot, PLAY_FORM_FILE));
+
+  const evidence = buildPrivacyConsistencyEvidence({
+    candidate: candidate(),
+    repoRoot,
+    reviewedPlayFormSha256,
+  });
+  const externalMap = evidence.policyBoundaryConsistency.boundaries.find(
+    (boundary) => boundary.id === "external_map_user_initiated",
+  );
+
+  assert.equal(externalMap.inventoryFactHolds, false);
+  assert.equal(evidence.checks.inventoryPolicyConsistent, "FAILED");
   assert.equal(evidence.status, "BLOCKED_PRIVACY_CONSISTENCY");
 });
 

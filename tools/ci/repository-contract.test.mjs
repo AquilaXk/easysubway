@@ -1733,6 +1733,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_DATASOURCE_USERNAME=easysubway",
     "EASYSUBWAY_DATASOURCE_PASSWORD=secret",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=ci-native-map-key",
     "EASYSUBWAY_DATAPACK_CATALOG_BASE_URL=https://cdn.example.com/easysubway-datapacks",
     "EASYSUBWAY_REPORT_API_BASE_URL=https://api.example.com",
     "EASYSUBWAY_ADS_ASSET_ORIGIN=https://ads-assets.fixture.test-only.dev",
@@ -3023,22 +3024,27 @@ test("OSV 의존성 취약점 게이트는 Gradle lockfile을 스캔 근거로 �
   assert.match(androidLockfile, /This is a Gradle generated file for dependency locking/);
   assert.match(backendLockfile, /\n[^#\n][^=\n]+=/);
   assert.match(androidLockfile, /\n[^#\n][^=\n]+=/);
+  assert.match(androidLockfile, /^com\.kakao\.maps\.open:android:2\.12\.18=/m);
   assert.doesNotMatch(androidLockfile, /^io\.flutter:/m);
 });
 
 test("release dart-define guard는 public API URL과 demo flag를 검증한다", async () => {
   const guard = read("tools/mobile/validate-release-dart-defines.sh");
   assert.match(guard, /case "\$\{host\}" in[\s\S]*?\n  \*\) ;;\nesac/);
+  assert.match(guard, /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY must be defined exactly once/);
   await execFileAsync("bash", ["-n", "tools/mobile/validate-release-dart-defines.sh"], { cwd: root });
   await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
     "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
+    "--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
     "--dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false",
   ], { cwd: root });
   await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
     "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app:443",
+    "--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
   ], { cwd: root });
   await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
     "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
+    "--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
     "--dart-define=EASYSUBWAY_ROUTE_V2_ONLINE_FIRST_ENABLED=true",
     "--dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER=123456789",
   ], { cwd: root });
@@ -3047,6 +3053,7 @@ test("release dart-define guard는 public API URL과 demo flag를 검증한다",
   try {
     await execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
       `--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app/$(touch\${IFS}${injectionMarker})`,
+      "--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
     ], { cwd: root });
     assert.equal(existsSync(injectionMarker), false);
   } finally {
@@ -3071,10 +3078,27 @@ test("release dart-define guard는 public API URL과 demo flag를 검증한다",
   ];
   for (const args of rejectedArgs) {
     await assert.rejects(
-      execFileAsync("tools/mobile/validate-release-dart-defines.sh", args, { cwd: root }),
+      execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+        ...args,
+        "--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
+      ], { cwd: root }),
       /EASYSUBWAY_API_BASE_URL/,
     );
   }
+  await assert.rejects(
+    execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+      "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
+    ], { cwd: root }),
+    /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY is required for release/,
+  );
+  await assert.rejects(
+    execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+      "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
+      "--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
+      "--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=second-test-key",
+    ], { cwd: root }),
+    /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY must be defined exactly once/,
+  );
   await assert.rejects(
     execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
       "--dart-define=EASYSUBWAY_API_BASE_URL=https://api.easysubway.app",
@@ -3135,6 +3159,14 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 
   assert.match(workflow, /android-release:/);
   assert.match(workflow, /name: Android Release Artifact/);
+  assert.match(
+    workflow,
+    /android-release:[\s\S]*outputs:[\s\S]*artifact_available: \$\{\{ steps\.release-env\.outputs\.artifact_available \}\}/,
+  );
+  assert.match(
+    workflow,
+    /needs\.android-release\.result == 'success' && needs\.android-release\.outputs\.artifact_available == 'true'/,
+  );
   assert.match(workflow, /keytool -genkeypair/);
 	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEYSTORE_PATH: \$\{\{ runner\.temp \}\}\/easysubway-ci-release\.jks/);
 	  assert.match(workflow, /EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-password/);
@@ -3543,27 +3575,36 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "apps/mobile/release/support-incident-response-gate.json",
     ],
   );
+  const supersededFinalRcBindings = new Map([
+    ["apps/mobile/pubspec.yaml", "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42"],
+    ["apps/mobile/lib/main.dart", "e03403afc1d3370905ef0c3f90533c67dc7fa37eb95c3d8743b7cbd52d2ab9b0"],
+    [
+      ".github/workflows/release-artifacts.yml",
+      "7a40f47727818e79abe1156eee2dd105a0c499eda087708f419993759d404245",
+    ],
+    [
+      "tools/ci/validate-store-privacy-env.mjs",
+      "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a",
+    ],
+  ]);
   for (const binding of refreshBindings) {
     assert.ok(binding.files.length > 0, `${binding.refreshOn} must bind at least one file`);
     for (const file of binding.files) {
       const liveSha256 = createHash("sha256").update(read(file.path)).digest("hex");
-      if (file.path === "apps/mobile/pubspec.yaml") {
-        // #2068 datapack/렌더 전환(vector_graphics 의존성·basemap/ 자산 추가)으로
-        // apps/mobile/pubspec.yaml 해시가 바뀌면서 "fixed-release-procedure-change"
-        // RC evidence는 중단(superseded)되었다. dataPackManifestSha256와 동일 원칙:
-        // 게이트 기록값(1c491874… — post-launch-operations-review-gate.json이 마지막
-        // RC 재바인딩 때 고정한 pubspec 해시)은 그대로 검증하고, live 해시와는 반드시
-        // 달라야 한다(의도된 불일치). #1016(final RC) 재개 시 새 RC 전체 identity +
-        // Play evidence를 함께 재바인딩하면서 이 검증을 동등성으로 복귀시킨다. (오너 결정 2026-07-16)
+      const supersededSha256 = supersededFinalRcBindings.get(file.path);
+      if (supersededSha256 != null) {
+        // #2068과 #2655가 고정 RC 입력을 변경해 기존 evidence를 중단(superseded)했다.
+        // 마지막 RC 기록값은 보존하고 live hash 불일치로 재사용 불가를 증명한다.
+        // #1016(final RC) 재개 시 전체 identity와 함께 재바인딩한다.
         assert.equal(
           file.sha256,
-          "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42",
+          supersededSha256,
           `${binding.refreshOn} recorded hash for ${file.path} must stay pinned to the superseded RC evidence`,
         );
         assert.notEqual(
           liveSha256,
           file.sha256,
-          `중단된 RC identity는 재사용 불가 — ${file.path}의 기록 해시는 #2068 변경 후 live 해시와 달라야 한다`,
+          `중단된 RC identity는 재사용 불가 — ${file.path}의 기록 해시는 live 해시와 달라야 한다`,
         );
         continue;
       }
@@ -6791,6 +6832,10 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.match(workflow, /--dart-define=EASYSUBWAY_SUPPORT_EMAIL="\$\{EASYSUBWAY_SUPPORT_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_DATA_DELETION_EMAIL="\$\{EASYSUBWAY_DATA_DELETION_EMAIL\}"/);
   assert.match(workflow, /--dart-define=EASYSUBWAY_SECURITY_EMAIL="\$\{EASYSUBWAY_SECURITY_EMAIL\}"/);
+  assert.equal(
+    (workflow.match(/--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY="\$\{EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY\}"/g) ?? []).length,
+    4,
+  );
 
   assert.equal(privacyInventory.privacyPolicyUrlSource, "EASYSUBWAY_PRIVACY_POLICY_URL dart-define");
   assert.equal(
@@ -6847,6 +6892,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
     "",
   ].join("\n"));
   const githubEnv = path.join(dir, "github.env");
@@ -6864,6 +6910,10 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
   assert.match(githubEnvOutput, /^EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk\.site$/m);
   assert.match(githubEnvOutput, /^EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk\.site$/m);
+  assert.equal(
+    (githubEnvOutput.match(/^EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key$/gm) ?? []).length,
+    1,
+  );
   assert.match(
     githubEnvOutput,
     /^EASYSUBWAY_SUPPORT_CONTACT_SET_SHA256=e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a$/m,
@@ -6877,6 +6927,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
@@ -6919,6 +6970,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@easysubway.local",
     "EASYSUBWAY_SECURITY_EMAIL=security@easysubway.local",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@easysubway.local",
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
     "",
   ].join("\n"));
   await assert.rejects(
@@ -6936,6 +6988,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
     "EASYSUBWAY_DATA_PACK_BASE_URL=http://localhost/datapacks/",
     `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
@@ -6965,6 +7018,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=public-key-modulus",
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
@@ -6994,6 +7048,7 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
     "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
     "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
     "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://objectstorage.ap-seoul-1.oraclecloud.com/n/axvym6vk8g7i/b/easysubway-datapacks/o",
     `EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_N=${validDataPackPublicKeyModulus}`,
     "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_E=AQAB",
@@ -7013,6 +7068,45 @@ test("스토어 개인정보 제출 기준선은 release artifact placeholder �
       cwd: root,
     }),
     /EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256 must be a full SHA-256 fingerprint/,
+  );
+
+  const missingKakaoKeyEnv = path.join(dir, "missing-kakao-key.env");
+  await writeFile(missingKakaoKeyEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
+    "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/ci/validate-store-privacy-env.mjs",
+      "--env-file",
+      missingKakaoKeyEnv,
+    ], { cwd: root }),
+    /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY is required/,
+  );
+
+  const placeholderKakaoKeyEnv = path.join(dir, "placeholder-kakao-key.env");
+  await writeFile(placeholderKakaoKeyEnv, [
+    "EASYSUBWAY_TERMS_OF_SERVICE_URL=https://easysubway-api.aquilaxk.site/easysubway/terms",
+    "EASYSUBWAY_PRIVACY_POLICY_URL=https://easysubway-api.aquilaxk.site/easysubway/privacy",
+    "EASYSUBWAY_LOCATION_TERMS_URL=https://easysubway-api.aquilaxk.site/easysubway/location-terms",
+    "EASYSUBWAY_SUPPORT_EMAIL=support@aquilaxk.site",
+    "EASYSUBWAY_SECURITY_EMAIL=security@aquilaxk.site",
+    "EASYSUBWAY_DATA_DELETION_EMAIL=privacy@aquilaxk.site",
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=placeholder",
+    "",
+  ].join("\n"));
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      "tools/ci/validate-store-privacy-env.mjs",
+      "--env-file",
+      placeholderKakaoKeyEnv,
+    ], { cwd: root }),
+    /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY must not use local or placeholder values/,
   );
 });
 
@@ -7838,6 +7932,10 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(datapackWorkflow, /remote_publish_enabled=\$\{remotePublishEnabled \|\| "unknown"\}/);
   assert.match(datapackWorkflow, /remotePublishResult === "success" \? "success" : "failed"/);
   assert.match(releaseArtifactsWorkflow, /mapping_retention_days=90/);
+  assert.equal(
+    (releaseArtifactsWorkflow.match(/--target-platform=android-arm,android-arm64/g) ?? []).length,
+    2,
+  );
   assert.doesNotMatch(releaseArtifactsWorkflow, /dsym_retention_days=90/);
   assert.match(releaseArtifactsWorkflow, /retention-days: 90/);
 });
@@ -7916,6 +8014,20 @@ test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정
   ]);
   assert.deepEqual(idsByPlatform.get("android"), requiredAndroidChecks.toSorted());
   assert.deepEqual(idsByPlatform.get("ios"), requiredIosChecks.toSorted());
+  const androidInstallCheck = gate.checks.find(
+    (check) => check.id === "android_internal_test_track_install",
+  );
+  assert.match(androidInstallCheck.command, /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY/);
+  assert.match(androidInstallCheck.command, /--target-platform=android-arm,android-arm64/);
+  const iosBuildChecks = gate.checks.filter(
+    (check) => check.platform === "ios" && /flutter build (?:ios|ipa)/.test(check.command ?? ""),
+  );
+  assert.equal(iosBuildChecks.length, 4);
+  for (const check of iosBuildChecks) {
+    assert.match(check.command, /validate-release-dart-defines\.sh/);
+    assert.match(check.command, /--dart-define=EASYSUBWAY_API_BASE_URL=/);
+    assert.match(check.command, /--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=/);
+  }
 
   for (const check of gate.checks) {
     if (check.id === "android_app_start_backend_down") {
@@ -15663,7 +15775,7 @@ test("모바일 async lint 기준선은 Future 처리 누락을 analyzer에서 �
   const asyncLintBaseline = readJson("apps/mobile/analysis/async-lint-baseline.json");
 
   assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
-  assert.match(analysisOptions, /^analyzer:\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
+  assert.match(analysisOptions, /^analyzer:\n  exclude:\n    - build\/\*\*\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
   assert.match(analysisOptions, /^\s{4}unawaited_futures: true$/m);
   assert.match(analysisOptions, /^\s{4}discarded_futures: false # staged in apps\/mobile\/analysis\/async-lint-baseline\.json$/m);
   assert.equal(asyncLintBaseline.schema, "easysubway.mobile_async_lint_baseline.v1");
@@ -15683,9 +15795,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const androidDebugManifest = read("apps/mobile/android/app/src/debug/AndroidManifest.xml");
   const androidProfileManifest = read("apps/mobile/android/app/src/profile/AndroidManifest.xml");
   const androidBuildGradle = read("apps/mobile/android/app/build.gradle.kts");
+  const androidProguardRules = read("apps/mobile/android/app/proguard-rules.pro");
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
+  const kakaoMapConfiguration = read(
+    "apps/mobile/lib/core/external/kakao_map_configuration.dart",
+  );
   const appRoot = read("apps/mobile/lib/app/easy_subway_app.dart");
   const homeScreen = read(
     "apps/mobile/lib/features/home/presentation/home_screen.dart",
@@ -15721,6 +15837,18 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const stationExitCard = read(
     "apps/mobile/lib/features/stations/presentation/station_exit_card.dart",
   );
+  const stationExitMapTarget = read(
+    "apps/mobile/lib/features/stations/presentation/station_exit_map_target.dart",
+  );
+  const stationExitMapPreview = read(
+    "apps/mobile/lib/features/stations/presentation/station_exit_map_preview.dart",
+  );
+  const stationExitSection = read(
+    "apps/mobile/lib/features/stations/presentation/station_exit_section.dart",
+  );
+  const stationDetailBody = read(
+    "apps/mobile/lib/features/stations/presentation/station_detail_body.dart",
+  );
   const stationDetailHeader = read(
     "apps/mobile/lib/features/stations/presentation/station_detail_header.dart",
   );
@@ -15736,11 +15864,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const stationApiRepository = read(
     "apps/mobile/lib/features/stations/data/station_api_repository.dart",
   );
-  const mapAdapter = read("apps/mobile/lib/map_adapter.dart");
   const externalMapDeeplinkPolicy = readJson(
     "apps/mobile/release/external-map-deeplink-policy.json",
   );
-  const mapAdapterTest = read("apps/mobile/test/map_adapter_test.dart");
   const facilityReport = read("apps/mobile/lib/facility_report.dart");
   const facilityReportTest = read("apps/mobile/test/facility_report_test.dart");
   const notificationSettings = read("apps/mobile/lib/notification_settings.dart");
@@ -15762,9 +15888,14 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(pubspec, /sdk: \^3\./);
   assert.match(pubspec, /flutter_lints:/);
   assert.match(pubspec, /flutter_secure_storage:/);
+  assert.match(pubspec, /kakao_map_sdk: \^1\.2\.6/);
   assert.match(pubspec, /uses-material-design: true/);
   assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
-  assert.match(analysisOptions, /^analyzer:\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
+  assert.match(analysisOptions, /^analyzer:\n  exclude:\n    - build\/\*\*\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
+  assert.ok(
+    main.indexOf("await initializeMobileCrashReporting") <
+      main.indexOf("await KakaoMapSdk.instance.initialize"),
+  );
   assert.match(androidManifest, /android:label="쉬운 지하철"/);
   assert.match(androidManifest, /android:allowBackup="false"/);
   assert.match(androidManifest, /android:fullBackupContent="false"/);
@@ -15786,6 +15917,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(androidBuildGradle, /"EASYSUBWAY_ANDROID_KEY_PASSWORD"/);
   assert.match(androidBuildGradle, /providers\.environmentVariable\(name\)/);
   assert.match(androidBuildGradle, /throw GradleException\([\s\S]*Android release signing values are missing:/);
+  assert.match(androidProguardRules, /-keep class com\.kakao\.vectormap\.\*\* \{ \*; \}/);
+  assert.match(androidProguardRules, /-keep interface com\.kakao\.vectormap\.\*\*/);
+  assert.match(envExample, /^EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=$/m);
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEYSTORE_PATH=$/m);
   assert.match(envExample, /^EASYSUBWAY_ANDROID_STORE_PASSWORD=$/m);
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_ALIAS=$/m);
@@ -15800,6 +15934,13 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(appSettingsScreen, /이동 조건/);
   assert.match(appSettingsScreen, /알림 설정/);
   assert.match(main, /EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS/);
+  assert.match(kakaoMapConfiguration, /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY/);
+  assert.match(main, /validateKakaoMapConfiguration/);
+  assert.match(main, /KakaoMapSdk\.instance\.initialize\(kakaoMapNativeAppKey\)/);
+  assert.ok(
+    main.indexOf("await KakaoMapSdk.instance.initialize(kakaoMapNativeAppKey)") <
+      main.indexOf("markKakaoMapSdkInitialized()"),
+  );
   assert.match(main, /defaultValue: false/);
   assert.match(main, /enablePushNotifications/);
   assert.doesNotMatch(`${main}\n${appDependencies}`, /AnonymousAuth|enableAnonymousAuth|anonymousAuth/);
@@ -15959,20 +16100,20 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 HTTPS API 주소만 사용한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /릴리즈 빌드는 호스트가 없는 API 주소를 거부한다/);
   assert.match(read("apps/mobile/test/station_search_test.dart"), /개발 빌드는 Android 에뮬레이터 로컬 API 주소를 유지한다/);
-  assert.match(mapAdapter, /enum MapProviderType/);
-  assert.match(mapAdapter, /MapProviderType\.kakao => '카카오 지도'/);
-  assert.match(mapAdapter, /const MapProviderConfiguration\.defaults\(\)/);
-  assert.match(mapAdapter, /primary = MapProviderType\.kakao/);
-  assert.doesNotMatch(mapAdapter, /fallbacks/);
-  assert.match(mapAdapter, /abstract interface class MapAdapter/);
-  assert.match(mapAdapter, /class EasySubwayMapAdapter implements MapAdapter/);
-  assert.match(mapAdapter, /markersForStationDetail/);
-  assert.match(mapAdapter, /_coordinateFrom\(station\.latitude, station\.longitude\)/);
-  assert.match(mapAdapter, /_coordinateFrom\(exit\.latitude, exit\.longitude\)/);
-  assert.match(mapAdapter, /_coordinateFrom\(facility\.latitude, facility\.longitude\)/);
+  assert.match(stationExitMapTarget, /final class StationExitMapTarget/);
+  assert.match(stationExitMapTarget, /StationExitMapTarget\? stationExitMapTarget/);
+  assert.match(stationExitMapTarget, /usesStationFallback/);
+  assert.match(stationExitCard, /stationExitMapTarget\(station: station, exit: exit\)/);
+  assert.match(stationExitMapPreview, /stationExitPreviewPoints/);
+  assert.match(stationExitMapPreview, /forceGesture: false/);
+  assert.match(stationExitMapPreview, /controller\.setGesture\(gesture, false\)/);
+  assert.match(stationExitMapPreview, /controller\.finish/);
+  assert.match(stationExitSection, /StationExitMapPreview/);
+  assert.match(stationDetailBody, /StationExitSection/);
+  assert.doesNotMatch(stationDetailBody, /for \(final exit in exits\)[\s\S]*StationExitCard/);
   assert.equal(
     externalMapDeeplinkPolicy.schema,
-    "easysubway.external_map_deeplink_policy.v1",
+    "easysubway.external_map_deeplink_policy.v2",
   );
   assert.equal(externalMapDeeplinkPolicy.ownerIssue, "#1770");
   assert.deepEqual(externalMapDeeplinkPolicy.providerOrder, ["kakao-map"]);
@@ -15988,8 +16129,17 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     externalMapDeeplinkPolicy.providers[0].webFallbackHost,
     "map.kakao.com",
   );
-  assert.equal(externalMapDeeplinkPolicy.providers[0].requiresSdkKey, false);
-  assert.equal(externalMapDeeplinkPolicy.providers[0].embeddedSdkAllowed, false);
+  assert.equal(externalMapDeeplinkPolicy.providers[0].requiresSdkKey, true);
+  assert.equal(externalMapDeeplinkPolicy.providers[0].embeddedSdkAllowed, true);
+  assert.deepEqual(externalMapDeeplinkPolicy.embeddedPreview.sharedCoordinates, [
+    "station",
+    "coordinate-valid exits",
+    "viewport",
+  ]);
+  assert.equal(externalMapDeeplinkPolicy.embeddedPreview.loadTrigger, "station_exit_section_visible");
+  assert.equal(externalMapDeeplinkPolicy.embeddedPreview.sharesCurrentLocation, false);
+  assert.equal(externalMapDeeplinkPolicy.embeddedPreview.gesturesEnabled, false);
+  assert.equal(externalMapDeeplinkPolicy.embeddedPreview.tapAction, "existing-open-look-fallback");
   assert.equal(
     externalMapDeeplinkPolicy.privacyContract.currentLocationRequest,
     "explicit_user_tap_only",
@@ -16009,11 +16159,8 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
     /카카오맵 앱에서는 현재 위치와 출구 좌표를, 웹에서는 출구 좌표만 카카오에 전달합니다/,
   );
   assert.match(widgetTest, /출구 좌표가 없어 역 위치 기준으로 안내합니다/);
-  assert.doesNotMatch(stationSearch, /EasySubwayMapAdapter\(\)\.markersForStationDetail/);
   assert.doesNotMatch(stationSearch, /Text\(\s*'지도 위치 목록'/);
   assert.doesNotMatch(stationSearch, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다\./);
-  assert.match(mapAdapterTest, /지도 제공자는 승인된 기본 제공자만 사용한다/);
-  assert.match(mapAdapterTest, /지도 어댑터는 좌표가 있는 역 출구 시설만 쉬운 이름의 마커로 만든다/);
   assert.match(widgetTest, /중복 "지도 위치 목록" 섹션은 제거됐다\(#1497\)\./);
   assert.match(widgetTest, /find\.text\('지도 위치 목록'\), findsNothing/);
   assert.doesNotMatch(widgetTest, /지도를 열 수 없어도 아래 위치 목록으로 확인할 수 있습니다/);
@@ -16835,6 +16982,9 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
       `${dataType} matrix optional flag must match inventory`,
     );
   }
+  assert.deepEqual(dataSafetyAnswerMatrix.get("Location").excludedInventoryDataIds, [
+    storePrivacyInventory.embeddedMapPreview.inventoryDataId,
+  ]);
   assert.equal(dataSafetyAnswerMatrix.get("Diagnostics").containsLocalOnlyDiagnostics, true);
   assert.equal(playStoreContent.privacyPolicyRequirements.urlMustBePublicHttps, true);
   assert.equal(playStoreContent.privacyPolicyRequirements.urlMustBeUnauthenticated, true);
@@ -16844,18 +16994,26 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
     "public policy page",
   ]);
   assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("외부 지도 길안내 제3자 공유 범위"));
+  assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("카카오맵 출구 미리보기 자동 로드 범위"));
   assert.ok(playStoreContent.privacyPolicyRequirements.requiredContentKo.includes("tracking 없음"));
   const publicPrivacyPolicy = read("backend/src/main/resources/templates/legal/privacy.html");
   assert.match(publicPrivacyPolicy, /외부 지도 도보 길안내/);
   assert.match(publicPrivacyPolicy, /출구 도보 길안내/);
   assert.match(publicPrivacyPolicy, /카카오맵 앱에는 현재 위치 시작 좌표와 목적지 좌표/);
   assert.match(publicPrivacyPolicy, /카카오맵 웹에는 목적지 좌표/);
+  assert.match(publicPrivacyPolicy, /출구 정보가 표시되면 카카오맵 미리보기를 자동으로 불러/);
+  assert.match(publicPrivacyPolicy, /현재 위치는 사용하지 않/);
+  assert.match(publicPrivacyPolicy, /공고일: 2026년 7월 28일/);
+  assert.match(publicPrivacyPolicy, /시행일: 2026년 8월 4일/);
   assert.equal(playStoreContent.storeMetadataRequirements.publicContactEmailMustMatchAppSupportEmail, true);
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("대중교통"));
   assert.ok(playStoreContent.storeMetadataRequirements.requiredTagsKo.includes("접근성"));
   assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("로그인 없음"));
   assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("위치 권한은 선택적 사용"));
-  assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("카카오맵 앱/웹 공유는 사용자가 지도 또는 도보 길안내를 누를 때만 실행"));
+  assert.ok(playStoreContent.storeMetadataRequirements.reviewerNotesMustIncludeKo.includes("출구 정보가 표시되면 공개 역·출구 좌표로 카카오맵 미리보기를 자동 로드하며 현재 위치는 사용하지 않음"));
+  assert.match(playStoreContent.dataSafetyDeclarations.thirdPartySharingScopeKo, /자동으로 불러/);
+  assert.match(playStoreContent.dataSafetyDeclarations.thirdPartySharingScopeKo, /현재 위치는 사용하지 않/);
+  assert.match(playStoreContent.dataSafetyDeclarations.thirdPartySharingScopeKo, /사용할 수 없으면 좌표를 복사/);
   assert.equal(playStoreContent.crashAnrProviderDecision.separateCrashProvider, false);
   assert.ok(playStoreContent.crashAnrProviderDecision.sourceOfTruth.includes("Android vitals"));
   assert.ok(playStoreContent.crashAnrProviderDecision.sourceOfTruth.includes("Google Play pre-launch report"));
@@ -17433,6 +17591,26 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
   assert.equal(inventory.sharesDataWithThirdParties, true);
   assert.equal(inventory.encryptionInTransitRequired, true);
   assert.equal(inventory.userDataDeletionSupported, true);
+  assert.equal(inventory.embeddedMapPreview.provider, "kakao-map");
+  assert.equal(inventory.embeddedMapPreview.loadTrigger, "station_exit_section_visible");
+  assert.deepEqual(inventory.embeddedMapPreview.sharedData, [
+    "public-station-coordinate",
+    "public-exit-coordinate",
+    "map-viewport",
+  ]);
+  assert.equal(inventory.embeddedMapPreview.currentLocationShared, false);
+  assert.equal(inventory.embeddedMapPreview.serverStored, false);
+  assert.equal(inventory.embeddedMapPreview.tracking, false);
+  assert.equal(inventory.embeddedMapPreview.inventoryDataId, "embedded_map_preview_public_coordinates");
+  assert.equal(inventory.embeddedMapPreview.googlePlayLocationClassification.included, false);
+  assert.equal(
+    inventory.embeddedMapPreview.googlePlayLocationClassification.policyReference,
+    "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+  );
+  assert.match(
+    inventory.embeddedMapPreview.googlePlayLocationClassification.rationaleKo,
+    /사용자 또는 기기의 물리적 위치가 아닌 공개된 역·출구 위치/,
+  );
   assert.match(inventory.privacyPolicyUrlSource, /EASYSUBWAY_PRIVACY_POLICY_URL/);
   assert.deepEqual(inventory.googlePlayDataSafetyRequiredFields, [
     "collected",
@@ -17634,7 +17812,7 @@ test("모바일 스토어 개인정보 인벤토리는 앱 동작과 심사 분�
     "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
   );
   assert.match(preciseLocationException.rationaleKo, /버튼/, "exception rationale must cite the dedicated user tap");
-  assert.match(preciseLocationException.rationaleKo, /자동 실행이나 백그라운드 전송은 없다/);
+  assert.match(preciseLocationException.rationaleKo, /현재 위치.*자동 전송은 없다/);
   assert.match(preciseLocationException.rationaleKo, /user-initiated action/);
   assert.deepEqual(preciseLocationException.evidence, [
     "apps/mobile/lib/features/stations/presentation/station_exit_card.dart",
