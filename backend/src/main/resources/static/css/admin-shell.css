@@ -279,7 +279,7 @@
 	border: 0;
 	border-radius: 0;
 	background: transparent;
-	box-shadow: var(--admin-shadow-card);
+	box-shadow: none;
 }
 
 .admin-topbar-search {
@@ -554,9 +554,7 @@
 	}
 
 	/* ≤1024px는 사이드바가 off-canvas라 topbar 브랜드가 유일한 브랜드 표시가 된다(#2349 PR⑨). */
-	.admin-topbar-brand,
-	.admin-topbar-sep,
-	.admin-topbar-scope {
+	.admin-topbar-brand {
 		display: inline;
 	}
 

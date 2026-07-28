@@ -76,7 +76,7 @@
 		     th:attr="data-current=${isCurrent},data-persistent=${isPersistent}">
 			<button th:unless="${isPersistent}" type="button" class="admin-nav-workspace-toggle" aria-expanded="true"
 			        x-on:click="toggle"
-			        th:attr="aria-controls=${'admin-workspace-' + workspace.id}">
+			        th:attr="aria-controls=${'admin-workspace-' + workspace.id},aria-disabled=${isCurrent ? 'true' : null}">
 				<!-- aria-expanded="true"는 no-JS 정적 상태(모든 영역 펼침). JS는 init에서 실제 상태를 덮어쓴다. -->
 				<span class="admin-nav-workspace-icon"><svg th:replace="~{admin/fragments/icon :: icon(${workspaceIcon})}"></svg></span>
 				<span class="admin-nav-workspace-name" th:text="${workspace.label}">업무 영역</span>

@@ -272,7 +272,7 @@ class AdminV3PageSmokeTest {
 			.contains("is-current")
 			.contains("data-current=\"true\"")
 			.contains("data-current=\"false\"")
-			.contains("aria-expanded=\"true\"")
+			.containsPattern("class=\"admin-nav-workspace-toggle\"[^>]*aria-expanded=\"true\"[^>]*aria-controls=\"admin-workspace-accessibility-data\"")
 			.contains("aria-current=\"page\"")
 			// 현재 위치가 있는 페이지는 no-current 폴백 표식을 붙이지 않는다(현재 영역만 펼침 유지).
 			.doesNotContain("class=\"admin-nav-scroll is-no-current\"");
@@ -291,6 +291,7 @@ class AdminV3PageSmokeTest {
 		assertThat(html)
 			.contains("data-persistent=\"true\"")
 			.contains("href=\"/admin/dashboard/page\"")
+			.containsPattern("class=\"admin-nav-workspace-toggle\"[^>]*aria-controls=\"admin-workspace-accessibility-data\"[^>]*aria-disabled=\"true\"")
 			.doesNotContain("aria-controls=\"admin-workspace-overview\"");
 	}
 

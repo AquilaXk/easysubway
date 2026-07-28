@@ -870,6 +870,7 @@ class AdminDesignGuardTest {
 		assertThat(rule(components, "\\.login-layout"))
 			.contains("grid-template-columns: 1fr;")
 			.contains("place-content: center;")
+			.contains("min-height: 100dvh;")
 			.doesNotContain("0.82fr")
 			.doesNotContain("1.18fr");
 		assertThat(rule(components, "\\.login-brand-panel"))
@@ -910,6 +911,11 @@ class AdminDesignGuardTest {
 
 		assertThat(rule(data, "\\.dashboard-week-days"))
 			.contains("margin: 14px 0 0;");
+		assertThat(rule(data, "\\.dashboard-basis-time"))
+			.contains("font-size: var(--admin-fs-meta);");
+		assertThat(rule(data, "\\.dashboard-week-day\\.is-today"))
+			.contains("border-color: var(--admin-border-strong);")
+			.doesNotContain("var(--es-");
 		assertThat(rule(data, "\\.dashboard-triage-list"))
 			.contains("display: grid;")
 			.contains("grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));");
@@ -917,7 +923,10 @@ class AdminDesignGuardTest {
 			.contains(".dashboard-operations-details")
 			.contains("@media (max-width: 1200px) {\n\t.dashboard-overview-grid {\n\t\tgrid-template-columns: 1fr;")
 			.doesNotContain(".dashboard-week-day.is-weekend:not(.is-today)")
-			.doesNotContain(".admin-dashboard-page .dashboard-urgent,");
+			.doesNotContain(".admin-dashboard-page .dashboard-urgent,")
+			.doesNotContain(".dashboard-overview-grid,\n\t.dashboard-reference-lower");
+		assertThat(rule(shell, "(?m)^\\.admin-topbar-row"))
+			.contains("box-shadow: none;");
 		assertThat(rule(shell, "\\.admin-topbar-search:focus-within"))
 			.contains("outline: 3px solid var(--admin-focus);");
 		assertThat(dashboard.indexOf("dashboardUrgentItems"))

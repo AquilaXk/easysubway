@@ -38,7 +38,7 @@
 .dashboard-basis-time {
 	margin: 0;
 	color: var(--admin-ink-3);
-	font-size: 12px;
+	font-size: var(--admin-fs-meta);
 	font-variant-numeric: tabular-nums;
 }
 
@@ -95,7 +95,7 @@
 
 .dashboard-service-copy span {
 	color: var(--admin-ink-2);
-	font-size: 12px;
+	font-size: var(--admin-fs-meta);
 	font-weight: var(--admin-w-strong);
 }
 
@@ -105,7 +105,7 @@
 	gap: 10px;
 	margin-top: 11px;
 	color: var(--admin-ink);
-	font-size: 34px;
+	font-size: var(--admin-fs-page);
 	line-height: 1;
 	font-weight: var(--admin-w-title);
 }
@@ -157,7 +157,7 @@
 	padding: 0;
 	border: 0;
 	color: var(--admin-ink-3);
-	font-size: 11px;
+	font-size: var(--admin-fs-meta);
 	font-weight: var(--admin-w-strong);
 }
 
@@ -173,7 +173,7 @@
 	border-radius: 50%;
 	background: var(--admin-accent);
 	color: var(--admin-on-primary);
-	font-size: 12px;
+	font-size: var(--admin-fs-control);
 	font-weight: var(--admin-w-title);
 	font-variant-numeric: tabular-nums;
 }
@@ -203,7 +203,7 @@
 	padding-top: 20px;
 	border-top: 1px solid var(--admin-border);
 	color: var(--admin-ink-2);
-	font-size: 13px;
+	font-size: var(--admin-fs-control);
 }
 
 .dashboard-api-health strong {
@@ -238,7 +238,7 @@
 	display: flex;
 	gap: 22px;
 	color: var(--admin-ink-2);
-	font-size: 11px;
+	font-size: var(--admin-fs-meta);
 	font-weight: var(--admin-w-medium);
 }
 
@@ -264,19 +264,19 @@
 
 .dashboard-week-day span {
 	color: var(--admin-ink-3);
-	font-size: 12px;
+	font-size: var(--admin-fs-meta);
 	font-weight: var(--admin-w-medium);
 }
 
 .dashboard-week-day strong {
 	color: var(--admin-ink);
-	font-size: 17px;
+	font-size: var(--admin-fs-body);
 	font-weight: var(--admin-w-strong);
 	font-variant-numeric: tabular-nums;
 }
 
 .dashboard-week-day.is-today {
-	border-color: var(--es-brand-300);
+	border-color: var(--admin-border-strong);
 	background: var(--admin-accent-soft);
 }
 
@@ -287,7 +287,7 @@
 
 .dashboard-weekly-total {
 	color: var(--admin-accent);
-	font-size: 12px;
+	font-size: var(--admin-fs-meta);
 	font-weight: var(--admin-w-title);
 }
 
@@ -827,8 +827,7 @@
 }
 
 @media (max-width: 900px) {
-	.dashboard-overview-grid,
-	.dashboard-reference-lower {
+	.dashboard-overview-grid {
 		grid-template-columns: 1fr;
 	}
 

@@ -8050,7 +8050,7 @@ void main() {
       expect(find.text('꺼짐'), findsWidgets);
       expect(
         EasySubwayAccessibleColors.brandSignature,
-        const Color(0xFF6064F4),
+        const Color(0xFF5C6BC0),
       );
       expect(
         EasySubwayAccessibleColors.brandSignatureMedium,

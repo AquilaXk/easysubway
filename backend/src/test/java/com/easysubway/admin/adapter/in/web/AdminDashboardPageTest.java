@@ -21,6 +21,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.annotation.DirtiesContext;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
@@ -40,6 +41,7 @@ class AdminDashboardPageTest {
 	private AdminMetricDailyRepository repository;
 
 	@Test
+	@DirtiesContext(methodMode = DirtiesContext.MethodMode.BEFORE_METHOD)
 	@DisplayName("현재 운영 상태와 최근 7일 제보 흐름을 실제 지표로 렌더한다")
 	void rendersCurrentOperationsAndSevenDayReportFlow() throws Exception {
 		repository.save(AdminMetricDaily.scalar(AdminMetricKeys.REPORTS_RECENT_24H, LocalDate.now().minusDays(1), 4));
@@ -61,6 +63,7 @@ class AdminDashboardPageTest {
 			.contains("href=\"/admin/dashboard/page\" aria-label=\"운영 상태 새로고침\"")
 			.contains("전체 서비스")
 			.containsPattern("<dt>제보</dt>\\s*<dd[^>]*>\\d+건</dd>")
+			.doesNotContainPattern("class=\"is-warn\"[^>]*>\\s*<dt>데이터</dt>")
 			.containsPattern("class=\"\\s*is-waiting\"[^>]*>\\s*<dt>지표 집계</dt>\\s*<dd[^>]*>대기</dd>")
 			.contains("최근 7일 API 정상률")
 			.contains("id=\"dashboard-weekly-operations\"")

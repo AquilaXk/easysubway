@@ -10,7 +10,7 @@ abstract final class EasySubwayColorPrimitives {
   static const brand400 = Color(0xFFB4BCFB);
   static const brand500 = Color(0xFF949FE8);
   static const brand600 = Color(0xFF7480D2);
-  static const brand700 = Color(0xFF6064F4);
+  static const brand700 = Color(0xFF5C6BC0);
   static const brand800 = Color(0xFF4A58A9);
   static const brand900 = Color(0xFF3B4890);
   static const brand950 = Color(0xFF1F2340);

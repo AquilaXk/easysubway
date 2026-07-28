@@ -1182,6 +1182,7 @@
 	grid-template-columns: 1fr;
 	place-content: center;
 	min-height: 100vh;
+	min-height: 100dvh;
 	padding: 48px 24px;
 	background: var(--admin-surface);
 }
