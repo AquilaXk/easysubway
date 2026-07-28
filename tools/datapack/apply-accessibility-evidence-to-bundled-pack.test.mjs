@@ -9,9 +9,35 @@ import {
   accessibilityIndexMetadata,
   applyEvidenceIfStale,
   assertAccessibilityEdges,
+  stripLegacyCoreClaims,
   syncAccessibilityEdges,
   syncCanonicalFixture,
 } from "./apply-accessibility-evidence-to-bundled-pack.mjs";
+
+test("core-only strips facility quality targets and check rejects leftovers", () => {
+  const database = new DatabaseSync(":memory:");
+  database.exec(`
+    CREATE TABLE facilities (id TEXT PRIMARY KEY);
+    CREATE TABLE data_quality_records (id TEXT PRIMARY KEY, target_type TEXT, target_id TEXT);
+    INSERT INTO facilities VALUES ('legacy-facility');
+    INSERT INTO data_quality_records VALUES
+      ('facility-quality', 'facility', 'legacy-facility'),
+      ('exit-quality', 'station_exit', 'exit-1');
+  `);
+
+  assert.throws(() => stripLegacyCoreClaims(database, { check: true }), /legacy core accessibility claims are stale/);
+  assert.equal(stripLegacyCoreClaims(database, { check: false }), true);
+  assert.deepEqual(
+    database.prepare("SELECT target_type AS targetType FROM data_quality_records").all()
+      .map((row) => ({ ...row })),
+    [{ targetType: "station_exit" }],
+  );
+  assert.doesNotThrow(() => stripLegacyCoreClaims(database, { check: true }));
+
+  database.prepare("INSERT INTO data_quality_records VALUES ('dangling', 'facility', 'missing')").run();
+  assert.throws(() => stripLegacyCoreClaims(database, { check: true }), /legacy core accessibility claims are stale/);
+  database.close();
+});
 
 test("stale refresh does not mask structural SQLite errors", async () => {
   const directory = await mkdtemp(path.join(tmpdir(), "easysubway-accessibility-structural-"));

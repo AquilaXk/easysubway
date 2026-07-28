@@ -301,6 +301,25 @@ function assertCanonicalFixture(canonical, reviewedPack) {
   }
 }
 
+export function stripLegacyCoreClaims(database, { check }) {
+  const facilityCount = database.prepare("SELECT count(*) AS count FROM facilities").get().count;
+  const qualityCount = database.prepare(`
+    SELECT count(*) AS count
+    FROM data_quality_records
+    WHERE target_type = 'facility'
+  `).get().count;
+  const stale = facilityCount !== 0 || qualityCount !== 0;
+  if (check && stale) throw new Error("legacy core accessibility claims are stale");
+  if (!check && stale) {
+    database.exec(`
+      DELETE FROM data_quality_records WHERE target_type = 'facility';
+      DELETE FROM facilities;
+      VACUUM;
+    `);
+  }
+  return stale;
+}
+
 async function stripLegacyCore({ check }) {
   const packPath = path.join(root, "apps/mobile/assets/datapacks/core.sqlite.gz");
   const indexPath = path.join(root, "apps/mobile/assets/datapacks/index.json");
@@ -310,11 +329,13 @@ async function stripLegacyCore({ check }) {
     const currentGzipBytes = await readFile(packPath);
     await writeFile(sqlitePath, gunzipSync(currentGzipBytes));
     const database = new DatabaseSync(sqlitePath);
-    const count = database.prepare("SELECT count(*) AS count FROM facilities").get().count;
-    if (check && count !== 0) throw new Error("legacy core accessibility claims are stale");
-    if (!check && count !== 0) database.exec("DELETE FROM facilities; VACUUM");
-    database.close();
-    if (!check && count === 0) return;
+    let stale;
+    try {
+      stale = stripLegacyCoreClaims(database, { check });
+    } finally {
+      database.close();
+    }
+    if (!check && !stale) return;
     const sqliteBytes = await readFile(sqlitePath);
     if (check) {
       const index = JSON.parse(await readFile(indexPath, "utf8"));
