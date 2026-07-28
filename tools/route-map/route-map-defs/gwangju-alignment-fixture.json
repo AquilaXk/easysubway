@@ -5,7 +5,7 @@
     "geometry": "tools/route-map/route-map-defs/easy-subway-gwangju-v3-geometry.json",
     "geometrySha256": "2831a30185d100c6a7d309b9441244316f9b88e32a2c116d77341f23d7a63b5f",
     "pack": "apps/mobile/assets/datapacks/capital.sqlite.gz",
-    "packSha256": "b5df7e9dc9326f302f196e00ec52d0772bccf65d3415f229a6594e7c1de4eb5c"
+    "packSha256": "0fc9103e3b27e867d90513d1c8ffb6e01ac9b8026e4a6311fda9ee6f18c4779c"
   },
   "stationCount": 20,
   "unmatchedCount": 0,
