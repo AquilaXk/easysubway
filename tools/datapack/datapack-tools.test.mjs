@@ -12569,7 +12569,9 @@ test("AVAILABLE ENTRY edge rejects missing approved movement pathway", async () 
   const outputDir = path.join(tmpdir(), `easysubway-accessibility-edge-approved-pathway-${Date.now()}`);
   const input = await capitalPilotProductionSourceInput();
   useAccessibilitySourceForAvailableEdge(input, "edge-entry-sadang-seoul-4");
-  const facility = input.facilityRows.find((row) => row.id === "facility-station-sadang-elevator-kric-standard-1");
+  const facility = input.facilityRows.find((row) =>
+    row.station.sourceStationCode === "MOLIT-SEOUL-4-433" && row.type === "ELEVATOR");
+  assert.ok(facility);
   facility.status = "NORMAL";
   facility.operationalStatus = "AVAILABLE";
   facility.statusMeaning = "OPERATOR_CONFIRMED";
@@ -12626,7 +12628,7 @@ test("데이터팩 검증기는 AVAILABLE accessibility edge의 station-line ope
   edge.stairAccessState = "STEP_FREE";
   edge.verificationStatus = "VERIFIED";
   edge.sourceId = "kric-station-convenience-standard";
-  edge.sourceSnapshotId = "kric-station-convenience-standard-20260728";
+  edge.sourceSnapshotId = "kric-station-convenience-standard-20260728T184503338Z";
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
   await execFileAsync(
     process.execPath,
@@ -15473,7 +15475,7 @@ function useAccessibilitySourceForAvailableEdge(input, edgeId) {
   edge.stairAccessState = "STEP_FREE";
   edge.verificationStatus = "VERIFIED";
   edge.sourceId = "kric-station-convenience-standard";
-  edge.sourceSnapshotId = "kric-station-convenience-standard-20260728";
+  edge.sourceSnapshotId = "kric-station-convenience-standard-20260728T184503338Z";
 }
 
 function addSeoul2ProductionScope(input) {

@@ -642,7 +642,7 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
       || edge.fieldProvenance !== undefined
       || ![undefined, "UNKNOWN"].includes(edge.provenanceKind)
       || ![undefined, "UNKNOWN"].includes(edge.verificationStatus);
-    if ((pack.networkEdges ?? []).some((edge) => !isReviewedAccessibilityEdge(edge) && hasFixtureProvenance(edge))
+    if ((pack.networkEdges ?? []).some((edge) => !isReviewedAccessibilityEdge(edge, pack) && hasFixtureProvenance(edge))
       || (pack.outOfStationTransferLinks ?? []).some(hasFixtureProvenance)) {
       throw new Error("production network edge fixture must not contain provenance");
     }
@@ -664,7 +664,17 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
   )).toISOString();
 }
 
-function isReviewedAccessibilityEdge(edge) {
+function isReviewedAccessibilityEdge(edge, pack) {
+  const nodeId = edge.edgeType === "ENTRY" ? edge.toNodeId : edge.fromNodeId;
+  const [stationId, lineId] = String(nodeId ?? "").split(":");
+  const probes = (pack?.stationFacilityEvidence ?? []).filter((row) =>
+    row.stationId === stationId
+    && row.lineId === lineId
+    && row.facilityType === "ACCESSIBILITY_STATUS_PROBE"
+    && row.sourceId === edge.sourceId
+    && row.sourceSnapshotId === edge.sourceSnapshotId
+    && row.providerRecordHash === edge.providerRecordHash);
+  const probe = probes.length === 1 ? probes[0] : undefined;
   return edge.sourceId === "seoul-metro-accessibility"
     && ["ENTRY", "EXIT"].includes(edge.edgeType)
     && ["UNKNOWN", "NO_OFFICIAL_FEED"].includes(edge.accessibilityStatus)
@@ -674,7 +684,13 @@ function isReviewedAccessibilityEdge(edge) {
     && typeof edge.sourceSnapshotId === "string"
     && /^[0-9a-f]{64}$/.test(edge.providerRecordHash ?? "")
     && /^[0-9a-f]{64}$/.test(edge.evidenceHash ?? "")
-    && Number.isFinite(Date.parse(edge.lastVerifiedAt));
+    && Number.isFinite(Date.parse(edge.lastVerifiedAt))
+    && probe?.evidenceHash === sha256(JSON.stringify({
+      snapshotId: edge.sourceSnapshotId, stationId, lineId, providerRecordHash: edge.providerRecordHash,
+    }))
+    && edge.evidenceHash === sha256(JSON.stringify({
+      edgeId: edge.id, sourceSnapshotId: edge.sourceSnapshotId, providerRecordHash: edge.providerRecordHash,
+    }));
 }
 
 export function productionAccessibilityFreshUntil(packs, inventory, sourceSnapshots) {
@@ -707,7 +723,7 @@ export function productionAccessibilityFreshUntil(packs, inventory, sourceSnapsh
 export function normalizeUnverifiedNetworkEdgeStates(pack) {
   for (const edge of [...(pack.networkEdges ?? []), ...(pack.outOfStationTransferLinks ?? [])]) {
     if (edge.verificationStatus !== "VERIFIED") {
-      if (!(isReviewedAccessibilityEdge(edge) && edge.accessibilityStatus === "NO_OFFICIAL_FEED")) {
+      if (!(isReviewedAccessibilityEdge(edge, pack) && edge.accessibilityStatus === "NO_OFFICIAL_FEED")) {
         edge.accessibilityStatus = "UNKNOWN";
       }
       edge.stairAccessState = "UNKNOWN";

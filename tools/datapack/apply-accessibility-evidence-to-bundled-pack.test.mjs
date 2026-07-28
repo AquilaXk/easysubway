@@ -1,13 +1,33 @@
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
 import {
   accessibilityIndexMetadata,
+  applyEvidenceIfStale,
   assertAccessibilityEdges,
   syncAccessibilityEdges,
   syncCanonicalFixture,
 } from "./apply-accessibility-evidence-to-bundled-pack.mjs";
+
+test("stale refresh does not mask structural SQLite errors", async () => {
+  const directory = await mkdtemp(path.join(tmpdir(), "easysubway-accessibility-structural-"));
+  const sqlitePath = path.join(directory, "malformed.sqlite");
+  const database = new DatabaseSync(sqlitePath);
+  database.exec("CREATE TABLE facilities (id TEXT, station_id TEXT)");
+  database.close();
+  try {
+    assert.throws(
+      () => applyEvidenceIfStale(sqlitePath, { facilities: [], stationFacilityEvidence: [], networkEdges: [] }),
+      /no such column: exit_id/,
+    );
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+});
 
 const reviewedEdge = {
   id: "edge-entry-sadang-seoul-4",

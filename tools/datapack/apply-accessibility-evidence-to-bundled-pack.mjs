@@ -23,6 +23,8 @@ const replacedSourceIds = new Set([
   "seoul-metro-accessibility",
 ]);
 
+class StaleAccessibilityEvidenceError extends Error {}
+
 function option(name, fallback) {
   const index = process.argv.indexOf(name);
   return index < 0 ? fallback : process.argv[index + 1];
@@ -119,7 +121,7 @@ function assertEvidence(sqlitePath, pack) {
       confidence: row.confidence,
     })).sort((left, right) => codepointCompare(left.id, right.id));
     if (JSON.stringify(facilities) !== JSON.stringify(expectedFacilities)) {
-      throw new Error("bundled accessibility facilities are stale");
+      throw new StaleAccessibilityEvidenceError("bundled accessibility facilities are stale");
     }
     const evidence = database.prepare(`
       SELECT station_id AS stationId, line_id AS lineId, facility_type AS facilityType,
@@ -157,23 +159,24 @@ function assertEvidence(sqlitePath, pack) {
       `${right.stationId}:${right.lineId}:${right.facilityType}`,
     ));
     if (JSON.stringify(evidence) !== JSON.stringify(expectedEvidence)) {
-      throw new Error("bundled accessibility facility evidence is stale");
+      throw new StaleAccessibilityEvidenceError("bundled accessibility facility evidence is stale");
     }
     const snapshotIds = [...new Set(pack.stationFacilityEvidence.map(({ sourceSnapshotId }) => sourceSnapshotId))];
     const stale = database.prepare(`SELECT count(*) AS count FROM station_facility_evidence WHERE station_id IN (?,?) AND source_snapshot_id NOT IN (${snapshotIds.map(() => "?").join(",")})`).get(...stationIds, ...snapshotIds).count;
-    if (stale !== 0) throw new Error("bundled accessibility source snapshot is stale");
+    if (stale !== 0) throw new StaleAccessibilityEvidenceError("bundled accessibility source snapshot is stale");
     const staleFacility = database.prepare(`SELECT count(*) AS count FROM facilities WHERE station_id IN (?,?) AND source_id IN (${[...replacedSourceIds].map(() => "?").join(",")})`).get(...stationIds, ...replacedSourceIds).count;
-    if (staleFacility !== 0) throw new Error("bundled accessibility facility source is stale");
+    if (staleFacility !== 0) throw new StaleAccessibilityEvidenceError("bundled accessibility facility source is stale");
     assertAccessibilityEdges(database, pack);
   } finally {
     database.close();
   }
 }
 
-function applyEvidenceIfStale(sqlitePath, pack) {
+export function applyEvidenceIfStale(sqlitePath, pack) {
   try {
     assertEvidence(sqlitePath, pack);
-  } catch {
+  } catch (error) {
+    if (!(error instanceof StaleAccessibilityEvidenceError)) throw error;
     applyEvidence(sqlitePath, pack);
   }
 }
@@ -271,7 +274,7 @@ export function assertAccessibilityEdges(database, pack) {
     evidenceHash: row.evidenceHash,
   })).sort((left, right) => codepointCompare(left.id, right.id));
   if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-    throw new Error("bundled accessibility edge is stale");
+    throw new StaleAccessibilityEvidenceError("bundled accessibility edge is stale");
   }
 }
 
@@ -399,7 +402,7 @@ async function syncReleaseEvidence({ check }) {
   hashes.fixturePath.sha256 = sha256(canonicalBytes);
   hashes.sourceSnapshots.note = "기존 release source 중 movement·timetable·network identity는 유지하고, detailed location 3종을 KRIC stationCnvFacl standard로 교체했다. 서울 accessibility는 2026-07-28 full snapshot으로 교체했다.";
   hashes.sourceSnapshots.order = `release snapshot 순서: ${releaseSnapshots.map(({ sourceId }) => sourceId).join(" → ")}`;
-  hashes.sourceSnapshots.committedVerificationCommand = "node -e \"import('./tools/datapack/source-snapshot-policy.mjs').then(({validateLineage})=>{const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),h=validateLineage(s).headsBySource,e=require('./tools/datapack/release/hash-evidence.json');for(const n of s.filter(x=>h[x.sourceId]===x.snapshotId)){const p=e.perSourceEvidence.find(x=>x.snapshotId===n.snapshotId);console.log(n.sourceId,!!p&&c.createHash('sha256').update(JSON.stringify([n])).digest('hex')===p.perSourceSnapshotSetHash)}})\"";
+  hashes.sourceSnapshots.committedVerificationCommand = "node -e \"import('./tools/datapack/source-snapshot-policy.mjs').then(({validateLineage})=>{const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),h=validateLineage(s).headsBySource,e=require('./tools/datapack/release/hash-evidence.json');for(const n of s.filter(x=>h[x.sourceId]===x.snapshotId)){const p=e.perSourceEvidence.find(x=>x.snapshotId===n.snapshotId);if(!p||c.createHash('sha256').update(JSON.stringify([n])).digest('hex')!==p.perSourceSnapshotSetHash)throw new Error('source snapshot evidence mismatch: '+n.sourceId)}})\"";
   hashes.perSourceEvidence = releaseSnapshots.map((snapshot) => ({
     sourceId: snapshot.sourceId,
     snapshotId: snapshot.snapshotId,
