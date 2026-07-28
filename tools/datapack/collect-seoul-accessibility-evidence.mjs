@@ -198,6 +198,9 @@ export async function collectSeoulAccessibility({
     }
     pageNo += 1;
   }
+  if (totalCount === 0 || collected.length === 0) {
+    throw new Error(`${INVALID_RESPONSE}: emptyExhaustiveList`);
+  }
   return { rows: collected, rawRowCount: totalCount, rawSha256: hash(rawPages) };
 }
 

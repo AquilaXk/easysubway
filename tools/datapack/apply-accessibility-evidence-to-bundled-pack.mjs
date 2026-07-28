@@ -287,14 +287,15 @@ export function accessibilityIndexMetadata(pack, spec, inventory, currentFreshne
     return snapshot.freshnessExpiresAt;
   }).sort().at(0);
   const qualityAsOf = [...consumed.keys()].map((sourceId) => evidenceBySource.get(sourceId).observedAt).sort().at(-1);
+  const currentFreshnessMillis = Date.parse(currentFreshnessExpiresAt);
+  const accessibilityFreshnessMillis = Date.parse(accessibilityFreshnessExpiresAt);
+  if (!Number.isFinite(currentFreshnessMillis)) throw new Error("bundled pack freshness missing");
+  if (!Number.isFinite(accessibilityFreshnessMillis)) throw new Error("accessibility snapshot freshness missing");
   return {
     builtAt: candidateBuildNow().toISOString(),
     qualityAsOf,
     // ponytail: accessibility refresh may tighten, never extend another domain's pack expiry; the identity test owns extension.
-    freshnessExpiresAt: new Date(Math.min(
-      Date.parse(currentFreshnessExpiresAt),
-      Date.parse(accessibilityFreshnessExpiresAt),
-    )).toISOString(),
+    freshnessExpiresAt: new Date(Math.min(currentFreshnessMillis, accessibilityFreshnessMillis)).toISOString(),
     sourceSnapshotSetHash: spec.sourceSnapshotSetHash,
   };
 }

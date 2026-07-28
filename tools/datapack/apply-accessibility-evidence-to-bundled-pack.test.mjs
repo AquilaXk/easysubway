@@ -38,4 +38,11 @@ test("metadata fails closed when a consumed source lacks admission evidence", ()
     { sources: [] },
     "2026-08-01T00:00:00.000Z",
   ), /accessibility admission evidence missing: missing/);
+
+  assert.throws(() => accessibilityIndexMetadata(
+    { facilities: [{ sourceId: "source", sourceSnapshotId: "snapshot" }], stationFacilityEvidence: [] },
+    { sourceSnapshotSetHash: "a".repeat(64), sourceSnapshots: [{ sourceId: "source", snapshotId: "snapshot", freshnessExpiresAt: "2026-08-01T00:00:00.000Z" }] },
+    { sources: [{ id: "source", accessibilityAdmissionEvidence: { snapshotId: "snapshot", observedAt: "2026-07-28T00:00:00.000Z", freshUntil: "2026-07-29T00:00:00.000Z" } }] },
+    undefined,
+  ), /bundled pack freshness missing/);
 });

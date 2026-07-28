@@ -10171,7 +10171,9 @@ test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 
     (row) => row.facilityType !== "ACCESSIBILITY_STATUS_PROBE",
   );
   assert.equal(requiredFacilityEvidence.length, input.supportedV1Scope.facilityCoverageDenominator.expectedRows);
-  assert.ok(requiredFacilityEvidence.filter(({ evidenceKind }) => evidenceKind === "NOT_EXISTS")
+  const notExistsEvidence = requiredFacilityEvidence.filter(({ evidenceKind }) => evidenceKind === "NOT_EXISTS");
+  assert.ok(notExistsEvidence.length > 0);
+  assert.ok(notExistsEvidence
     .every(({ strictRouteEligibleReason }) => strictRouteEligibleReason === "FACILITY_NOT_INSTALLED"));
   // #1996: 접근성 상태 실측 증거(ACCESSIBILITY_STATUS_PROBE)는 별도 행으로 추가된다.
   // fresh snapshot 기준 사당 AVAILABLE(EXISTS)이지만 route edge 실측이 아니므로 strict 부적격,

@@ -189,6 +189,36 @@ test("full-scope collector는 station filter 없이 pagination total을 보존�
   assert.equal(requestUrls[0].searchParams.get("numOfRows"), "1000");
 });
 
+test("collector pagination은 다중 page만 허용하고 불완전·빈 전수응답을 거부한다", async () => {
+  const row = (stationName) => ({
+    lineNm: "4호선", stnNm: stationName, oprtngSitu: "M", dtlPstn: "대합실-승강장",
+  });
+  const response = (totalCount, rows) => ({
+    ok: true,
+    text: async () => JSON.stringify({
+      response: { header: { resultCode: "00" }, body: { totalCount, items: { item: rows } } },
+    }),
+  });
+  const collect = (pages, pageNumbers = []) => collectSeoulAccessibility({
+    endpoint: "https://apis.data.go.kr/example",
+    serviceKey: "secret",
+    fetchImpl: async (url) => {
+      const pageNo = Number(new URL(url).searchParams.get("pageNo"));
+      pageNumbers.push(pageNo);
+      return pages[pageNo - 1];
+    },
+  });
+
+  const pageNumbers = [];
+  const result = await collect([response(2, [row("사당")]), response(2, [row("서울역")])], pageNumbers);
+  assert.deepEqual(pageNumbers, [1, 2]);
+  assert.equal(result.rows.length, 2);
+  await assert.rejects(collect([response(2, [row("사당")]), response(3, [row("서울역")])]), /invalid: totalCount/);
+  await assert.rejects(collect([response(1, [row("사당"), row("서울역")])]), /invalid: pagination/);
+  await assert.rejects(collect([response(2, [row("사당")]), response(2, [])]), /invalid: pagination/);
+  await assert.rejects(collect([response(0, [])]), /invalid: emptyExhaustiveList/);
+});
+
 test("collector는 normalized content와 별도로 raw pagination identity를 보존한다", async () => {
   const payload = (deletedPath) => ({
     response: {
