@@ -28,10 +28,10 @@
     "inputSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
     "inputSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
     "inputByteSize": 359319,
-    "outputSha256": "7d96e2c408069d2940f1f8bfd114e57ddaf9855d667aaa7420f2619ef1b7320b",
-    "outputSqliteSha256": "95b0c33e287857809ecedbc7136d6f79d976e9a8147d2fb6d15b8a093a525408",
-    "byteSize": 1463946,
-    "byteSizeDelta": 1104627
+    "outputSha256": "b5df7e9dc9326f302f196e00ec52d0772bccf65d3415f229a6594e7c1de4eb5c",
+    "outputSqliteSha256": "83e4fe62cb650c4c8eafc58b1a827accb884b19f885a3cfee3f762fa0f3ac0a3",
+    "byteSize": 1463773,
+    "byteSizeDelta": 1104454
   },
   "readmissions": [
     {
@@ -2696,6 +2696,37 @@
             ],
             "changed": []
           }
+        }
+      ]
+    },
+    {
+      "readmittedAt": "2026-07-28T09:20:55.352Z",
+      "provenance": "#2606 owner-approved 5-region geometry/route_map_positions rejoin",
+      "previousPack": {
+        "sha256": "7d96e2c408069d2940f1f8bfd114e57ddaf9855d667aaa7420f2619ef1b7320b",
+        "sqliteSha256": "95b0c33e287857809ecedbc7136d6f79d976e9a8147d2fb6d15b8a093a525408",
+        "byteSize": 1463946
+      },
+      "newPack": {
+        "sha256": "b5df7e9dc9326f302f196e00ec52d0772bccf65d3415f229a6594e7c1de4eb5c",
+        "sqliteSha256": "83e4fe62cb650c4c8eafc58b1a827accb884b19f885a3cfee3f762fa0f3ac0a3",
+        "byteSize": 1463773
+      },
+      "byteSizeDelta": -173,
+      "itxSubgraph": {
+        "unchanged": true,
+        "edgeCount": 48,
+        "edgesSha256": "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+        "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
+      },
+      "rowDiff": [
+        {
+          "table": "route_map_positions",
+          "previousRowCount": 1102,
+          "newRowCount": 1102,
+          "rowsRemoved": 0,
+          "rowsAdded": 0,
+          "rowsChanged": 58
         }
       ]
     }

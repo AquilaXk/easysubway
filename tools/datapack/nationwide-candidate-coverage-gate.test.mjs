@@ -527,9 +527,9 @@ test("candidate evidence는 배포 artifact row count와 transition을 함께 �
   assert.deepEqual(evidence.deployedArtifact, {
     verifierPath: "tools/datapack/verify-production-pack-artifact-identity.mjs",
     packId: "capital",
-    gzipSha256: "7d96e2c408069d2940f1f8bfd114e57ddaf9855d667aaa7420f2619ef1b7320b",
-    sqliteSha256: "95b0c33e287857809ecedbc7136d6f79d976e9a8147d2fb6d15b8a093a525408",
-    byteSize: 1463946,
+    gzipSha256: "b5df7e9dc9326f302f196e00ec52d0772bccf65d3415f229a6594e7c1de4eb5c",
+    sqliteSha256: "83e4fe62cb650c4c8eafc58b1a827accb884b19f885a3cfee3f762fa0f3ac0a3",
+    byteSize: 1463773,
     rowCounts: {
       catalog_metadata: 2,
       data_quality_records: 5,
