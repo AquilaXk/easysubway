@@ -18,6 +18,20 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
   const mappings = new Map((input.stationMappings ?? [])
     .filter(({ sourceId }) => sourceId === "molit-urban-rail-full-route")
     .map((mapping) => [mapping.stationId, mapping]));
+  const facilityIdsByRecordHash = new Map();
+  const recordHashesByFacilityId = new Map();
+  for (const row of (input.facilityRows ?? []).filter(({ sourceId }) => sourceId === KRIC_SOURCE_ID)) {
+    if (!/^[0-9a-f]{64}$/.test(row.providerRecordHash ?? "")
+      || typeof row.id !== "string" || row.id === "" || row.id.length > 120
+      || (facilityIdsByRecordHash.has(row.providerRecordHash)
+        && facilityIdsByRecordHash.get(row.providerRecordHash) !== row.id)
+      || (recordHashesByFacilityId.has(row.id)
+        && recordHashesByFacilityId.get(row.id) !== row.providerRecordHash)) {
+      throw new Error("facility identity collision");
+    }
+    facilityIdsByRecordHash.set(row.providerRecordHash, row.id);
+    recordHashesByFacilityId.set(row.id, row.providerRecordHash);
+  }
   const facilityRows = [];
   const absenceRows = [];
   for (const query of kricSnapshot.queries ?? []) {
@@ -42,9 +56,18 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
       .sort((left, right) => codepointCompare(left.providerRecordHash, right.providerRecordHash))) {
       const number = (counts.get(type) ?? 0) + 1;
       counts.set(type, number);
+      const facilityId = facilityIdsByRecordHash.get(providerRecordHash)
+        ?? `facility-${query.stationId}-${type.toLowerCase()}-kric-standard-${providerRecordHash.slice(0, 16)}`;
+      if (facilityId.length > 120
+        || (recordHashesByFacilityId.has(facilityId)
+          && recordHashesByFacilityId.get(facilityId) !== providerRecordHash)) {
+        throw new Error("facility identity collision");
+      }
+      facilityIdsByRecordHash.set(providerRecordHash, facilityId);
+      recordHashesByFacilityId.set(facilityId, providerRecordHash);
       facilityRows.push({
         sourceId: KRIC_SOURCE_ID,
-        id: `facility-${query.stationId}-${type.toLowerCase()}-kric-standard-${number}`,
+        id: facilityId,
         station: { sourceId: mapping.sourceId, sourceStationCode: mapping.sourceStationCode, lineId: mapping.lineId },
         type,
         name: `${stationName}역 ${type} ${number}`,

@@ -58,10 +58,8 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
     seoulSnapshot,
   }).facilityRows.map(({ description, id, name, providerFacilityRef }) => [description, { id, name, providerFacilityRef }]));
   assert.deepEqual(facilitiesByDescription(sameTypeRows), facilitiesByDescription(sameTypeRows.toReversed()));
-  assert.deepEqual(
-    Object.values(facilitiesByDescription(sameTypeRows)).map(({ id }) => id).sort(),
-    ["facility-station-a-elevator-kric-standard-1", "facility-station-a-elevator-kric-standard-2"],
-  );
+  assert.ok(Object.values(facilitiesByDescription(sameTypeRows))
+    .every(({ id }) => /^facility-station-a-elevator-kric-standard-[0-9a-f]{16}$/.test(id)));
   assert.ok(Object.values(facilitiesByDescription(sameTypeRows)).every(({ id }) => id.length <= 120));
   const nextSnapshotIds = materializeAccessibilitySourceInput({
     input,
@@ -69,6 +67,42 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
     seoulSnapshot,
   }).facilityRows.map(({ id }) => id);
   assert.deepEqual(nextSnapshotIds.sort(), Object.values(facilitiesByDescription(sameTypeRows)).map(({ id }) => id).sort());
+  const baseline = materializeAccessibilitySourceInput({
+    input,
+    kricSnapshot: { ...kricSnapshot, queries: [{ ...kricSnapshot.queries[0], rows: sameTypeRows }] },
+    seoulSnapshot,
+  });
+  const added = materializeAccessibilitySourceInput({
+    input: { ...input, facilityRows: baseline.facilityRows },
+    kricSnapshot: {
+      ...kricSnapshot,
+      queries: [{ ...kricSnapshot.queries[0], rows: [...sameTypeRows, { gubun: "EV", stinFlor: 0, dtlLoc: "새 시설" }] }],
+    },
+    seoulSnapshot,
+  });
+  assert.ok(baseline.facilityRows.every(({ providerRecordHash, id }) =>
+    added.facilityRows.find((row) => row.providerRecordHash === providerRecordHash)?.id === id));
+  const removed = materializeAccessibilitySourceInput({
+    input: { ...input, facilityRows: added.facilityRows },
+    kricSnapshot: {
+      ...kricSnapshot,
+      queries: [{ ...kricSnapshot.queries[0], rows: [sameTypeRows[1], { gubun: "EV", stinFlor: 0, dtlLoc: "새 시설" }] }],
+    },
+    seoulSnapshot,
+  });
+  assert.ok(removed.facilityRows.every(({ providerRecordHash, id }) =>
+    added.facilityRows.find((row) => row.providerRecordHash === providerRecordHash)?.id === id));
+  assert.throws(() => materializeAccessibilitySourceInput({
+    input: {
+      ...input,
+      facilityRows: [
+        { sourceId: "kric-station-convenience-standard", id: "facility-collision", providerRecordHash: "a".repeat(64) },
+        { sourceId: "kric-station-convenience-standard", id: "facility-collision", providerRecordHash: "b".repeat(64) },
+      ],
+    },
+    kricSnapshot,
+    seoulSnapshot,
+  }), /facility identity collision/);
   const duplicated = materializeAccessibilitySourceInput({
     input,
     kricSnapshot: { ...kricSnapshot, queries: [{ ...kricSnapshot.queries[0], rows: [sameTypeRows[0], sameTypeRows[0]] }] },
