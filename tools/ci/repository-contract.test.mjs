@@ -1733,6 +1733,7 @@ test("CD dotenv 검증은 운영 fallback env 계약을 반영한다", async () 
     "EASYSUBWAY_DATASOURCE_USERNAME=easysubway",
     "EASYSUBWAY_DATASOURCE_PASSWORD=secret",
     "EASYSUBWAY_DATA_PACK_BASE_URL=https://cdn.example.com/easysubway-datapacks",
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=ci-native-map-key",
     "EASYSUBWAY_DATAPACK_CATALOG_BASE_URL=https://cdn.example.com/easysubway-datapacks",
     "EASYSUBWAY_REPORT_API_BASE_URL=https://api.example.com",
     "EASYSUBWAY_ADS_ASSET_ORIGIN=https://ads-assets.fixture.test-only.dev",
@@ -3158,6 +3159,14 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 
   assert.match(workflow, /android-release:/);
   assert.match(workflow, /name: Android Release Artifact/);
+  assert.match(
+    workflow,
+    /android-release:[\s\S]*outputs:[\s\S]*artifact_available: \$\{\{ steps\.release-env\.outputs\.artifact_available \}\}/,
+  );
+  assert.match(
+    workflow,
+    /needs\.android-release\.result == 'success' && needs\.android-release\.outputs\.artifact_available == 'true'/,
+  );
   assert.match(workflow, /keytool -genkeypair/);
 	  assert.match(workflow, /EASYSUBWAY_ANDROID_KEYSTORE_PATH: \$\{\{ runner\.temp \}\}\/easysubway-ci-release\.jks/);
 	  assert.match(workflow, /EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-password/);
@@ -3566,27 +3575,36 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "apps/mobile/release/support-incident-response-gate.json",
     ],
   );
+  const supersededFinalRcBindings = new Map([
+    ["apps/mobile/pubspec.yaml", "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42"],
+    ["apps/mobile/lib/main.dart", "e03403afc1d3370905ef0c3f90533c67dc7fa37eb95c3d8743b7cbd52d2ab9b0"],
+    [
+      ".github/workflows/release-artifacts.yml",
+      "7a40f47727818e79abe1156eee2dd105a0c499eda087708f419993759d404245",
+    ],
+    [
+      "tools/ci/validate-store-privacy-env.mjs",
+      "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a",
+    ],
+  ]);
   for (const binding of refreshBindings) {
     assert.ok(binding.files.length > 0, `${binding.refreshOn} must bind at least one file`);
     for (const file of binding.files) {
       const liveSha256 = createHash("sha256").update(read(file.path)).digest("hex");
-      if (file.path === "apps/mobile/pubspec.yaml") {
-        // #2068 datapack/렌더 전환(vector_graphics 의존성·basemap/ 자산 추가)으로
-        // apps/mobile/pubspec.yaml 해시가 바뀌면서 "fixed-release-procedure-change"
-        // RC evidence는 중단(superseded)되었다. dataPackManifestSha256와 동일 원칙:
-        // 게이트 기록값(1c491874… — post-launch-operations-review-gate.json이 마지막
-        // RC 재바인딩 때 고정한 pubspec 해시)은 그대로 검증하고, live 해시와는 반드시
-        // 달라야 한다(의도된 불일치). #1016(final RC) 재개 시 새 RC 전체 identity +
-        // Play evidence를 함께 재바인딩하면서 이 검증을 동등성으로 복귀시킨다. (오너 결정 2026-07-16)
+      const supersededSha256 = supersededFinalRcBindings.get(file.path);
+      if (supersededSha256 != null) {
+        // #2068과 #2655가 고정 RC 입력을 변경해 기존 evidence를 중단(superseded)했다.
+        // 마지막 RC 기록값은 보존하고 live hash 불일치로 재사용 불가를 증명한다.
+        // #1016(final RC) 재개 시 전체 identity와 함께 재바인딩한다.
         assert.equal(
           file.sha256,
-          "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42",
+          supersededSha256,
           `${binding.refreshOn} recorded hash for ${file.path} must stay pinned to the superseded RC evidence`,
         );
         assert.notEqual(
           liveSha256,
           file.sha256,
-          `중단된 RC identity는 재사용 불가 — ${file.path}의 기록 해시는 #2068 변경 후 live 해시와 달라야 한다`,
+          `중단된 RC identity는 재사용 불가 — ${file.path}의 기록 해시는 live 해시와 달라야 한다`,
         );
         continue;
       }
