@@ -134,29 +134,40 @@ private class RouteMapViewportPlatformView(
         }
         initialAssetUrl = resolvedUrl
         fontUrls = resolvedFonts.values.toSet()
-        val svgWebView = WebView(container.context).apply {
-            isClickable = false
-            isFocusable = false
-            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
-            setOnTouchListener { _, _ -> true }
-            isHorizontalScrollBarEnabled = false
-            isVerticalScrollBarEnabled = false
-            setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            settings.javaScriptEnabled = true
-            settings.javaScriptCanOpenWindowsAutomatically = false
-            settings.builtInZoomControls = false
-            settings.displayZoomControls = false
-            settings.blockNetworkLoads = true
-            settings.allowContentAccess = false
-            settings.allowFileAccess = true
-            webViewClient = routeMapWebViewClient()
+        var svgWebView: WebView? = null
+        try {
+            val candidate = WebView(container.context).apply {
+                isClickable = false
+                isFocusable = false
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                setOnTouchListener { _, _ -> true }
+                isHorizontalScrollBarEnabled = false
+                isVerticalScrollBarEnabled = false
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                settings.javaScriptEnabled = true
+                settings.javaScriptCanOpenWindowsAutomatically = false
+                settings.builtInZoomControls = false
+                settings.displayZoomControls = false
+                settings.blockNetworkLoads = true
+                settings.allowContentAccess = false
+                settings.allowFileAccess = true
+                webViewClient = routeMapWebViewClient()
+            }
+            svgWebView = candidate
+            webView = candidate
+            container.addView(candidate, FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.MATCH_PARENT,
+                FrameLayout.LayoutParams.MATCH_PARENT,
+            ))
+            candidate.loadUrl(resolvedUrl)
+        } catch (_: RuntimeException) {
+            webView = null
+            svgWebView?.let { candidate ->
+                runCatching { container.removeView(candidate) }
+                runCatching { candidate.destroy() }
+            }
+            reportAssetLoadFailed()
         }
-        webView = svgWebView
-        container.addView(svgWebView, FrameLayout.LayoutParams(
-            FrameLayout.LayoutParams.MATCH_PARENT,
-            FrameLayout.LayoutParams.MATCH_PARENT,
-        ))
-        svgWebView.loadUrl(resolvedUrl)
     }
 
     private fun resolvedAssetUrl(path: String): String? {

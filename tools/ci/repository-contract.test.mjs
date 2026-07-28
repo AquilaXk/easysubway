@@ -146,6 +146,15 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   assert.match(android, /settings\.blockNetworkLoads = true/);
   assert.match(android, /settings\.allowContentAccess = false/);
   assert.match(android, /settings\.allowFileAccess = true/);
+  assert.match(
+    android,
+    /var svgWebView: WebView\? = null[\s\S]*try \{[\s\S]*WebView\(container\.context\)/,
+    "Android must fail closed when the WebView provider cannot construct or initialize a view",
+  );
+  assert.match(
+    android,
+    /catch \(_: RuntimeException\) \{[\s\S]*svgWebView\?\.let[\s\S]*destroy\(\)[\s\S]*reportAssetLoadFailed\(\)/,
+  );
   assert.match(android, /private var isDisposed = false/);
   assert.match(android, /frameToken = call\.argument<Any>\("frameToken"\)\.asInt\(\)/);
   assert.match(android, /"frameToken" to presentedFrameToken/);
