@@ -14,8 +14,8 @@ void main() {
     final index = DataPackIndex.fromJson(decoded);
 
     expect(index.schemaVersion, 1);
-    expect(index.builtAt, DateTime.utc(2026, 7, 28, 15, 42, 48, 571));
-    expect(index.qualityAsOf, DateTime.utc(2026, 7, 28, 15, 35, 25, 704));
+    expect(index.builtAt, DateTime.utc(2026, 7, 28, 19, 7, 21, 579));
+    expect(index.qualityAsOf, DateTime.utc(2026, 7, 28, 18, 45, 3, 338));
     expect(index.freshnessExpiresAt, DateTime.utc(2026, 8, 2, 15));
     expect(index.sourceSnapshotSetHash, hasLength(64));
     expect(index.schemaIdentity, 'catalog-schema-v1');
