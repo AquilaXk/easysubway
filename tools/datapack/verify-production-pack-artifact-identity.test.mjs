@@ -444,6 +444,19 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     extraEdgeSpec.fixturePath = extraEdgePath;
     await runRejectedBuild(extraEdgeSpec, /capital topology fixture projection is not exact/);
 
+    const defaultedExtraEdgeFixture = structuredClone(partialFixture);
+    const defaultedExtraEdge = { ...defaultedExtraEdgeFixture.packs[0].networkEdges.find(({ id }) =>
+      id.startsWith("edge-line-051552e50435-")
+    ) };
+    delete defaultedExtraEdge.serviceClass;
+    defaultedExtraEdge.id = `${defaultedExtraEdge.id}-review-defaulted-extra`;
+    defaultedExtraEdgeFixture.packs[0].networkEdges.push(defaultedExtraEdge);
+    const defaultedExtraEdgePath = path.join(workspace, "defaulted-extra-edge-fixture.json");
+    await writeFile(defaultedExtraEdgePath, `${JSON.stringify(defaultedExtraEdgeFixture)}\n`);
+    const defaultedExtraEdgeSpec = structuredClone(spec);
+    defaultedExtraEdgeSpec.fixturePath = defaultedExtraEdgePath;
+    await runRejectedBuild(defaultedExtraEdgeSpec, /capital topology fixture projection is not exact/);
+
     partialFixture.packs[0].networkEdges.find(({ id }) =>
       id.startsWith("edge-line-051552e50435-")
     ).distanceMeters += 1;
