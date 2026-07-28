@@ -55,8 +55,6 @@ class RouteMapSvgViewportController {
 
   Future<void> attach({
     required int viewId,
-    required MapCameraState camera,
-    required Offset sourceOrigin,
   }) async {
     _channel = MethodChannel('$_channelPrefix$viewId')
       ..setMethodCallHandler(_handleMethodCall);
@@ -217,7 +215,7 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
         creationParams: params,
         creationParamsCodec: const StandardMessageCodec(),
         onPlatformViewCreated: (id) => unawaited(_controller.attach(
-          viewId: id, camera: widget.camera, sourceOrigin: widget.sourceOrigin)),
+          viewId: id)),
       ),
       TargetPlatform.iOS => UiKitView(
         viewType: _viewType,
@@ -225,7 +223,7 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
         creationParams: params,
         creationParamsCodec: const StandardMessageCodec(),
         onPlatformViewCreated: (id) => unawaited(_controller.attach(
-          viewId: id, camera: widget.camera, sourceOrigin: widget.sourceOrigin)),
+          viewId: id)),
       ),
       _ => const SizedBox.expand(),
     };

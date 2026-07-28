@@ -4743,11 +4743,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           return Stack(
             children: [
               Positioned.fill(
-                child: _buildStructuredRouteMapCanvas(
-                  camera,
-                  geometry.origin,
-                  _layoutKey!,
-                ),
+                child: _buildStructuredRouteMapCanvas(camera, geometry.origin),
               ),
               Positioned.fill(
                 child: Semantics(
@@ -5255,14 +5251,10 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     );
   }
 
-  // 하이브리드 바탕층(#2068)을 visual camera로 마운트한다. 바탕은 region에 매핑된
-  // 컴파일 .vec를 런타임 디코드해 그리며(RouteMapBasemapView), 인터랙션 좌표계와
-  // 1:1 정렬된다. WebView와 달리 명령형 controller 없이 camera prop 변경(setState)
-  // 으로 갱신된다. sourceOrigin은 오버레이·카메라의 origin-뺀 공간과 맞춘다.
+  // Native SVG viewport와 Flutter overlay는 source 좌표계를 공유한다.
   Widget _buildStructuredRouteMapCanvas(
     MapCameraState camera,
     Offset sourceOrigin,
-    String rendererKey,
   ) {
     final attribution = _attributionTextByRegion?[widget.data.selectedRegion];
     _ensureStructuredRouteMap();
@@ -5274,12 +5266,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
       fit: StackFit.expand,
       children: [
         RouteMapBasemapView(
+          key: ValueKey(_layoutKey),
           region: _displayRegionName(widget.data.selectedRegion),
           camera: camera,
           sourceOrigin: sourceOrigin,
           attributionText: attribution,
           onUnavailable: _markRouteMapBasemapUnavailable,
-          rendererKey: rendererKey,
         ),
         StructuredRouteMapView(
           map: map,

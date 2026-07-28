@@ -56,7 +56,7 @@ void main() {
     addTearDown(() => messenger.setMockMethodCallHandler(const MethodChannel(channelName), null));
 
     final controller = RouteMapSvgViewportController(onUnavailable: () {});
-    controller.attach(viewId: 42, camera: camera, sourceOrigin: origin);
+    controller.attach(viewId: 42);
     await controller.update(
       camera.copyWith(revision: 4, center: const Offset(60.25, 55.5)),
       sourceOrigin: origin,
@@ -87,7 +87,7 @@ void main() {
     final latest = camera.copyWith(revision: 5, center: const Offset(61, 56));
 
     await controller.update(latest, sourceOrigin: origin);
-    await controller.attach(viewId: 43, camera: camera, sourceOrigin: origin);
+    await controller.attach(viewId: 43);
 
     expect(calls, hasLength(1));
     expect(calls.single.arguments, routeMapSvgViewportCameraPayload(
@@ -106,7 +106,7 @@ void main() {
       final controller = RouteMapSvgViewportController(
         onUnavailable: () => unavailableCount++,
       );
-      await controller.attach(viewId: 7, camera: camera, sourceOrigin: origin);
+      await controller.attach(viewId: 7);
       await messenger.handlePlatformMessage(
         channelName,
         const StandardMethodCodec().encodeMethodCall(MethodCall(method)),
@@ -125,7 +125,7 @@ void main() {
     final controller = RouteMapSvgViewportController(
       onUnavailable: () => unavailableCount++,
     );
-    controller.attach(viewId: 7, camera: camera, sourceOrigin: origin);
+    controller.attach(viewId: 7);
 
     await controller.update(
       camera.copyWith(viewportSize: const Size(double.nan, 800), revision: 4),
@@ -167,6 +167,54 @@ void main() {
       ));
       await tester.pump();
       expect(unavailableCount, 1);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('첫 framePresented 전에는 숨기고 current revision ack 뒤 표시한다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    const viewId = 91;
+    const channelName =
+        'com.easysubway.easysubway_mobile/route_map_viewport_webview/91';
+    try {
+      await tester.pumpWidget(Directionality(
+        textDirection: TextDirection.ltr,
+        child: RouteMapSvgViewport(
+          region: '수도권', camera: camera, sourceOrigin: origin,
+          onUnavailable: () {},
+        ),
+      ));
+      final visibility = tester.widget<Visibility>(find.byType(Visibility));
+      expect(visibility.visible, isFalse);
+      expect(
+        find.descendant(
+          of: find.byType(Visibility),
+          matching: find.byType(IgnorePointer),
+        ),
+        findsAtLeastNWidgets(1),
+      );
+      final androidView = tester.widget<AndroidView>(find.byType(AndroidView));
+      expect(androidView.creationParams, <String, Object>{
+        'assetPath': 'assets/datapacks/metro_map_pack/basemap/seoul.svg',
+        'mimeType': 'image/svg+xml',
+        'sourceWidth': 200.0,
+        'sourceHeight': 200.0,
+        ...routeMapSvgViewportCameraPayload(camera: camera, sourceOrigin: origin),
+        'labelCollisionScript': '',
+      });
+
+      androidView.onPlatformViewCreated!(viewId);
+      await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+          .handlePlatformMessage(
+        channelName,
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('framePresented', <String, Object>{'revision': 3}),
+        ),
+        (_) {},
+      );
+      await tester.pump();
+      expect(tester.widget<Visibility>(find.byType(Visibility)).visible, isTrue);
     } finally {
       debugDefaultTargetPlatformOverride = null;
     }

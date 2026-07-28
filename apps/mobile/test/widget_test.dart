@@ -862,7 +862,7 @@ void main() {
           initialOnboardingState: _completedOnboardingState(),
         ),
       );
-      await tester.pump();
+      await tester.pumpAndSettle();
     });
 
     expect(reportedErrors, isEmpty);
@@ -3608,7 +3608,10 @@ void main() {
       );
       await tester.pumpAndSettle();
 
-      await tester.tap(find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')));
+      final stationFinder = find.byKey(
+        const Key('networkMapStation-sangnoksu-seoul-4'),
+      );
+      await tester.tapAt(tester.getCenter(stationFinder));
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
       final basemap = tester.widget<RouteMapBasemapView>(

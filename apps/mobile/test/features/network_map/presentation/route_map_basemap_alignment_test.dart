@@ -9,11 +9,8 @@ import 'package:flutter_test/flutter_test.dart';
 
 // #2068 하이브리드 바탕층 좌표 정렬 회귀 방지.
 //
-// (A) 좌표 변환 정합(엄격 <1e-6): RouteMapBasemapPainter의 재생 변환
-//     sourceToViewport(P)가 오버레이·카메라가 쓰는
-//     camera.sourceToViewportPoint(P − sourceOrigin)와 항등임을 고정한다. 바탕
-//     .vec는 viewBox=source 좌표라 designScale 곱셈/나눗셈이 없다 — 이 항등이
-//     깨지면 바탕과 인터랙션(히트 rect·팝오버·핀)이 어긋난다.
+// (A) Direct SVG viewport creation/update viewBox가 non-zero source origin을
+//     반영한 visibleSourceRect와 full precision으로 동일함을 고정한다.
 //
 // (B) 바탕↔인터랙션 역위치 실측 정합(전 역 하드 5px, #2068 P-65): SVG 노드
 //     좌표(바탕이 그리는 위치)와 팩 좌표(route_map_positions, 인터랙션이
@@ -95,18 +92,8 @@ void main() {
     ),
   };
 
-  // 여러 viewBox 점(비영점 origin 부근·원점·먼 점 포함)에서 항등을 확인한다.
-  final viewBoxPoints = <Offset>[
-    Offset.zero,
-    base,
-    base + const Offset(24, 0),
-    base + const Offset(48, 123),
-    const Offset(1369.617, 1266.787), // seoul 강남 노드(아래 fixture와 동일).
-    const Offset(2400, 1800), // sma-v2 viewBox 우하단 코너.
-  ];
-
   for (final entry in cameras.entries) {
-    test('(A) 바탕 재생 변환 == 오버레이 앵커(<1e-6): ${entry.key}', () {
+    test('(A) direct SVG viewBox == shifted visible rect: ${entry.key}', () {
       final camera = entry.value;
       final expected = camera.visibleSourceRect.shift(origin);
       final viewBox = routeMapSvgViewportCameraPayload(
