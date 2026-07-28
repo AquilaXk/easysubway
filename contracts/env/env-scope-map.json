@@ -79,6 +79,7 @@
     "EASYSUBWAY_SUPPORT_EMAIL": ["mobile-build"],
     "EASYSUBWAY_SECURITY_EMAIL": ["mobile-build"],
     "EASYSUBWAY_DATA_DELETION_EMAIL": ["mobile-build"],
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY": ["mobile-build", "store-release"],
     "EASYSUBWAY_ANDROID_KEYSTORE_PATH": ["store-release"],
     "EASYSUBWAY_ANDROID_STORE_PASSWORD": ["store-release"],
     "EASYSUBWAY_ANDROID_KEY_ALIAS": ["store-release"],

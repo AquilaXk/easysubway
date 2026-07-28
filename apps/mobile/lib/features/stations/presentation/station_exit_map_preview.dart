@@ -188,7 +188,7 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
       key: const Key('stationExitMapPreview'),
       height: 144,
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
         child: Stack(
           fit: StackFit.expand,
           children: [
@@ -326,6 +326,7 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
         selected: selected,
         primary: colorScheme.primary,
         onPrimary: colorScheme.onPrimary,
+        surface: colorScheme.surface,
       ),
       Size.square(size),
       context: context,
@@ -445,18 +446,20 @@ class _ExitNumberMarker extends StatelessWidget {
     required this.selected,
     required this.primary,
     required this.onPrimary,
+    required this.surface,
   });
 
   final String number;
   final bool selected;
   final Color primary;
   final Color onPrimary;
+  final Color surface;
 
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
       decoration: BoxDecoration(
-        color: selected ? primary : Colors.white,
+        color: selected ? primary : surface,
         shape: BoxShape.circle,
         border: Border.all(color: primary, width: selected ? 3 : 2),
       ),
@@ -468,7 +471,7 @@ class _ExitNumberMarker extends StatelessWidget {
               number,
               style: TextStyle(
                 color: selected ? onPrimary : primary,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
             ),
           ),
@@ -498,7 +501,7 @@ class _MapMessagePanel extends StatelessWidget {
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(8),
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
