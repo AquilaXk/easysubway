@@ -4743,13 +4743,14 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           if (_routeMapBasemapFailed || !_routeMapRendererActive) {
             return const _OriginalRouteMapUnavailable();
           }
-          final frameReady = identical(_presentedRendererCamera, camera);
-          final interactionCamera = frameReady
-              ? _presentedRendererCamera
-              : null;
-          final gestureCamera = _gestureActive
-              ? _presentedRendererCamera
-              : interactionCamera;
+          final presentedRendererCamera = _presentedRendererCamera;
+          final interactionCamera = presentedRendererCamera == null
+              ? null
+              : networkMapRendererTransformVisualCamera(
+                  rendererCamera: presentedRendererCamera,
+                  visualCamera: camera,
+                );
+          final gestureCamera = interactionCamera;
           return Stack(
             children: [
               Positioned.fill(
@@ -5269,35 +5270,49 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
 
   // Native SVG viewport와 Flutter overlay는 source 좌표계를 공유한다.
   Widget _buildStructuredRouteMapCanvas(
-    MapCameraState camera,
+    MapCameraState visualCamera,
     Offset sourceOrigin,
   ) {
-    if (!identical(_presentedRendererCamera, camera)) {
-      _requestedRendererCamerasByRevision[camera.revision] = camera;
+    final rendererCamera = _requestedRendererCamera ?? visualCamera;
+    if (!identical(_presentedRendererCamera, rendererCamera)) {
+      _requestedRendererCamerasByRevision[rendererCamera.revision] =
+          rendererCamera;
     }
+    final displayedRendererCamera = _presentedRendererCamera ?? rendererCamera;
+    final transformedVisualCamera = networkMapRendererTransformVisualCamera(
+      rendererCamera: displayedRendererCamera,
+      visualCamera: visualCamera,
+    );
     final attribution = _attributionTextByRegion?[widget.data.selectedRegion];
     _ensureStructuredRouteMap();
     final map = _structuredRouteMapCache!;
     final lineColors = _structuredLineColorsCache!;
     final labelTextByStationId = _structuredLabelTextCache!;
     final lineBadgeLabelByLineId = _structuredLineBadgeLabelCache!;
-    return RouteMapBasemapView(
-      key: ValueKey(_layoutKey),
-      region: _displayRegionName(widget.data.selectedRegion),
-      camera: camera,
-      sourceOrigin: sourceOrigin,
-      attributionText: attribution,
-      onUnavailable: _markRouteMapBasemapUnavailable,
-      onFramePresented: _acceptRouteMapFrame,
-      overlay: StructuredRouteMapView(
-        map: map,
-        camera: camera,
-        lineColors: lineColors,
-        labelTextByStationId: labelTextByStationId,
-        lineBadgeLabelByLineId: lineBadgeLabelByLineId,
-        drawLines: false,
-        drawStationSymbols: false,
+    return Transform(
+      alignment: Alignment.topLeft,
+      transform: networkMapRendererFrameTransform(
+        rendererCamera: displayedRendererCamera,
+        visualCamera: transformedVisualCamera,
+      ),
+      child: RouteMapBasemapView(
+        key: ValueKey(_layoutKey),
+        region: _displayRegionName(widget.data.selectedRegion),
+        camera: rendererCamera,
         sourceOrigin: sourceOrigin,
+        attributionText: attribution,
+        onUnavailable: _markRouteMapBasemapUnavailable,
+        onFramePresented: _acceptRouteMapFrame,
+        overlay: StructuredRouteMapView(
+          map: map,
+          camera: rendererCamera,
+          lineColors: lineColors,
+          labelTextByStationId: labelTextByStationId,
+          lineBadgeLabelByLineId: lineBadgeLabelByLineId,
+          drawLines: false,
+          drawStationSymbols: false,
+          sourceOrigin: sourceOrigin,
+        ),
       ),
     );
   }

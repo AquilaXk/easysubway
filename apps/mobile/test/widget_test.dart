@@ -3868,6 +3868,16 @@ void main() {
         await left.moveTo(center - const Offset(60, 0));
         await right.moveTo(center + const Offset(60, 0));
         await tester.pump();
+        final cameraCallsAfterFirstMove = nativeCalls
+            .where((call) => call.method == 'setCamera')
+            .length;
+        await left.moveTo(center - const Offset(65, 0));
+        await right.moveTo(center + const Offset(65, 0));
+        await tester.pump();
+        expect(
+          nativeCalls.where((call) => call.method == 'setCamera').length,
+          cameraCallsAfterFirstMove,
+        );
         expect(find.bySemanticsLabel('노선도'), findsOneWidget);
         await left.up();
         await right.up();
@@ -3878,12 +3888,14 @@ void main() {
           (call) => call.method == 'setCamera',
         );
         final pendingArguments = pendingCamera.arguments as Map;
-        expect(find.bySemanticsLabel('광주송정역'), findsNothing);
+        // presented overscan frame이 현재 visual camera를 덮는 동안에는 transform과
+        // interaction overlay를 함께 유지한다.
+        expect(find.bySemanticsLabel('광주송정역'), findsOneWidget);
         expect(
           find.byKey(
             const Key('networkMapStation-gwangju-songjeong-gwangju-1'),
           ),
-          findsNothing,
+          findsOneWidget,
         );
 
         await messenger.handlePlatformMessage(
@@ -3899,31 +3911,7 @@ void main() {
         await tester.pump();
         expect(find.bySemanticsLabel('광주송정역'), findsOneWidget);
 
-        final cameraCallCountBeforeTap = nativeCalls
-            .where((call) => call.method == 'setCamera')
-            .length;
         tester.semantics.tap(find.semantics.byLabel('광주송정역'));
-        await tester.pump();
-        await tester.pump();
-        expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
-        final cameraCallsAfterTap = nativeCalls
-            .where((call) => call.method == 'setCamera')
-            .toList();
-        expect(
-          cameraCallsAfterTap.length,
-          greaterThan(cameraCallCountBeforeTap),
-        );
-        final selectionArguments = cameraCallsAfterTap.last.arguments as Map;
-        await messenger.handlePlatformMessage(
-          channelName,
-          const StandardMethodCodec().encodeMethodCall(
-            MethodCall('framePresented', <String, Object>{
-              'revision': selectionArguments['revision'] as int,
-              'frameToken': selectionArguments['frameToken'] as int,
-            }),
-          ),
-          (_) {},
-        );
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
       } finally {
