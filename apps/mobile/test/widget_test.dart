@@ -50,6 +50,7 @@ import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/search_field.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
+import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_svg_viewport.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/nearby_direction_title.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu_geometry.dart'
@@ -62,7 +63,7 @@ import 'package:easysubway_mobile/user_data_deletion.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/easy_subway_app_fixture.dart';
@@ -3592,7 +3593,9 @@ void main() {
     expect(find.byKey(const Key('networkMapPainter')), findsNothing);
   });
 
-  testWidgets('SVG 바탕 실패는 지도 상호작용 전체를 unavailable surface로 교체한다', (tester) async {
+  testWidgets('SVG 바탕 실패는 지도 상호작용 전체를 unavailable surface로 교체한다', (
+    tester,
+  ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       await tester.pumpWidget(
@@ -3623,7 +3626,10 @@ void main() {
       expect(find.text('노선도를 불러오지 못했어요'), findsOneWidget);
       expect(find.byType(RouteMapBasemapView), findsNothing);
       expect(find.bySemanticsLabel('노선도'), findsNothing);
-      expect(find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')), findsNothing);
+      expect(
+        find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+        findsNothing,
+      );
       expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
     } finally {
       debugDefaultTargetPlatformOverride = null;
@@ -3668,6 +3674,125 @@ void main() {
       tester.view.resetDevicePixelRatio();
     }
   });
+
+  testWidgets(
+    '광주송정역 native visual layer는 중복 semantics 없이 station action을 유지한다',
+    (tester) async {
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      const viewId = 2571;
+      const channelName =
+          'com.easysubway.easysubway_mobile/route_map_viewport_webview/$viewId';
+      final semanticsHandle = tester.ensureSemantics();
+      primeNetworkMapOwnerLabelsCacheForTest(const {});
+      try {
+        await tester.pumpWidget(
+          buildEasySubwayTestApp(
+            repository: FakeStationSearchRepository(
+              networkMapRegionNames: const ['광주'],
+              networkMapData: const NetworkMapData(
+                regions: [NetworkMapRegion(name: '광주')],
+                selectedRegion: '광주',
+                lines: [
+                  NetworkMapLine(
+                    id: 'gwangju-1',
+                    name: '광주 1호선',
+                    color: '#009088',
+                    region: '광주',
+                  ),
+                ],
+                stations: [
+                  NetworkMapStation(
+                    id: 'station-gwangju-songjeong',
+                    nameKo: '광주송정역',
+                    nameEn: 'Gwangju Songjeong',
+                    region: '광주',
+                    lineId: 'gwangju-1',
+                    stationCode: '100',
+                    sequence: 1,
+                    position: NetworkMapPosition(
+                      x: 160,
+                      y: 160,
+                      labelDx: 0,
+                      labelDy: 0,
+                      upPath: '',
+                      downPath: '',
+                      sourceId: 'task-2571-gwangju-semantics',
+                    ),
+                  ),
+                ],
+                edges: [],
+                positionSources: [
+                  NetworkMapPositionSource(
+                    id: 'task-2571-gwangju-semantics',
+                    name: 'Task 2571 Gwangju semantics fixture',
+                    licenseStatus: 'fixture-only',
+                  ),
+                ],
+                stationLineMemberships: [
+                  NetworkMapStationLineMembership(
+                    stationId: 'station-gwangju-songjeong',
+                    lineId: 'gwangju-1',
+                  ),
+                ],
+              ),
+            ),
+            reportRepository: FakeFacilityReportRepository(),
+            routeRepository: FakeRouteSearchRepository(),
+            notificationRepository: FakeNotificationSettingsRepository(),
+            initialOnboardingState: _completedOnboardingState(),
+          ),
+        );
+        await tester.pump();
+
+        final androidView = tester.widget<AndroidView>(
+          find.byType(AndroidView),
+        );
+        androidView.onPlatformViewCreated!(viewId);
+        await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+            .handlePlatformMessage(
+              channelName,
+              const StandardMethodCodec().encodeMethodCall(
+                MethodCall('framePresented', <String, Object>{'revision': 0}),
+              ),
+              (_) {},
+            );
+        await tester.pump();
+
+        final nativeVisualLayer = find.ancestor(
+          of: find.byType(AndroidView),
+          matching: find.byType(Visibility),
+        );
+        expect(nativeVisualLayer, findsOneWidget);
+        expect(tester.widget<Visibility>(nativeVisualLayer).visible, isTrue);
+        expect(
+          find.ancestor(
+            of: find.byType(AndroidView),
+            matching: find.byType(ExcludeSemantics),
+          ),
+          findsOneWidget,
+        );
+
+        final station = find.bySemanticsLabel('광주송정역');
+        expect(station, findsOneWidget);
+        expect(find.bySemanticsLabel(RegExp('광주송정역역')), findsNothing);
+        expect(
+          tester
+              .getSemantics(station)
+              .getSemanticsData()
+              .hasAction(SemanticsAction.tap),
+          isTrue,
+        );
+
+        tester.semantics.tap(find.semantics.byLabel('광주송정역'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+      } finally {
+        semanticsHandle.dispose();
+        resetNetworkMapOwnerLabelsCacheForTest();
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 
   test('Android 노선도 edge resolver는 station-line endpoint를 해석한다', () {
     const stations = [
