@@ -54,7 +54,7 @@ test("Gwangju canonical SVG retains 광주송정역 text without duplicated stat
   const ariaLabels = [...svg.matchAll(/\baria-label="([^"]*)"/g)].map((match) => match[1]);
 
   assert.match(svg, />광주송정역\s*<\/tspan>/);
-  assert.deepEqual(ariaLabels.filter((label) => label.includes("광주송정역역")), []);
+  assert.deepEqual(ariaLabels.filter((label) => label.includes("역역")), []);
 });
 
 test("verifyDisplaySvgProvenance: source byte drift fails", () => {
