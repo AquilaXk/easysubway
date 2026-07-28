@@ -28,6 +28,11 @@ import {
   inkBBoxOf,
   viewBoxOf,
 } from "./svg-ink-bbox.mjs";
+import {
+  buildRegionProvenance,
+  generateGeometryProvenanceManifest,
+  verifyGeometryProvenanceManifest,
+} from "./generate-geometry-provenance-manifest.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const svgDir = path.join(here, "route-map-defs", "svg-sources");
@@ -39,6 +44,80 @@ const REGIONS = [
   { id: "daejeon", svg: "easy-subway-daejeon-v3.svg" },
   { id: "gwangju", svg: "easy-subway-gwangju-v3.svg" },
 ];
+
+test("5권역 geometry provenance manifest가 current source·pack과 exact match다", () => {
+  const manifestPath = path.join(here, "geometry-provenance-manifest.json");
+  const expected = JSON.parse(readFileSync(manifestPath, "utf8"));
+  const actual = generateGeometryProvenanceManifest();
+  verifyGeometryProvenanceManifest(expected, actual);
+
+  const digest = /^[a-f0-9]{64}$/;
+  assert.deepEqual(Object.keys(actual.regions), REGIONS.map(({ id }) => id));
+  for (const region of Object.values(actual.regions)) {
+    assert.deepEqual(Object.keys(region), [
+      "sourceSvgSha256",
+      "normalizedSvgSha256",
+      "sourceViewBox",
+      "fullInkBounds",
+      "extractorVersion",
+      "geometrySha256",
+      "routeMapPositionsSha256",
+      "labelSourceCount",
+      "stationNodeCount",
+      "generatorContractVersion",
+    ]);
+    for (const key of [
+      "sourceSvgSha256",
+      "normalizedSvgSha256",
+      "geometrySha256",
+      "routeMapPositionsSha256",
+    ]) {
+      assert.match(region[key], digest, key);
+    }
+    assert.equal(region.generatorContractVersion, 1);
+  }
+});
+
+test("geometry provenance verifier는 source·geometry·positions mutation을 fail-closed로 막는다", () => {
+  const svg = '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="1"/></svg>';
+  const sourceSvgSha256 = createHash("sha256").update(svg).digest("hex");
+  const geometry = {
+    sourceSvgSha256,
+    sourceViewBox: [0, 0, 10, 10],
+    extractorVersion: "fixture-v1",
+    labels: [{ classification: "STATION_LABEL" }],
+    strokes: [],
+    stationNodes: [{ x: 5, y: 5 }],
+  };
+  const expected = buildRegionProvenance({
+    svg,
+    geometryBytes: Buffer.from(JSON.stringify(geometry)),
+    routeMapPositionRows: [{ station_id: "s1", line_id: "l1", region: "fixture", x: 5, y: 5 }],
+  });
+
+  assert.throws(
+    () => buildRegionProvenance({
+      svg: svg.replace('r="1"', 'r="2"'),
+      geometryBytes: Buffer.from(JSON.stringify(geometry)),
+      routeMapPositionRows: [],
+    }),
+    /sourceSvgSha256/,
+  );
+
+  const geometryMutation = structuredClone(expected);
+  geometryMutation.geometrySha256 = "0".repeat(64);
+  assert.throws(
+    () => verifyGeometryProvenanceManifest(expected, geometryMutation),
+    /provenance drift/,
+  );
+
+  const positionsMutation = structuredClone(expected);
+  positionsMutation.routeMapPositionsSha256 = "f".repeat(64);
+  assert.throws(
+    () => verifyGeometryProvenanceManifest(expected, positionsMutation),
+    /provenance drift/,
+  );
+});
 
 /**
  * 크롭 결과 여유(단위: source px) 기준선.
@@ -255,24 +334,8 @@ test("장식 제외 집합 정합 — 헤더·범례는 정규화가 이미 걷�
   }
 });
 
-/**
- * `*-geometry.json`의 provenance가 현재 SVG와 어긋난 권역(#2606).
- *
- * 손으로 `sourceSvgSha256`만 갱신하면 안 된다 — `extract-svg-geometry.mjs`가
- * `sourceElementKey`를 그 sha로 만들기 때문에 파일 안에서 키와 provenance가
- * 모순된다. 제대로 고치려면 재추출 + `join-svg-label-polygons` 재실행이 필요하고,
- * 그건 datapack 좌표에 파급되므로 viewBox 전용 변경(#2603)과 섞지 않았다.
- *
- * 여기서는 **드리프트를 늘리지 못하게** 고정만 한다. #2606에서 해소하면 이
- * 목록을 비운다.
- */
-const KNOWN_GEOMETRY_PROVENANCE_DRIFT = new Set([
-  "seoul",
-  "busan",
-  "daegu",
-  "daejeon",
-  "gwangju",
-]);
+/** 해소된 drift가 되살아나거나 새 drift가 생기면 실패하는 명시 기준선. */
+const KNOWN_GEOMETRY_PROVENANCE_DRIFT = new Set();
 
 test("geometry.json provenance drift가 늘지 않는다(#2606 추적)", () => {
   const drifted = [];
