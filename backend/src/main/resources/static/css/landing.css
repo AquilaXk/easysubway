@@ -26,7 +26,7 @@ body.is-english [data-copy="en"] { display: revert; }
 .brand { font-size: 17px; font-weight: 850; letter-spacing: -.04em; text-decoration: none; }
 .brand i { display: inline-block; width: 7px; height: 7px; margin-left: 5px; border-radius: 50%; background: var(--signature); box-shadow: 0 0 18px var(--signature); }
 .header-meta { display: flex; align-items: center; gap: 32px; color: #e2e5ef; font-size: 13px; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
-.language-switch { display: flex; align-items: center; gap: 7px; }
+.language-switch { display: flex; align-items: center; gap: 7px; min-inline-size: 0; margin: 0; border: 0; padding: 0; }
 .language-button { border: 0; padding: 5px 2px; background: none; color: #e2e5ef; cursor: pointer; opacity: .68; }
 .language-button.is-active { color: var(--signature); opacity: 1; }
 

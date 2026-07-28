@@ -12,7 +12,8 @@ test("공개 랜딩은 한국어 기본값과 접근 가능한 KR/EN 전환 계�
 	assert.match(html, /data-language="en"/);
 	assert.match(html, /aria-pressed="true"/);
 	assert.match(html, /aria-pressed="false"/);
-	assert.match(html, /class="language-switch" role="group"/);
+	assert.match(html, /<fieldset class="language-switch" aria-label="언어 선택"/);
+	assert.doesNotMatch(html, /role="group"/);
 	assert.match(html, /class="skip-link"[^>]*lang="ko"/);
 	assert.match(html, /class="site-footer" lang="ko"/);
 	assert.match(html, /class="kicker" lang="en">Mobility without barriers/);
