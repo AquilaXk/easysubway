@@ -11,7 +11,7 @@
 
 * { box-sizing: border-box; }
 html { background: var(--ink); scroll-behavior: smooth; }
-body { margin: 0; overflow-x: hidden; background: var(--ink); color: var(--white); font-family: Inter, -apple-system, BlinkMacSystemFont, "Pretendard", "Apple SD Gothic Neo", sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
+body { margin: 0; overflow-x: hidden; background: var(--ink); color: var(--white); font-family: Inter, -apple-system, BlinkMacSystemFont, Pretendard, "Apple SD Gothic Neo", sans-serif; -webkit-font-smoothing: antialiased; text-rendering: optimizelegibility; }
 button, a { color: inherit; font: inherit; }
 a:focus-visible, button:focus-visible { outline: 3px solid var(--signature); outline-offset: 4px; }
 .frame { width: min(1240px, calc(100% - 48px)); margin-inline: auto; }
@@ -71,9 +71,10 @@ body.is-english [data-copy="en"] { display: revert; }
 .process-tile { position: absolute; z-index: 1; top: 180px; right: 0; width: 390px; height: 410px; border-radius: 42px; background: linear-gradient(145deg, #8793ec, var(--primary) 68%, #344480); box-shadow: 0 50px 130px #4859ba45; }
 .process-tile b { position: absolute; top: 54px; right: 46px; font-size: 112px; letter-spacing: -.075em; }
 .process-tile p { position: absolute; right: 46px; bottom: 48px; max-width: 260px; margin: 0; font-size: 23px; font-weight: 650; line-height: 1.3; text-align: right; }
-.process-lead { position: absolute; top: 440px; left: 0; max-width: 390px; margin: 0; color: #c7cbd7; font-size: 17px; line-height: 1.75; word-break: keep-all; }
-.flow-label { position: absolute; top: 585px; left: 0; margin: 0; color: var(--signature); font-size: 18px; font-weight: 850; }
-.process-steps { position: absolute; top: 625px; right: 0; left: 0; display: grid; grid-template-columns: repeat(4, 1fr); margin: 0; border-top: 1px solid #ffffff70; padding: 0; list-style: none; }
+.process-flow { position: absolute; top: 440px; right: 0; left: 0; }
+.process-lead { max-width: 390px; margin: 0; color: #c7cbd7; font-size: 17px; line-height: 1.75; word-break: keep-all; }
+.flow-label { margin: 45px 0 0; color: var(--signature); font-size: 18px; font-weight: 850; }
+.process-steps { display: grid; grid-template-columns: repeat(4, 1fr); margin: 22px 0 0; border-top: 1px solid #ffffff70; padding: 0; list-style: none; }
 .process-steps li { display: grid; grid-template-columns: 44px 1fr; align-items: center; padding: 25px 28px 0 0; }
 .process-steps b { color: var(--signature); font-size: 20px; }
 .process-steps span { font-size: 20px; font-weight: 800; letter-spacing: -.035em; }
@@ -186,9 +187,10 @@ body.is-english .release-state[data-copy="en"] { display: inline-block; }
 	.device--hero { top: 370px; right: -20px; width: 300px; height: 620px; }
 	.process, .process-frame { min-height: 980px; }
 	.process-tile { top: 245px; right: -15px; width: 300px; height: 360px; }
-	.process-lead { top: 625px; right: 0; max-width: none; }
-	.flow-label { top: 755px; }
-	.process-steps { top: 795px; }
+	.process-flow { top: 625px; }
+	.process-lead { max-width: none; }
+	.flow-label { margin-top: 36px; }
+	.process-steps { margin-top: 18px; }
 	.feature { min-height: 970px; }
 	.feature-copy, .feature-copy--left, .feature-copy--right { top: 170px; right: auto; left: 24px; width: calc(100% - 48px); }
 	.feature-device, .feature-device--left, .feature-device--right { top: 430px; right: auto; left: 50%; width: 250px; height: 505px; transform: translateX(-50%) rotate(4deg); }
@@ -209,9 +211,9 @@ body.is-english .release-state[data-copy="en"] { display: inline-block; }
 	.process, .process-frame { min-height: 980px; }
 	.process-title { top: 75px; font-size: 72px; }
 	.process-tile { top: 245px; width: 275px; height: 360px; }
-	.process-lead { top: 625px; right: 0; max-width: none; font-size: 15px; }
-	.flow-label { top: 755px; font-size: 17px; }
-	.process-steps { top: 795px; grid-template-columns: repeat(2, 1fr); row-gap: 18px; }
+	.process-lead { font-size: 15px; }
+	.flow-label { margin-top: 28px; font-size: 17px; }
+	.process-steps { grid-template-columns: repeat(2, 1fr); row-gap: 18px; }
 	.process-steps li { grid-template-columns: 34px 1fr; padding: 16px 10px 0 0; }
 	.process-steps b { font-size: 16px; }
 	.process-steps span { font-size: 15px; }

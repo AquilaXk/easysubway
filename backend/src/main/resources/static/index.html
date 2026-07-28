@@ -17,7 +17,7 @@
 			<div class="header-meta" lang="en">
 				<span>Accessible navigation</span>
 				<span>Seoul · 2026</span>
-				<div class="language-switch" aria-label="언어 선택" lang="ko">
+				<div class="language-switch" role="group" aria-label="언어 선택" lang="ko">
 					<button class="language-button is-active" type="button" data-language="ko" aria-pressed="true">KR</button>
 					<span aria-hidden="true">/</span>
 					<button class="language-button" type="button" data-language="en" aria-pressed="false">EN</button>
@@ -37,7 +37,7 @@
 				<p data-copy="en">Accessible routes and verified station information, connected in one product.</p>
 			</div>
 			<div class="device device--hero device--map">
-				<img src="/images/landing/route-map.png" alt="EasySubway 실제 노선도 화면" lang="ko">
+				<img src="/images/landing/route-map.png" alt="EasySubway 실제 노선도 화면" width="1080" height="2340" decoding="async" lang="ko">
 			</div>
 			<span class="scroll-label" lang="en">Scroll to explore ↓</span>
 		</section>
@@ -57,37 +57,39 @@
 		<section class="process" aria-labelledby="process-title">
 			<div class="frame process-frame">
 				<h2 id="process-title" class="process-title" lang="en">How<span>It works</span></h2>
-				<p class="process-lead" data-copy="ko">EasySubway는 노선을 찾는 순간부터 역 시설을 확인하고 실제로 이동하는 순간까지 하나의 흐름으로 연결합니다.</p>
-				<p class="process-lead" data-copy="en">EasySubway connects route discovery, accessibility decisions, station information, and the actual journey.</p>
 				<div class="process-tile"><b>04</b><p data-copy="ko">노선 탐색부터<br>실제 이동까지</p><p data-copy="en">From route discovery<br>to the journey</p></div>
-				<p class="flow-label"><span data-copy="ko">제품 이용 흐름</span><span data-copy="en">Journey flow</span></p>
-				<ol class="process-steps">
-					<li><b>01</b><span data-copy="ko">노선 탐색</span><span data-copy="en">Explore</span></li>
-					<li><b>02</b><span data-copy="ko">접근성 판단</span><span data-copy="en">Decide</span></li>
-					<li><b>03</b><span data-copy="ko">시설 확인</span><span data-copy="en">Verify</span></li>
-					<li><b>04</b><span data-copy="ko">이동</span><span data-copy="en">Move</span></li>
-				</ol>
+				<div class="process-flow">
+					<p class="process-lead" data-copy="ko">EasySubway는 노선을 찾는 순간부터 역 시설을 확인하고 실제로 이동하는 순간까지 하나의 흐름으로 연결합니다.</p>
+					<p class="process-lead" data-copy="en">EasySubway connects route discovery, accessibility decisions, station information, and the actual journey.</p>
+					<p class="flow-label"><span data-copy="ko">제품 이용 흐름</span><span data-copy="en">Journey flow</span></p>
+					<ol class="process-steps">
+						<li><b>01</b><span data-copy="ko">노선 탐색</span><span data-copy="en">Explore</span></li>
+						<li><b>02</b><span data-copy="ko">접근성 판단</span><span data-copy="en">Decide</span></li>
+						<li><b>03</b><span data-copy="ko">시설 확인</span><span data-copy="en">Verify</span></li>
+						<li><b>04</b><span data-copy="ko">이동</span><span data-copy="en">Move</span></li>
+					</ol>
+				</div>
 			</div>
 		</section>
 
 		<section class="screen-wall">
 			<div class="frame wall-heading" lang="en"><strong>One journey. Three decisions.</strong><span>Actual product screens · Android</span></div>
-			<div class="device wall-device wall-device--map device--map"><img src="/images/landing/route-map.png" alt="실제 노선도 홈 화면" lang="ko"></div>
-			<div class="device wall-device wall-device--route device--route"><img src="/images/landing/accessible-route.png" alt="실제 접근성 경로 결과 화면" lang="ko"></div>
-			<div class="device wall-device wall-device--station device--station"><img src="/images/landing/station-detail.png" alt="노선도에서 상록수역을 선택한 실제 화면" lang="ko"></div>
+			<div class="device wall-device wall-device--map device--map"><img src="/images/landing/route-map.png" alt="실제 노선도 홈 화면" width="1080" height="2340" loading="lazy" decoding="async" lang="ko"></div>
+			<div class="device wall-device wall-device--route device--route"><img src="/images/landing/accessible-route.png" alt="실제 접근성 경로 결과 화면" width="1080" height="2340" loading="lazy" decoding="async" lang="ko"></div>
+			<div class="device wall-device wall-device--station device--station"><img src="/images/landing/station-detail.png" alt="노선도에서 상록수역을 선택한 실제 화면" width="1080" height="2340" loading="lazy" decoding="async" lang="ko"></div>
 			<p class="wall-caption" lang="en">Explore · Decide · Move</p>
 		</section>
 
 		<section class="feature">
 			<span class="feature-number">01</span><div class="halo halo--right" aria-hidden="true"></div>
 			<div class="feature-copy feature-copy--left"><span class="feature-label" lang="en">Network map</span><h2 data-copy="ko">검증 중인 노선을<br>한눈에.</h2><h2 data-copy="en">The pilot network,<br>at a glance.</h2><p data-copy="ko">검증 중인 노선에서 출발지와 도착지를 직관적으로 선택합니다.</p><p data-copy="en">Choose origin and destination intuitively within the validation pilot.</p></div>
-			<div class="device feature-device feature-device--right device--map"><img src="/images/landing/route-map.png" alt="노선도 기능 실제 화면" lang="ko"></div>
+			<div class="device feature-device feature-device--right device--map"><img src="/images/landing/route-map.png" alt="노선도 기능 실제 화면" width="1080" height="2340" loading="lazy" decoding="async" lang="ko"></div>
 			<div class="mini-data mini-data--left" lang="en"><div><b>02 stations</b>Validation pilot</div><div><b>Android</b>In preparation</div></div>
 		</section>
 
 		<section class="feature feature--alternate">
 			<span class="feature-number feature-number--right">02</span><div class="halo halo--left" aria-hidden="true"></div>
-			<div class="device feature-device feature-device--left device--route"><img src="/images/landing/accessible-route.png" alt="접근성 경로 실제 화면" lang="ko"></div>
+			<div class="device feature-device feature-device--left device--route"><img src="/images/landing/accessible-route.png" alt="접근성 경로 실제 화면" width="1080" height="2340" loading="lazy" decoding="async" lang="ko"></div>
 			<div class="feature-copy feature-copy--right"><span class="feature-label" lang="en">Accessible route</span><h2 data-copy="ko">시간보다 먼저,<br>갈 수 있는가.</h2><h2 data-copy="en">Before time,<br>can you take it?</h2><p data-copy="ko">계단 여부와 이동 부담을 함께 판단해 사용자에게 맞는 경로를 보여줍니다.</p><p data-copy="en">Routes consider stairs and mobility burden, not travel time alone.</p></div>
 			<div class="mini-data mini-data--right" lang="en"><div><b>Step-free</b>Route priority</div><div><b>Transparent</b>Travel burden</div></div>
 		</section>
@@ -95,7 +97,7 @@
 		<section class="feature">
 			<span class="feature-number">03</span><div class="halo halo--right" aria-hidden="true"></div>
 			<div class="feature-copy feature-copy--left"><span class="feature-label" lang="en">Station selection</span><h2 data-copy="ko">노선 위에서,<br>역을 바로 선택.</h2><h2 data-copy="en">Choose a station,<br>directly on the map.</h2><p data-copy="ko">노선도에서 역을 선택하고 출발·경유·도착 흐름을 한 화면에서 이어갑니다.</p><p data-copy="en">Choose a station on the map and continue to origin, waypoint, or destination in one flow.</p></div>
-			<div class="device feature-device feature-device--right device--station"><img src="/images/landing/station-detail.png" alt="노선도에서 상록수역을 선택한 실제 화면" lang="ko"></div>
+			<div class="device feature-device feature-device--right device--station"><img src="/images/landing/station-detail.png" alt="노선도에서 상록수역을 선택한 실제 화면" width="1080" height="2340" loading="lazy" decoding="async" lang="ko"></div>
 			<div class="mini-data mini-data--left" lang="en"><div><b>Verified</b>Source &amp; date</div><div><b>Honest</b>Unknown stays unknown</div></div>
 		</section>
 
