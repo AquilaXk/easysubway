@@ -26,10 +26,10 @@
       },
       "offline": {
         "included": true,
-        "type": "vector-graphics-vec",
-        "path": "assets/datapacks/metro_map_pack/basemap/seoul.vec",
+        "type": "svg",
+        "path": "assets/datapacks/metro_map_pack/basemap/seoul.svg",
         "official_asset_url": "internal:route-map/route-map-defs/svg-sources/easy-subway-sma-v4.svg",
-        "mime_type": "application/vnd.flutter.vector-graphics"
+        "mime_type": "image/svg+xml"
       },
       "license": {
         "name": "오너 자작 노선도(self-drawn)",
@@ -46,7 +46,7 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
-        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear schematic, not the raw SVG. Line colors follow the official Seoul Metropolitan Government route-color PDF (GTX-A retained from the source SVG). The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap `.vec` (vector_graphics binary, compiled from the self-drawn SVG via tools/route-map/compile-basemap-vec.mjs) is now bundled offline (offline.included=true, type vector-graphics-vec)."
+        "changes": "The app displays the owner's canonical SVG bytes directly in a native viewport. Line colors follow the official Seoul Metropolitan Government route-color PDF (GTX-A retained from the source SVG). Interaction still trusts route_map_positions, and the bundled offline display asset is basemap/seoul.svg."
       }
     },
     {
@@ -65,10 +65,10 @@
       },
       "offline": {
         "included": true,
-        "type": "vector-graphics-vec",
-        "path": "assets/datapacks/metro_map_pack/basemap/busan.vec",
+        "type": "svg",
+        "path": "assets/datapacks/metro_map_pack/basemap/busan.svg",
         "official_asset_url": "https://www2.humetro.busan.kr/upload/default/integrate.zip",
-        "mime_type": "application/vnd.flutter.vector-graphics"
+        "mime_type": "image/svg+xml"
       },
       "license": {
         "name": "오너 자작 노선도(self-drawn)",
@@ -89,7 +89,7 @@
           "Font Awesome Free plane icon (FortAwesome, CC BY 4.0)",
           "KTX/SRT and other brand marks"
         ],
-        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Busan schematic (easy-subway-busan-v3), not the raw SVG. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap `.vec` (vector_graphics binary, compiled from the self-drawn SVG via tools/route-map/compile-basemap-vec.mjs) is now bundled offline (offline.included=true, type vector-graphics-vec)."
+        "changes": "The app displays the owner's canonical SVG bytes directly in a native viewport. Interaction still trusts route_map_positions, and the bundled offline display asset is basemap/busan.svg."
       }
     },
     {
@@ -108,9 +108,9 @@
       },
       "offline": {
         "included": true,
-        "type": "vector-graphics-vec",
-        "path": "assets/datapacks/metro_map_pack/basemap/gwangju.vec",
-        "mime_type": "application/vnd.flutter.vector-graphics"
+        "type": "svg",
+        "path": "assets/datapacks/metro_map_pack/basemap/gwangju.svg",
+        "mime_type": "image/svg+xml"
       },
       "license": {
         "name": "오너 자작 노선도(self-drawn)",
@@ -127,7 +127,7 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
-        "changes": "Attribution contract transition (not removal): the previously bundled CC BY-SA 2.0 KR route-map asset (kiwitree, ShareAlike) is superseded by the owner's self-drawn 8-linear Gwangju schematic (easy-subway-gwangju-v3). App rendering uses structured coordinates (route_map_positions) derived from the self-drawn schematic, not the CC BY-SA SVG, so the ShareAlike/attribution chain no longer attaches to the distributed render. The v3 schematic draws only the operating line-1 network; line 2 is absent from the schematic, and all 20 line-1 catalog stations are mapped. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap `.vec` (vector_graphics binary, compiled from the self-drawn SVG via tools/route-map/compile-basemap-vec.mjs) is now bundled offline (offline.included=true, type vector-graphics-vec)."
+        "changes": "Attribution contract transition (not removal): the previously bundled CC BY-SA 2.0 KR route-map asset is superseded by the owner's self-drawn canonical SVG. The app displays those canonical SVG bytes directly in a native viewport. The v3 schematic draws only the operating line-1 network; line 2 is absent, all 20 line-1 stations are mapped, interaction trusts route_map_positions, and the bundled offline display asset is basemap/gwangju.svg."
       }
     },
     {
@@ -146,10 +146,10 @@
       },
       "offline": {
         "included": true,
-        "type": "vector-graphics-vec",
-        "path": "assets/datapacks/metro_map_pack/basemap/daegu.vec",
+        "type": "svg",
+        "path": "assets/datapacks/metro_map_pack/basemap/daegu.svg",
         "official_asset_url": "https://www.dtro.or.kr/cmsh/dtro.or.kr/images/content02/subway_total18.zip",
-        "mime_type": "application/vnd.flutter.vector-graphics"
+        "mime_type": "image/svg+xml"
       },
       "license": {
         "name": "오너 자작 노선도(self-drawn)",
@@ -166,7 +166,7 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
-        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Daegu schematic (easy-subway-daegu-v3), not the raw SVG. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap `.vec` (vector_graphics binary, compiled from the self-drawn SVG via tools/route-map/compile-basemap-vec.mjs) is now bundled offline (offline.included=true, type vector-graphics-vec)."
+        "changes": "The app displays the owner's canonical SVG bytes directly in a native viewport. Interaction still trusts route_map_positions, and the bundled offline display asset is basemap/daegu.svg."
       }
     },
     {
@@ -185,10 +185,10 @@
       },
       "offline": {
         "included": true,
-        "type": "vector-graphics-vec",
-        "path": "assets/datapacks/metro_map_pack/basemap/daejeon.vec",
+        "type": "svg",
+        "path": "assets/datapacks/metro_map_pack/basemap/daejeon.svg",
         "official_asset_url": "https://www.djtc.kr/kor/resources/routemap/korean.zip",
-        "mime_type": "application/vnd.flutter.vector-graphics"
+        "mime_type": "image/svg+xml"
       },
       "license": {
         "name": "오너 자작 노선도(self-drawn)",
@@ -205,7 +205,7 @@
         "derivativeWorkAllowed": true,
         "redistributionAllowed": true,
         "reviewStatus": "self-drawn-confirmed",
-        "changes": "App rendering uses structured coordinates (route_map_positions) derived from the owner's self-drawn 8-linear Daejeon schematic (easy-subway-daejeon-v3), not the raw SVG. The v3 schematic draws only the operating line-1 network; the unopened lines (circular line 2, Chungcheong regional rail) are absent from the schematic, and all 22 line-1 catalog stations are mapped. The self-drawn SVG is now the basemap paint source (build-time compiled, hybrid rendering), while interaction (station tap hit-testing, focus camera, popover anchoring, route highlighting) still trusts the structured coordinates. The compiled basemap `.vec` (vector_graphics binary, compiled from the self-drawn SVG via tools/route-map/compile-basemap-vec.mjs) is now bundled offline (offline.included=true, type vector-graphics-vec)."
+        "changes": "The app displays the owner's canonical SVG bytes directly in a native viewport. The v3 schematic draws only the operating line-1 network; unopened lines are absent, all 22 line-1 stations are mapped, interaction trusts route_map_positions, and the bundled offline display asset is basemap/daejeon.svg."
       }
     }
   ]

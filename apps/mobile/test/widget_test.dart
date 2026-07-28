@@ -32,6 +32,7 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_schedule_
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscription.dart';
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
+import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_svg_viewport.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_detail_body.dart';
@@ -62,7 +63,7 @@ import 'package:easysubway_mobile/user_data_deletion.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
-import 'package:flutter/services.dart' show rootBundle;
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 import 'support/easy_subway_app_fixture.dart';
@@ -566,6 +567,9 @@ Future<void> _tapFirstRouteResultListItem(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() => debugRouteMapSvgViewportPresentImmediately = true);
+  tearDown(() => debugRouteMapSvgViewportPresentImmediately = false);
+
   testWidgets('앱 Theme는 시그니처 ColorScheme 역할색을 사용한다', (tester) async {
     await tester.pumpWidget(
       buildEasySubwayTestApp(
@@ -3528,17 +3532,24 @@ void main() {
       final path = offline['path'] as String;
       expect(map['source_url'], isA<String>());
       expect(validSourceScheme(map['source_url'] as String), isTrue);
-      // [#2068] 하이브리드 바탕층 전환: 오너 자작 SVG를 build-time 컴파일한
-      // vector_graphics 바이너리(.vec)를 basemap/으로 번들한다. offline 블록은
-      // 이제 실제 번들 .vec를 가리키고 included=true다.
+      // [#2571] canonical SVG를 변환 없이 native viewport에 직접 표시한다.
       expect(offline['included'], isTrue);
       expect(path, startsWith('assets/datapacks/metro_map_pack/basemap/'));
       final extension = path.split('.').last.toLowerCase();
-      expect(extension, 'vec');
-      expect(offline['type'], 'vector-graphics-vec');
-      // 가리키는 .vec가 실제로 번들에 존재해야 한다(offline included 계약 강화).
+      expect(extension, 'svg');
+      expect(offline['type'], 'svg');
+      expect(offline['mime_type'], 'image/svg+xml');
       expect(File(path).existsSync(), isTrue, reason: '$path가 번들에 없다');
       final license = map['license'] as Map<String, Object?>;
+      expect((license['changes'] as String), contains('canonical SVG'));
+      expect(
+        (license['changes'] as String),
+        isNot(contains('build-time compiled')),
+      );
+      expect(
+        (license['changes'] as String),
+        isNot(contains('vector-graphics')),
+      );
       expect(license['name'], isA<String>());
       expect(license['spdx'], isA<String>());
       expect(validSourceScheme(license['url'] as String), isTrue);
@@ -3592,6 +3603,95 @@ void main() {
     expect(find.byKey(const Key('networkMapPainter')), findsNothing);
   });
 
+  testWidgets('SVG 바탕 실패는 지도 상호작용 전체를 unavailable surface로 교체한다', (
+    tester,
+  ) async {
+    debugRouteMapSvgViewportPresentImmediately = false;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    const viewId = 2570;
+    const channelName =
+        'com.easysubway.easysubway_mobile/route_map_viewport_webview/$viewId';
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final nativeCalls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(const MethodChannel(channelName), (
+      call,
+    ) async {
+      nativeCalls.add(call);
+      return null;
+    });
+    try {
+      await tester.pumpWidget(
+        buildEasySubwayTestApp(
+          repository: FakeStationSearchRepository(
+            networkMapRegionNames: const ['수도권'],
+          ),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      final androidView = tester.widget<AndroidView>(find.byType(AndroidView));
+      androidView.onPlatformViewCreated!(viewId);
+      await messenger.handlePlatformMessage(
+        channelName,
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('framePresented', <String, Object>{
+            'revision': 0,
+            'frameToken': 0,
+          }),
+        ),
+        (_) {},
+      );
+      await tester.pump();
+
+      final stationFinder = find.byKey(
+        const Key('networkMapStation-sangnoksu-seoul-4'),
+      );
+      await tester.tapAt(tester.getCenter(stationFinder));
+      await tester.pump();
+      await tester.pump();
+      final selectionArguments =
+          nativeCalls.lastWhere((call) => call.method == 'setCamera').arguments
+              as Map;
+      await messenger.handlePlatformMessage(
+        channelName,
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('framePresented', <String, Object>{
+            'revision': selectionArguments['revision'] as int,
+            'frameToken': selectionArguments['frameToken'] as int,
+          }),
+        ),
+        (_) {},
+      );
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+      final basemap = tester.widget<RouteMapBasemapView>(
+        find.byType(RouteMapBasemapView),
+      );
+      basemap.onUnavailable!();
+      await tester.pump();
+
+      expect(find.text('노선도를 불러오지 못했어요'), findsOneWidget);
+      expect(find.byType(RouteMapBasemapView), findsNothing);
+      expect(find.bySemanticsLabel('노선도'), findsNothing);
+      expect(
+        find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')),
+        findsNothing,
+      );
+      expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    } finally {
+      messenger.setMockMethodCallHandler(
+        const MethodChannel(channelName),
+        null,
+      );
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
   testWidgets('수도권 노선도는 Android에서 구조화 canvas 렌더러로 전체 크기를 채운다', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     tester.view.devicePixelRatio = 3;
@@ -3630,6 +3730,202 @@ void main() {
       tester.view.resetDevicePixelRatio();
     }
   });
+
+  testWidgets(
+    '광주송정역 native visual layer는 중복 semantics 없이 station action을 유지한다',
+    (tester) async {
+      debugRouteMapSvgViewportPresentImmediately = false;
+      debugDefaultTargetPlatformOverride = TargetPlatform.android;
+      const viewId = 2571;
+      const channelName =
+          'com.easysubway.easysubway_mobile/route_map_viewport_webview/$viewId';
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final nativeCalls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(const MethodChannel(channelName), (
+        call,
+      ) async {
+        nativeCalls.add(call);
+        return null;
+      });
+      final semanticsHandle = tester.ensureSemantics();
+      primeNetworkMapOwnerLabelsCacheForTest(const {});
+      try {
+        await tester.pumpWidget(
+          buildEasySubwayTestApp(
+            repository: FakeStationSearchRepository(
+              networkMapRegionNames: const ['광주'],
+              networkMapData: const NetworkMapData(
+                regions: [NetworkMapRegion(name: '광주')],
+                selectedRegion: '광주',
+                lines: [
+                  NetworkMapLine(
+                    id: 'gwangju-1',
+                    name: '광주 1호선',
+                    color: '#009088',
+                    region: '광주',
+                  ),
+                ],
+                stations: [
+                  NetworkMapStation(
+                    id: 'station-gwangju-songjeong',
+                    nameKo: '광주송정역',
+                    nameEn: 'Gwangju Songjeong',
+                    region: '광주',
+                    lineId: 'gwangju-1',
+                    stationCode: '100',
+                    sequence: 1,
+                    position: NetworkMapPosition(
+                      x: 160,
+                      y: 160,
+                      labelDx: 0,
+                      labelDy: 0,
+                      upPath: '',
+                      downPath: '',
+                      sourceId: 'task-2571-gwangju-semantics',
+                    ),
+                  ),
+                ],
+                edges: [],
+                positionSources: [
+                  NetworkMapPositionSource(
+                    id: 'task-2571-gwangju-semantics',
+                    name: 'Task 2571 Gwangju semantics fixture',
+                    licenseStatus: 'fixture-only',
+                  ),
+                ],
+                stationLineMemberships: [
+                  NetworkMapStationLineMembership(
+                    stationId: 'station-gwangju-songjeong',
+                    lineId: 'gwangju-1',
+                  ),
+                ],
+              ),
+            ),
+            reportRepository: FakeFacilityReportRepository(),
+            routeRepository: FakeRouteSearchRepository(),
+            notificationRepository: FakeNotificationSettingsRepository(),
+            initialOnboardingState: _completedOnboardingState(),
+          ),
+        );
+        await tester.pump();
+
+        expect(find.bySemanticsLabel('광주송정역'), findsNothing);
+
+        final androidView = tester.widget<AndroidView>(
+          find.byType(AndroidView),
+        );
+        androidView.onPlatformViewCreated!(viewId);
+        await messenger.handlePlatformMessage(
+          channelName,
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall('framePresented', <String, Object>{
+              'revision': 0,
+              'frameToken': 0,
+            }),
+          ),
+          (_) {},
+        );
+        await tester.pump();
+
+        final nativeVisualLayer = find.ancestor(
+          of: find.byType(AndroidView),
+          matching: find.byType(Visibility),
+        );
+        expect(nativeVisualLayer, findsOneWidget);
+        expect(tester.widget<Visibility>(nativeVisualLayer).visible, isTrue);
+        expect(
+          find.ancestor(
+            of: find.byType(AndroidView),
+            matching: find.byType(ExcludeSemantics),
+          ),
+          findsOneWidget,
+        );
+
+        final station = find.bySemanticsLabel('광주송정역');
+        expect(station, findsOneWidget);
+        expect(find.bySemanticsLabel(RegExp('광주송정역역')), findsNothing);
+        expect(
+          tester
+              .getSemantics(station)
+              .getSemanticsData()
+              .hasAction(SemanticsAction.tap),
+          isTrue,
+        );
+
+        final center = tester.getCenter(
+          find.byKey(const Key('networkMapSurface')),
+        );
+        final left = await tester.startGesture(
+          center - const Offset(30, 0),
+          pointer: 1,
+        );
+        final right = await tester.startGesture(
+          center + const Offset(30, 0),
+          pointer: 2,
+        );
+        await tester.pump();
+        await left.moveTo(center - const Offset(60, 0));
+        await right.moveTo(center + const Offset(60, 0));
+        await tester.pump();
+        final cameraCallsAfterFirstMove = nativeCalls
+            .where((call) => call.method == 'setCamera')
+            .length;
+        expect(cameraCallsAfterFirstMove, greaterThan(0));
+        await left.moveTo(center - const Offset(65, 0));
+        await right.moveTo(center + const Offset(65, 0));
+        await tester.pump();
+        expect(
+          nativeCalls.where((call) => call.method == 'setCamera').length,
+          cameraCallsAfterFirstMove,
+        );
+        expect(find.bySemanticsLabel('노선도'), findsOneWidget);
+        await left.up();
+        await right.up();
+        await tester.pump();
+        await tester.pump();
+
+        final pendingCamera = nativeCalls.lastWhere(
+          (call) => call.method == 'setCamera',
+        );
+        final pendingArguments = pendingCamera.arguments as Map;
+        // presented overscan frame이 현재 visual camera를 덮는 동안에는 transform과
+        // interaction overlay를 함께 유지한다.
+        expect(find.bySemanticsLabel('광주송정역'), findsOneWidget);
+        expect(
+          find.byKey(
+            const Key('networkMapStation-gwangju-songjeong-gwangju-1'),
+          ),
+          findsOneWidget,
+        );
+
+        await messenger.handlePlatformMessage(
+          channelName,
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall('framePresented', <String, Object>{
+              'revision': pendingArguments['revision'] as int,
+              'frameToken': pendingArguments['frameToken'] as int,
+            }),
+          ),
+          (_) {},
+        );
+        await tester.pump();
+        expect(find.bySemanticsLabel('광주송정역'), findsOneWidget);
+
+        tester.semantics.tap(find.semantics.byLabel('광주송정역'));
+        await tester.pumpAndSettle();
+        expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+      } finally {
+        messenger.setMockMethodCallHandler(
+          const MethodChannel(channelName),
+          null,
+        );
+        semanticsHandle.dispose();
+        resetNetworkMapOwnerLabelsCacheForTest();
+        debugDefaultTargetPlatformOverride = null;
+      }
+    },
+  );
 
   test('Android 노선도 edge resolver는 station-line endpoint를 해석한다', () {
     const stations = [

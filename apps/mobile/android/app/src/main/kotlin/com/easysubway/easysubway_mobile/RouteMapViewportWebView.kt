@@ -1,11 +1,15 @@
 package com.easysubway.easysubway_mobile
 
 import android.content.Context
-import android.graphics.Color
+import android.content.pm.ApplicationInfo
 import android.os.Build
+import android.os.Handler
+import android.os.Looper
 import android.view.View
 import android.webkit.RenderProcessGoneDetail
+import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebView
 import android.webkit.WebViewClient
 import android.widget.FrameLayout
@@ -15,8 +19,21 @@ import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.StandardMessageCodec
 import io.flutter.plugin.platform.PlatformView
 import io.flutter.plugin.platform.PlatformViewFactory
+import java.io.ByteArrayInputStream
 import java.io.IOException
-import java.util.Locale
+import org.json.JSONObject
+
+private val routeMapFontAssets = listOf(
+    400 to "fonts/Pretendard-Regular.otf",
+    600 to "fonts/Pretendard-SemiBold.otf",
+    700 to "fonts/Pretendard-Bold.otf",
+    800 to "fonts/Pretendard-ExtraBold.otf",
+    900 to "fonts/Pretendard-Black.otf",
+)
+
+// ponytail: local fonts get 5s; add a JS bridge only if cold-load evidence exceeds this bound.
+private const val fontReadinessMaxAttempts = 100
+private const val fontReadinessPollMillis = 50L
 
 class RouteMapViewportWebViewFactory(
     codec: StandardMessageCodec,
@@ -30,11 +47,9 @@ class RouteMapViewportWebViewFactory(
             viewId = viewId,
             assetPath = params["assetPath"] as? String ?: "",
             mimeType = params["mimeType"] as? String ?: "",
-            sourceWidth = params["sourceWidth"].asDouble(),
-            sourceHeight = params["sourceHeight"].asDouble(),
             viewBox = params["viewBox"].asDoubleList(),
             revision = params["revision"].asInt(),
-            labelCollisionScript = params["labelCollisionScript"] as? String ?: "",
+            frameToken = params["frameToken"].asInt(),
         )
     }
 }
@@ -45,28 +60,47 @@ private class RouteMapViewportPlatformView(
     viewId: Int,
     private val assetPath: String,
     private val mimeType: String,
-    private val sourceWidth: Double,
-    private val sourceHeight: Double,
     private var viewBox: List<Double>,
     private var revision: Int,
-    private val labelCollisionScript: String,
+    private var frameToken: Int,
 ) : PlatformView {
+    private val mainHandler = Handler(Looper.getMainLooper())
+    private val isDebuggable =
+        context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0
     private val container = FrameLayout(context).apply {
-        setBackgroundColor(Color.WHITE)
+        isClickable = false
+        isFocusable = false
+        importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
     }
     private val channel = MethodChannel(
         messenger,
         "com.easysubway.easysubway_mobile/route_map_viewport_webview/$viewId",
     )
     private var webView: WebView? = null
+    @Volatile
+    private var initialAssetUrl: String? = null
+    @Volatile
+    private var fontUrls = emptySet<String>()
+    private var documentReady = false
+    private var fontReadinessAttempts = 0
+    private var isDisposed = false
+    private var started = false
 
     init {
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "start" -> {
+                    if (!started) {
+                        started = true
+                        load()
+                    }
+                    result.success(null)
+                }
                 "setCamera" -> {
-                    viewBox = (call.argument<Any>("viewBox")).asDoubleList()
-                    revision = (call.argument<Any>("revision")).asInt()
-                    applyViewBox()
+                    viewBox = call.argument<Any>("viewBox").asDoubleList()
+                    revision = call.argument<Any>("revision").asInt()
+                    frameToken = call.argument<Any>("frameToken").asInt()
+                    if (documentReady) applyViewBox()
                     result.success(null)
                 }
                 "reload" -> {
@@ -77,6 +111,7 @@ private class RouteMapViewportPlatformView(
                     webView?.clearCache(false)
                     result.success(null)
                 }
+                "debugFault" -> handleDebugFault(call.argument<String>("kind"), result)
                 "dispose" -> {
                     dispose()
                     result.success(null)
@@ -84,135 +119,310 @@ private class RouteMapViewportPlatformView(
                 else -> result.notImplemented()
             }
         }
-        load()
     }
 
-    private fun load() {
+    private fun load(assetPathOverride: String? = null) {
+        if (isDisposed) return
+        documentReady = false
+        fontReadinessAttempts = 0
+        fontUrls = emptySet()
         destroyWebView()
         container.removeAllViews()
-        val svgWebView = WebView(container.context)
-        webView = svgWebView
-        svgWebView.setBackgroundColor(Color.WHITE)
-        svgWebView.isHorizontalScrollBarEnabled = false
-        svgWebView.isVerticalScrollBarEnabled = false
-        svgWebView.settings.javaScriptEnabled = true
-        svgWebView.settings.builtInZoomControls = false
-        svgWebView.settings.displayZoomControls = false
-        svgWebView.webViewClient = routeMapWebViewClient()
-        svgWebView.loadDataWithBaseURL(
-            "file:///android_asset/",
-            htmlForSvg(container.context),
-            "text/html",
-            "UTF-8",
-            null,
-        )
-        container.addView(
-            svgWebView,
-            FrameLayout.LayoutParams(
+        val resolvedUrl = resolvedAssetUrl(assetPathOverride ?: assetPath)
+        val resolvedFonts = resolvedFontUrls()
+        if (resolvedUrl == null || resolvedFonts == null) {
+            reportAssetLoadFailed()
+            return
+        }
+        initialAssetUrl = resolvedUrl
+        fontUrls = resolvedFonts.values.toSet()
+        var svgWebView: WebView? = null
+        try {
+            val candidate = WebView(container.context).apply {
+                isClickable = false
+                isFocusable = false
+                importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+                setOnTouchListener { _, _ -> true }
+                isHorizontalScrollBarEnabled = false
+                isVerticalScrollBarEnabled = false
+                setBackgroundColor(android.graphics.Color.TRANSPARENT)
+                settings.javaScriptEnabled = true
+                settings.javaScriptCanOpenWindowsAutomatically = false
+                settings.builtInZoomControls = false
+                settings.displayZoomControls = false
+                settings.blockNetworkLoads = true
+                settings.allowContentAccess = false
+                settings.allowFileAccess = true
+                webViewClient = routeMapWebViewClient()
+            }
+            svgWebView = candidate
+            webView = candidate
+            container.addView(candidate, FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT,
-            ),
-        )
+            ))
+            candidate.loadUrl(resolvedUrl)
+        } catch (_: RuntimeException) {
+            webView = null
+            svgWebView?.let { candidate ->
+                runCatching { container.removeView(candidate) }
+                runCatching { candidate.destroy() }
+            }
+            reportAssetLoadFailed()
+        }
     }
 
-    private fun routeMapWebViewClient(): WebViewClient {
+    private fun resolvedAssetUrl(path: String): String? {
+        if (mimeType != "image/svg+xml" || path.isBlank()) return null
+        return try {
+            val lookupKey = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(path)
+            container.context.assets.open(lookupKey).close()
+            "file:///android_asset/$lookupKey"
+        } catch (_: IOException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
+    private fun resolvedFontUrls(): Map<Int, String>? {
+        return try {
+            routeMapFontAssets.associate { (weight, path) ->
+                val lookupKey = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(path)
+                container.context.assets.open(lookupKey).close()
+                weight to "file:///android_asset/$lookupKey"
+            }
+        } catch (_: IOException) {
+            null
+        } catch (_: RuntimeException) {
+            null
+        }
+    }
+
+    private fun routeMapWebViewClient(): WebViewClient =
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            return object : BlockingRouteMapWebViewClient() {
-                override fun onRenderProcessGone(
-                    view: WebView,
-                    detail: RenderProcessGoneDetail,
-                ): Boolean {
-                    if (webView === view) {
-                        channel.invokeMethod("processGone", mapOf("didCrash" to detail.didCrash()))
-                        container.removeView(view)
-                        view.destroy()
-                        webView = null
+            Api26RouteMapWebViewClient()
+        } else {
+            RouteMapWebViewClient()
+        }
+
+    private open inner class RouteMapWebViewClient : WebViewClient() {
+        override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
+            val allowed = request.url.toString() == initialAssetUrl
+            if (!allowed && request.isForMainFrame) reportAssetLoadFailed()
+            return !allowed
+        }
+
+        @Deprecated("Old Android callback kept so external navigation stays blocked.")
+        override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean {
+            val allowed = url == initialAssetUrl
+            if (!allowed) reportAssetLoadFailed()
+            return !allowed
+        }
+
+        override fun shouldInterceptRequest(view: WebView, request: WebResourceRequest): WebResourceResponse? {
+            val url = request.url.toString()
+            if (url == initialAssetUrl || url in fontUrls) return null
+            reportAssetLoadFailedFromWebThread()
+            return WebResourceResponse("text/plain", "UTF-8", ByteArrayInputStream(ByteArray(0)))
+        }
+
+        override fun onPageFinished(view: WebView, url: String) {
+            if (webView !== view || url != initialAssetUrl) {
+                reportAssetLoadFailed()
+                return
+            }
+            prepareDocument(view)
+        }
+
+        override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
+            if (request.isForMainFrame) reportAssetLoadFailed()
+        }
+    }
+
+    @android.annotation.TargetApi(Build.VERSION_CODES.O)
+    private inner class Api26RouteMapWebViewClient : RouteMapWebViewClient() {
+        override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
+            handleProcessGone(view, detail.didCrash())
+            return true
+        }
+    }
+
+    private fun prepareDocument(currentWebView: WebView) {
+        val fonts = resolvedFontUrls() ?: run {
+            reportAssetLoadFailed()
+            return
+        }
+        val css = fonts.entries.joinToString("") { (weight, url) ->
+            "@font-face{font-family:'Pretendard';src:url('$url') format('opentype');" +
+                "font-weight:$weight;font-style:normal;font-display:block;}"
+        }
+        // The asset stays byte-identical; this only resolves its declared Pretendard family.
+        val script = """
+            (function(){
+              const svg=document.documentElement;
+              if(!svg||svg.tagName.toLowerCase()!=='svg'||!document.fonts){return false;}
+              const style=document.createElementNS('http://www.w3.org/2000/svg','style');
+              style.textContent=${JSONObject.quote(css)};
+              svg.insertBefore(style,svg.firstChild);
+              const allowed=['viewBox','width','height','preserveAspectRatio'];
+              window.__easySubwaySvgIntegrityViolation=false;
+              const observer=new MutationObserver((records)=>{
+                for(const record of records){
+                  if(record.type==='attributes'&&record.target===svg&&allowed.includes(record.attributeName)){continue;}
+                  window.__easySubwaySvgIntegrityViolation=true;
+                  observer.disconnect();
+                  break;
+                }
+              });
+              observer.observe(svg,{subtree:true,childList:true,characterData:true,attributes:true});
+              window.__easySubwaySvgObserver=observer;
+              window.__easySubwayFontState='pending';
+              const specs=['400 12px Pretendard','600 12px Pretendard','700 12px Pretendard','800 12px Pretendard','900 12px Pretendard'];
+              Promise.all(specs.map((spec)=>document.fonts.load(spec,'가'))).then(()=>{
+                window.__easySubwayFontState=specs.every((spec)=>document.fonts.check(spec,'가'))?'ready':'failed';
+              }).catch(()=>{window.__easySubwayFontState='failed';});
+              return true;
+            })();
+        """.trimIndent()
+        currentWebView.evaluateJavascript(script) { result ->
+            if (webView !== currentWebView || result != "true") {
+                reportAssetLoadFailed()
+                return@evaluateJavascript
+            }
+            pollDocumentReady(currentWebView)
+        }
+    }
+
+    private fun pollDocumentReady(currentWebView: WebView) {
+        if (webView !== currentWebView || documentReady) return
+        currentWebView.evaluateJavascript("window.__easySubwayFontState || 'failed'") { result ->
+            if (webView !== currentWebView || documentReady) return@evaluateJavascript
+            when (result) {
+                "\"ready\"" -> {
+                    documentReady = true
+                    applyViewBox()
+                }
+                "\"failed\"" -> reportAssetLoadFailed()
+                else -> {
+                    fontReadinessAttempts += 1
+                    if (fontReadinessAttempts >= fontReadinessMaxAttempts) {
+                        reportAssetLoadFailed()
+                    } else {
+                        mainHandler.postDelayed(
+                            { pollDocumentReady(currentWebView) },
+                            fontReadinessPollMillis,
+                        )
                     }
-                    return true
                 }
             }
         }
-        return BlockingRouteMapWebViewClient()
     }
-
-    private open inner class BlockingRouteMapWebViewClient : WebViewClient() {
-        override fun shouldOverrideUrlLoading(
-            view: WebView,
-            request: WebResourceRequest,
-        ): Boolean = true
-
-        @Deprecated("Old Android callback kept so external navigation stays blocked.")
-        override fun shouldOverrideUrlLoading(view: WebView, url: String): Boolean = true
-
-        override fun onPageFinished(view: WebView, url: String) {
-            if (webView !== view) {
-                return
-            }
-            channel.invokeMethod("assetReady", null)
-            applyViewBox()
-        }
-    }
-
-    private fun htmlForSvg(context: Context): String {
-        if (mimeType != "image/svg+xml" || assetPath.isBlank()) {
-            return emptyHtml()
-        }
-        val lookupKey = FlutterInjector.instance().flutterLoader().getLookupKeyForAsset(assetPath)
-        val svg = try {
-            context.assets.open(lookupKey).bufferedReader().use { reader ->
-                reader.readText()
-            }
-        } catch (exception: RuntimeException) {
-            return emptyHtml()
-        } catch (exception: IOException) {
-            return emptyHtml()
-        }
-        return """
-            <!doctype html>
-            <html>
-            <head>
-                <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-                <style>
-                    html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; background: #ffffff; }
-                    svg { display: block; width: 100%; height: 100%; }
-                </style>
-                <script>$labelCollisionScript</script>
-            </head>
-            <body>$svg</body>
-            </html>
-        """.trimIndent()
-    }
-
-    private fun emptyHtml(): String = "<!doctype html><html><body></body></html>"
 
     private fun applyViewBox() {
-        val values = normalizedViewBox()
+        val currentWebView = webView ?: run {
+            reportCameraApplyFailed()
+            return
+        }
+        val values = viewBox
+        if (!isValidViewBox(values)) {
+            reportCameraApplyFailed()
+            return
+        }
         val frameRevision = revision
-        val script = String.format(
-            Locale.US,
-            "(function(){const svg=document.querySelector('svg');if(!svg){return false;}svg.setAttribute('viewBox','%.4f %.4f %.4f %.4f');svg.setAttribute('width','100%%');svg.setAttribute('height','100%%');svg.setAttribute('preserveAspectRatio','xMidYMid meet');try{if(window.easysubwayApplyRouteMapLabelPolicy){window.easysubwayApplyRouteMapLabelPolicy();}}catch(e){}return true;})();",
-            values[0],
-            values[1],
-            values[2],
-            values[3],
-        )
-        webView?.evaluateJavascript(script) { result ->
-            if (result == "true") {
-                channel.invokeMethod("framePresented", mapOf("revision" to frameRevision))
+        val presentedFrameToken = frameToken
+        val encodedValues = values.joinToString(",") { value -> value.toString() }
+        val script = """
+            (function(){
+              const values=[$encodedValues];
+              const svg=document.documentElement;
+              if(!svg||svg.tagName.toLowerCase()!=='svg'||window.__easySubwaySvgIntegrityViolation===true||values.length!==4||!values.every(Number.isFinite)||values[2]<=0||values[3]<=0){return false;}
+              svg.setAttribute('viewBox',values.join(' '));
+              svg.setAttribute('width','100%');
+              svg.setAttribute('height','100%');
+              svg.setAttribute('preserveAspectRatio','xMidYMid meet');
+              return true;
+            })();
+        """.trimIndent()
+        currentWebView.evaluateJavascript(script) { result ->
+            if (webView !== currentWebView || result != "true") {
+                reportCameraApplyFailed()
+            } else {
+                currentWebView.postVisualStateCallback(
+                    frameRevision.toLong(),
+                    object : WebView.VisualStateCallback() {
+                        override fun onComplete(requestId: Long) {
+                            if (
+                                webView === currentWebView &&
+                                revision == frameRevision &&
+                                frameToken == presentedFrameToken &&
+                                requestId == frameRevision.toLong()
+                            ) {
+                                channel.invokeMethod(
+                                    "framePresented",
+                                    mapOf(
+                                        "revision" to frameRevision,
+                                        "frameToken" to presentedFrameToken,
+                                    ),
+                                )
+                            }
+                        }
+                    },
+                )
             }
         }
     }
 
-    private fun normalizedViewBox(): List<Double> {
-        if (viewBox.size == 4 && viewBox[2] > 0.0 && viewBox[3] > 0.0) {
-            return viewBox
+    private fun isValidViewBox(values: List<Double>): Boolean =
+        values.size == 4 && values.all { it.isFinite() } && values[2] > 0.0 && values[3] > 0.0
+
+    private fun reportAssetLoadFailed() {
+        channel.invokeMethod("assetLoadFailed", null)
+    }
+
+    private fun reportAssetLoadFailedFromWebThread() {
+        mainHandler.post { reportAssetLoadFailed() }
+    }
+
+    private fun reportCameraApplyFailed() {
+        channel.invokeMethod("cameraApplyFailed", null)
+    }
+
+    private fun handleProcessGone(view: WebView?, didCrash: Boolean) {
+        if (view != null && webView !== view) return
+        channel.invokeMethod("processGone", mapOf("didCrash" to didCrash))
+        webView?.let { current ->
+            container.removeView(current)
+            current.destroy()
         }
-        return listOf(0.0, 0.0, sourceWidth.coerceAtLeast(1.0), sourceHeight.coerceAtLeast(1.0))
+        webView = null
+        documentReady = false
+    }
+
+    private fun handleDebugFault(kind: String?, result: MethodChannel.Result) {
+        if (!isDebuggable) {
+            result.error("debugUnavailable", "debug faults are unavailable in release", null)
+            return
+        }
+        result.success(null)
+        mainHandler.post {
+            when (kind) {
+                "invalidAsset" -> load("assets/datapacks/metro_map_pack/basemap/__missing_route_map__.svg")
+                "invalidViewBox" -> {
+                    viewBox = listOf(0.0, 0.0, Double.NaN, 1.0)
+                    applyViewBox()
+                }
+                "debugProcessGone" -> handleProcessGone(webView, didCrash = true)
+                else -> reportAssetLoadFailed()
+            }
+        }
     }
 
     override fun getView(): View = container
 
     override fun dispose() {
+        isDisposed = true
+        mainHandler.removeCallbacksAndMessages(null)
         channel.setMethodCallHandler(null)
         destroyWebView()
         container.removeAllViews()
@@ -221,20 +431,12 @@ private class RouteMapViewportPlatformView(
     private fun destroyWebView() {
         webView?.let { view ->
             view.stopLoading()
-            view.loadUrl("about:blank")
             view.removeAllViews()
             view.destroy()
         }
         webView = null
+        documentReady = false
     }
-}
-
-private fun Any?.asDouble(): Double = when (this) {
-    is Double -> this
-    is Float -> toDouble()
-    is Int -> toDouble()
-    is Long -> toDouble()
-    else -> 0.0
 }
 
 private fun Any?.asInt(): Int = when (this) {
@@ -247,5 +449,13 @@ private fun Any?.asInt(): Int = when (this) {
 
 private fun Any?.asDoubleList(): List<Double> {
     val values = this as? List<*> ?: return emptyList()
-    return values.map { value -> value.asDouble() }
+    return values.mapNotNull { value ->
+        when (value) {
+            is Double -> value
+            is Float -> value.toDouble()
+            is Int -> value.toDouble()
+            is Long -> value.toDouble()
+            else -> null
+        }
+    }
 }

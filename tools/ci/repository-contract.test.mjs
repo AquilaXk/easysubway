@@ -66,6 +66,169 @@ function collapseQuotedStringConcatenations(source) {
 
 const adEventEndpointOccurrence = /\/api\/ads\/events(?=["']|\?|$)/g;
 
+test("native route map은 canonical SVG 문서만 무수정 표시한다", () => {
+  const android = read("apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/RouteMapViewportWebView.kt");
+  const ios = read("apps/mobile/ios/Runner/AppDelegate.swift");
+  const dartViewport = read(
+    "apps/mobile/lib/features/network_map/infrastructure/route_map_svg_viewport.dart",
+  );
+  const iosProject = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
+  const iosViewport = ios.slice(ios.indexOf("private final class RouteMapViewportWebViewFactory"));
+  const runnerDebugMatch = iosProject.match(
+    /97C147061CF9000F007C117D \/\* Debug \*\/ = \{[\s\S]*?name = Debug;/,
+  );
+  const runnerReleaseMatch = iosProject.match(
+    /97C147071CF9000F007C117D \/\* Release \*\/ = \{[\s\S]*?name = Release;/,
+  );
+  const runnerProfileMatch = iosProject.match(
+    /249021D4217E4FDB00AE95B9 \/\* Profile \*\/ = \{[\s\S]*?name = Profile;/,
+  );
+  assert.ok(runnerDebugMatch, "Runner Debug configuration block must exist");
+  assert.ok(runnerReleaseMatch, "Runner Release configuration block must exist");
+  assert.ok(runnerProfileMatch, "Runner Profile configuration block must exist");
+  const runnerDebugConfiguration = runnerDebugMatch[0];
+  const runnerReleaseConfiguration = runnerReleaseMatch[0];
+  const runnerProfileConfiguration = runnerProfileMatch[0];
+  const allowedRootAttributes = ["viewBox", "width", "height", "preserveAspectRatio"];
+
+  for (const [platform, source] of [["Android", android], ["iOS", iosViewport]]) {
+    assert.doesNotMatch(source, /labelCollisionScript|htmlForSvg|emptyHtml|loadHTMLString|loadDataWithBaseURL|UILabel/,
+      `${platform} must not wrap, rewrite, or replace the canonical SVG document`);
+    assert.match(source, /assetLoadFailed/, `${platform} must fail closed on asset/navigation/load errors`);
+    assert.match(source, /cameraApplyFailed/, `${platform} must fail closed on camera errors`);
+    assert.match(source, /processGone/, `${platform} must surface renderer loss`);
+    assert.match(source, /debugProcessGone/, `${platform} must expose a debug-only renderer-loss fault`);
+    assert.match(source, /document\.documentElement/, `${platform} camera script must require the SVG root`);
+    assert.doesNotMatch(
+      source,
+      /cloneNode\(true\)|outerHTML/,
+      `${platform} camera updates must not clone or serialize the full SVG DOM`,
+    );
+    assert.match(
+      source,
+      /const allowed=\['viewBox','width','height','preserveAspectRatio'\];/,
+      `${platform} integrity guard must name exactly the allowed root attributes`,
+    );
+    assert.match(source, /isFinite/, `${platform} must reject non-finite camera dimensions`);
+    assert.deepEqual(
+      [...source.matchAll(/svg\.setAttribute\('([^']+)'/g)].map((match) => match[1]),
+      allowedRootAttributes,
+      `${platform} must mutate exactly the allowed SVG root attributes`,
+    );
+    assert.match(
+      source,
+      /svg\.setAttribute\('viewBox',values\.join\(' '\)\);/,
+      `${platform} must retain full-precision camera coordinates only in viewBox`,
+    );
+    assert.match(source, /svg\.setAttribute\('width','100%'\);/);
+    assert.match(source, /svg\.setAttribute\('height','100%'\);/);
+    assert.doesNotMatch(
+      source,
+      /svg\.setAttribute\('(width|height)',String\(values\[[23]\]\)\);/,
+      `${platform} must not interpret source-coordinate dimensions as CSS pixels`,
+    );
+    assert.match(source, /MutationObserver/, `${platform} must monitor non-camera DOM mutations`);
+    assert.match(source, /document\.fonts\.load/, `${platform} must await bundled web fonts`);
+    assert.match(source, /@font-face/, `${platform} must register Pretendard in the WebView document`);
+    assert.match(source, /font-display:block/, `${platform} must not expose fallback-font frames`);
+    assert.match(source, /Pretendard-Regular\.otf/);
+    assert.match(source, /Pretendard-SemiBold\.otf/);
+    assert.match(source, /Pretendard-Bold\.otf/);
+    assert.match(source, /Pretendard-ExtraBold\.otf/);
+    assert.match(source, /Pretendard-Black\.otf/);
+    assert.match(source, /documentReady/, `${platform} must queue camera state until SVG and fonts are ready`);
+    assert.match(source, /prepareDocument/, `${platform} must prepare the canonical document once per load`);
+    assert.match(source, /fontReadinessAttempts/, `${platform} font readiness polling must be bounded`);
+  }
+
+  assert.match(android, /loadUrl\(resolvedUrl\)/);
+  assert.match(android, /file:\/\/\/android_asset\//);
+  assert.match(android, /isClickable = false/);
+  assert.match(android, /setOnTouchListener \{ _, _ -> true \}/);
+  assert.match(android, /importantForAccessibility = View\.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS/);
+  assert.match(android, /initialAssetUrl/);
+  assert.match(android, /request\.url\.toString\(\) == initialAssetUrl/);
+  assert.match(android, /ApplicationInfo\.FLAG_DEBUGGABLE/);
+  assert.match(android, /reportAssetLoadFailedFromWebThread/);
+  assert.match(android, /settings\.blockNetworkLoads = true/);
+  assert.match(android, /settings\.allowContentAccess = false/);
+  assert.match(android, /settings\.allowFileAccess = true/);
+  assert.match(
+    android,
+    /var svgWebView: WebView\? = null[\s\S]*try \{[\s\S]*WebView\(container\.context\)/,
+    "Android must fail closed when the WebView provider cannot construct or initialize a view",
+  );
+  assert.match(
+    android,
+    /catch \(_: RuntimeException\) \{[\s\S]*svgWebView\?\.let[\s\S]*destroy\(\)[\s\S]*reportAssetLoadFailed\(\)/,
+  );
+  assert.match(android, /private var isDisposed = false/);
+  assert.match(android, /frameToken = call\.argument<Any>\("frameToken"\)\.asInt\(\)/);
+  assert.match(android, /"frameToken" to presentedFrameToken/);
+  assert.match(android, /"start" -> \{[\s\S]*if \(!started\) \{[\s\S]*load\(\)/);
+  assert.doesNotMatch(android, /mainHandler\.post \{[\s\S]*load\(\)/);
+  assert.match(android, /private fun load\([\s\S]*if \(isDisposed\) return/);
+  assert.match(android, /isDisposed = true[\s\S]*mainHandler\.removeCallbacksAndMessages\(null\)/);
+  assert.match(
+    android,
+    /if \(Build\.VERSION\.SDK_INT >= Build\.VERSION_CODES\.O\)[\s\S]*Api26RouteMapWebViewClient\(\)[\s\S]*else[\s\S]*RouteMapWebViewClient\(\)/,
+    "Android API 24–25 must not load the API 26 renderer-loss callback type",
+  );
+  assert.match(
+    android,
+    /if \(!isDebuggable\) \{[\s\S]*result\.error\("debugUnavailable"[\s\S]*return/,
+  );
+  assert.match(
+    android,
+    /if \(webView !== currentWebView \|\| result != "true"\) \{[\s\S]*reportCameraApplyFailed\(\)[\s\S]*\} else \{[\s\S]*postVisualStateCallback[\s\S]*framePresented/,
+  );
+
+  assert.match(iosViewport, /loadFileURL\(assetURL, allowingReadAccessTo: readAccessURL\)/);
+  assert.match(iosViewport, /isUserInteractionEnabled = false/);
+  assert.match(iosViewport, /accessibilityElementsHidden = true/);
+  assert.match(iosViewport, /initialAssetURL/);
+  assert.match(iosViewport, /request\.url == initialAssetURL/);
+  assert.match(iosViewport, /WKContentRuleListStore\.default\(\)\.compileContentRuleList/);
+  assert.match(
+    iosViewport,
+    /\[\{"trigger":\{"url-filter":"\^https\?:\/\/\.\*"\},"action":\{"type":"block"\}\}\]/,
+  );
+  assert.match(
+    iosViewport,
+    /guard self\.webView === webView else \{[\s\S]*if navigationAction\.request\.url == initialAssetURL/,
+  );
+  assert.match(
+    iosViewport,
+    /guard self\.webView === webView else \{[\s\S]*if navigationResponse\.response\.url == initialAssetURL/,
+  );
+  assert.match(
+    iosViewport,
+    /private func handleDebugFault[\s\S]*#if DEBUG[\s\S]*#else[\s\S]*debugUnavailable[\s\S]*#endif/,
+  );
+  assert.match(runnerDebugConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;/);
+  assert.doesNotMatch(runnerReleaseConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS/);
+  assert.doesNotMatch(runnerProfileConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS/);
+  assert.match(iosViewport, /result as\? Bool == true/);
+  assert.match(iosViewport, /callAsyncJavaScript/);
+  assert.match(iosViewport, /requestAnimationFrame/);
+  assert.match(iosViewport, /private var loadGeneration = 0/);
+  assert.match(iosViewport, /case "start":[\s\S]*if !started \{[\s\S]*load\(\)/);
+  assert.doesNotMatch(iosViewport, /DispatchQueue\.main\.async \{[\s\S]*load\(\)/);
+  assert.match(iosViewport, /private var isDisposed = false/);
+  assert.match(iosViewport, /frameToken = params\["frameToken"\]\.asInt\(\)/);
+  assert.match(iosViewport, /"frameToken": presentedFrameToken/);
+  assert.match(iosViewport, /loadGeneration \+= 1[\s\S]*let generation = loadGeneration/);
+  assert.match(iosViewport, /guard self\.isCurrentLoad\(generation, assetURL: assetURL\) else \{ return \}/);
+  assert.match(iosViewport, /private func loadDocument\(_ assetURL: URL, generation: Int,/);
+  assert.match(iosViewport, /guard isCurrentLoad\(generation, assetURL: assetURL\) else \{ return \}/);
+  assert.match(iosViewport, /isDisposed = true[\s\S]*loadGeneration \+= 1[\s\S]*initialAssetURL = nil/);
+  assert.match(
+    dartViewport,
+    /setMethodCallHandler\(_handleMethodCall\)[\s\S]*invokeMethod<void>\('start'\)/,
+    "Dart must register its native event handler before starting the SVG document",
+  );
+});
+
 function containsAdEventEndpoint(source) {
   // ponytail: literal/quoted-concat endpoint만 탐지한다. 새 interpolation/variable 광고 endpoint를
   // 허용해야 할 때는 regex를 넓히지 말고 Dart AST 기반 검사로 교체한다.
@@ -19382,7 +19545,7 @@ test("Android 다음 열차 위젯은 로컬 snapshot과 명시적 구성만 사
   assert.match(provider, /easysubway:\/\/station\/detail/);
 });
 
-test("home_widget 호환 iOS deployment target은 모든 configuration에서 14.0 이상이다", () => {
+test("home_widget 호환 iOS deployment target은 모든 configuration에서 15.0 이상이다", () => {
   const project = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
   const deploymentTargets = [
     ...project.matchAll(/IPHONEOS_DEPLOYMENT_TARGET = ([^;]+);/g),
@@ -19390,7 +19553,7 @@ test("home_widget 호환 iOS deployment target은 모든 configuration에서 14.
 
   assert.ok(deploymentTargets.length > 0);
   assert.ok(
-    deploymentTargets.every((target) => Number.parseFloat(target) >= 14),
+    deploymentTargets.every((target) => Number.parseFloat(target) >= 15),
   );
 });
 

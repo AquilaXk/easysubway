@@ -85,7 +85,7 @@ const TextStyle _badgeStyle = TextStyle(
 );
 
 /// #2068 SVG 충실도(2026-07-26 오너 결정): 바탕층 모드가 소비하는 **빈** 라벨
-/// 레이아웃. 오너 SVG의 역명 라벨과 종점 마크가 .vec 바탕층에 그대로 구워지므로
+/// 레이아웃. 오너 SVG의 역명 라벨과 종점 마크가 canonical SVG 바탕층에 있으므로
 /// 앱은 같은 글자를 다시 그리지 않는다("글자도 복붙" — 화면이 SVG와 픽셀 동일).
 /// 라벨 솔버 자체는 구조화 노선도 모드(역 심벌을 앱이 그리는 모드)에서 그대로
 /// 쓰인다. 게이트: test/features/network_map/presentation/
@@ -224,7 +224,7 @@ bool _transferDotsHorizontal(
 ///
 /// [basemap]이 true(=역 심벌을 앱이 그리지 않는 바탕층 모드)면 솔버를 아예
 /// 호출하지 않고 [kRouteMapBasemapEmptyLabelLayout]을 돌려준다 — 오너 SVG의
-/// 역명 라벨이 .vec에 구워져 있어 앱이 같은 글자를 다시 그리면 이중 렌더이자
+/// 역명 라벨이 canonical SVG에 있어 앱이 같은 글자를 다시 그리면 이중 렌더이자
 /// 오배치의 원인이 된다. false(구조화 노선도 모드)면 기존 솔버 결과 그대로다.
 RouteMapStaticLabelLayout routeMapPictureLabelLayout({
   required bool basemap,
@@ -564,7 +564,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
   void initState() {
     super.initState();
     // cold 진입 첫 프레임에서 label layout + picture record가 build를 막지 않게
-    // 다음 프레임으로 미룬다. 그 사이 바탕(.vec)만 보여 체감 jank를 줄인다.
+    // 다음 프레임으로 미룬다. 그 사이 canonical SVG 바탕만 보여 체감 jank를 줄인다.
     _schedulePictureBuild();
   }
 
@@ -663,9 +663,8 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
         measureRouteMapBadge(text, fontSize: fontSize);
 
     // #2068 SVG 충실도(2026-07-26 오너 결정): **바탕층 모드에서 앱은 역명 글자를
-    // 그리지 않는다.** 오너 SVG의 역명 라벨이 .vec 바탕층에 그대로 구워지므로
-    // (compile-basemap-vec.mjs의 MAP_BODY_LAYER_IDS에 라벨 레이어 포함), 앱이
-    // 같은 글자를 다시 배치·렌더하면 이중 렌더이자 오배치의 원인이 된다 —
+    // 그리지 않는다.** 오너 SVG의 역명 라벨이 canonical SVG 바탕층에 있으므로
+    // 앱이 같은 글자를 다시 배치·렌더하면 이중 렌더이자 오배치의 원인이 된다 —
     // #1635에서 온 "라벨=구조화 렌더" 조항의 오너 공식 폐기다.
     // 유지되는 것: 역 탭 히트(_labelPolygonFor는 route_map_positions의
     // labelPolygon을 쓰고, labels.json은 networkMapOwnerLabelSourceRects로 히트
@@ -736,7 +735,7 @@ class _StructuredRouteMapViewState extends State<StructuredRouteMapView> {
     final picture = _picture;
     final design = _design;
     // Picture 준비 전: 빈 레이어만 두어 첫 프레임 build를 가볍게 유지한다.
-    // 바탕(.vec)은 형제 RouteMapBasemapView가 담당한다.
+    // canonical SVG 바탕은 형제 RouteMapBasemapView가 담당한다.
     if (picture == null || design == null) {
       return SizedBox.fromSize(size: widget.camera.viewportSize);
     }
