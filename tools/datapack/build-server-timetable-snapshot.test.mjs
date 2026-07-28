@@ -131,6 +131,8 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
   assert.equal((first.sql.match(/INSERT INTO station_pathway_edges/g) ?? []).length, 4);
   assert.equal((first.sql.match(/INSERT INTO transfer_rules/g) ?? []).length, 0);
   assert.equal((first.sql.match(/INSERT INTO route_edge_evidence/g) ?? []).length, 4);
+  assert.match(first.sql, /'edge-entry-sadang-seoul-4', 'ENTRY', 'seoul-metro-accessibility', 'seoul-metro-accessibility-20260728', 'OFFICIAL_SOURCE', 'UNKNOWN'/);
+  assert.doesNotMatch(first.sql, /route_edge_evidence[^;]+'NOT_VERIFIED'/);
   assert.match(first.sql, /'ITX_CHEONGCHUN'/);
   assert.match(first.sql, /, 2135\);/);
   assert.equal((first.sql.match(/INSERT INTO transit_feed_info/g) ?? []).length, 1);

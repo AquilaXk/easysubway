@@ -19,6 +19,7 @@ import {
   buildRouteIntegrationVerdict,
 } from "../release/generate-route-integration-verdict.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
+import { validateLineage } from "../datapack/source-snapshot-policy.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -7614,8 +7615,8 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     currentImplementation: {
       status: "SATISFIED",
       fields: ["snapshotSha256", "freshUntil"],
-      snapshotId: "server-timetable-snapshot-a6f783c31973ca04",
-      snapshotSha256: "a6f783c31973ca04ee01fbc26ad46a7585ef83c7140f26fc35dbdcc0461ebe6f",
+      snapshotId: "server-timetable-snapshot-990d16f424b25f92",
+      snapshotSha256: "990d16f424b25f92727c5d35665a839161fb107d81c55101b3ac113b988af4c5",
       freshUntil: "2026-08-03T00:00:00+09:00",
       evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
     },
@@ -20029,8 +20030,10 @@ test("#2609 accessibility release canonical pins는 tracked source와 exact-matc
 
   assert.equal(spec.sourceInventorySha256, digest(JSON.stringify(inventory)));
   assert.equal(spec.networkEdgeEvidence.sourceInventory.sha256, digest(inventoryBytes));
-  assert.equal(spec.sourceSnapshotSetHash, digest(JSON.stringify(snapshots)));
-  assert.deepEqual(spec.sourceSnapshots.map(({ snapshotId }) => snapshotId), snapshots.map(({ snapshotId }) => snapshotId));
+  const { headsBySource } = validateLineage(snapshots);
+  const releaseSnapshots = snapshots.filter(({ sourceId, snapshotId }) => headsBySource[sourceId] === snapshotId);
+  assert.equal(spec.sourceSnapshotSetHash, digest(JSON.stringify(releaseSnapshots)));
+  assert.deepEqual(spec.sourceSnapshots.map(({ snapshotId }) => snapshotId), releaseSnapshots.map(({ snapshotId }) => snapshotId));
   assert.equal(request.buildSpecSha256, digest(specBytes));
   assert.equal(request.sourceSnapshotSetHash, spec.sourceSnapshotSetHash);
 
