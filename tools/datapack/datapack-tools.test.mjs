@@ -4311,6 +4311,55 @@ test("데이터팩 검증기는 출처 없는 production positive edge를 거부
   );
 });
 
+test("데이터팩 검증기는 exact UNKNOWN edge만 provenance 예외로 허용한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-datapack-production-edge-exact-unknown-${Date.now()}`);
+  const partialOutputDir = `${outputDir}-partial`;
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await rm(partialOutputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  markFixturePackProduction(fixture);
+  const edge = fixture.packs[0].networkEdges.find(({ id }) => id === "edge-sangnoksu-sadang-seoul-4");
+  Object.assign(edge, {
+    accessibilityStatus: "UNKNOWN",
+    stairAccessState: "UNKNOWN",
+    sourceId: "",
+    sourceSnapshotId: "",
+    providerRecordHash: "",
+    provenanceKind: "UNKNOWN",
+    verificationStatus: "UNKNOWN",
+    lastVerifiedAt: null,
+    evidenceHash: "",
+  });
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-datapack.mjs",
+    "--fixture", fixturePath,
+    "--output", outputDir,
+  ], { cwd: root, env: productionEnv });
+  await execFileAsync(process.execPath, [
+    "tools/datapack/validate-datapack.mjs",
+    "--manifest", path.join(outputDir, "current.json"),
+    "--root", outputDir,
+  ], { cwd: root, env: productionEnv });
+
+  edge.sourceId = "capital-official-stations";
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await execFileAsync(process.execPath, [
+    "tools/datapack/build-datapack.mjs",
+    "--fixture", fixturePath,
+    "--output", partialOutputDir,
+  ], { cwd: root, env: productionEnv });
+  await assert.rejects(execFileAsync(process.execPath, [
+    "tools/datapack/validate-datapack.mjs",
+    "--manifest", path.join(partialOutputDir, "current.json"),
+    "--root", partialOutputDir,
+  ], { cwd: root, env: productionEnv }), /source_snapshot_id must be a non-empty string/);
+});
+
 test("데이터팩 생성기는 production pack의 최소 row 기준 누락을 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-datapack-production-minimum-rows-${Date.now()}`);
   const fixturePath = path.join(outputDir, "fixture.json");

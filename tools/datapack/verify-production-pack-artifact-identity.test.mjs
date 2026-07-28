@@ -95,12 +95,17 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
               OR evidence_hash = ''
             )
           ) AS incompleteVerifiedCount,
+          SUM(
+            verification_status = 'UNKNOWN'
+            AND (accessibility_status != 'UNKNOWN' OR stair_access_state != 'UNKNOWN')
+          ) AS unsafeUnknownCount,
           SUM(service_class = 'ITX_CHEONGCHUN' AND verification_status = 'VERIFIED') AS verifiedItxCount
         FROM network_edges
       `).get();
       assert.equal(provenance.verifiedCount, 652);
       assert.ok(provenance.unknownCount > 0);
       assert.equal(provenance.incompleteVerifiedCount, 0);
+      assert.equal(provenance.unsafeUnknownCount, 0);
       assert.equal(provenance.verifiedItxCount, 48);
       assert.deepEqual(database.prepare(`
         SELECT DISTINCT source_id AS sourceId
