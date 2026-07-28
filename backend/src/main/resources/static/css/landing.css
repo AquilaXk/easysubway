@@ -156,11 +156,11 @@ body.is-english .release-state[data-copy="en"] { display: inline-block; }
 	.device--hero { top: 230px; right: -35px; width: 315px; height: 650px; }
 	.intro-grid { grid-template-columns: 1fr; gap: 64px; }
 	.intro-copy { max-width: 520px; }
-	.process, .process-frame { min-height: 900px; }
+	.process, .process-frame { min-height: 1040px; }
 	.process-tile { top: 280px; right: -45px; width: 330px; }
-	.process-lead { top: 420px; max-width: 310px; }
-	.flow-label { top: 710px; }
-	.process-steps { top: 750px; grid-template-columns: repeat(2, 1fr); row-gap: 20px; }
+	.process-flow { top: 710px; }
+	.process-lead { max-width: 310px; }
+	.process-steps { grid-template-columns: repeat(2, 1fr); row-gap: 20px; }
 	.screen-wall { min-height: 900px; }
 	.wall-device { width: 230px; height: 477px; }
 	.wall-device--map { left: -40px; }
