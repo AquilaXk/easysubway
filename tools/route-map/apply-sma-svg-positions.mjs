@@ -66,7 +66,7 @@ export function resolveStationIds(db, name, lineId, { disambiguateByLine = false
     return byLine ? [byLine.id] : [];
   }
   // 그 외 동명(콜론 아님): 오분리된 한 물리역이므로 해당 권역 노선 멤버 후보 전부에
-  // 같은 좌표를 broadcast한다(수도권 상봉·석남·이매, 부산 벡스코·부전).
+  // 같은 좌표를 broadcast한다(수도권 상봉·석남·이매, 부산 벡스코).
   const regional = rows.filter((r) =>
     db
       .prepare(
@@ -224,7 +224,8 @@ export function buildAssignments(db, extraction, config = SEOUL) {
     // (대전 2호선·충청권 광역철도·미개통 라벨) 그 노드를 정합 대상에서 배제한다.
     // 정의되지 않은 권역(수도권·부산·대구)에는 영향이 없다.
     if (config.nodeFilter && !config.nodeFilter(node)) continue;
-    const slug = node.dataLine || config.missingLineHint[node.dataStation] || "";
+    const transferLine = String(node.transferLines ?? "").trim().split(/\s+/)[0] || "";
+    const slug = node.dataLine || transferLine || config.missingLineHint[node.dataStation] || "";
     const lineId = slug ? slugToLineId.get(slug) : null;
     const canon = config.canonicalRules(node.dataStation);
     const ids = resolveStationIds(db, canon.name, lineId, {

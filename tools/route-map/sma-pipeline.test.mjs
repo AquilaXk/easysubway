@@ -79,6 +79,71 @@ test("resolveStationIds: 동명 별개역(신촌·양평)은 노선으로 1:1 �
   db.close();
 });
 
+test("부산 부전·동래는 노선 힌트로 별개 역에 1:1 배정한다", () => {
+  const db = new DatabaseSync(":memory:");
+  db.exec(`
+    CREATE TABLE stations (id TEXT PRIMARY KEY, name_ko TEXT);
+    CREATE TABLE lines (id TEXT PRIMARY KEY, name_ko TEXT);
+    CREATE TABLE station_lines (station_id TEXT, line_id TEXT);
+    INSERT INTO stations VALUES
+      ('station-dbfe9e072d98','동래'),
+      ('station-b65d6408d975','동래'),
+      ('station-9acc028dded4','부전'),
+      ('station-ee8407a487c2','부전');
+    INSERT INTO lines VALUES
+      ('busan-line1','부산 1호선'),
+      ('busan-line2','부산 2호선'),
+      ('busan-line3','부산 3호선'),
+      ('busan-line4','부산 4호선'),
+      ('busan-donghae','부산 동해'),
+      ('busan-bgl','부산 부산김해경전철');
+    INSERT INTO station_lines VALUES
+      ('station-dbfe9e072d98','busan-line1'),
+      ('station-dbfe9e072d98','busan-line4'),
+      ('station-b65d6408d975','busan-donghae'),
+      ('station-9acc028dded4','busan-line1'),
+      ('station-ee8407a487c2','busan-donghae');
+  `);
+  const config = getRegionConfig("busan");
+  assert.deepEqual(config.scatteredCandidateExceptions, []);
+  assert.deepEqual(config.canonicalRules("부전"), {
+    name: "부전",
+    disambiguateByLine: true,
+  });
+  assert.deepEqual(config.canonicalRules("동래"), {
+    name: "동래",
+    disambiguateByLine: true,
+  });
+
+  const extraction = {
+    labels: [],
+    stationNodes: [
+      { dataStation: "부전", dataLine: "line1", x: 10, y: 10 },
+      { dataStation: "부전", dataLine: "donghae", x: 20, y: 20 },
+      {
+        dataStation: "동래",
+        dataLine: "",
+        transferLines: "line1 line4",
+        x: 30,
+        y: 30,
+      },
+      { dataStation: "동래", dataLine: "donghae", x: 40, y: 40 },
+    ],
+  };
+  const result = buildAssignments(db, extraction, config);
+  assert.deepEqual(result.unresolvedNodes, []);
+  assert.deepEqual(
+    result.assignments.map(({ stationId, x, y }) => ({ stationId, x, y })),
+    [
+      { stationId: "station-9acc028dded4", x: 10, y: 10 },
+      { stationId: "station-ee8407a487c2", x: 20, y: 20 },
+      { stationId: "station-dbfe9e072d98", x: 30, y: 30 },
+      { stationId: "station-b65d6408d975", x: 40, y: 40 },
+    ],
+  );
+  db.close();
+});
+
 // 위 계약은 오너 SVG가 두 노드에 서로 다른 data-line을 실어 줄 때만 성립한다.
 // v4 실 SVG에서 그 전제를 실측으로 고정한다(도식이 힌트를 잃으면 즉시 실패).
 test("easy-subway-sma-v4: 동명 별개역 노드는 서로 다른 data-line을 들고 있다", () => {
@@ -437,16 +502,12 @@ test("scatteredCandidateExceptions는 5권역 전부에 명시 선언되고 예�
       assert.ok(exception.reason, `${region}/${exception.name}: reason이 필요하다`);
     }
   }
-  // 실측(2026-07-26): 산발 예외가 필요한 권역은 부산뿐(동래·부전 선재 결함).
+  // 부산 동래·부전 신원 결함 해소 후 5권역 모두 산발 예외가 없어야 한다.
   assert.deepEqual(
-    ["seoul", "daegu", "daejeon", "gwangju"].map(
+    ["seoul", "busan", "daegu", "daejeon", "gwangju"].map(
       (r) => getRegionConfig(r).scatteredCandidateExceptions.length,
     ),
-    [0, 0, 0, 0],
-  );
-  assert.deepEqual(
-    getRegionConfig("busan").scatteredCandidateExceptions.map((e) => e.name),
-    ["동래", "부전"],
+    [0, 0, 0, 0, 0],
   );
 });
 
