@@ -7304,6 +7304,39 @@ void main() {
     expect(focused.center, const Offset(430, 280));
   });
 
+  testWidgets('GPS 패널을 닫아도 같은 역의 현재 배율을 유지한다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: _gpsNetworkMapData(
+        selectedRegion: '수도권',
+        regions: const ['수도권'],
+        centerNearestStation: true,
+      ),
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    final focused = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    await tester.tap(find.byKey(const Key('networkMapNearbyPanelCloseButton')));
+    await tester.pumpAndSettle();
+
+    final closed = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(closed.scale, focused.scale);
+    expect(closed.initialScale, focused.initialScale);
+  });
+
   testWidgets('GPS 재시도는 이전 오류 메시지와 timer를 즉시 지운다', (tester) async {
     var locationAttempts = 0;
     final locationProvider = FakeCurrentLocationProvider(
@@ -7700,6 +7733,48 @@ void main() {
         .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
         .camera;
     expect(camera.scale, camera.initialScale);
+  });
+
+  testWidgets('GPS 자동 초기 focus도 타 권역의 읽기 가능한 초기 배율을 쓴다', (tester) async {
+    final viewportRepository = FakeNetworkMapViewportRepository(
+      viewports: const {'부산권': Rect.fromLTWH(0, 0, 80, 80)},
+    );
+    final repository = FakeStationSearchRepository(
+      networkMapData: _gpsNetworkMapData(
+        selectedRegion: '수도권',
+        regions: const ['수도권', '부산권'],
+      ),
+      networkMapDataByRegion: {
+        '부산권': _gpsNetworkMapData(
+          selectedRegion: '부산권',
+          regions: const ['수도권', '부산권'],
+          centerNearestStation: true,
+        ),
+      },
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+      ],
+    );
+
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      viewportRepository: viewportRepository,
+    );
+
+    expect(repository.requestedNetworkMapRegions, [null, '부산권']);
+    expect(viewportRepository.loadedRegions, isNot(contains('부산권')));
+    expect(viewportRepository.selectedRegion, '부산권');
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    final camera = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(camera.scale, camera.initialScale);
+    expect(camera.center, const Offset(430, 280));
   });
 
   testWidgets('저장 지역을 복원하고 없는 지역은 기본 지역 카메라로 복구한다', (tester) async {

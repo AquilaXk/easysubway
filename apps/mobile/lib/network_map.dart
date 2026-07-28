@@ -1444,6 +1444,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     CurrentLocationProvider locationProvider,
     StationSearchRepository stationRepository,
   ) async {
+    final mapFuture = _future;
     try {
       if (await locationProvider.needsLocationPermissionRequest()) {
         return;
@@ -1456,17 +1457,59 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         location,
         limit: 1,
       );
-      if (!mounted || results.isEmpty || _nearbyPanelVisible) {
+      if (!mounted ||
+          results.isEmpty ||
+          _nearbyPanelVisible ||
+          _future != mapFuture) {
         return;
       }
+
+      final result = results.first;
+      var targetMap = await mapFuture;
+      var regionChanged = false;
+      if (_displayRegionName(targetMap.data.selectedRegion) != result.region) {
+        final matchingRegions = targetMap.data.regions
+            .where((region) => region.displayName == result.region)
+            .toList(growable: false);
+        if (matchingRegions.length != 1) {
+          return;
+        }
+        targetMap = await _loadMapForRegion(
+          matchingRegions.single.name,
+          loadStoredViewport: false,
+        );
+        regionChanged = true;
+      }
+      if (!mounted || _nearbyPanelVisible || _future != mapFuture) {
+        return;
+      }
+      if (!targetMap.data.stations.any((station) => station.id == result.id)) {
+        return;
+      }
+      if (regionChanged) {
+        await _saveSelectedRegion(targetMap.data.selectedRegion);
+        if (!mounted || _nearbyPanelVisible || _future != mapFuture) {
+          return;
+        }
+      }
       setState(() {
-        _nearbySelectedStationId = results.first.id;
+        if (regionChanged) {
+          _selectedRegion = targetMap.data.selectedRegion;
+          _future = Future.value(targetMap);
+        }
+        _nearbySelectedStationId = result.id;
         _preserveFocusedStationScale = true;
       });
     } on CurrentLocationException {
       return;
     } on StationSearchException {
       return;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 초기 주변 역 확인 중 예외가 발생했습니다.',
+      );
     }
   }
 
@@ -1779,7 +1822,13 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     unawaited(_loadNearbyTimetable(station, line, request: request));
   }
 
-  void _hideNearbyPanel() => setState(_resetNearbyPanelState);
+  void _hideNearbyPanel() {
+    final preserveFocusedStationScale = _preserveFocusedStationScale;
+    setState(() {
+      _resetNearbyPanelState();
+      _preserveFocusedStationScale = preserveFocusedStationScale;
+    });
+  }
 
   /// 저장소가 있을 때만 "상세 보기"를 탭 가능 컨트롤로 노출한다.
   VoidCallback? get _nearbyStationDetailAction =>
