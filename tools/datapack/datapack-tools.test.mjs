@@ -2003,7 +2003,7 @@ test("데이터팩 생성기는 일반 fixture 입력으로 production channel�
     fixturePack.manifest = {
       ...fixturePack.manifest,
       manifestVersion: 2,
-      channel: "production",
+      channel: " production ",
       keyId: "production-v1",
     };
     const fixturePackPath = path.join(workspace, "fixture-pack.json");

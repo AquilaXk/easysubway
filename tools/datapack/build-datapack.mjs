@@ -223,16 +223,19 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
     const fixture = JSON.parse(await readFile(path.resolve(root, fixtureArg), "utf8"));
     rejectTestOnlyBuildInput(fixture);
     const hasProductionPack = fixture.packs?.some(({ artifactKind }) => artifactKind === "production");
+    const fixtureChannel = fixture.manifest?.channel == null
+      ? null
+      : requiredString(fixture.manifest.channel, "manifest.channel");
     if (hasProductionPack) {
       if (process.env.EASYSUBWAY_DATAPACK_PRODUCTION_FIXTURE_VALIDATION_ONLY !== "true") {
         throw new Error("production fixture builds are validation-only; release builds require --build-spec");
       }
     }
-    if (hasProductionPack || fixture.manifest?.channel === "production") {
+    if (hasProductionPack || fixtureChannel === "production") {
       fixture.manifest = {
         ...fixture.manifest,
         manifestVersion: 2,
-        channel: fixture.manifest.channel === "candidate" ? "candidate" : "dev",
+        channel: fixtureChannel === "candidate" ? "candidate" : "dev",
         releaseSequence: 1,
         publishedAt: fixture.manifest.publishedAt ?? buildPublishedAt(),
         ...(hasProductionPack
