@@ -1369,8 +1369,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       }
 
       if (regionChanged) {
-        await _saveSelectedRegion(targetMap.data.selectedRegion);
-        if (!isCurrentRequest()) {
+        if (!widget.routeDraftController.draft.isEmpty) {
+          _showNearbyLookupMessage('경로를 정한 뒤에는 지역을 바꿀 수 없어요.');
           return;
         }
         setState(() {
@@ -1378,6 +1378,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           _future = Future.value(targetMap);
           _initialNearbyFocusStarted = true;
         });
+        unawaited(_saveSelectedRegion(targetMap.data.selectedRegion));
       }
       // 역 확정 후 공통 오픈으로 즉시 표시(기본 탭 시간표). 실시간/시간표 await 금지.
       _openNearbyStationPanel(
@@ -1468,6 +1469,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       var targetMap = await mapFuture;
       var regionChanged = false;
       if (_displayRegionName(targetMap.data.selectedRegion) != result.region) {
+        if (!widget.routeDraftController.draft.isEmpty) {
+          return;
+        }
         final matchingRegions = targetMap.data.regions
             .where((region) => region.displayName == result.region)
             .toList(growable: false);
@@ -1480,17 +1484,14 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         );
         regionChanged = true;
       }
-      if (!mounted || _nearbyPanelVisible || _future != mapFuture) {
+      if (!mounted ||
+          _nearbyPanelVisible ||
+          _future != mapFuture ||
+          (regionChanged && !widget.routeDraftController.draft.isEmpty)) {
         return;
       }
       if (!targetMap.data.stations.any((station) => station.id == result.id)) {
         return;
-      }
-      if (regionChanged) {
-        await _saveSelectedRegion(targetMap.data.selectedRegion);
-        if (!mounted || _nearbyPanelVisible || _future != mapFuture) {
-          return;
-        }
       }
       setState(() {
         if (regionChanged) {
@@ -1500,6 +1501,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         _nearbySelectedStationId = result.id;
         _preserveFocusedStationScale = true;
       });
+      if (regionChanged) {
+        unawaited(_saveSelectedRegion(targetMap.data.selectedRegion));
+      }
     } on CurrentLocationException {
       return;
     } on StationSearchException {

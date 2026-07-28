@@ -7411,7 +7411,7 @@ void main() {
       repository: repository,
       locationProvider: FakeCurrentLocationProvider(
         location: _freshCurrentLocation(),
-        needsPermissionRequest: false,
+        needsPermissionRequest: true,
       ),
       viewportRepository: viewportRepository,
     );
@@ -7775,6 +7775,45 @@ void main() {
         .camera;
     expect(camera.scale, camera.initialScale);
     expect(camera.center, const Offset(430, 280));
+  });
+
+  testWidgets('GPS 자동 타 권역 응답은 진행 중 생긴 경로 초안을 바꾸지 않는다', (tester) async {
+    final nearbyCompleter = Completer<List<StationSearchResult>>();
+    final viewportRepository = FakeNetworkMapViewportRepository();
+    final repository = FakeStationSearchRepository(
+      networkMapData: _gpsNetworkMapData(
+        selectedRegion: '수도권',
+        regions: const ['수도권', '부산권'],
+      ),
+      networkMapDataByRegion: {
+        '부산권': _gpsNetworkMapData(
+          selectedRegion: '부산권',
+          regions: const ['수도권', '부산권'],
+        ),
+      },
+      nearbyCompleter: nearbyCompleter,
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      viewportRepository: viewportRepository,
+    );
+    tester
+        .widget<NetworkMapScreen>(find.byType(NetworkMapScreen))
+        .routeDraftController
+        .setOrigin(const RouteDraftStation(id: 'origin', nameKo: '출발역'));
+
+    nearbyCompleter.complete([
+      _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNetworkMapRegions, [null]);
+    expect(viewportRepository.selectedRegion, '수도권');
   });
 
   testWidgets('저장 지역을 복원하고 없는 지역은 기본 지역 카메라로 복구한다', (tester) async {
