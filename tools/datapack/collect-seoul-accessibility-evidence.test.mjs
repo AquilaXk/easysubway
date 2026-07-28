@@ -362,7 +362,7 @@ test("snapshot contains sorted full-scope evidence and hashes", () => {
   );
 
   assert.equal(snapshot.sourceId, "seoul-metro-accessibility");
-  assert.equal(snapshot.snapshotId, "seoul-metro-accessibility-20260710");
+  assert.equal(snapshot.snapshotId, "seoul-metro-accessibility-20260710T000000000Z");
   assert.equal(snapshot.observedAt, "2026-07-10T00:00:00.000Z");
   assert.match(snapshot.schemaFingerprint, /^[0-9a-f]{64}$/);
   assert.equal(snapshot.capturedAt, "2026-07-10T00:00:00.000Z");
@@ -372,6 +372,49 @@ test("snapshot contains sorted full-scope evidence and hashes", () => {
   assert.notEqual(snapshot.contentSha256, snapshot.rawSha256);
   assert.deepEqual(snapshot.stations.map(({ stationName }) => stationName), ["사당", "상록수"]);
   assert.doesNotMatch(JSON.stringify(snapshot), /serviceKey|https?:\/\//);
+});
+
+test("same-day captures keep distinct timestamped files and explicit lineage", async (t) => {
+  const outputRoot = await mkdtemp(join(tmpdir(), "easysubway-seoul-snapshots-"));
+  t.after(() => rm(outputRoot, { recursive: true, force: true }));
+  const fetchImpl = async () => ({
+    ok: true,
+    text: async () => JSON.stringify({
+      response: {
+        header: { resultCode: "00" },
+        body: {
+          totalCount: 1,
+          items: { item: [{ lineNm: "4호선", stnNm: "사당", oprtngSitu: "M", dtlPstn: "대합실-승강장" }] },
+        },
+      },
+    }),
+  });
+  const first = await writeSeoulAccessibilityEvidence({
+    endpoint: "https://apis.data.go.kr/example",
+    serviceKey: "secret",
+    output: "snapshots",
+    outputRoot,
+    fetchImpl,
+    retrievedAt: "2026-07-28T15:35:25.704Z",
+  });
+  const firstPath = join(outputRoot, "snapshots", `${first.snapshotId}.json`);
+  const firstBytes = await readFile(firstPath, "utf8");
+
+  const second = await writeSeoulAccessibilityEvidence({
+    endpoint: "https://apis.data.go.kr/example",
+    serviceKey: "secret",
+    output: "snapshots",
+    outputRoot,
+    fetchImpl,
+    retrievedAt: "2026-07-28T16:35:25.704Z",
+    previousSnapshotId: first.snapshotId,
+  });
+
+  assert.equal(first.snapshotId, "seoul-metro-accessibility-20260728T153525704Z");
+  assert.equal(second.snapshotId, "seoul-metro-accessibility-20260728T163525704Z");
+  assert.equal(second.previousSnapshotId, first.snapshotId);
+  assert.equal(await readFile(firstPath, "utf8"), firstBytes);
+  await access(join(outputRoot, "snapshots", `${second.snapshotId}.json`));
 });
 
 test("snapshot content identity is stable when provider facility order changes", () => {

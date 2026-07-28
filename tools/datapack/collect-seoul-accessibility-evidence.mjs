@@ -2,7 +2,7 @@
 import { constants as fileSystemConstants } from "node:fs";
 import { createHash } from "node:crypto";
 import { lstat, mkdir, open, realpath } from "node:fs/promises";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_ENDPOINT = "https://apis.data.go.kr/B553766/wksn/getWksnElvtr";
@@ -62,7 +62,7 @@ export function normalizeAccessibilityRows(rows) {
   return normalized;
 }
 
-export function buildAccessibilitySnapshot(rows, retrievedAt, { rawRowCount, rawSha256 }) {
+export function buildAccessibilitySnapshot(rows, retrievedAt, { rawRowCount, rawSha256, previousSnapshotId = null }) {
   if (
     !Array.isArray(rows) ||
     rows.some(
@@ -91,6 +91,17 @@ export function buildAccessibilitySnapshot(rows, retrievedAt, { rawRowCount, raw
   if (!Number.isSafeInteger(rawRowCount) || rawRowCount < rows.length || !/^[0-9a-f]{64}$/.test(rawSha256 ?? "")) {
     throw new Error(`${INVALID_RESPONSE}: rawIdentity`);
   }
+  const retrievedMillis = Date.parse(retrievedAt);
+  const snapshotId = `seoul-metro-accessibility-${typeof retrievedAt === "string" ? retrievedAt.replaceAll(/[-:.]/g, "") : ""}`;
+  if (typeof retrievedAt !== "string"
+    || !Number.isFinite(retrievedMillis)
+    || new Date(retrievedMillis).toISOString() !== retrievedAt
+    || (previousSnapshotId !== null
+      && (typeof previousSnapshotId !== "string"
+        || !previousSnapshotId.startsWith("seoul-metro-accessibility-")
+        || previousSnapshotId === snapshotId))) {
+    throw new Error(`${INVALID_RESPONSE}: snapshotIdentity`);
+  }
   const stationsByIdentity = new Map();
   for (const row of rows) {
     const key = `${row.lineName}\0${row.stationName}`;
@@ -118,11 +129,12 @@ export function buildAccessibilitySnapshot(rows, retrievedAt, { rawRowCount, raw
     schemaVersion: 1,
     artifactKind: "seoul-accessibility-snapshot",
     sourceId: "seoul-metro-accessibility",
-    snapshotId: `seoul-metro-accessibility-${retrievedAt.slice(0, 10).replaceAll("-", "")}`,
+    snapshotId,
+    previousSnapshotId,
     retrievedAt,
     capturedAt: retrievedAt,
     observedAt: retrievedAt,
-    freshUntil: new Date(Date.parse(retrievedAt) + 86_400_000).toISOString(),
+    freshUntil: new Date(retrievedMillis + 86_400_000).toISOString(),
     credentialRedacted: true,
     absenceEvidenceMode: "EXHAUSTIVE_LIST",
     rowCount: rawRowCount,
@@ -211,10 +223,19 @@ export async function writeSeoulAccessibilityEvidence({
   outputRoot = REPOSITORY_ROOT,
   fetchImpl = fetch,
   retrievedAt = new Date().toISOString(),
+  previousSnapshotId = null,
 }) {
-  const { outputPath, canonicalRoot } = await validatedOutputPath(output, outputRoot);
+  const { outputPath: requestedOutputPath } = await validatedOutputPath(output, outputRoot);
   const collected = await collectSeoulAccessibility({ endpoint, serviceKey, fetchImpl });
-  const snapshot = buildAccessibilitySnapshot(collected.rows, retrievedAt, collected);
+  const snapshot = buildAccessibilitySnapshot(collected.rows, retrievedAt, { ...collected, previousSnapshotId });
+  const outputPath = extname(requestedOutputPath) === ".json"
+    ? requestedOutputPath
+    : join(requestedOutputPath, `${snapshot.snapshotId}.json`);
+  if (extname(requestedOutputPath) === ".json"
+    && basename(requestedOutputPath) !== `${snapshot.snapshotId}.json`) {
+    throw new Error("output filename must match snapshot ID");
+  }
+  const { canonicalRoot } = await validatedOutputPath(outputPath, outputRoot);
   await mkdir(dirname(outputPath), { recursive: true });
   const canonicalParent = await realpath(dirname(outputPath));
   if (!isPathWithin(canonicalRoot, canonicalParent)) {
@@ -260,7 +281,7 @@ async function writeOutputFileNoFollow(outputPath, contents) {
       outputPath,
       fileSystemConstants.O_WRONLY |
         fileSystemConstants.O_CREAT |
-        fileSystemConstants.O_TRUNC |
+        fileSystemConstants.O_EXCL |
         fileSystemConstants.O_NOFOLLOW,
       0o600,
     );
@@ -314,13 +335,15 @@ function compare(left, right) {
 }
 
 async function main() {
+  const previousSnapshotArgument = process.argv.length === 8
+    && process.argv[6] === "--previous-snapshot-id";
   if (
-    process.argv.length !== 6 ||
+    (process.argv.length !== 6 && !previousSnapshotArgument) ||
     process.argv[2] !== "--output" ||
     process.argv[4] !== "--output-root"
   ) {
     throw new Error(
-      "usage: collect-seoul-accessibility-evidence.mjs --output <path> --output-root <path>",
+      "usage: collect-seoul-accessibility-evidence.mjs --output <path-or-directory> --output-root <path> [--previous-snapshot-id <id>]",
     );
   }
   const serviceKey = process.env.DATA_GO_KR_SERVICE_KEY;
@@ -332,6 +355,7 @@ async function main() {
     serviceKey,
     output: process.argv[3],
     outputRoot: process.argv[5],
+    previousSnapshotId: previousSnapshotArgument ? process.argv[7] : null,
   });
 }
 
