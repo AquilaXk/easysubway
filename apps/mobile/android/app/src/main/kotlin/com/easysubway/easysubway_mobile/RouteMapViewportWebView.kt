@@ -49,6 +49,7 @@ class RouteMapViewportWebViewFactory(
             mimeType = params["mimeType"] as? String ?: "",
             viewBox = params["viewBox"].asDoubleList(),
             revision = params["revision"].asInt(),
+            frameToken = params["frameToken"].asInt(),
         )
     }
 }
@@ -61,6 +62,7 @@ private class RouteMapViewportPlatformView(
     private val mimeType: String,
     private var viewBox: List<Double>,
     private var revision: Int,
+    private var frameToken: Int,
 ) : PlatformView {
     private val mainHandler = Handler(Looper.getMainLooper())
     private val isDebuggable =
@@ -95,6 +97,7 @@ private class RouteMapViewportPlatformView(
                 "setCamera" -> {
                     viewBox = call.argument<Any>("viewBox").asDoubleList()
                     revision = call.argument<Any>("revision").asInt()
+                    frameToken = call.argument<Any>("frameToken").asInt()
                     if (documentReady) applyViewBox()
                     result.success(null)
                 }
@@ -314,6 +317,7 @@ private class RouteMapViewportPlatformView(
             return
         }
         val frameRevision = revision
+        val presentedFrameToken = frameToken
         val encodedValues = values.joinToString(",") { value -> value.toString() }
         val script = """
             (function(){
@@ -338,11 +342,15 @@ private class RouteMapViewportPlatformView(
                             if (
                                 webView === currentWebView &&
                                 revision == frameRevision &&
+                                frameToken == presentedFrameToken &&
                                 requestId == frameRevision.toLong()
                             ) {
                                 channel.invokeMethod(
                                     "framePresented",
-                                    mapOf("revision" to frameRevision),
+                                    mapOf(
+                                        "revision" to frameRevision,
+                                        "frameToken" to presentedFrameToken,
+                                    ),
                                 )
                             }
                         }

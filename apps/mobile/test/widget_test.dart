@@ -3760,7 +3760,10 @@ void main() {
             .handlePlatformMessage(
               channelName,
               const StandardMethodCodec().encodeMethodCall(
-                MethodCall('framePresented', <String, Object>{'revision': 0}),
+                MethodCall('framePresented', <String, Object>{
+                  'revision': 0,
+                  'frameToken': 0,
+                }),
               ),
               (_) {},
             );

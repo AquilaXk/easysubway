@@ -10,6 +10,9 @@ const _viewType = 'com.easysubway.easysubway_mobile/route_map_viewport_webview';
 const _channelPrefix =
     'com.easysubway.easysubway_mobile/route_map_viewport_webview/';
 
+typedef RouteMapSvgFramePresentedCallback =
+    void Function(int revision, int frameToken);
+
 const Map<String, String> kRouteMapSvgRegionToId = {
   '수도권': 'seoul',
   '부산': 'busan',
@@ -26,11 +29,13 @@ String? routeMapSvgAssetForRegion(String region) {
 Map<String, Object> routeMapSvgViewportCameraPayload({
   required MapCameraState camera,
   required Offset sourceOrigin,
+  int frameToken = 0,
 }) {
   final rect = camera.visibleSourceRect.shift(sourceOrigin);
   return <String, Object>{
     'viewBox': <double>[rect.left, rect.top, rect.width, rect.height],
     'revision': camera.revision,
+    'frameToken': frameToken,
   };
 }
 
@@ -51,7 +56,7 @@ class RouteMapSvgViewportController {
   });
 
   final VoidCallback onUnavailable;
-  final ValueChanged<int>? onFramePresented;
+  final RouteMapSvgFramePresentedCallback? onFramePresented;
   MethodChannel? _channel;
   Map<String, Object>? _pendingCameraPayload;
   bool _unavailable = false;
@@ -78,6 +83,7 @@ class RouteMapSvgViewportController {
   Future<void> update(
     MapCameraState camera, {
     required Offset sourceOrigin,
+    int frameToken = 0,
   }) async {
     if (!_hasValidViewBox(camera, sourceOrigin)) {
       _fail();
@@ -86,6 +92,7 @@ class RouteMapSvgViewportController {
     final payload = routeMapSvgViewportCameraPayload(
       camera: camera,
       sourceOrigin: sourceOrigin,
+      frameToken: frameToken,
     );
     final channel = _channel;
     if (channel == null) {
@@ -109,8 +116,12 @@ class RouteMapSvgViewportController {
   Future<void> _handleMethodCall(MethodCall call) async {
     switch (call.method) {
       case 'framePresented':
-        final revision = (call.arguments as Map?)?['revision'];
-        if (revision is int) onFramePresented?.call(revision);
+        final arguments = call.arguments as Map?;
+        final revision = arguments?['revision'];
+        final frameToken = arguments?['frameToken'];
+        if (revision is int && frameToken is int) {
+          onFramePresented?.call(revision, frameToken);
+        }
         return;
       case 'assetLoadFailed':
       case 'cameraApplyFailed':
@@ -160,15 +171,31 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
   late final RouteMapSvgViewportController _controller;
   bool _framePresented = false;
   bool _failed = false;
+  int _frameToken = 0;
   Widget? _presentedOverlay;
-  ({int revision, double left, double top, double width, double height})?
+  ({
+    int revision,
+    int token,
+    double left,
+    double top,
+    double width,
+    double height,
+  })?
   _presentedFrame;
 
-  ({int revision, double left, double top, double width, double height})
+  ({
+    int revision,
+    int token,
+    double left,
+    double top,
+    double width,
+    double height,
+  })
   get _frame {
     final rect = widget.camera.visibleSourceRect.shift(widget.sourceOrigin);
     return (
       revision: widget.camera.revision,
+      token: _frameToken,
       left: rect.left,
       top: rect.top,
       width: rect.width,
@@ -181,8 +208,10 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
     super.initState();
     _controller = RouteMapSvgViewportController(
       onUnavailable: _fail,
-      onFramePresented: (revision) {
-        if (mounted && revision == widget.camera.revision) {
+      onFramePresented: (revision, frameToken) {
+        if (mounted &&
+            revision == widget.camera.revision &&
+            frameToken == _frameToken) {
           setState(() {
             _framePresented = true;
             _presentedFrame = _frame;
@@ -209,8 +238,13 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.camera != widget.camera ||
         oldWidget.sourceOrigin != widget.sourceOrigin) {
+      _frameToken += 1;
       unawaited(
-        _controller.update(widget.camera, sourceOrigin: widget.sourceOrigin),
+        _controller.update(
+          widget.camera,
+          sourceOrigin: widget.sourceOrigin,
+          frameToken: _frameToken,
+        ),
       );
     } else if (_framePresented && _presentedFrame == _frame) {
       _presentedOverlay = widget.overlay;
@@ -241,6 +275,7 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
     final cameraPayload = routeMapSvgViewportCameraPayload(
       camera: widget.camera,
       sourceOrigin: widget.sourceOrigin,
+      frameToken: _frameToken,
     );
     final params = <String, Object>{
       'assetPath': asset,

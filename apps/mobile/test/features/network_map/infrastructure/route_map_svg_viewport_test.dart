@@ -55,6 +55,7 @@ void main() {
         188.23529411764707,
       ],
       'revision': 3,
+      'frameToken': 0,
     });
   });
 
@@ -91,6 +92,7 @@ void main() {
         sourceOrigin: origin,
       )['viewBox']!,
       'revision': 4,
+      'frameToken': 0,
     });
     controller.dispose();
   });
@@ -247,10 +249,13 @@ void main() {
         'com.easysubway.easysubway_mobile/route_map_viewport_webview/91';
     final messenger =
         TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
-    messenger.setMockMethodCallHandler(
-      const MethodChannel(channelName),
-      (_) async => null,
-    );
+    final calls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(const MethodChannel(channelName), (
+      call,
+    ) async {
+      calls.add(call);
+      return null;
+    });
     try {
       await tester.pumpWidget(
         Directionality(
@@ -290,13 +295,17 @@ void main() {
           camera: camera,
           sourceOrigin: origin,
         ),
+        'frameToken': 0,
       });
 
       androidView.onPlatformViewCreated!(viewId);
       await messenger.handlePlatformMessage(
         channelName,
         const StandardMethodCodec().encodeMethodCall(
-          MethodCall('framePresented', <String, Object>{'revision': 3}),
+          MethodCall('framePresented', <String, Object>{
+            'revision': 3,
+            'frameToken': 0,
+          }),
         ),
         (_) {},
       );
@@ -325,6 +334,8 @@ void main() {
       );
       expect(find.text('overlay-3'), findsOneWidget);
       expect(find.text('overlay-4'), findsNothing);
+      expect(calls.last.method, 'setCamera');
+      expect((calls.last.arguments as Map)['frameToken'], 1);
 
       await tester.pumpWidget(
         Directionality(
@@ -345,7 +356,24 @@ void main() {
       await messenger.handlePlatformMessage(
         channelName,
         const StandardMethodCodec().encodeMethodCall(
-          MethodCall('framePresented', <String, Object>{'revision': 3}),
+          MethodCall('framePresented', <String, Object>{
+            'revision': 4,
+            'frameToken': 0,
+          }),
+        ),
+        (_) {},
+      );
+      await tester.pump();
+      expect(find.text('overlay-3'), findsOneWidget);
+      expect(find.text('overlay-4b'), findsNothing);
+
+      await messenger.handlePlatformMessage(
+        channelName,
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('framePresented', <String, Object>{
+            'revision': 3,
+            'frameToken': 0,
+          }),
         ),
         (_) {},
       );
@@ -360,7 +388,10 @@ void main() {
       await messenger.handlePlatformMessage(
         channelName,
         const StandardMethodCodec().encodeMethodCall(
-          MethodCall('framePresented', <String, Object>{'revision': 4}),
+          MethodCall('framePresented', <String, Object>{
+            'revision': 4,
+            'frameToken': 1,
+          }),
         ),
         (_) {},
       );

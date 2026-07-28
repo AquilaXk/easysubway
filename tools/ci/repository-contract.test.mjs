@@ -147,6 +147,8 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   assert.match(android, /settings\.allowContentAccess = false/);
   assert.match(android, /settings\.allowFileAccess = true/);
   assert.match(android, /private var isDisposed = false/);
+  assert.match(android, /frameToken = call\.argument<Any>\("frameToken"\)\.asInt\(\)/);
+  assert.match(android, /"frameToken" to presentedFrameToken/);
   assert.match(android, /"start" -> \{[\s\S]*if \(!started\) \{[\s\S]*load\(\)/);
   assert.doesNotMatch(android, /mainHandler\.post \{[\s\S]*load\(\)/);
   assert.match(android, /private fun load\([\s\S]*if \(isDisposed\) return/);
@@ -197,6 +199,8 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   assert.match(iosViewport, /case "start":[\s\S]*if !started \{[\s\S]*load\(\)/);
   assert.doesNotMatch(iosViewport, /DispatchQueue\.main\.async \{[\s\S]*load\(\)/);
   assert.match(iosViewport, /private var isDisposed = false/);
+  assert.match(iosViewport, /frameToken = params\["frameToken"\]\.asInt\(\)/);
+  assert.match(iosViewport, /"frameToken": presentedFrameToken/);
   assert.match(iosViewport, /loadGeneration \+= 1[\s\S]*let generation = loadGeneration/);
   assert.match(iosViewport, /guard self\.isCurrentLoad\(generation, assetURL: assetURL\) else \{ return \}/);
   assert.match(iosViewport, /private func loadDocument\(_ assetURL: URL, generation: Int,/);

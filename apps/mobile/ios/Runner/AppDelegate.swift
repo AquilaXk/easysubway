@@ -309,7 +309,8 @@ private final class RouteMapViewportWebViewFactory: NSObject, FlutterPlatformVie
       assetPath: params["assetPath"] as? String ?? "",
       mimeType: params["mimeType"] as? String ?? "",
       viewBox: params["viewBox"].asDoubleList(),
-      revision: params["revision"].asInt()
+      revision: params["revision"].asInt(),
+      frameToken: params["frameToken"].asInt()
     )
   }
 }
@@ -332,6 +333,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   private let mimeType: String
   private var viewBox: [Double]
   private var revision: Int
+  private var frameToken: Int
   private var webView: WKWebView?
   private var initialAssetURL: URL?
   private var loadGeneration = 0
@@ -348,7 +350,8 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     assetPath: String,
     mimeType: String,
     viewBox: [Double],
-    revision: Int
+    revision: Int,
+    frameToken: Int
   ) {
     container = UIView(frame: frame)
     channel = FlutterMethodChannel(
@@ -359,6 +362,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     self.mimeType = mimeType
     self.viewBox = viewBox
     self.revision = revision
+    self.frameToken = frameToken
     super.init()
 
     container.isUserInteractionEnabled = false
@@ -384,6 +388,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
       let params = call.arguments as? [String: Any] ?? [:]
       viewBox = params["viewBox"].asDoubleList()
       revision = params["revision"].asInt()
+      frameToken = params["frameToken"].asInt()
       if documentReady { applyViewBox() }
       result(nil)
     case "reload":
@@ -586,6 +591,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
       return
     }
     let frameRevision = revision
+    let presentedFrameToken = frameToken
     let encodedValues = values.map { String($0) }.joined(separator: ",")
     let script = """
       (function(){
@@ -624,13 +630,20 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
           let self,
           let currentWebView,
           self.webView === currentWebView,
-          self.revision == frameRevision
+          self.revision == frameRevision,
+          self.frameToken == presentedFrameToken
         else { return }
         guard case .success(let value) = result, value as? Bool == true else {
           self.reportCameraApplyFailed()
           return
         }
-        self.channel.invokeMethod("framePresented", arguments: ["revision": frameRevision])
+        self.channel.invokeMethod(
+          "framePresented",
+          arguments: [
+            "revision": frameRevision,
+            "frameToken": presentedFrameToken,
+          ]
+        )
       }
     }
   }
