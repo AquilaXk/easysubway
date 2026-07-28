@@ -142,6 +142,17 @@ void main() {
   const alignmentThresholdPx = 5.0;
   const minStationCoverage = 700; // 수도권 800행 중 대다수 커버(하드 최소선).
 
+  void expectNoUnmatched(Map<String, dynamic> fixture, String regionKey) {
+    final unmatched = (fixture['unmatched'] as List)
+        .cast<Map<String, dynamic>>();
+    expect(
+      fixture['unmatchedCount'],
+      0,
+      reason: '$regionKey 팩 행 중 SVG 배정이 없는 역이 생겼다(미매핑 회귀)',
+    );
+    expect(unmatched, isEmpty, reason: '$regionKey fixture에 선언되지 않은 미매칭 역이 있다');
+  }
+
   test('(B) seoul 바탕(SVG 배정) ↔ 인터랙션(팩) 좌표가 같은 viewBox 좌표계 — 전 역 하드 <5px', () {
     // apps/mobile 밖(tools/route-map/route-map-defs/)에 둔다 — pubspec.yaml의
     // assets/datapacks/metro_map_pack/basemap/ 와일드카드 번들에 QA 전용
@@ -158,6 +169,13 @@ void main() {
     );
     final fixture = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
     final entries = (fixture['entries'] as List).cast<Map<String, dynamic>>();
+    final unmatched = (fixture['unmatched'] as List)
+        .cast<Map<String, dynamic>>();
+
+    expect(fixture['unmatchedCount'], unmatched.length);
+    expect(unmatched.length, 1);
+    expect(unmatched.single['name'], '도라산');
+    expect((unmatched.single['reason'] as String).trim(), isNotEmpty);
 
     expect(
       entries.length,
@@ -208,6 +226,7 @@ void main() {
     );
     final fixture = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
     final entries = (fixture['entries'] as List).cast<Map<String, dynamic>>();
+    expectNoUnmatched(fixture, '부산권');
 
     final nudgeFile = File(busanNudgeExceptionsFile);
     final nudgeExceptions = <String>{};
@@ -262,6 +281,7 @@ void main() {
     );
     final fixture = jsonDecode(file.readAsStringSync()) as Map<String, dynamic>;
     final entries = (fixture['entries'] as List).cast<Map<String, dynamic>>();
+    expectNoUnmatched(fixture, '대구권');
 
     expect(
       entries.length,
@@ -336,11 +356,7 @@ void main() {
           reason:
               'fixture 커버리지 급감 — canonical 정합이 대량 깨졌을 가능성(entries=${entries.length})',
         );
-        expect(
-          fixture['unmatchedCount'],
-          0,
-          reason: '$regionKey 팩 행 중 SVG 배정이 없는 역이 생겼다(미매핑 회귀)',
-        );
+        expectNoUnmatched(fixture, regionKey);
 
         for (final e in entries) {
           final delta = (e['deltaPx'] as num).toDouble();
