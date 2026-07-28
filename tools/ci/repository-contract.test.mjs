@@ -18300,6 +18300,38 @@ test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
   assert.doesNotMatch(infoPlist, /UIBackgroundModes/);
 });
 
+test("전화 앱은 일반 세로 모드만 지원한다", () => {
+  const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
+  const activityDeclarations = [
+    ...androidManifest.matchAll(/<activity\b[^>]*>/g),
+  ].map((match) => match[0]);
+  for (const activity of [".MainActivity", ".WidgetConfigurationActivity"]) {
+    const declaration = activityDeclarations.find((candidate) =>
+      candidate.includes(`android:name="${activity}"`),
+    );
+    assert.ok(declaration, `${activity} declaration is missing`);
+    assert.match(declaration, /android:screenOrientation="portrait"/);
+  }
+
+  const infoPlist = read("apps/mobile/ios/Runner/Info.plist");
+  const orientations = (key) => {
+    const array = infoPlist.match(
+      new RegExp(`<key>${key}<\\/key>\\s*<array>([\\s\\S]*?)<\\/array>`),
+    )?.[1];
+    assert.ok(array, `${key} is missing`);
+    return [...array.matchAll(/<string>([^<]+)<\/string>/g)].map((match) => match[1]);
+  };
+  assert.deepEqual(orientations("UISupportedInterfaceOrientations"), [
+    "UIInterfaceOrientationPortrait",
+  ]);
+  assert.deepEqual(orientations("UISupportedInterfaceOrientations~ipad"), [
+    "UIInterfaceOrientationPortrait",
+    "UIInterfaceOrientationPortraitUpsideDown",
+    "UIInterfaceOrientationLandscapeLeft",
+    "UIInterfaceOrientationLandscapeRight",
+  ]);
+});
+
 test("iOS 릴리즈는 푸시 알림 entitlement를 출시 범위에서 제외한다", () => {
   const debugEntitlementsPath =
     "apps/mobile/ios/Runner/Runner-Debug.entitlements";
