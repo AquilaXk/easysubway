@@ -291,6 +291,9 @@ function validateSource(source, snapshotsByIdentity, evaluatedMillis, violations
     violations.snapshot.push(`${source.id}:SNAPSHOT_IDENTITY_MISSING`);
     return;
   }
+  if (evidence.decision !== "APPROVED" || evidence.productionUseAllowed !== true) {
+    violations.provenance.push(`${source.id}:ACCESSIBILITY_ADMISSION_NOT_APPROVED`);
+  }
   const capturedMillis = Date.parse(evidence.capturedAt);
   const observedMillis = Date.parse(evidence.observedAt);
   const freshUntilMillis = Date.parse(evidence.freshUntil);

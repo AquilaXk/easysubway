@@ -86,7 +86,8 @@
       "sourceIds": [
         "kric-station-convenience-standard",
         "kric-station-elevator-movement",
-        "kric-wheelchair-lift-movement"
+        "kric-wheelchair-lift-movement",
+        "seoul-metro-accessibility"
       ],
       "evidence": "국가철도공단 접근성 시설 위치와 이동동선 source inventory coverageScope"
     },

@@ -259,6 +259,12 @@ for (const { name, mutate, partition, expected } of [
     expected: "bundled-capital:station-a|line-a|STATION_FACILITY_EVIDENCE:PROVENANCE_MISSING",
   },
   {
+    name: "accessibility admission not approved",
+    mutate: (input) => { input.inventory.sources[0].accessibilityAdmissionEvidence.decision = "PENDING"; },
+    partition: "provenance",
+    expected: "official-accessibility:ACCESSIBILITY_ADMISSION_NOT_APPROVED",
+  },
+  {
     name: "row absence without completeness evidence",
     mutate: (input) => {
       input.artifacts[0].claims[0].evidenceKind = "NOT_EXISTS";
@@ -331,6 +337,8 @@ function validInput() {
         productionUseAllowed: true,
         license: { redistributionAllowed: true, attribution: "공식 제공기관" },
         accessibilityAdmissionEvidence: {
+          decision: "APPROVED",
+          productionUseAllowed: true,
           snapshotId,
           snapshotPath: "tools/datapack/sources/official-accessibility-20260728.json",
           capturedAt: "2026-07-27T23:00:00.000Z",

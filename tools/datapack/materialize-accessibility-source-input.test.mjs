@@ -9,7 +9,7 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
     stationLineRows: [{ stationCode: "1", lineId: "line-1", stationNameKo: "가" }],
     routeEdges: [{ id: "edge-a", sourceId: "seoul-metro-accessibility", edgeType: "ENTRY", to: { sourceStationCode: "1" } }],
     supportedV1Scope: { includedStationIds: ["station-a"] },
-    minimumProductionCoverage: { facilities: 3 },
+    minimumProductionCoverage: { facilities: 1 },
     coverageEvidence: [{ sourceDomain: "accessibility_facilities", sourceIds: ["old"] }],
   };
   const kricSnapshot = {
@@ -33,4 +33,9 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
   ]);
   assert.equal(output.routeEdges[0].accessibilityStatus, "UNKNOWN");
   assert.equal(output.routeEdges[0].verificationStatus, "NOT_VERIFIED");
+  assert.deepEqual(output.sourceIds, ["kric-station-convenience-standard", "seoul-metro-accessibility"]);
+  assert.ok(output.coverageEvidence[0].sourceIds.includes("seoul-metro-accessibility"));
+  assert.throws(() => materializeAccessibilitySourceInput({
+    input: { ...input, minimumProductionCoverage: { facilities: 2 } }, kricSnapshot, seoulSnapshot,
+  }), /accessibility facility coverage below declared minimum: 1\/2/);
 });
