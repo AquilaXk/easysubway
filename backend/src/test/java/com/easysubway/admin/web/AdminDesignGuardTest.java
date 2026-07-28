@@ -185,6 +185,14 @@ class AdminDesignGuardTest {
 			.contains("outline: 3px solid var(--admin-focus);");
 		assertThat(rule(read(CSS_SHELL), "\\.admin-nav-item\\.is-active:focus-visible"))
 			.contains("outline-color: var(--admin-focus-on-signature);");
+		assertThat(rule(read(CSS_SHELL),
+			"\\.admin-v3 \\.admin-sidebar \\.admin-nav-workspace-toggle:focus-visible,\\s*"
+				+ "\\.admin-v3 \\.admin-sidebar \\.admin-nav-item:focus-visible"))
+			.contains("outline-color: var(--admin-focus-on-signature);");
+		assertThat(rule(read(CSS_SHELL), "\\.admin-v3 \\.admin-nav-workspace-toggle"))
+			.contains("color: var(--admin-on-primary);");
+		assertThat(rule(read(CSS_SHELL), "(?m)^\\.admin-nav-item(?=\\s*\\{)"))
+			.contains("color: var(--admin-on-primary);");
 		assertThat(rule(read(CSS_OPERATOR), "\\.nav-link\\.active:focus-visible"))
 			.contains("outline-color: var(--admin-focus-on-signature);");
 		assertThat(rule(read(CSS_SHELL), "\\.admin-nav-item\\.is-active"))
@@ -794,7 +802,8 @@ class AdminDesignGuardTest {
 			.contains("font-size: var(--admin-fs-page);")
 			.contains("letter-spacing: -0.04em;");
 		assertThat(rule(shell, "\\.admin-page-head p"))
-			.contains("display: none;");
+			.doesNotContain("display: none;")
+			.contains("color: var(--admin-ink-2);");
 	}
 
 	@Test

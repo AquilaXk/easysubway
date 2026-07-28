@@ -61,7 +61,7 @@ class AdminDashboardPageTest {
 			.contains("전체 서비스")
 			.containsPattern("<dt>제보</dt>\\s*<dd[^>]*>\\d+건</dd>")
 			.containsPattern("class=\"\\s*is-waiting\"[^>]*>\\s*<dt>배치</dt>\\s*<dd[^>]*>대기</dd>")
-			.contains("API 정상률")
+			.contains("최근 7일 API 정상률")
 			.contains("id=\"dashboard-weekly-operations\"")
 			.contains("data-weekday=\"월\"")
 			.contains("data-weekday=\"화\"")

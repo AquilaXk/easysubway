@@ -69,7 +69,7 @@
 				</dl>
 			</div>
 			<div class="dashboard-api-health">
-				<span>API 정상률</span>
+					<span>최근 7일 API 정상률</span>
 				<strong th:text="${snapshotStatus == null ? '집계 대기' : dashboard.apiNormalRateLabel}">집계 대기</strong>
 				<progress th:if="${snapshotStatus != null}" max="100" th:value="${dashboard.apiNormalRate}" aria-label="API 정상률"></progress>
 				<div th:if="${snapshotStatus != null}" class="dashboard-api-meta">

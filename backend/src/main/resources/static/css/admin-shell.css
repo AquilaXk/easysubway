@@ -120,7 +120,7 @@
 	border: 0;
 	border-radius: 0;
 	background: transparent;
-	color: color-mix(in srgb, var(--admin-on-primary) 78%, transparent);
+	color: var(--admin-on-primary);
 	font-size: var(--admin-fs-control);
 	font-weight: var(--admin-w-strong);
 	letter-spacing: -0.01em;
@@ -202,7 +202,7 @@
 	padding: 0 24px 0 68px;
 	border-radius: 0;
 	border-left: 2px solid transparent;
-	color: color-mix(in srgb, var(--admin-on-primary) 78%, transparent);
+	color: var(--admin-on-primary);
 	font-size: var(--admin-fs-control);
 	font-weight: var(--admin-w-medium);
 	text-decoration: none;
@@ -228,6 +228,11 @@
 }
 
 .admin-nav-item.is-active:focus-visible {
+	outline-color: var(--admin-focus-on-signature);
+}
+
+.admin-v3 .admin-sidebar .admin-nav-workspace-toggle:focus-visible,
+.admin-v3 .admin-sidebar .admin-nav-item:focus-visible {
 	outline-color: var(--admin-focus-on-signature);
 }
 
@@ -469,7 +474,6 @@
 }
 
 .admin-page-head p {
-	display: none;
 	margin: 6px 0 0;
 	color: var(--admin-ink-2);
 	font-size: 15px;
