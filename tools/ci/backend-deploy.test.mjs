@@ -796,7 +796,10 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
   assert.doesNotMatch(routeHeaders, /proxy_set_header CF-Connecting-IP \$http_cf_connecting_ip;/);
   assert.match(routeHeaders, /proxy_set_header X-Forwarded-For "";/);
   assert.match(host, /listen 443 ssl default_server;[\s\S]*server_name _;[\s\S]*return 444;/);
-  assert.match(host, /listen 443 ssl;[\s\S]*server_name easysubway-api\.aquilaxk\.site;/);
+  assert.equal(
+    (host.match(/server_name easysubway-api\.aquilaxk\.site easysubway\.aquilaxk\.site;/g) ?? []).length,
+    2,
+  );
   assert.equal((host.match(/listen 443 ssl default_server;/g) ?? []).length, 1);
   assert.match(deploy, /sudo nginx -t/);
   assert.match(deploy, /sudo systemctl reload nginx/);
