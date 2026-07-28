@@ -103,6 +103,18 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
     );
     assert.match(
       source,
+      /svg\.setAttribute\('viewBox',values\.join\(' '\)\);/,
+      `${platform} must retain full-precision camera coordinates only in viewBox`,
+    );
+    assert.match(source, /svg\.setAttribute\('width','100%'\);/);
+    assert.match(source, /svg\.setAttribute\('height','100%'\);/);
+    assert.doesNotMatch(
+      source,
+      /svg\.setAttribute\('(width|height)',String\(values\[[23]\]\)\);/,
+      `${platform} must not interpret source-coordinate dimensions as CSS pixels`,
+    );
+    assert.match(
+      source,
       /const before=snapshot\(svg\);[\s\S]*return before===snapshot\(svg\);/,
       `${platform} must gate success on immutable SVG snapshot equality`,
     );

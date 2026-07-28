@@ -470,8 +470,8 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
         const snapshot=(node)=>{const clone=node.cloneNode(true);for(const name of allowed){clone.removeAttribute(name);}return clone.outerHTML;};
         const before=snapshot(svg);
         svg.setAttribute('viewBox',values.join(' '));
-        svg.setAttribute('width',String(values[2]));
-        svg.setAttribute('height',String(values[3]));
+        svg.setAttribute('width','100%');
+        svg.setAttribute('height','100%');
         svg.setAttribute('preserveAspectRatio','xMidYMid meet');
         return before===snapshot(svg);
       })();
