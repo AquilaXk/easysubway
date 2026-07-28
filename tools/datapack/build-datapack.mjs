@@ -637,13 +637,13 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
   const productionPacks = fixture.packs?.filter(({ artifactKind }) => artifactKind === "production") ?? [];
   if (productionPacks.length === 0) throw new Error("network edge evidence requires a production pack");
   for (const pack of productionPacks) {
-    if ([...(pack.networkEdges ?? []), ...(pack.outOfStationTransferLinks ?? [])].some((edge) =>
-      [edge.sourceId, edge.sourceSnapshotId, edge.providerRecordHash, edge.evidenceHash,
-        edge.lastFieldVerifiedAt, edge.lastVerifiedAt, edge.verifiedAt].some(Boolean)
+    const hasFixtureProvenance = (edge) => [edge.sourceId, edge.sourceSnapshotId, edge.providerRecordHash,
+      edge.evidenceHash, edge.lastFieldVerifiedAt, edge.lastVerifiedAt, edge.verifiedAt].some(Boolean)
       || edge.fieldProvenance !== undefined
       || ![undefined, "UNKNOWN"].includes(edge.provenanceKind)
-      || ![undefined, "UNKNOWN"].includes(edge.verificationStatus)
-    )) {
+      || ![undefined, "UNKNOWN"].includes(edge.verificationStatus);
+    if ((pack.networkEdges ?? []).some((edge) => !isReviewedAccessibilityEdge(edge) && hasFixtureProvenance(edge))
+      || (pack.outOfStationTransferLinks ?? []).some(hasFixtureProvenance)) {
       throw new Error("production network edge fixture must not contain provenance");
     }
     materializeCapitalTopologySource(pack, topology, capitalAdmissions);
@@ -662,6 +662,19 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     ...[...capitalAdmissions.values()].map(({ freshUntil }) => Date.parse(freshUntil)),
     Date.parse(accessibilityFreshUntil),
   )).toISOString();
+}
+
+function isReviewedAccessibilityEdge(edge) {
+  return edge.sourceId === "seoul-metro-accessibility"
+    && ["ENTRY", "EXIT"].includes(edge.edgeType)
+    && ["UNKNOWN", "NO_OFFICIAL_FEED"].includes(edge.accessibilityStatus)
+    && edge.stairAccessState === "UNKNOWN"
+    && edge.provenanceKind === "OFFICIAL_SOURCE"
+    && edge.verificationStatus === "NOT_VERIFIED"
+    && typeof edge.sourceSnapshotId === "string"
+    && /^[0-9a-f]{64}$/.test(edge.providerRecordHash ?? "")
+    && /^[0-9a-f]{64}$/.test(edge.evidenceHash ?? "")
+    && Number.isFinite(Date.parse(edge.lastVerifiedAt));
 }
 
 export function productionAccessibilityFreshUntil(packs, inventory, sourceSnapshots) {
@@ -694,7 +707,9 @@ export function productionAccessibilityFreshUntil(packs, inventory, sourceSnapsh
 export function normalizeUnverifiedNetworkEdgeStates(pack) {
   for (const edge of [...(pack.networkEdges ?? []), ...(pack.outOfStationTransferLinks ?? [])]) {
     if (edge.verificationStatus !== "VERIFIED") {
-      edge.accessibilityStatus = "UNKNOWN";
+      if (!(isReviewedAccessibilityEdge(edge) && edge.accessibilityStatus === "NO_OFFICIAL_FEED")) {
+        edge.accessibilityStatus = "UNKNOWN";
+      }
       edge.stairAccessState = "UNKNOWN";
     }
   }
@@ -1489,6 +1504,15 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
     addRecord(facility, "facility", facility.id, "status", operatorIds, lineIds);
     if (facility.verifiedAt || facility.lastVerifiedAt) {
       addRecord(facility, "facility", facility.id, "verified_at", operatorIds, lineIds);
+    }
+  }
+  for (const evidence of pack.stationFacilityEvidence ?? []) {
+    const operatorIds = [lineOperatorIds.get(evidence.lineId)].filter(Boolean);
+    const field = facilityField(evidence.facilityType);
+    if (field) {
+      const entityId = `${evidence.stationId}:${evidence.lineId}:${evidence.facilityType}`;
+      addRecord(evidence, "station_facility_evidence", entityId, field, operatorIds, [evidence.lineId]);
+      addRecord(evidence, "station_facility_evidence", entityId, "verified_at", operatorIds, [evidence.lineId]);
     }
   }
   for (const mapping of pack.realtimeProviderStationMappings ?? []) {

@@ -90,7 +90,7 @@ test("#2135 ADMITTED source와 subway seed를 deterministic complete server snap
     admittedInputSha256: contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sha256,
     admittedInputSqliteSha256:
       contract.officialEvidence.korailCompletenessAdmission.canonicalPackIdentity.sqliteSha256,
-    readmissionCount: 16,
+    readmissionCount: 19,
   });
   assert.deepEqual(first.evidence.serviceIdentity, {
     serviceId: "ITX_CHEONGCHUN",
@@ -171,12 +171,12 @@ test("접근성 source snapshot의 lineage와 governance 값을 그대로 materi
   const reviewedPack = JSON.parse(value.reviewedPackBytes);
   const snapshots = JSON.parse(value.sourceSnapshotsBytes);
   const parent = snapshots.find(
-    ({ snapshotId }) => snapshotId === "seoul-metro-accessibility-capital-admission-20260712",
+    ({ snapshotId }) => snapshotId === "seoul-metro-accessibility-20260728",
   );
   const child = {
     ...parent,
-    snapshotId: "seoul-metro-accessibility-capital-admission-20260713",
-    retrievedAt: "2026-07-13T00:00:00Z",
+    snapshotId: "seoul-metro-accessibility-20260729",
+    retrievedAt: "2026-07-29T00:00:00Z",
     sourceUpdatedAt: null,
     rowCount: 9,
     coverageCount: 2,

@@ -24,8 +24,24 @@ const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
 test("production producer는 미승격 network edge와 역외 환승 link 상태를 UNKNOWN으로 내린다", () => {
   const verified = { verificationStatus: "VERIFIED", accessibilityStatus: "AVAILABLE", stairAccessState: "STEP_FREE" };
+  const officialFeedAbsence = {
+    edgeType: "ENTRY",
+    sourceId: "seoul-metro-accessibility",
+    sourceSnapshotId: "seoul-metro-accessibility-20260728",
+    providerRecordHash: "a".repeat(64),
+    evidenceHash: "b".repeat(64),
+    provenanceKind: "OFFICIAL_SOURCE",
+    verificationStatus: "NOT_VERIFIED",
+    accessibilityStatus: "NO_OFFICIAL_FEED",
+    stairAccessState: "UNKNOWN",
+    lastVerifiedAt: "2026-07-28T15:35:25.704Z",
+  };
   const pack = {
-    networkEdges: [{ verificationStatus: "UNKNOWN", accessibilityStatus: "AVAILABLE", stairAccessState: "STEP_FREE" }, verified],
+    networkEdges: [
+      { verificationStatus: "UNKNOWN", accessibilityStatus: "AVAILABLE", stairAccessState: "STEP_FREE" },
+      verified,
+      officialFeedAbsence,
+    ],
     outOfStationTransferLinks: [{ accessibilityStatus: "AVAILABLE", stairAccessState: "STEP_FREE" }],
   };
 
@@ -37,6 +53,7 @@ test("production producer는 미승격 network edge와 역외 환승 link 상태
     stairAccessState: "UNKNOWN",
   });
   assert.equal(pack.networkEdges[1], verified);
+  assert.equal(pack.networkEdges[2], officialFeedAbsence);
   assert.deepEqual(pack.outOfStationTransferLinks[0], {
     accessibilityStatus: "UNKNOWN",
     stairAccessState: "UNKNOWN",
@@ -159,8 +176,8 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
     assert.equal(report.byteSize, pack.sizeBytes);
     assert.ok(report.rowCounts.stations > 0);
     assert.deepEqual(report.networkEdgeCounts, {
-      total: 2178,
-      provenanceComplete: 652,
+      total: 2182,
+      provenanceComplete: 656,
       strictEligible: 652,
     });
     assert.deepEqual(await verifyProductionPackArtifactIdentity({

@@ -1,7 +1,90 @@
 import assert from "node:assert/strict";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
 
-import { accessibilityIndexMetadata } from "./apply-accessibility-evidence-to-bundled-pack.mjs";
+import {
+  accessibilityIndexMetadata,
+  assertAccessibilityEdges,
+  syncAccessibilityEdges,
+  syncCanonicalFixture,
+} from "./apply-accessibility-evidence-to-bundled-pack.mjs";
+
+const reviewedEdge = {
+  id: "edge-entry-sadang-seoul-4",
+  fromNodeId: "station-sadang",
+  toNodeId: "station-sadang:seoul-4",
+  durationSeconds: 90,
+  distanceMeters: 0,
+  edgeType: "ENTRY",
+  servicePattern: "",
+  includesStairs: false,
+  stairAccessState: "UNKNOWN",
+  accessibilityStatus: "UNKNOWN",
+  reliabilityScore: 90,
+  sourceId: "seoul-metro-accessibility",
+  sourceSnapshotId: "seoul-metro-accessibility-20260728",
+  providerRecordHash: "a".repeat(64),
+  provenanceKind: "OFFICIAL_SOURCE",
+  verificationStatus: "NOT_VERIFIED",
+  lastVerifiedAt: "2026-07-28T15:35:25.704Z",
+  evidenceHash: "b".repeat(64),
+};
+
+test("canonical and SQLite refresh the reviewed ENTRY/EXIT identity together", () => {
+  const reviewedPack = {
+    networkEdges: [reviewedEdge],
+    metadata: { productionCoverageEvidence: "reviewed-accessibility-sources" },
+  };
+  const officialOdFareQuotes = [{ originStationId: "station-sadang", destinationStationId: "station-sangnoksu" }];
+  const routeServiceArtifactEvidence = [{ serviceClass: "ITX_CHEONGCHUN", admissionStatus: "MISSING" }];
+  const canonical = { packs: [{
+    id: "capital",
+    networkEdges: [{ ...reviewedEdge, sourceSnapshotId: "stale" }],
+    sourceInventory: [{ id: "seoul-metro-official-od-fares" }],
+    officialOdFareQuotes,
+    routeServiceArtifactEvidence,
+    metadata: { productionCoverageEvidence: "retired-accessibility-sources" },
+    minimumTableRows: {},
+  }] };
+  const synced = syncCanonicalFixture(structuredClone(canonical), {
+    ...reviewedPack,
+    facilities: [],
+    stationFacilityEvidence: [],
+    sourceInventory: [],
+  });
+  assert.deepEqual(synced.packs[0].networkEdges, [reviewedEdge]);
+  assert.deepEqual(synced.packs[0].officialOdFareQuotes, officialOdFareQuotes);
+  assert.deepEqual(synced.packs[0].routeServiceArtifactEvidence, routeServiceArtifactEvidence);
+  assert.deepEqual(synced.packs[0].sourceInventory, [{ id: "seoul-metro-official-od-fares" }]);
+  assert.equal(synced.packs[0].metadata.productionCoverageEvidence, "reviewed-accessibility-sources");
+
+  const database = new DatabaseSync(":memory:");
+  database.exec(`
+    CREATE TABLE network_edges (
+      id TEXT PRIMARY KEY, from_node_id TEXT, to_node_id TEXT, duration_seconds INTEGER,
+      distance_meters INTEGER, edge_type TEXT, service_pattern TEXT, service_class TEXT,
+      includes_stairs INTEGER, stair_access_state TEXT, accessibility_status TEXT,
+      reliability_score INTEGER, source_id TEXT, source_snapshot_id TEXT,
+      provider_record_hash TEXT, provenance_kind TEXT, verification_status TEXT,
+      facility_id TEXT, last_verified_at INTEGER, evidence_hash TEXT
+    );
+    INSERT INTO network_edges VALUES (
+      'stale-edge', 'station-sadang', 'station-sadang:seoul-4', 1, 1, 'ENTRY', '', 'SUBWAY',
+      0, 'UNKNOWN', 'UNKNOWN', 1, 'seoul-metro-accessibility', 'stale', '',
+      'OFFICIAL_SOURCE', 'NOT_VERIFIED', NULL, 1, ''
+    );
+  `);
+  syncAccessibilityEdges(database, reviewedPack);
+  assert.doesNotThrow(() => assertAccessibilityEdges(database, reviewedPack));
+  assert.deepEqual(
+    database.prepare("SELECT id, source_snapshot_id AS sourceSnapshotId, evidence_hash AS evidenceHash FROM network_edges")
+      .all().map((row) => ({ ...row })),
+    [{ id: reviewedEdge.id, sourceSnapshotId: reviewedEdge.sourceSnapshotId, evidenceHash: reviewedEdge.evidenceHash }],
+  );
+  database.prepare("UPDATE network_edges SET source_snapshot_id = 'stale'").run();
+  assert.throws(() => assertAccessibilityEdges(database, reviewedPack), /bundled accessibility edge is stale/);
+  database.close();
+});
 
 test("metadata requires admission for facilities-only sources and uses the build clock hook", (t) => {
   const previousBuildNow = process.env.EASYSUBWAY_DATAPACK_BUILD_NOW;
