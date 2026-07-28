@@ -73,15 +73,21 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   );
   const iosProject = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
   const iosViewport = ios.slice(ios.indexOf("private final class RouteMapViewportWebViewFactory"));
-  const runnerDebugConfiguration = iosProject.match(
+  const runnerDebugMatch = iosProject.match(
     /97C147061CF9000F007C117D \/\* Debug \*\/ = \{[\s\S]*?name = Debug;/,
-  )?.[0] ?? "";
-  const runnerReleaseConfiguration = iosProject.match(
+  );
+  const runnerReleaseMatch = iosProject.match(
     /97C147071CF9000F007C117D \/\* Release \*\/ = \{[\s\S]*?name = Release;/,
-  )?.[0] ?? "";
-  const runnerProfileConfiguration = iosProject.match(
+  );
+  const runnerProfileMatch = iosProject.match(
     /249021D4217E4FDB00AE95B9 \/\* Profile \*\/ = \{[\s\S]*?name = Profile;/,
-  )?.[0] ?? "";
+  );
+  assert.ok(runnerDebugMatch, "Runner Debug configuration block must exist");
+  assert.ok(runnerReleaseMatch, "Runner Release configuration block must exist");
+  assert.ok(runnerProfileMatch, "Runner Profile configuration block must exist");
+  const runnerDebugConfiguration = runnerDebugMatch[0];
+  const runnerReleaseConfiguration = runnerReleaseMatch[0];
+  const runnerProfileConfiguration = runnerProfileMatch[0];
   const allowedRootAttributes = ["viewBox", "width", "height", "preserveAspectRatio"];
 
   for (const [platform, source] of [["Android", android], ["iOS", iosViewport]]) {

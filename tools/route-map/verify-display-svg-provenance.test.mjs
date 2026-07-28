@@ -16,6 +16,7 @@ const regions = [
 ];
 const sourceDir = "tools/route-map/route-map-defs/svg-sources";
 const bundleDir = "apps/mobile/assets/datapacks/metro_map_pack/basemap";
+const repositoryRoot = path.resolve(import.meta.dirname, "../..");
 const digest = (value) => createHash("sha256").update(value).digest("hex");
 
 function fixture() {
@@ -54,7 +55,10 @@ test("verifyDisplaySvgProvenance: repository display artifacts match canonical s
 });
 
 test("Gwangju canonical SVG retains 광주송정역 text without duplicated station accessibility labels", () => {
-  const svg = readFileSync(`${sourceDir}/easy-subway-gwangju-v3.svg`, "utf8");
+  const svg = readFileSync(
+    path.join(repositoryRoot, sourceDir, "easy-subway-gwangju-v3.svg"),
+    "utf8",
+  );
   const ariaLabels = [...svg.matchAll(/(?:^|\s)aria-label="([^"]*)"/g)].map((match) => match[1]);
 
   assert.match(svg, />광주송정역\s*<\/tspan>/);

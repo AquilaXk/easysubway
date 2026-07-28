@@ -77,7 +77,9 @@ private class RouteMapViewportPlatformView(
         "com.easysubway.easysubway_mobile/route_map_viewport_webview/$viewId",
     )
     private var webView: WebView? = null
+    @Volatile
     private var initialAssetUrl: String? = null
+    @Volatile
     private var fontUrls = emptySet<String>()
     private var documentReady = false
     private var fontReadinessAttempts = 0

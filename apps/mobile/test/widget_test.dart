@@ -3871,6 +3871,7 @@ void main() {
         final cameraCallsAfterFirstMove = nativeCalls
             .where((call) => call.method == 'setCamera')
             .length;
+        expect(cameraCallsAfterFirstMove, greaterThan(0));
         await left.moveTo(center - const Offset(65, 0));
         await right.moveTo(center + const Offset(65, 0));
         await tester.pump();
