@@ -5,7 +5,7 @@ import 'dart:ui';
 const Size kFanMenuDesignSize = Size(700, 380);
 
 /// v3 말풍선 꼬리 팁(design 좌표). 닫기 섹터·실루엣 하단 베지어의 t=0.5 접점이며
-/// 이 점이 앵커 역 노드의 앵커점(가로 중앙 · 노드 상단에서 높이의 2/3 지점,
+/// 이 점이 앵커 역 노드의 앵커점(가로 중앙 · 노드 바닥에서 높이의 2/3 위 지점,
 /// #2068 QA)에 닿도록 배치한다(팬 메뉴 placement가 소비하는 단일 출처 —
 /// 배치식이 좌표를 재하드코딩하지 않게 한다).
 const Offset kFanMenuTailTip = Offset(350, 375);
