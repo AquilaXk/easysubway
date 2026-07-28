@@ -7,12 +7,43 @@ import '../../../core/database/user/user_database.dart' as user_db;
 import '../../../network_map.dart';
 
 const _networkMapViewportKeyPrefix = 'network_map_viewport';
+const _networkMapSelectedRegionKey = 'network_map_selected_region';
 
 class DriftNetworkMapViewportRepository
     implements NetworkMapViewportRepository {
   DriftNetworkMapViewportRepository({required this.userDatabase});
 
   final user_db.UserDatabase userDatabase;
+
+  @override
+  Future<String?> loadSelectedRegion() async {
+    final row = await userDatabase
+        .customSelect(
+          'SELECT value FROM app_preferences WHERE key = ?',
+          variables: [Variable.withString(_networkMapSelectedRegionKey)],
+          readsFrom: {userDatabase.appPreferences},
+        )
+        .getSingleOrNull();
+    final region = row?.read<String>('value').trim();
+    return region == null || region.isEmpty ? null : region;
+  }
+
+  @override
+  Future<void> saveSelectedRegion(String region) async {
+    final value = region.trim();
+    if (value.isEmpty) {
+      throw ArgumentError.value(region, 'region', 'must not be empty');
+    }
+    await userDatabase
+        .into(userDatabase.appPreferences)
+        .insertOnConflictUpdate(
+          user_db.AppPreferencesCompanion.insert(
+            key: _networkMapSelectedRegionKey,
+            value: value,
+            updatedAt: DateTime.now().toUtc(),
+          ),
+        );
+  }
 
   @override
   Future<Rect?> loadViewport(String region) async {

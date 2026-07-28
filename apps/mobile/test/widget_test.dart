@@ -7272,6 +7272,118 @@ void main() {
     await tester.pump();
   });
 
+  testWidgets('GPS 최근접 역은 현재 배율을 유지하고 역만 중앙에 둔다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: _gpsNetworkMapData(
+        selectedRegion: '수도권',
+        regions: const ['수도권'],
+        centerNearestStation: true,
+      ),
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+    final initial = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    final focused = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(focused.scale, initial.scale);
+    expect(focused.center, const Offset(430, 280));
+
+    addTearDown(tester.view.resetPhysicalSize);
+    tester.view.physicalSize = const Size(600, 1200);
+    await tester.pumpAndSettle();
+    final rotated = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(rotated.scale, focused.scale);
+    expect(rotated.initialScale, isNot(focused.initialScale));
+    expect(rotated.center, const Offset(430, 280));
+  });
+
+  testWidgets('GPS 패널을 닫아도 현재 배율은 유지하고 초기 기준은 다시 계산한다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: _gpsNetworkMapData(
+        selectedRegion: '수도권',
+        regions: const ['수도권'],
+        centerNearestStation: true,
+      ),
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    final focused = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    await tester.tap(find.byKey(const Key('networkMapNearbyPanelCloseButton')));
+    await tester.pumpAndSettle();
+
+    final closed = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(closed.scale, focused.scale);
+    expect(closed.initialScale, isNot(focused.initialScale));
+  });
+
+  testWidgets('GPS 패널과 팬 메뉴를 닫으면 다음 layout은 초기 카메라를 다시 계산한다', (tester) async {
+    tester.view.physicalSize = const Size(1200, 600);
+    addTearDown(tester.view.resetPhysicalSize);
+    final repository = FakeStationSearchRepository(
+      networkMapData: _gpsNetworkMapData(
+        selectedRegion: '수도권',
+        regions: const ['수도권'],
+        centerNearestStation: true,
+      ),
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+    await tester.tap(find.byKey(const Key('networkMapNearbyPanelCloseButton')));
+    await tester.pumpAndSettle();
+    await _tapFanMenuSector(tester, _fanCloseLabel);
+    final beforeLayoutChange = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+
+    tester.view.physicalSize = const Size(600, 1200);
+    await tester.pumpAndSettle();
+
+    final afterLayoutChange = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(afterLayoutChange.scale, isNot(beforeLayoutChange.scale));
+  });
+
   testWidgets('GPS 재시도는 이전 오류 메시지와 timer를 즉시 지운다', (tester) async {
     var locationAttempts = 0;
     final locationProvider = FakeCurrentLocationProvider(
@@ -7331,6 +7443,9 @@ void main() {
 
   testWidgets('GPS 다른 지역 결과는 지도와 역을 검증한 뒤에만 팬 메뉴를 연다', (tester) async {
     final busanMap = Completer<NetworkMapData>();
+    final viewportRepository = FakeNetworkMapViewportRepository(
+      viewports: const {'부산권': Rect.fromLTWH(0, 0, 80, 80)},
+    );
     final repository = FakeStationSearchRepository(
       networkMapRegionNames: const ['수도권', '부산권'],
       networkMapCompletersByRegion: {'부산권': busanMap},
@@ -7343,8 +7458,9 @@ void main() {
       repository: repository,
       locationProvider: FakeCurrentLocationProvider(
         location: _freshCurrentLocation(),
-        needsPermissionRequest: false,
+        needsPermissionRequest: true,
       ),
+      viewportRepository: viewportRepository,
     );
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pump();
@@ -7362,6 +7478,12 @@ void main() {
       find.byKey(const Key('networkMapNearbyStationPanel')),
       findsOneWidget,
     );
+    expect(viewportRepository.loadedRegions, isNot(contains('부산권')));
+    expect(viewportRepository.selectedRegion, '부산권');
+    final camera = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(camera.scale, camera.initialScale);
   });
 
   testWidgets('GPS 지역 지도 load 실패는 팬 메뉴를 열지 않는다', (tester) async {
@@ -7406,6 +7528,7 @@ void main() {
         _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
       ],
     );
+    final viewportRepository = FakeNetworkMapViewportRepository();
     await _pumpNetworkMapForGpsTest(
       tester,
       repository: repository,
@@ -7413,6 +7536,7 @@ void main() {
         location: _freshCurrentLocation(),
         needsPermissionRequest: false,
       ),
+      viewportRepository: viewportRepository,
     );
 
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
@@ -7420,6 +7544,7 @@ void main() {
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
     expect(find.text('주변 역을 불러오지 못했어요.'), findsOneWidget);
+    expect(viewportRepository.selectedRegion, '수도권');
   });
 
   testWidgets('GPS의 오래된 비동기 결과는 일반 지역 전환을 되돌리지 않는다', (tester) async {
@@ -7612,7 +7737,7 @@ void main() {
     expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
   });
 
-  testWidgets('노선도는 위치 권한이 이미 있으면 가까운 역 중심 viewport를 저장한다', (tester) async {
+  testWidgets('노선도는 위치 권한이 이미 있으면 배율을 유지한 viewport를 저장한다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       location: _freshCurrentLocation(),
       needsPermissionRequest: false,
@@ -7651,6 +7776,317 @@ void main() {
     expect(viewportRepository.loadedRegions, contains('수도권'));
     expect(viewportRepository.savedViewports['수도권'], isNotNull);
     expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    final camera = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(camera.scale, camera.initialScale);
+  });
+
+  testWidgets('GPS 자동 초기 focus도 타 권역의 읽기 가능한 초기 배율을 쓴다', (tester) async {
+    final viewportRepository = FakeNetworkMapViewportRepository(
+      viewports: const {'부산권': Rect.fromLTWH(0, 0, 80, 80)},
+    );
+    final repository = FakeStationSearchRepository(
+      networkMapData: _gpsNetworkMapData(
+        selectedRegion: '수도권',
+        regions: const ['수도권', '부산권'],
+      ),
+      networkMapDataByRegion: {
+        '부산권': _gpsNetworkMapData(
+          selectedRegion: '부산권',
+          regions: const ['수도권', '부산권'],
+          centerNearestStation: true,
+        ),
+      },
+      nearbyResults: [
+        _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+      ],
+    );
+
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      viewportRepository: viewportRepository,
+    );
+
+    expect(repository.requestedNetworkMapRegions, [null, '부산권']);
+    expect(viewportRepository.loadedRegions, isNot(contains('부산권')));
+    expect(viewportRepository.selectedRegion, '부산권');
+    expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    final camera = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(camera.scale, camera.initialScale);
+    expect(camera.center, const Offset(430, 280));
+  });
+
+  testWidgets('GPS 자동 타 권역 전환은 부모 지역 라벨도 갱신한다', (tester) async {
+    final regionLabels = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(
+            networkMapData: _gpsNetworkMapData(
+              selectedRegion: '수도권',
+              regions: const ['수도권', '부산'],
+            ),
+            networkMapDataByRegion: {
+              '부산': _gpsNetworkMapData(
+                selectedRegion: '부산',
+                regions: const ['수도권', '부산'],
+              ),
+            },
+            nearbyResults: [
+              _stationResult(
+                id: 'station-sangnoksu',
+                name: '상록수',
+                region: '부산',
+              ),
+            ],
+          ),
+          routeDraftController: RouteDraftController(),
+          viewportRepository: FakeNetworkMapViewportRepository(),
+          locationProvider: FakeCurrentLocationProvider(
+            location: _freshCurrentLocation(),
+            needsPermissionRequest: false,
+          ),
+          stationSearchRepository: FakeStationSearchRepository(
+            nearbyResults: [
+              _stationResult(
+                id: 'station-sangnoksu',
+                name: '상록수',
+                region: '부산',
+              ),
+            ],
+          ),
+          onOpenStationSearch: (_, _) {},
+          onRegionLabelChanged: regionLabels.add,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(regionLabels, contains('부산'));
+  });
+
+  testWidgets('GPS 자동 타 권역 응답은 진행 중 생긴 경로 초안을 바꾸지 않는다', (tester) async {
+    final nearbyCompleter = Completer<List<StationSearchResult>>();
+    final viewportRepository = FakeNetworkMapViewportRepository();
+    final repository = FakeStationSearchRepository(
+      networkMapData: _gpsNetworkMapData(
+        selectedRegion: '수도권',
+        regions: const ['수도권', '부산권'],
+      ),
+      networkMapDataByRegion: {
+        '부산권': _gpsNetworkMapData(
+          selectedRegion: '부산권',
+          regions: const ['수도권', '부산권'],
+        ),
+      },
+      nearbyCompleter: nearbyCompleter,
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+      viewportRepository: viewportRepository,
+    );
+    tester
+        .widget<NetworkMapScreen>(find.byType(NetworkMapScreen))
+        .routeDraftController
+        .setOrigin(const RouteDraftStation(id: 'origin', nameKo: '출발역'));
+
+    nearbyCompleter.complete([
+      _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+    ]);
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNetworkMapRegions, [null]);
+    expect(viewportRepository.selectedRegion, '수도권');
+  });
+
+  testWidgets('GPS 자동·명시 target map load 중 생긴 경로 초안은 지역 전환을 막는다', (
+    tester,
+  ) async {
+    for (final automatic in [true, false]) {
+      final busanMap = Completer<NetworkMapData>();
+      final viewportRepository = FakeNetworkMapViewportRepository();
+      final repository = FakeStationSearchRepository(
+        networkMapData: _gpsNetworkMapData(
+          selectedRegion: '수도권',
+          regions: const ['수도권', '부산권'],
+        ),
+        networkMapCompletersByRegion: {'부산권': busanMap},
+        nearbyResults: [
+          _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+        ],
+      );
+      await _pumpNetworkMapForGpsTest(
+        tester,
+        repository: repository,
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: !automatic,
+        ),
+        viewportRepository: viewportRepository,
+      );
+      if (!automatic) {
+        await tester.tap(find.byKey(const Key('nearbyStationButton')));
+        await tester.pump();
+      }
+      expect(repository.requestedNetworkMapRegions, [null, '부산권']);
+
+      tester
+          .widget<NetworkMapScreen>(find.byType(NetworkMapScreen))
+          .routeDraftController
+          .setOrigin(const RouteDraftStation(id: 'origin', nameKo: '출발역'));
+      busanMap.complete(
+        _gpsNetworkMapData(
+          selectedRegion: '부산권',
+          regions: const ['수도권', '부산권'],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(viewportRepository.selectedRegion, '수도권');
+      expect(
+        find.byKey(const Key('networkMapNearbyStationPanel')),
+        findsNothing,
+      );
+      expect(
+        tester
+            .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+            .region,
+        '수도권',
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    }
+  });
+
+  testWidgets('저장 지역을 복원하고 없는 지역은 기본 지역 카메라로 복구한다', (tester) async {
+    const fallbackViewport = Rect.fromLTWH(20, 30, 400, 240);
+    final viewportRepository = FakeNetworkMapViewportRepository(
+      viewports: const {'부산': fallbackViewport},
+      selectedRegion: '삭제된 지역',
+    );
+    final fallbackMap = _gpsNetworkMapData(
+      selectedRegion: '부산',
+      regions: const ['부산'],
+    );
+    final repository = FakeStationSearchRepository(
+      networkMapData: fallbackMap,
+      networkMapDataByRegion: {
+        '삭제된 지역': _gpsNetworkMapData(
+          selectedRegion: '삭제된 지역',
+          regions: const ['부산'],
+          includeNearestStation: false,
+        ),
+      },
+    );
+
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: repository,
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        networkMapViewportRepository: viewportRepository,
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(repository.requestedNetworkMapRegions, ['삭제된 지역', null]);
+    expect(viewportRepository.selectedRegion, '부산');
+    expect(viewportRepository.loadedRegions, ['부산']);
+    expect(find.byType(RouteMapBasemapView), findsOneWidget);
+  });
+
+  testWidgets('오래된 지도 load는 최신 선택 지역 preference를 덮지 않는다', (tester) async {
+    final busanMap = Completer<NetworkMapData>();
+    final daeguMap = Completer<NetworkMapData>();
+    final bridge = NetworkMapRegionBridge();
+    final viewportRepository = FakeNetworkMapViewportRepository();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(
+            networkMapData: _gpsNetworkMapData(
+              selectedRegion: '수도권',
+              regions: const ['수도권', '부산', '대구'],
+            ),
+            networkMapCompletersByRegion: {'부산': busanMap, '대구': daeguMap},
+          ),
+          routeDraftController: RouteDraftController(),
+          regionBridge: bridge,
+          viewportRepository: viewportRepository,
+          onOpenStationSearch: (_, _) {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    bridge.selectRegion('부산');
+    await tester.pump();
+    bridge.selectRegion('대구');
+    await tester.pump();
+    daeguMap.complete(
+      _gpsNetworkMapData(selectedRegion: '대구', regions: const ['부산', '대구']),
+    );
+    await tester.pumpAndSettle();
+    expect(viewportRepository.selectedRegion, '대구');
+
+    busanMap.complete(
+      _gpsNetworkMapData(selectedRegion: '부산', regions: const ['부산', '대구']),
+    );
+    await tester.pumpAndSettle();
+
+    expect(viewportRepository.selectedRegion, '대구');
+  });
+
+  testWidgets('지역 preference 실패는 성공한 지도를 가리지 않는다', (tester) async {
+    final errors = <FlutterErrorDetails>[];
+    final previousOnError = FlutterError.onError;
+    FlutterError.onError = errors.add;
+    addTearDown(() => FlutterError.onError = previousOnError);
+
+    for (final viewportRepository in [
+      FakeNetworkMapViewportRepository(
+        loadSelectedRegionError: StateError('load region'),
+      ),
+      FakeNetworkMapViewportRepository(
+        saveSelectedRegionError: StateError('save region'),
+      ),
+      FakeNetworkMapViewportRepository(
+        loadViewportError: StateError('load viewport'),
+      ),
+    ]) {
+      await tester.pumpWidget(
+        buildEasySubwayTestApp(
+          repository: FakeStationSearchRepository(
+            networkMapRegionNames: const ['수도권'],
+          ),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          favoriteRepository: FakeFavoriteStationRepository(),
+          networkMapViewportRepository: viewportRepository,
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+      expect(find.byType(RouteMapBasemapView), findsOneWidget);
+      expect(find.text('노선도를 불러오지 못했어요'), findsNothing);
+      await tester.pumpWidget(const SizedBox.shrink());
+    }
+    expect(errors, hasLength(3));
   });
 
   testWidgets('노선도 좌측 메뉴에서 설정 화면으로 들어갈 수 있다', (tester) async {
@@ -21519,6 +21955,7 @@ NetworkMapData _gpsNetworkMapData({
   required String selectedRegion,
   required List<String> regions,
   bool includeNearestStation = true,
+  bool centerNearestStation = false,
 }) {
   const sourceId = 'fixture-gps-nearest-station';
   const lineId = 'gps-test-line';
@@ -21543,9 +21980,9 @@ NetworkMapData _gpsNetworkMapData({
               lineId: lineId,
               stationCode: '448',
               sequence: 1,
-              position: const NetworkMapPosition(
-                x: 200,
-                y: 200,
+              position: NetworkMapPosition(
+                x: centerNearestStation ? 430 : 200,
+                y: centerNearestStation ? 280 : 200,
                 labelDx: 0,
                 labelDy: 0,
                 upPath: '',
@@ -21553,6 +21990,25 @@ NetworkMapData _gpsNetworkMapData({
                 sourceId: sourceId,
               ),
             ),
+            if (centerNearestStation)
+              NetworkMapStation(
+                id: 'station-bounds-anchor',
+                nameKo: '경계 기준점',
+                nameEn: 'Bounds Anchor',
+                region: selectedRegion,
+                lineId: lineId,
+                stationCode: '000',
+                sequence: 0,
+                position: const NetworkMapPosition(
+                  x: 72,
+                  y: 72,
+                  labelDx: 0,
+                  labelDy: 0,
+                  upPath: '',
+                  downPath: '',
+                  sourceId: sourceId,
+                ),
+              ),
           ]
         : const [],
     edges: const [],
@@ -21564,11 +22020,16 @@ NetworkMapData _gpsNetworkMapData({
       ),
     ],
     stationLineMemberships: includeNearestStation
-        ? const [
-            NetworkMapStationLineMembership(
+        ? [
+            const NetworkMapStationLineMembership(
               stationId: 'station-sangnoksu',
               lineId: lineId,
             ),
+            if (centerNearestStation)
+              const NetworkMapStationLineMembership(
+                stationId: 'station-bounds-anchor',
+                lineId: lineId,
+              ),
           ]
         : const [],
   );
@@ -21801,15 +22262,43 @@ class FakeCurrentLocationProvider implements CurrentLocationProvider {
 }
 
 class FakeNetworkMapViewportRepository implements NetworkMapViewportRepository {
-  FakeNetworkMapViewportRepository({Map<String, Rect>? viewports})
-    : savedViewports = {...?viewports};
+  FakeNetworkMapViewportRepository({
+    Map<String, Rect>? viewports,
+    this.selectedRegion,
+    this.loadSelectedRegionError,
+    this.saveSelectedRegionError,
+    this.loadViewportError,
+  }) : savedViewports = {...?viewports};
 
   final Map<String, Rect> savedViewports;
   final loadedRegions = <String>[];
+  String? selectedRegion;
+  final Object? loadSelectedRegionError;
+  final Object? saveSelectedRegionError;
+  final Object? loadViewportError;
+
+  @override
+  Future<String?> loadSelectedRegion() async {
+    if (loadSelectedRegionError case final error?) {
+      throw error;
+    }
+    return selectedRegion;
+  }
+
+  @override
+  Future<void> saveSelectedRegion(String region) async {
+    if (saveSelectedRegionError case final error?) {
+      throw error;
+    }
+    selectedRegion = region;
+  }
 
   @override
   Future<Rect?> loadViewport(String region) async {
     loadedRegions.add(region);
+    if (loadViewportError case final error?) {
+      throw error;
+    }
     return savedViewports[region];
   }
 

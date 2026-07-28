@@ -176,6 +176,12 @@ class _StubViewportRepository implements NetworkMapViewportRepository {
   final saved = <String, Rect>{};
 
   @override
+  Future<String?> loadSelectedRegion() async => null;
+
+  @override
+  Future<void> saveSelectedRegion(String region) async {}
+
+  @override
   Future<Rect?> loadViewport(String region) async => stored;
 
   @override
