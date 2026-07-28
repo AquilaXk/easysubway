@@ -124,6 +124,7 @@ export async function verifyProductionPackArtifactIdentity({ buildSpecPath, asse
     const index = JSON.parse(await readFile(indexPath, "utf8"));
     const indexPacks = index.packs?.filter(({ id }) => id === packId) ?? [];
     if (indexPacks.length !== 1) throw new Error(`index must contain exactly one pack: ${packId}`);
+    assertEqual(indexPacks[0].asset, path.relative(path.join(root, "apps/mobile"), assetPath).split(path.sep).join("/"), "index asset");
     assertEqual(indexPacks[0].sha256, gzipSha256, "index sha256");
     assertEqual(indexPacks[0].sqliteSha256, sqliteSha256, "index SQLite sha256");
     assertEqual(indexPacks[0].byteSize, byteSize, "index byteSize");
