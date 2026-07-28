@@ -294,6 +294,36 @@
               "accessibility_facilities"
             ]
           }
+        },
+        {
+          "id": "seoul-metro-official-od-fares",
+          "owner": "서울특별시",
+          "url": "https://www.data.go.kr/data/15143846/openapi.do",
+          "license": "공공데이터포털 이용허락범위 제한 없음",
+          "licenseStatus": "redistributable",
+          "redistributionAllowed": true,
+          "updateFrequency": "approved-snapshot-only",
+          "updatedAt": "2026-07-12T00:00:00.000Z",
+          "fields": [
+            "childCardFare",
+            "childCashFare",
+            "gnrlCardFare",
+            "gnrlCashFare",
+            "yungCardFare",
+            "yungCashFare"
+          ],
+          "coverageScope": {
+            "regionIds": [
+              "capital"
+            ],
+            "operatorIds": [
+              "seoul-metro",
+              "korail"
+            ],
+            "sourceDomains": [
+              "official_od_fares"
+            ]
+          }
         }
       ],
       "requiredTables": [
@@ -588,8 +618,8 @@
           "type": "ELEVATOR",
           "name": "상록수역 ELEVATOR 1",
           "status": "UNKNOWN",
-          "floorFrom": "1",
-          "floorTo": "1",
+          "floorFrom": "1F",
+          "floorTo": "",
           "description": "(1층) 표 내는 곳 내 한대앞 방향 계단 옆",
           "sourceId": "kric-station-convenience-standard",
           "sourceSnapshotId": "kric-station-convenience-standard-20260728T184503338Z",
@@ -614,8 +644,8 @@
           "type": "ELEVATOR",
           "name": "상록수역 ELEVATOR 2",
           "status": "UNKNOWN",
-          "floorFrom": "1",
-          "floorTo": "1",
+          "floorFrom": "1F",
+          "floorTo": "",
           "description": "(1층) 표 내는 곳 내 반월 방향 계단 옆",
           "sourceId": "kric-station-convenience-standard",
           "sourceSnapshotId": "kric-station-convenience-standard-20260728T184503338Z",
@@ -640,8 +670,8 @@
           "type": "ELEVATOR",
           "name": "사당역 ELEVATOR 1",
           "status": "UNKNOWN",
-          "floorFrom": "1",
-          "floorTo": "1",
+          "floorFrom": "B1",
+          "floorTo": "",
           "description": "9,10번 출구 사이",
           "sourceId": "kric-station-convenience-standard",
           "sourceSnapshotId": "kric-station-convenience-standard-20260728T184503338Z",
@@ -666,8 +696,8 @@
           "type": "ELEVATOR",
           "name": "사당역 ELEVATOR 2",
           "status": "UNKNOWN",
-          "floorFrom": "3",
-          "floorTo": "3",
+          "floorFrom": "B3",
+          "floorTo": "",
           "description": "총신대입구 방면9-2",
           "sourceId": "kric-station-convenience-standard",
           "sourceSnapshotId": "kric-station-convenience-standard-20260728T184503338Z",

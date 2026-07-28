@@ -84,8 +84,8 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
         installationStatus: "INSTALLED",
         providerFacilityRef,
         provenanceKind: "OFFICIAL_SOURCE",
-        floorFrom: String(row.stinFlor ?? ""),
-        floorTo: String(row.stinFlor ?? ""),
+        floorFrom: kricFloorLabel(row),
+        floorTo: "",
         description: row.dtlLoc,
         verifiedAt: kricSnapshot.observedAt,
         retrievedAt: kricSnapshot.capturedAt,
@@ -202,6 +202,13 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
 
 function tuple(query) {
   return { railOprIsttCd: query.railOprIsttCd, lnCd: query.lnCd, stinCd: query.stinCd };
+}
+
+function kricFloorLabel(row) {
+  if (row.stinFlor === undefined || row.stinFlor === null || row.stinFlor === "") return "";
+  if (String(row.grndDvCd) === "1") return `${row.stinFlor}F`;
+  if (String(row.grndDvCd) === "2") return `B${row.stinFlor}`;
+  throw new Error(`unknown KRIC ground division code: ${row.grndDvCd ?? "<missing>"}`);
 }
 
 function stationLineIdentity(input, mapping) {

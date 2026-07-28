@@ -28,10 +28,10 @@
     "inputSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
     "inputSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
     "inputByteSize": 359319,
-    "outputSha256": "f6c07725bc3048ada02a994abc397161610eeb1b42803c21f2733f768d5ced47",
-    "outputSqliteSha256": "352169ed11ca77ed01fb337cf839b97cda7f254fd75f14e251146103d72416ac",
-    "byteSize": 1463744,
-    "byteSizeDelta": 1104425
+    "outputSha256": "67a6b1ac33cc317c93b374bc7b1a1e4932c1717fe79bdc62a61b6d65efabc275",
+    "outputSqliteSha256": "0f57fc1ea5fb1d5bba7caafcf185b6993b956cb58a129a5067d54a61a19abfb1",
+    "byteSize": 1463745,
+    "byteSizeDelta": 1104426
   },
   "readmissions": [
     {
@@ -4731,6 +4731,235 @@
         "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
       },
       "rowDiff": []
+    },
+    {
+      "readmittedAt": "2026-07-28T22:36:56.984Z",
+      "provenance": "#2609 final Codex Review: KRIC 단일 층 위치의 지상·지하 표기 정정 및 허위 연결 종점 제거; clean canonical builder identity와 ITX topology 불변 확인",
+      "previousPack": {
+        "sha256": "f6c07725bc3048ada02a994abc397161610eeb1b42803c21f2733f768d5ced47",
+        "sqliteSha256": "352169ed11ca77ed01fb337cf839b97cda7f254fd75f14e251146103d72416ac",
+        "byteSize": 1463744
+      },
+      "newPack": {
+        "sha256": "67a6b1ac33cc317c93b374bc7b1a1e4932c1717fe79bdc62a61b6d65efabc275",
+        "sqliteSha256": "0f57fc1ea5fb1d5bba7caafcf185b6993b956cb58a129a5067d54a61a19abfb1",
+        "byteSize": 1463745
+      },
+      "byteSizeDelta": 1,
+      "itxSubgraph": {
+        "unchanged": true,
+        "edgeCount": 48,
+        "edgesSha256": "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+        "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
+      },
+      "rowDiff": [
+        {
+          "table": "facilities",
+          "previousRowCount": 4,
+          "newRowCount": 4,
+          "rowsRemoved": 0,
+          "rowsAdded": 0,
+          "rowsChanged": 4,
+          "detail": {
+            "removed": [],
+            "added": [],
+            "changed": [
+              {
+                "previous": {
+                  "id": "facility-station-sangnoksu-elevator-kric-standard-1",
+                  "station_id": "station-sangnoksu",
+                  "exit_id": null,
+                  "type": "ELEVATOR",
+                  "name": "상록수역 ELEVATOR 1",
+                  "status": "UNKNOWN",
+                  "floor_from": "1",
+                  "floor_to": "1",
+                  "description": "(1층) 표 내는 곳 내 한대앞 방향 계단 옆",
+                  "source_id": "kric-station-convenience-standard",
+                  "source_snapshot_id": "kric-station-convenience-standard-20260728T184503338Z",
+                  "provider_facility_ref": "KR:4:448:EV:117ba2cb0916c2b668e1db8b4bb068dc14e94d009357c1f4bd87844ff8a5252b",
+                  "provider_record_hash": "117ba2cb0916c2b668e1db8b4bb068dc14e94d009357c1f4bd87844ff8a5252b",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "verified_at": 1785264303,
+                  "retrieved_at": 1785264303,
+                  "evidence_hash": "ddbd082ea4949b3cf7280e2d59d3376a39307ced8a2e000c45d1edc90681af76",
+                  "status_meaning": "STATIC_LOCATION",
+                  "operational_status": "UNKNOWN",
+                  "installation_status": "INSTALLED",
+                  "confidence": 100
+                },
+                "new": {
+                  "id": "facility-station-sangnoksu-elevator-kric-standard-1",
+                  "station_id": "station-sangnoksu",
+                  "exit_id": null,
+                  "type": "ELEVATOR",
+                  "name": "상록수역 ELEVATOR 1",
+                  "status": "UNKNOWN",
+                  "floor_from": "1F",
+                  "floor_to": "",
+                  "description": "(1층) 표 내는 곳 내 한대앞 방향 계단 옆",
+                  "source_id": "kric-station-convenience-standard",
+                  "source_snapshot_id": "kric-station-convenience-standard-20260728T184503338Z",
+                  "provider_facility_ref": "KR:4:448:EV:117ba2cb0916c2b668e1db8b4bb068dc14e94d009357c1f4bd87844ff8a5252b",
+                  "provider_record_hash": "117ba2cb0916c2b668e1db8b4bb068dc14e94d009357c1f4bd87844ff8a5252b",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "verified_at": 1785264303,
+                  "retrieved_at": 1785264303,
+                  "evidence_hash": "ddbd082ea4949b3cf7280e2d59d3376a39307ced8a2e000c45d1edc90681af76",
+                  "status_meaning": "STATIC_LOCATION",
+                  "operational_status": "UNKNOWN",
+                  "installation_status": "INSTALLED",
+                  "confidence": 100
+                }
+              },
+              {
+                "previous": {
+                  "id": "facility-station-sangnoksu-elevator-kric-standard-2",
+                  "station_id": "station-sangnoksu",
+                  "exit_id": null,
+                  "type": "ELEVATOR",
+                  "name": "상록수역 ELEVATOR 2",
+                  "status": "UNKNOWN",
+                  "floor_from": "1",
+                  "floor_to": "1",
+                  "description": "(1층) 표 내는 곳 내 반월 방향 계단 옆",
+                  "source_id": "kric-station-convenience-standard",
+                  "source_snapshot_id": "kric-station-convenience-standard-20260728T184503338Z",
+                  "provider_facility_ref": "KR:4:448:EV:6ac9fbc76de61a110d84eed388c39e8e6321b4b8a78b3b02659f8b0f278f5804",
+                  "provider_record_hash": "6ac9fbc76de61a110d84eed388c39e8e6321b4b8a78b3b02659f8b0f278f5804",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "verified_at": 1785264303,
+                  "retrieved_at": 1785264303,
+                  "evidence_hash": "43f7a158a59730e27f70edb6a14cd2f0301d087884648381fa362127373742de",
+                  "status_meaning": "STATIC_LOCATION",
+                  "operational_status": "UNKNOWN",
+                  "installation_status": "INSTALLED",
+                  "confidence": 100
+                },
+                "new": {
+                  "id": "facility-station-sangnoksu-elevator-kric-standard-2",
+                  "station_id": "station-sangnoksu",
+                  "exit_id": null,
+                  "type": "ELEVATOR",
+                  "name": "상록수역 ELEVATOR 2",
+                  "status": "UNKNOWN",
+                  "floor_from": "1F",
+                  "floor_to": "",
+                  "description": "(1층) 표 내는 곳 내 반월 방향 계단 옆",
+                  "source_id": "kric-station-convenience-standard",
+                  "source_snapshot_id": "kric-station-convenience-standard-20260728T184503338Z",
+                  "provider_facility_ref": "KR:4:448:EV:6ac9fbc76de61a110d84eed388c39e8e6321b4b8a78b3b02659f8b0f278f5804",
+                  "provider_record_hash": "6ac9fbc76de61a110d84eed388c39e8e6321b4b8a78b3b02659f8b0f278f5804",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "verified_at": 1785264303,
+                  "retrieved_at": 1785264303,
+                  "evidence_hash": "43f7a158a59730e27f70edb6a14cd2f0301d087884648381fa362127373742de",
+                  "status_meaning": "STATIC_LOCATION",
+                  "operational_status": "UNKNOWN",
+                  "installation_status": "INSTALLED",
+                  "confidence": 100
+                }
+              },
+              {
+                "previous": {
+                  "id": "facility-station-sadang-elevator-kric-standard-1",
+                  "station_id": "station-sadang",
+                  "exit_id": null,
+                  "type": "ELEVATOR",
+                  "name": "사당역 ELEVATOR 1",
+                  "status": "UNKNOWN",
+                  "floor_from": "1",
+                  "floor_to": "1",
+                  "description": "9,10번 출구 사이",
+                  "source_id": "kric-station-convenience-standard",
+                  "source_snapshot_id": "kric-station-convenience-standard-20260728T184503338Z",
+                  "provider_facility_ref": "S1:4:433:EV:11d17c54523cfd7a4fbfde5cf7a9219627134062ec2aa5f8da22bf84cb52ec94",
+                  "provider_record_hash": "11d17c54523cfd7a4fbfde5cf7a9219627134062ec2aa5f8da22bf84cb52ec94",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "verified_at": 1785264303,
+                  "retrieved_at": 1785264303,
+                  "evidence_hash": "6166236b54782d6c83b4d32c4f3903ea98ec4db4953b722333ba6438f2def8ab",
+                  "status_meaning": "STATIC_LOCATION",
+                  "operational_status": "UNKNOWN",
+                  "installation_status": "INSTALLED",
+                  "confidence": 100
+                },
+                "new": {
+                  "id": "facility-station-sadang-elevator-kric-standard-1",
+                  "station_id": "station-sadang",
+                  "exit_id": null,
+                  "type": "ELEVATOR",
+                  "name": "사당역 ELEVATOR 1",
+                  "status": "UNKNOWN",
+                  "floor_from": "B1",
+                  "floor_to": "",
+                  "description": "9,10번 출구 사이",
+                  "source_id": "kric-station-convenience-standard",
+                  "source_snapshot_id": "kric-station-convenience-standard-20260728T184503338Z",
+                  "provider_facility_ref": "S1:4:433:EV:11d17c54523cfd7a4fbfde5cf7a9219627134062ec2aa5f8da22bf84cb52ec94",
+                  "provider_record_hash": "11d17c54523cfd7a4fbfde5cf7a9219627134062ec2aa5f8da22bf84cb52ec94",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "verified_at": 1785264303,
+                  "retrieved_at": 1785264303,
+                  "evidence_hash": "6166236b54782d6c83b4d32c4f3903ea98ec4db4953b722333ba6438f2def8ab",
+                  "status_meaning": "STATIC_LOCATION",
+                  "operational_status": "UNKNOWN",
+                  "installation_status": "INSTALLED",
+                  "confidence": 100
+                }
+              },
+              {
+                "previous": {
+                  "id": "facility-station-sadang-elevator-kric-standard-2",
+                  "station_id": "station-sadang",
+                  "exit_id": null,
+                  "type": "ELEVATOR",
+                  "name": "사당역 ELEVATOR 2",
+                  "status": "UNKNOWN",
+                  "floor_from": "3",
+                  "floor_to": "3",
+                  "description": "총신대입구 방면9-2",
+                  "source_id": "kric-station-convenience-standard",
+                  "source_snapshot_id": "kric-station-convenience-standard-20260728T184503338Z",
+                  "provider_facility_ref": "S1:4:433:EV:5776566157f0895223bc122333e18e36cf55a99f2f3f760a9e4dfb048f23bc8f",
+                  "provider_record_hash": "5776566157f0895223bc122333e18e36cf55a99f2f3f760a9e4dfb048f23bc8f",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "verified_at": 1785264303,
+                  "retrieved_at": 1785264303,
+                  "evidence_hash": "698056706366e8886eb697339a6e90ccb5d38092b59705b13e7144ced1c960a1",
+                  "status_meaning": "STATIC_LOCATION",
+                  "operational_status": "UNKNOWN",
+                  "installation_status": "INSTALLED",
+                  "confidence": 100
+                },
+                "new": {
+                  "id": "facility-station-sadang-elevator-kric-standard-2",
+                  "station_id": "station-sadang",
+                  "exit_id": null,
+                  "type": "ELEVATOR",
+                  "name": "사당역 ELEVATOR 2",
+                  "status": "UNKNOWN",
+                  "floor_from": "B3",
+                  "floor_to": "",
+                  "description": "총신대입구 방면9-2",
+                  "source_id": "kric-station-convenience-standard",
+                  "source_snapshot_id": "kric-station-convenience-standard-20260728T184503338Z",
+                  "provider_facility_ref": "S1:4:433:EV:5776566157f0895223bc122333e18e36cf55a99f2f3f760a9e4dfb048f23bc8f",
+                  "provider_record_hash": "5776566157f0895223bc122333e18e36cf55a99f2f3f760a9e4dfb048f23bc8f",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "verified_at": 1785264303,
+                  "retrieved_at": 1785264303,
+                  "evidence_hash": "698056706366e8886eb697339a6e90ccb5d38092b59705b13e7144ced1c960a1",
+                  "status_meaning": "STATIC_LOCATION",
+                  "operational_status": "UNKNOWN",
+                  "installation_status": "INSTALLED",
+                  "confidence": 100
+                }
+              }
+            ]
+          }
+        }
+      ]
     }
   ]
 }

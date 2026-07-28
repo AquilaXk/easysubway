@@ -27,7 +27,7 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
   };
   const kricSnapshot = {
     sourceId: "kric-station-convenience-standard", snapshotId: "kric-1", observedAt: "2026-07-28T00:00:00Z", capturedAt: "2026-07-28T00:00:00Z",
-    queries: [{ stationId: "station-a", lineId: "line-1", railOprIsttCd: "S1", lnCd: "1", stinCd: "1", providerRecordHash: "a".repeat(64), rows: [{ gubun: "EV", stinFlor: 1, dtlLoc: "대합실" }, { gubun: "ELEC", stinFlor: 1, dtlLoc: "충전" }] }],
+    queries: [{ stationId: "station-a", lineId: "line-1", railOprIsttCd: "S1", lnCd: "1", stinCd: "1", providerRecordHash: "a".repeat(64), rows: [{ gubun: "EV", grndDvCd: "2", stinFlor: 3, dtlLoc: "대합실" }, { gubun: "ELEC", stinFlor: 1, dtlLoc: "충전" }] }],
   };
   const seoulSnapshot = {
     sourceId: "seoul-metro-accessibility", snapshotId: "seoul-1", observedAt: "2026-07-28T00:00:00Z", capturedAt: "2026-07-28T00:00:00Z",
@@ -37,6 +37,7 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
   const output = materializeAccessibilitySourceInput({ input, kricSnapshot, seoulSnapshot });
 
   assert.deepEqual(output.facilityRows.map(({ type }) => type), ["ELEVATOR"]);
+  assert.deepEqual(output.facilityRows.map(({ floorFrom, floorTo }) => [floorFrom, floorTo]), [["B3", ""]]);
   assert.deepEqual(output.accessibilityStatusEvidence.map(({ facilityType, evidenceKind }) => [facilityType, evidenceKind]), [
     ["ESCALATOR", "NOT_EXISTS"], ["WHEELCHAIR_LIFT", "NOT_EXISTS"], ["ACCESSIBILITY_STATUS_PROBE", "EXISTS"],
   ]);
@@ -49,8 +50,8 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
   assert.deepEqual(output.sourceIds, ["kric-station-convenience-standard", "seoul-metro-accessibility"]);
   assert.ok(output.coverageEvidence[0].sourceIds.includes("seoul-metro-accessibility"));
   const sameTypeRows = [
-    { gubun: "EV", stinFlor: 1, dtlLoc: "대합실 A" },
-    { gubun: "EV", stinFlor: 2, dtlLoc: "대합실 B" },
+    { gubun: "EV", grndDvCd: "1", stinFlor: 1, dtlLoc: "대합실 A" },
+    { gubun: "EV", grndDvCd: "2", stinFlor: 2, dtlLoc: "대합실 B" },
   ];
   const facilitiesByDescription = (rows) => Object.fromEntries(materializeAccessibilitySourceInput({
     input,
@@ -76,7 +77,7 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
     input: { ...input, facilityRows: baseline.facilityRows },
     kricSnapshot: {
       ...kricSnapshot,
-      queries: [{ ...kricSnapshot.queries[0], rows: [...sameTypeRows, { gubun: "EV", stinFlor: 0, dtlLoc: "새 시설" }] }],
+      queries: [{ ...kricSnapshot.queries[0], rows: [...sameTypeRows, { gubun: "EV", grndDvCd: "1", stinFlor: 0, dtlLoc: "새 시설" }] }],
     },
     seoulSnapshot,
   });
@@ -86,7 +87,7 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
     input: { ...input, facilityRows: added.facilityRows },
     kricSnapshot: {
       ...kricSnapshot,
-      queries: [{ ...kricSnapshot.queries[0], rows: [sameTypeRows[1], { gubun: "EV", stinFlor: 0, dtlLoc: "새 시설" }] }],
+      queries: [{ ...kricSnapshot.queries[0], rows: [sameTypeRows[1], { gubun: "EV", grndDvCd: "1", stinFlor: 0, dtlLoc: "새 시설" }] }],
     },
     seoulSnapshot,
   });
@@ -135,7 +136,7 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
     ],
     minimumProductionCoverage: { facilities: 2 },
   };
-  const sameProviderRow = { gubun: "EV", stinFlor: 1, dtlLoc: "동일 payload" };
+  const sameProviderRow = { gubun: "EV", grndDvCd: "1", stinFlor: 1, dtlLoc: "동일 payload" };
   const twoStationSnapshot = {
     ...kricSnapshot,
     queries: [
@@ -230,7 +231,7 @@ test("station과 edge identity는 line까지 일치해야 하고 결측 line은 
     observedAt: "2026-07-28T00:00:00Z", capturedAt: "2026-07-28T00:00:00Z",
     queries: [{
       stationId: "station-a", lineId: "line-1", railOprIsttCd: "S1", lnCd: "1", stinCd: "1",
-      providerRecordHash: "a".repeat(64), rows: [{ gubun: "EV", stinFlor: 1, dtlLoc: "대합실" }],
+      providerRecordHash: "a".repeat(64), rows: [{ gubun: "EV", grndDvCd: "1", stinFlor: 1, dtlLoc: "대합실" }],
     }],
   };
   const seoulSnapshot = {
