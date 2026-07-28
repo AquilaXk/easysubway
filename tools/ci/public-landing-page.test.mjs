@@ -31,7 +31,9 @@ test("공개 랜딩 스타일은 공식 브랜드와 읽기 쉬운 디바이스 
 		assert.match(css.toLowerCase(), new RegExp(color));
 	}
 	assert.doesNotMatch(css.toLowerCase(), /#0a705a/);
+	assert.match(css, /\.device--map img\s*\{[^}]*width:\s*122%;[^}]*height:\s*122%/);
 	assert.match(css, /\.device--route img,[\s\S]*\.device--station img[\s\S]*object-fit:\s*contain/);
+	assert.match(css, /@media\s*\(max-width:\s*720px\)[\s\S]*\.process-lead[\s\S]*\.feature-device/);
 	assert.match(css, /@media\s*\(prefers-reduced-motion:\s*reduce\)/);
 });
 

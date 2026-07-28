@@ -47,7 +47,7 @@ body.is-english [data-copy="en"] { display: revert; }
 .device::before { position: absolute; z-index: 3; top: 3px; left: 50%; width: 64px; height: 4px; border-radius: 10px; background: #292d37; content: ""; transform: translateX(-50%); }
 .device::after { position: absolute; z-index: 2; inset: 0; border-radius: 39px; background: linear-gradient(118deg, #ffffff12, transparent 19% 82%, #b4bcfb0a); content: ""; pointer-events: none; }
 .device img { display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; background: #f7f8fa; }
-.device--map img { width: 112%; max-width: none; height: 112%; object-fit: cover; object-position: 50% 0; }
+.device--map img { width: 122%; max-width: none; height: 122%; object-fit: cover; object-position: 50% 0; }
 .device--route img,
 .device--station img { object-fit: contain; object-position: center; }
 .device--hero { top: 105px; right: max(70px, calc((100vw - 1170px) / 2)); width: 390px; height: 824px; transform: rotate(11deg) perspective(1200px) rotateY(-7deg); }
@@ -181,15 +181,28 @@ body.is-english .release-state[data-copy="en"] { display: inline-block; }
 	.footer-inner nav { justify-content: flex-start; }
 }
 
+@media (max-width: 720px) {
+	.hero { min-height: 980px; }
+	.device--hero { top: 370px; right: -20px; width: 300px; height: 620px; }
+	.process, .process-frame { min-height: 980px; }
+	.process-tile { top: 245px; right: -15px; width: 300px; height: 360px; }
+	.process-lead { top: 625px; right: 0; max-width: none; }
+	.flow-label { top: 755px; }
+	.process-steps { top: 795px; }
+	.feature { min-height: 970px; }
+	.feature-copy, .feature-copy--left, .feature-copy--right { top: 170px; right: auto; left: 24px; width: calc(100% - 48px); }
+	.feature-device, .feature-device--left, .feature-device--right { top: 430px; right: auto; left: 50%; width: 250px; height: 505px; transform: translateX(-50%) rotate(4deg); }
+}
+
 @media (max-width: 560px) {
 	.frame { width: calc(100% - 30px); }
 	.site-header { height: 68px; }
 	.header-meta { gap: 8px; }
-	.hero { min-height: 870px; }
+	.hero { min-height: 930px; }
 	.hero-copy { top: 98px; left: 15px; }
 	.hero-copy h1 { font-size: 38px; }
 	.hero-copy > p:last-child { max-width: 330px; font-size: 15px; }
-	.device--hero { top: 280px; right: -53px; width: 270px; height: 548px; }
+	.device--hero { top: 360px; right: -53px; width: 270px; height: 548px; }
 	.scroll-label { left: 15px; }
 	.intro { padding: 110px 0; }
 	.display-title { font-size: 64px; }
