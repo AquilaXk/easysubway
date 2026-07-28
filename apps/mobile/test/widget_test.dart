@@ -2632,11 +2632,11 @@ void main() {
     expect(routeDraftController.draft.origin, isNull);
   });
 
-  testWidgets('#2068 팬 메뉴 꼬리 팁은 노드 정중앙이 아니라 그 아래(높이 2/3 지점)에 닿는다', (
+  testWidgets('#2068 팬 메뉴 꼬리 팁은 노드 바닥에서 높이 2/3 위에 닿는다', (
     tester,
   ) async {
     // 배선 가드: network_map.dart의 팬 메뉴 호출부를 _fanMenuTailAnchorSource에서
-    // _fanMenuAnchorSource(정중앙)로 되돌리면 아래 delta가 0이 되어 red가 된다.
+    // _fanMenuAnchorSource(정중앙)로 되돌리면 이 delta가 0이 되어 red가 된다.
     // 기준점은 같은 역의 draft pin이다 — pin은 정중앙 앵커를 그대로 쓰고
     // (_NetworkMapDraftPin: pinTop = anchor.dy - 52, hitPadTop 10 · hitPadBottom 0)
     // 히트박스 하단이 곧 노드 정중앙의 뷰포트 y다.
@@ -2682,18 +2682,18 @@ void main() {
         menuRect.top +
         menuRect.height * (kFanMenuTailTip.dy / kFanMenuDesignSize.height);
 
-    // 팁은 노드 정중앙보다 아래다(정중앙 앵커로 회귀하면 delta = 0 → red).
-    // 팁은 노드 정중앙보다 아래다. 이 fixture 실측 이동량은 0.70px
+    // 팁은 노드 정중앙보다 위다(정중앙 앵커로 회귀하면 delta = 0 → red).
+    // 팁은 노드 정중앙보다 위다. 이 fixture 실측 이동량은 0.70px
     // (= nodeHeight/6 × camera.scale)이고, 정중앙 앵커로 회귀하면 5.7e-14(=0)로
     // 떨어진다 — 0.25는 그 사이를 양쪽 3배 여유로 가르는 문턱이다.
     expect(
-      tipY - nodeCenterY,
+      nodeCenterY - tipY,
       greaterThan(0.25),
       reason: '꼬리 팁이 노드 정중앙($nodeCenterY)에 붙어 있으면 #2068 QA 이동이 배선되지 않은 것이다',
     );
     // 이동량은 노드 크기(height/6) 수준이라 메뉴 높이에 비하면 매우 작다 —
     // 과도한 이동(메뉴가 노드에서 떨어짐)도 함께 막는다.
-    expect(tipY - nodeCenterY, lessThan(menuRect.height * 0.1));
+    expect(nodeCenterY - tipY, lessThan(menuRect.height * 0.1));
   });
 
   testWidgets('상단 오버레이 출발칸 검색 선택은 지도 탭과 같은 draft로 수렴한다(G4)', (tester) async {

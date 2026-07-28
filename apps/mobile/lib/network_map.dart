@@ -5168,7 +5168,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   /// 일반역은 노드 좌표 그대로 유도한 뒤 [_MapGeometry] 원점을 빼
   /// [MapCameraState.sourceToViewportPoint] 입력 좌표계로 맞춘다.
   /// 드래프트 핀(출발·경유·도착)이 이 좌표를 그대로 앵커로 쓴다. 팬 메뉴는
-  /// 여기서 한 번 더 내린 [_fanMenuTailAnchorSource]를 쓴다(#2068 QA).
+  /// 여기서 한 번 더 올린 [_fanMenuTailAnchorSource]를 쓴다(#2068 QA).
   Offset _fanMenuAnchorSource(
     NetworkMapStation station,
     _MapGeometry geometry,
