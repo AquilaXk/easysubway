@@ -32,6 +32,7 @@ import {
   buildRegionProvenance,
   generateGeometryProvenanceManifest,
   verifyGeometryProvenanceManifest,
+  verifySourceElementKeyRotation,
 } from "./generate-geometry-provenance-manifest.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -61,6 +62,7 @@ test("5권역 geometry provenance manifest가 current source·pack과 exact matc
       "fullInkBounds",
       "extractorVersion",
       "geometrySha256",
+      "sourceElementKeysSha256",
       "routeMapPositionsSha256",
       "labelSourceCount",
       "stationNodeCount",
@@ -70,11 +72,12 @@ test("5권역 geometry provenance manifest가 current source·pack과 exact matc
       "sourceSvgSha256",
       "normalizedSvgSha256",
       "geometrySha256",
+      "sourceElementKeysSha256",
       "routeMapPositionsSha256",
     ]) {
       assert.match(region[key], digest, key);
     }
-    assert.equal(region.generatorContractVersion, 1);
+    assert.equal(region.generatorContractVersion, 2);
   }
 });
 
@@ -88,9 +91,9 @@ test("geometry provenance digest는 browser metadata·JSON formatting과 무관�
     extractorVersion: "fixture-v1",
     browser: { product: "Chrome", version: "150.0.0.0" },
     sourceViewBox: [0, 0, 10, 10],
-    labels: [{ classification: "STATION_LABEL" }],
+    labels: [{ classification: "STATION_LABEL", sourceElementKey: "a".repeat(64) }],
     strokes: [],
-    stationNodes: [{ x: 5, y: 5 }],
+    stationNodes: [{ x: 5, y: 5, sourceElementKey: "b".repeat(64) }],
   };
   const rows = [{ station_id: "s1", line_id: "l1", region: "fixture", x: 5, y: 5 }];
   const compact = buildRegionProvenance({
@@ -119,9 +122,13 @@ test("geometry provenance verifier는 geometry content와 non-key position mutat
     extractorVersion: "fixture-v1",
     browser: { product: "Chrome", version: "150.0.0.0" },
     sourceViewBox: [0, 0, 10, 10],
-    labels: [{ classification: "STATION_LABEL", polygon: [[5, 5]] }],
+    labels: [{
+      classification: "STATION_LABEL",
+      polygon: [[5, 5]],
+      sourceElementKey: "a".repeat(64),
+    }],
     strokes: [],
-    stationNodes: [{ x: 5, y: 5 }],
+    stationNodes: [{ x: 5, y: 5, sourceElementKey: "b".repeat(64) }],
   };
   const rows = [
     { station_id: "s2", line_id: "l1", region: "fixture", x: 6, y: 5 },
@@ -174,6 +181,45 @@ test("geometry provenance verifier는 geometry content와 non-key position mutat
     routeMapPositionRows: rows.slice().reverse(),
   });
   assert.equal(reversedRows.routeMapPositionsSha256, expected.routeMapPositionsSha256);
+});
+
+test("geometry provenance manifest는 source hash 변경 시 element key rotation을 강제한다", () => {
+  const svg = '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="1"/></svg>';
+  const changedSvg = svg.replace('r="1"', 'r="2"');
+  const geometry = {
+    schemaVersion: 1,
+    region: "fixture",
+    sourceSvgSha256: createHash("sha256").update(svg).digest("hex"),
+    extractorVersion: "fixture-v1",
+    browser: { product: "Chrome", version: "150.0.0.0" },
+    sourceViewBox: [0, 0, 10, 10],
+    labels: [{ classification: "STATION_LABEL", sourceElementKey: "a".repeat(64) }],
+    strokes: [{ sourceElementKey: "b".repeat(64) }],
+    stationNodes: [{ sourceElementKey: "c".repeat(64) }],
+  };
+  const build = (source, value) => ({
+    schemaVersion: 1,
+    regions: {
+      fixture: buildRegionProvenance({
+        svg: source,
+        geometryBytes: Buffer.from(JSON.stringify(value)),
+        routeMapPositionRows: [],
+      }),
+    },
+  });
+  const previous = build(svg, geometry);
+  verifySourceElementKeyRotation(previous, previous);
+
+  const stale = structuredClone(geometry);
+  stale.sourceSvgSha256 = createHash("sha256").update(changedSvg).digest("hex");
+  const staleManifest = build(changedSvg, stale);
+  assert.throws(
+    () => verifySourceElementKeyRotation(previous, staleManifest),
+    /sourceElementKey digest did not rotate/,
+  );
+
+  stale.labels[0].sourceElementKey = "d".repeat(64);
+  verifySourceElementKeyRotation(previous, build(changedSvg, stale));
 });
 
 /**

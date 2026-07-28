@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { readFileSync, writeFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 
@@ -49,6 +49,20 @@ function canonicalGeometryContent(geometry) {
   return canonicalJson(content);
 }
 
+function sourceElementKeysOf(geometry) {
+  return Object.fromEntries(
+    ["labels", "strokes", "stationNodes"].map((kind) => [
+      kind,
+      (geometry[kind] ?? []).map((row, index) => {
+        if (!/^[a-f0-9]{64}$/.test(row.sourceElementKey ?? "")) {
+          throw new Error(`geometry ${kind}[${index}] sourceElementKey invalid`);
+        }
+        return row.sourceElementKey;
+      }),
+    ]),
+  );
+}
+
 export function buildRegionProvenance({ svg, geometryBytes, routeMapPositionRows }) {
   const geometry = JSON.parse(Buffer.from(geometryBytes).toString("utf8"));
   const sourceSvgSha256 = sha256(svg);
@@ -80,13 +94,27 @@ export function buildRegionProvenance({ svg, geometryBytes, routeMapPositionRows
     },
     extractorVersion: geometry.extractorVersion,
     geometrySha256: sha256(canonicalGeometryContent(geometry)),
+    sourceElementKeysSha256: sha256(canonicalJson(sourceElementKeysOf(geometry))),
     routeMapPositionsSha256: sha256(canonicalJson(rows)),
     labelSourceCount: (geometry.labels ?? []).filter(
       ({ classification }) => classification === "STATION_LABEL",
     ).length,
     stationNodeCount: (geometry.stationNodes ?? []).length,
-    generatorContractVersion: 1,
+    generatorContractVersion: 2,
   };
+}
+
+export function verifySourceElementKeyRotation(expected, actual) {
+  for (const [region, next] of Object.entries(actual.regions ?? {})) {
+    const previous = expected.regions?.[region];
+    if (
+      previous?.sourceElementKeysSha256 &&
+      previous.sourceSvgSha256 !== next.sourceSvgSha256 &&
+      previous.sourceElementKeysSha256 === next.sourceElementKeysSha256
+    ) {
+      throw new Error(`${region} sourceElementKey digest did not rotate with sourceSvgSha256`);
+    }
+  }
 }
 
 export function generateGeometryProvenanceManifest({
@@ -139,10 +167,11 @@ function main() {
     repoRoot,
     "tools/route-map/geometry-provenance-manifest.json",
   );
-  writeFileSync(
-    output,
-    `${JSON.stringify(generateGeometryProvenanceManifest(), null, 2)}\n`,
-  );
+  const manifest = generateGeometryProvenanceManifest();
+  if (existsSync(output)) {
+    verifySourceElementKeyRotation(JSON.parse(readFileSync(output, "utf8")), manifest);
+  }
+  writeFileSync(output, `${JSON.stringify(manifest, null, 2)}\n`);
   process.stdout.write(`${path.relative(repoRoot, output)}\n`);
 }
 

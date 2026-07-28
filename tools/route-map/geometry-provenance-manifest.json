@@ -19,10 +19,11 @@
       },
       "extractorVersion": "route-map-svg-geometry-v3",
       "geometrySha256": "60b4f7f7b3932b27dde1c2169a0b918189279d384d1897cb7a6e4d2787ec478a",
+      "sourceElementKeysSha256": "8e551a3060d7fdf0c46998cec0704f9e88532a7ff35109931b4d20dd91874c99",
       "routeMapPositionsSha256": "8c0a7fde1d7efe982b7a315400ca1b559d89d03ab9ab444c127adc26a7fda188",
       "labelSourceCount": 967,
       "stationNodeCount": 655,
-      "generatorContractVersion": 1
+      "generatorContractVersion": 2
     },
     "busan": {
       "sourceSvgSha256": "8bd04aa7e94c8e6cd5c1a2dd83fda605e7d892bc66078db57ba8291cee80cdb0",
@@ -41,10 +42,11 @@
       },
       "extractorVersion": "route-map-svg-geometry-v3",
       "geometrySha256": "0c448836327ac7afc254b8f0dbf37b445415c920808a053920e3c53203946531",
+      "sourceElementKeysSha256": "832bdab0b456e0446707d920996937f01548776097eedc70d3e4615e02b3108c",
       "routeMapPositionsSha256": "972053ccab6d2f8f7d7a131e3a6bfccebf94618d422c072902846b85bc73096e",
       "labelSourceCount": 179,
       "stationNodeCount": 147,
-      "generatorContractVersion": 1
+      "generatorContractVersion": 2
     },
     "daegu": {
       "sourceSvgSha256": "145804d2c9d1de679d7d63937c942b714af02a6ed58562969b5ace5a0f077874",
@@ -63,10 +65,11 @@
       },
       "extractorVersion": "route-map-svg-geometry-v3",
       "geometrySha256": "a51d697222e96c7bd84c457e33c460465967542e7210f6dbf2965cb6a8f063a2",
+      "sourceElementKeysSha256": "9d7faa3cbf07f7842a9d5c3d981aeb14c77062d7be2b9b8951a1e92c0ba07452",
       "routeMapPositionsSha256": "775465da141bd2c85957ad7f8fa53c061fbaa749c1e54c9f79f6085a5bd8fde6",
       "labelSourceCount": 115,
       "stationNodeCount": 97,
-      "generatorContractVersion": 1
+      "generatorContractVersion": 2
     },
     "daejeon": {
       "sourceSvgSha256": "f0b1c04e6f5ee390738414702e9a4b60fd6e77ddcc775eb08b66e740af5839b8",
@@ -85,10 +88,11 @@
       },
       "extractorVersion": "route-map-svg-geometry-v3",
       "geometrySha256": "146d705b303f47ac09d4a2865e7d3718ba0d380f2ebeb41a23ca3a3f56e188d1",
+      "sourceElementKeysSha256": "81d156f421e52cdcef58fe82caf1c110c72cf32b1e9b5de2404b661f1dfa8202",
       "routeMapPositionsSha256": "b703f88f1eefa5218ce158ab6d96cdead36b28d6e15f27e7d3222483e71aea5f",
       "labelSourceCount": 25,
       "stationNodeCount": 22,
-      "generatorContractVersion": 1
+      "generatorContractVersion": 2
     },
     "gwangju": {
       "sourceSvgSha256": "ea28449f9cd4c7c96aeba413f7977932c78f9c56c0e2e17f173df046ef7695d9",
@@ -107,10 +111,11 @@
       },
       "extractorVersion": "route-map-svg-geometry-v3",
       "geometrySha256": "c6bc5ac8262bd5e74ead4e807c8f2c290d3d25a3aacbada4fb69c26d663aeeac",
+      "sourceElementKeysSha256": "9ef1af8b1d1cdfc00ef8e34d14af37fd40932014da7f98c7d420da205013b200",
       "routeMapPositionsSha256": "30dd2f204f52c2b142d4d49b4139a607512e44f2d6c8a4bcac6c3ccc76b0a12e",
       "labelSourceCount": 22,
       "stationNodeCount": 20,
-      "generatorContractVersion": 1
+      "generatorContractVersion": 2
     }
   }
 }
