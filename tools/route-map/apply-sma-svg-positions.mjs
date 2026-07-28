@@ -228,6 +228,13 @@ export function buildAssignments(db, extraction, config = SEOUL) {
     const slug = node.dataLine || transferLine || config.missingLineHint[node.dataStation] || "";
     const lineId = slug ? slugToLineId.get(slug) : null;
     const canon = config.canonicalRules(node.dataStation);
+    if ((slug && !lineId) || (canon.disambiguateByLine && !lineId)) {
+      unresolvedNodes.push({
+        ...node,
+        reason: `역 "${canon.name}"(노선 ${slug || "빈값"}) 미해소`,
+      });
+      continue;
+    }
     const ids = resolveStationIds(db, canon.name, lineId, {
       disambiguateByLine: canon.disambiguateByLine === true,
       config,

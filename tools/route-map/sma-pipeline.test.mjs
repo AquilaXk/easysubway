@@ -142,6 +142,25 @@ test("부산 부전·동래는 노선 힌트로 별개 역에 1:1 배정한다",
       { stationId: "station-b65d6408d975", x: 40, y: 40 },
     ],
   );
+  for (const node of [
+    { dataStation: "부전", dataLine: "unknown", x: 50, y: 50 },
+    {
+      dataStation: "동래",
+      dataLine: "",
+      transferLines: "unknown line4",
+      x: 60,
+      y: 60,
+    },
+  ]) {
+    const unknown = buildAssignments(
+      db,
+      { labels: [], stationNodes: [node] },
+      config,
+    );
+    assert.deepEqual(unknown.assignments, []);
+    assert.equal(unknown.unresolvedNodes.length, 1);
+    assert.match(unknown.unresolvedNodes[0].reason, /노선 unknown/);
+  }
   db.close();
 });
 
