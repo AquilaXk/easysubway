@@ -79,6 +79,7 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   const runnerProfileConfiguration = iosProject.match(
     /249021D4217E4FDB00AE95B9 \/\* Profile \*\/ = \{[\s\S]*?name = Profile;/,
   )?.[0] ?? "";
+  const allowedRootAttributes = ["viewBox", "width", "height", "preserveAspectRatio"];
 
   for (const [platform, source] of [["Android", android], ["iOS", iosViewport]]) {
     assert.doesNotMatch(source, /labelCollisionScript|htmlForSvg|emptyHtml|loadHTMLString|loadDataWithBaseURL|UILabel/,
@@ -89,8 +90,22 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
     assert.match(source, /debugProcessGone/, `${platform} must expose a debug-only renderer-loss fault`);
     assert.match(source, /document\.documentElement/, `${platform} camera script must require the SVG root`);
     assert.match(source, /cloneNode\(true\)/, `${platform} camera script must snapshot before mutation`);
-    assert.match(source, /preserveAspectRatio/, `${platform} camera script must change only viewport root attributes`);
+    assert.match(
+      source,
+      /const allowed=\['viewBox','width','height','preserveAspectRatio'\];/,
+      `${platform} camera snapshot must name exactly the allowed root attributes`,
+    );
     assert.match(source, /isFinite/, `${platform} must reject non-finite camera dimensions`);
+    assert.deepEqual(
+      [...source.matchAll(/svg\.setAttribute\('([^']+)'/g)].map((match) => match[1]),
+      allowedRootAttributes,
+      `${platform} must mutate exactly the allowed SVG root attributes`,
+    );
+    assert.match(
+      source,
+      /const before=snapshot\(svg\);[\s\S]*return before===snapshot\(svg\);/,
+      `${platform} must gate success on immutable SVG snapshot equality`,
+    );
   }
 
   assert.match(android, /loadUrl\(resolvedUrl\)/);
@@ -102,7 +117,17 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   assert.match(android, /request\.url\.toString\(\) == initialAssetUrl/);
   assert.match(android, /ApplicationInfo\.FLAG_DEBUGGABLE/);
   assert.match(android, /reportAssetLoadFailedFromWebThread/);
-  assert.match(android, /result != "true"/);
+  assert.match(android, /settings\.blockNetworkLoads = true/);
+  assert.match(android, /settings\.allowContentAccess = false/);
+  assert.match(android, /settings\.allowFileAccess = true/);
+  assert.match(
+    android,
+    /if \(!isDebuggable\) \{[\s\S]*result\.error\("debugUnavailable"[\s\S]*return/,
+  );
+  assert.match(
+    android,
+    /if \(webView !== currentWebView \|\| result != "true"\) \{[\s\S]*reportCameraApplyFailed\(\)[\s\S]*\} else \{[\s\S]*framePresented/,
+  );
 
   assert.match(iosViewport, /loadFileURL\(assetURL, allowingReadAccessTo: assetURL\.deletingLastPathComponent\(\)\)/);
   assert.match(iosViewport, /isUserInteractionEnabled = false/);
@@ -110,15 +135,33 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   assert.match(iosViewport, /initialAssetURL/);
   assert.match(iosViewport, /request\.url == initialAssetURL/);
   assert.match(iosViewport, /WKContentRuleListStore\.default\(\)\.compileContentRuleList/);
-  assert.match(iosViewport, /url-filter.*https\?/);
-  assert.match(iosViewport, /#if DEBUG/);
+  assert.match(
+    iosViewport,
+    /\[\{"trigger":\{"url-filter":"\^https\?:\/\/\.\*"\},"action":\{"type":"block"\}\}\]/,
+  );
+  assert.match(
+    iosViewport,
+    /guard self\.webView === webView else \{[\s\S]*if navigationAction\.request\.url == initialAssetURL/,
+  );
+  assert.match(
+    iosViewport,
+    /guard self\.webView === webView else \{[\s\S]*if navigationResponse\.response\.url == initialAssetURL/,
+  );
+  assert.match(
+    iosViewport,
+    /private func handleDebugFault[\s\S]*#if DEBUG[\s\S]*#else[\s\S]*debugUnavailable[\s\S]*#endif/,
+  );
   assert.match(runnerDebugConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;/);
   assert.doesNotMatch(runnerReleaseConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS/);
   assert.doesNotMatch(runnerProfileConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS/);
   assert.match(iosViewport, /result as\? Bool == true/);
-  for (const source of [android, iosViewport]) {
-    assert.match(source, /return before===snapshot\(svg\);/);
-  }
+  assert.match(iosViewport, /private var loadGeneration = 0/);
+  assert.match(iosViewport, /private var isDisposed = false/);
+  assert.match(iosViewport, /loadGeneration \+= 1[\s\S]*let generation = loadGeneration/);
+  assert.match(iosViewport, /guard self\.isCurrentLoad\(generation, assetURL: assetURL\) else \{ return \}/);
+  assert.match(iosViewport, /private func loadDocument\(_ assetURL: URL, generation: Int,/);
+  assert.match(iosViewport, /guard isCurrentLoad\(generation, assetURL: assetURL\) else \{ return \}/);
+  assert.match(iosViewport, /isDisposed = true[\s\S]*loadGeneration \+= 1[\s\S]*initialAssetURL = nil/);
 });
 
 function containsAdEventEndpoint(source) {

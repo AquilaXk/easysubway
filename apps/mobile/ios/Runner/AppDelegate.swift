@@ -323,6 +323,8 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   private var revision: Int
   private var webView: WKWebView?
   private var initialAssetURL: URL?
+  private var loadGeneration = 0
+  private var isDisposed = false
 
   init(
     frame: CGRect,
@@ -380,8 +382,12 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   }
 
   private func load(assetPathOverride: String? = nil) {
+    guard !isDisposed else { return }
+    loadGeneration += 1
+    let generation = loadGeneration
     destroyWebView()
     container.subviews.forEach { $0.removeFromSuperview() }
+    initialAssetURL = nil
 
     guard let assetURL = resolvedAssetURL(assetPathOverride ?? assetPath) else {
       reportAssetLoadFailed()
@@ -396,17 +402,23 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
         [{"trigger":{"url-filter":"^https?://.*"},"action":{"type":"block"}}]
         """
     ) { [weak self] ruleList, error in
-      guard let self, self.initialAssetURL == assetURL, let ruleList, error == nil else {
-        self?.reportAssetLoadFailed()
+      guard let self else { return }
+      guard self.isCurrentLoad(generation, assetURL: assetURL) else { return }
+      guard let ruleList, error == nil else {
+        self.reportAssetLoadFailed()
         return
       }
       configuration.userContentController.add(ruleList)
-      self.loadDocument(assetURL, configuration: configuration)
+      self.loadDocument(assetURL, generation: generation, configuration: configuration)
     }
   }
 
-  private func loadDocument(_ assetURL: URL, configuration: WKWebViewConfiguration) {
-    guard initialAssetURL == assetURL else { return }
+  private func isCurrentLoad(_ generation: Int, assetURL: URL) -> Bool {
+    !isDisposed && loadGeneration == generation && initialAssetURL == assetURL
+  }
+
+  private func loadDocument(_ assetURL: URL, generation: Int, configuration: WKWebViewConfiguration) {
+    guard isCurrentLoad(generation, assetURL: assetURL) else { return }
     let svgWebView = WKWebView(frame: container.bounds, configuration: configuration)
     webView = svgWebView
     svgWebView.navigationDelegate = self
@@ -521,6 +533,9 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   }
 
   private func dispose() {
+    isDisposed = true
+    loadGeneration += 1
+    initialAssetURL = nil
     channel.setMethodCallHandler(nil)
     destroyWebView()
     container.subviews.forEach { $0.removeFromSuperview() }
@@ -537,7 +552,8 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   }
 
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
-    guard self.webView === webView, webView.url == initialAssetURL else {
+    guard self.webView === webView else { return }
+    guard webView.url == initialAssetURL else {
       reportAssetLoadFailed()
       return
     }
@@ -553,6 +569,10 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     decidePolicyFor navigationAction: WKNavigationAction,
     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
   ) {
+    guard self.webView === webView else {
+      decisionHandler(.cancel)
+      return
+    }
     if navigationAction.request.url == initialAssetURL {
       decisionHandler(.allow)
       return
@@ -566,6 +586,10 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     decidePolicyFor navigationResponse: WKNavigationResponse,
     decisionHandler: @escaping (WKNavigationResponsePolicy) -> Void
   ) {
+    guard self.webView === webView else {
+      decisionHandler(.cancel)
+      return
+    }
     if navigationResponse.response.url == initialAssetURL {
       decisionHandler(.allow)
       return
@@ -575,10 +599,12 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   }
 
   func webView(_ webView: WKWebView, didFail navigation: WKNavigation!, withError error: Error) {
+    guard self.webView === webView else { return }
     reportAssetLoadFailed()
   }
 
   func webView(_ webView: WKWebView, didFailProvisionalNavigation navigation: WKNavigation!, withError error: Error) {
+    guard self.webView === webView else { return }
     reportAssetLoadFailed()
   }
 }
