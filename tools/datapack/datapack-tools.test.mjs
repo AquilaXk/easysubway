@@ -58,6 +58,7 @@ const productionEnv = {
   ...process.env,
   EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: testPrivateKeyPem,
   EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: testPublicKeyPem,
+  EASYSUBWAY_DATAPACK_PRODUCTION_FIXTURE_VALIDATION_ONLY: "true",
 };
 
 test("데이터팩 생성기는 TEST_ONLY admission fixture를 build input으로 거부한다", async (context) => {
@@ -1950,6 +1951,50 @@ test("데이터팩 생성기는 buildSpec과 fixture 동시 입력을 거부한�
     ),
     /exactly one of --fixture or --build-spec is required/,
   );
+});
+
+test("데이터팩 생성기는 일반 fixture 입력으로 production channel을 만들지 않는다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "easysubway-production-fixture-bypass-"));
+  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+  markFixturePackProduction(fixture);
+  fixture.manifest.channel = "production";
+  const fixturePath = path.join(workspace, "fixture.json");
+  await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
+
+  try {
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        "tools/datapack/build-datapack.mjs",
+        "--fixture", fixturePath,
+        "--output", path.join(workspace, "output"),
+      ], {
+        cwd: root,
+        env: {
+          ...productionEnv,
+          EASYSUBWAY_DATAPACK_PRODUCTION_FIXTURE_VALIDATION_ONLY: "false",
+        },
+      }),
+      /production fixture builds are validation-only/,
+    );
+    await execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture", fixturePath,
+      "--output", path.join(workspace, "validation-output"),
+    ], {
+      cwd: root,
+      env: {
+        ...productionEnv,
+        EASYSUBWAY_DATAPACK_PRODUCTION_FIXTURE_VALIDATION_ONLY: "true",
+      },
+    });
+    const manifest = JSON.parse(await readFile(
+      path.join(workspace, "validation-output/current.json"),
+      "utf8",
+    ));
+    assert.equal(manifest.channel, "dev");
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 });
 
 test("데이터팩 생성기는 invalid buildSpec hash를 거부한다", async () => {
