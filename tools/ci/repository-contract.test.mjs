@@ -18310,19 +18310,16 @@ test("전화 앱은 세로 모드, 대화면은 자유 회전을 지원한다", 
       candidate.includes(`android:name="${activity}"`),
     );
     assert.ok(declaration, `${activity} declaration is missing`);
-    assert.match(
-      declaration,
-      /android:screenOrientation="@integer\/app_screen_orientation"/,
-    );
+    assert.doesNotMatch(declaration, /android:screenOrientation=/);
   }
-  assert.match(
-    read("apps/mobile/android/app/src/main/res/values/orientation.xml"),
-    /<integer name="app_screen_orientation">1<\/integer>/,
-  );
-  assert.match(
-    read("apps/mobile/android/app/src/main/res/values-sw600dp/orientation.xml"),
-    /<integer name="app_screen_orientation">-1<\/integer>/,
-  );
+  for (const path of [
+    "apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/MainActivity.kt",
+    "apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/WidgetConfigurationActivity.kt",
+  ]) {
+    const activity = read(path);
+    assert.match(activity, /smallestScreenWidthDp < 600/);
+    assert.match(activity, /ActivityInfo\.SCREEN_ORIENTATION_PORTRAIT/);
+  }
 
   const infoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const orientations = (key) => {
