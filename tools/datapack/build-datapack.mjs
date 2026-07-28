@@ -5,6 +5,7 @@ import { constants as zlibConstants, gunzipSync, gzipSync } from "node:zlib";
 import { DatabaseSync } from "node:sqlite";
 import path from "node:path";
 import { tmpdir } from "node:os";
+import { pathToFileURL } from "node:url";
 import { usesLocalPlaceholderHost } from "./production-url-policy.mjs";
 import { requiredCredentialFreeObjectUri } from "./source-snapshot-policy.mjs";
 import {
@@ -648,18 +649,22 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     materializeCapitalTopologySource(pack, topology, capitalAdmissions);
     applyCapitalNetworkEdgeEvidence(pack, topology, capitalTopology.pinned.snapshotId, capitalAdmissions);
     applyItxNetworkEdgeEvidence(pack, itxAdmission);
-    for (const edge of [...(pack.networkEdges ?? []), ...(pack.outOfStationTransferLinks ?? [])]) {
-      if (edge.verificationStatus !== "VERIFIED") {
-        edge.accessibilityStatus = "UNKNOWN";
-        edge.stairAccessState = "UNKNOWN";
-      }
-    }
+    normalizeUnverifiedNetworkEdgeStates(pack);
   }
   return new Date(Math.min(
     Date.parse(topologyAdmission.freshUntil),
     Date.parse(itxAdmission.freshUntil),
     ...[...capitalAdmissions.values()].map(({ freshUntil }) => Date.parse(freshUntil)),
   )).toISOString();
+}
+
+export function normalizeUnverifiedNetworkEdgeStates(pack) {
+  for (const edge of [...(pack.networkEdges ?? []), ...(pack.outOfStationTransferLinks ?? [])]) {
+    if (edge.verificationStatus !== "VERIFIED") {
+      edge.accessibilityStatus = "UNKNOWN";
+      edge.stairAccessState = "UNKNOWN";
+    }
+  }
 }
 
 function materializeCapitalTopologySource(pack, topology, admissions) {
@@ -3435,7 +3440,9 @@ function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-main().catch((error) => {
-  console.error(error.message);
-  process.exit(1);
-});
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch((error) => {
+    console.error(error.message);
+    process.exit(1);
+  });
+}

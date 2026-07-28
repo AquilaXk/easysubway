@@ -8,6 +8,7 @@ import { DatabaseSync } from "node:sqlite";
 import { promisify } from "node:util";
 import test from "node:test";
 import { gunzipSync } from "node:zlib";
+import { normalizeUnverifiedNetworkEdgeStates } from "./build-datapack.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -19,6 +20,27 @@ const env = {
 const verifierEnv = { ...process.env };
 delete verifierEnv.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM;
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+
+test("production producer는 미승격 network edge와 역외 환승 link 상태를 UNKNOWN으로 내린다", () => {
+  const verified = { verificationStatus: "VERIFIED", accessibilityStatus: "AVAILABLE", stairAccessState: "STEP_FREE" };
+  const pack = {
+    networkEdges: [{ verificationStatus: "UNKNOWN", accessibilityStatus: "AVAILABLE", stairAccessState: "STEP_FREE" }, verified],
+    outOfStationTransferLinks: [{ accessibilityStatus: "AVAILABLE", stairAccessState: "STEP_FREE" }],
+  };
+
+  normalizeUnverifiedNetworkEdgeStates(pack);
+
+  assert.deepEqual(pack.networkEdges[0], {
+    verificationStatus: "UNKNOWN",
+    accessibilityStatus: "UNKNOWN",
+    stairAccessState: "UNKNOWN",
+  });
+  assert.equal(pack.networkEdges[1], verified);
+  assert.deepEqual(pack.outOfStationTransferLinks[0], {
+    accessibilityStatus: "UNKNOWN",
+    stairAccessState: "UNKNOWN",
+  });
+});
 
 test("production build와 bundled asset/index의 artifact identity를 exact-match한다", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "easysubway-production-pack-identity-"));
