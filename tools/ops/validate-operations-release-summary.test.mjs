@@ -47,16 +47,13 @@ postLaunchGate.latestQaEvidenceSummary.remainingExternalBlockers =
   postLaunchGate.latestQaEvidenceSummary.remainingExternalBlockers.filter(
     (item) => item !== "fixed-release-rehearsal-after-node24-runtime-change",
   );
-// #2068: 실 게이트의 pubspec.yaml 핀은 중단(superseded)된 RC에 의도적으로 고정돼
-// live 해시와 불일치한다(repository-contract 계약). fixed-release 재검증 상태를
-// 가정하는 이 유닛 케이스에서는 바뀐 파일을 현재 해시로 재바인딩해 정합시킨다.
+// 실 게이트의 핀은 중단(superseded)된 RC에 의도적으로 고정돼 있다.
+// fixed-release 재검증 상태를 가정하는 fixture는 모든 surface를 현재 해시로 재바인딩한다.
 for (const binding of postLaunchGate.preLaunchReadiness.finalRcBinding.refreshBindings) {
   for (const file of binding.files) {
-    if (file.path === "apps/mobile/pubspec.yaml") {
-      file.sha256 = createHash("sha256")
-        .update(readFileSync(path.join(root, file.path)))
-        .digest("hex");
-    }
+    file.sha256 = createHash("sha256")
+      .update(readFileSync(path.join(root, file.path)))
+      .digest("hex");
   }
 }
 validatorPostLaunchGatePath = path.join(
