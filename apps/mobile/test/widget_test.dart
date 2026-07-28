@@ -7272,6 +7272,38 @@ void main() {
     await tester.pump();
   });
 
+  testWidgets('GPS 최근접 역은 현재 배율을 유지하고 역만 중앙에 둔다', (tester) async {
+    final repository = FakeStationSearchRepository(
+      networkMapData: _gpsNetworkMapData(
+        selectedRegion: '수도권',
+        regions: const ['수도권'],
+        centerNearestStation: true,
+      ),
+      nearbyResults: [_stationResult(id: 'station-sangnoksu', name: '상록수')],
+    );
+    await _pumpNetworkMapForGpsTest(
+      tester,
+      repository: repository,
+      locationProvider: FakeCurrentLocationProvider(
+        location: _freshCurrentLocation(),
+        needsPermissionRequest: false,
+      ),
+    );
+    final initial = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+
+    await tester.tap(find.byKey(const Key('nearbyStationButton')));
+    await tester.pumpAndSettle();
+
+    final focused = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(focused.scale, initial.scale);
+    expect(focused.initialScale, initial.initialScale);
+    expect(focused.center, const Offset(430, 280));
+  });
+
   testWidgets('GPS 재시도는 이전 오류 메시지와 timer를 즉시 지운다', (tester) async {
     var locationAttempts = 0;
     final locationProvider = FakeCurrentLocationProvider(
@@ -7331,6 +7363,9 @@ void main() {
 
   testWidgets('GPS 다른 지역 결과는 지도와 역을 검증한 뒤에만 팬 메뉴를 연다', (tester) async {
     final busanMap = Completer<NetworkMapData>();
+    final viewportRepository = FakeNetworkMapViewportRepository(
+      viewports: const {'부산권': Rect.fromLTWH(0, 0, 80, 80)},
+    );
     final repository = FakeStationSearchRepository(
       networkMapRegionNames: const ['수도권', '부산권'],
       networkMapCompletersByRegion: {'부산권': busanMap},
@@ -7345,6 +7380,7 @@ void main() {
         location: _freshCurrentLocation(),
         needsPermissionRequest: false,
       ),
+      viewportRepository: viewportRepository,
     );
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
     await tester.pump();
@@ -7362,6 +7398,12 @@ void main() {
       find.byKey(const Key('networkMapNearbyStationPanel')),
       findsOneWidget,
     );
+    expect(viewportRepository.loadedRegions, isNot(contains('부산권')));
+    expect(viewportRepository.selectedRegion, '부산권');
+    final camera = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(camera.scale, camera.initialScale);
   });
 
   testWidgets('GPS 지역 지도 load 실패는 팬 메뉴를 열지 않는다', (tester) async {
@@ -7406,6 +7448,7 @@ void main() {
         _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
       ],
     );
+    final viewportRepository = FakeNetworkMapViewportRepository();
     await _pumpNetworkMapForGpsTest(
       tester,
       repository: repository,
@@ -7413,6 +7456,7 @@ void main() {
         location: _freshCurrentLocation(),
         needsPermissionRequest: false,
       ),
+      viewportRepository: viewportRepository,
     );
 
     await tester.tap(find.byKey(const Key('nearbyStationButton')));
@@ -7420,6 +7464,7 @@ void main() {
 
     expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
     expect(find.text('주변 역을 불러오지 못했어요.'), findsOneWidget);
+    expect(viewportRepository.selectedRegion, '수도권');
   });
 
   testWidgets('GPS의 오래된 비동기 결과는 일반 지역 전환을 되돌리지 않는다', (tester) async {
@@ -7612,7 +7657,7 @@ void main() {
     expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
   });
 
-  testWidgets('노선도는 위치 권한이 이미 있으면 가까운 역 중심 viewport를 저장한다', (tester) async {
+  testWidgets('노선도는 위치 권한이 이미 있으면 배율을 유지한 viewport를 저장한다', (tester) async {
     final locationProvider = FakeCurrentLocationProvider(
       location: _freshCurrentLocation(),
       needsPermissionRequest: false,
@@ -7651,6 +7696,10 @@ void main() {
     expect(viewportRepository.loadedRegions, contains('수도권'));
     expect(viewportRepository.savedViewports['수도권'], isNotNull);
     expect(find.byKey(const Key('networkMapNearbyStationPanel')), findsNothing);
+    final camera = tester
+        .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+        .camera;
+    expect(camera.scale, camera.initialScale);
   });
 
   testWidgets('저장 지역을 복원하고 없는 지역은 기본 지역 카메라로 복구한다', (tester) async {
@@ -21587,6 +21636,7 @@ NetworkMapData _gpsNetworkMapData({
   required String selectedRegion,
   required List<String> regions,
   bool includeNearestStation = true,
+  bool centerNearestStation = false,
 }) {
   const sourceId = 'fixture-gps-nearest-station';
   const lineId = 'gps-test-line';
@@ -21611,9 +21661,9 @@ NetworkMapData _gpsNetworkMapData({
               lineId: lineId,
               stationCode: '448',
               sequence: 1,
-              position: const NetworkMapPosition(
-                x: 200,
-                y: 200,
+              position: NetworkMapPosition(
+                x: centerNearestStation ? 430 : 200,
+                y: centerNearestStation ? 280 : 200,
                 labelDx: 0,
                 labelDy: 0,
                 upPath: '',
@@ -21621,6 +21671,25 @@ NetworkMapData _gpsNetworkMapData({
                 sourceId: sourceId,
               ),
             ),
+            if (centerNearestStation)
+              NetworkMapStation(
+                id: 'station-bounds-anchor',
+                nameKo: '경계 기준점',
+                nameEn: 'Bounds Anchor',
+                region: selectedRegion,
+                lineId: lineId,
+                stationCode: '000',
+                sequence: 0,
+                position: const NetworkMapPosition(
+                  x: 72,
+                  y: 72,
+                  labelDx: 0,
+                  labelDy: 0,
+                  upPath: '',
+                  downPath: '',
+                  sourceId: sourceId,
+                ),
+              ),
           ]
         : const [],
     edges: const [],
@@ -21632,11 +21701,16 @@ NetworkMapData _gpsNetworkMapData({
       ),
     ],
     stationLineMemberships: includeNearestStation
-        ? const [
-            NetworkMapStationLineMembership(
+        ? [
+            const NetworkMapStationLineMembership(
               stationId: 'station-sangnoksu',
               lineId: lineId,
             ),
+            if (centerNearestStation)
+              const NetworkMapStationLineMembership(
+                stationId: 'station-bounds-anchor',
+                lineId: lineId,
+              ),
           ]
         : const [],
   );
