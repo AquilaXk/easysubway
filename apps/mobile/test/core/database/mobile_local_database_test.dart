@@ -486,8 +486,10 @@ void main() {
       {null},
     );
     expect(
-      networkEdges.map((row) => row.read<int>('last_verified_at')).toSet(),
-      {1781827200},
+      networkEdges
+          .map((row) => row.readNullable<int>('last_verified_at'))
+          .toSet(),
+      {null},
     );
     expect(
       networkEdges.map((row) => row.read<int>('distance_meters')).toSet(),
