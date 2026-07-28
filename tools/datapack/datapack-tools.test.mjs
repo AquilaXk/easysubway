@@ -12684,6 +12684,17 @@ test("NO_OFFICIAL_FEED ENTRY edge는 NOT_EXISTS이나 statusMeaning이 FEED_ABSE
   );
 });
 
+test("공식 source ingest adapter는 임의 strict route reason을 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-strict-reason-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  input.accessibilityStatusEvidence[0].strictRouteEligibleReason = "ARBITRARY_REASON";
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /accessibilityStatusEvidence.strictRouteEligibleReason is not allowed: ARBITRARY_REASON/,
+  );
+});
+
 test("검증된 상태 3분류(AVAILABLE/UNDER_MAINTENANCE/NO_OFFICIAL_FEED) edge는 게시 게이트를 통과하고 UNKNOWN만 unverified로 남는다 (#1996)", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-accessibility-verified-states-${Date.now()}`);
   const packOutputDir = path.join(outputDir, "pack");

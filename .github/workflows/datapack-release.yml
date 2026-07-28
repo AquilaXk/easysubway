@@ -579,7 +579,7 @@ jobs:
         if: ${{ steps.release-mode.outputs.mode == 'release-candidate' || steps.release-mode.outputs.mode == 'production-publish' }}
         run: |
           set -euo pipefail
-          evaluation_at="${EASYSUBWAY_SOURCE_GOVERNANCE_EVALUATION_AT:-$(date -u +%Y-%m-%dT%H:%M:%S.000Z)}"
+          evaluation_at="$(date -u +%Y-%m-%dT%H:%M:%S.000Z)"
           node tools/datapack/build-accessibility-source-coverage-report.mjs \
             --manifest "${EASYSUBWAY_DATAPACK_OUTPUT}/current.json" \
             --manifest-root "${EASYSUBWAY_DATAPACK_OUTPUT}" \

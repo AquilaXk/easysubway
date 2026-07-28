@@ -8,9 +8,9 @@ import { gunzipSync } from "node:zlib";
 
 const minimumRows = {
   station_exits: 1,
-  facilities: 1,
   data_quality_records: 1,
 };
+const bundledAccessibilityTables = ["facilities", "station_facility_evidence"];
 
 const args = parseArgs(process.argv.slice(2));
 const indexPath = path.resolve(requiredArg(args, "index"));
@@ -29,6 +29,10 @@ try {
     const sqlitePath = path.join(temporaryDir, `${id}.sqlite`);
     await writeFile(sqlitePath, sqliteBytes);
     packs.push(auditPack(sqlitePath, pack, compressedBytes, sqliteBytes));
+  }
+  for (const tableName of bundledAccessibilityTables) {
+    const count = packs.reduce((sum, pack) => sum + pack.rowCounts[tableName], 0);
+    if (count < 1) throw new Error(`bundled ${tableName} row count ${count} is below 1`);
   }
   const report = {
     artifactKind: "mobile-datapack-asset-audit",
@@ -85,6 +89,7 @@ function auditPack(sqlitePath, pack, compressedBytes, sqliteBytes) {
         throw new Error(`${id} ${tableName} row count ${rowCounts[tableName]} is below ${minimum}`);
       }
     }
+    for (const tableName of bundledAccessibilityTables) rowCounts[tableName] = tableCount(database, tableName);
     assertNoFixtureSourceInventory(database, id);
     return {
       id,

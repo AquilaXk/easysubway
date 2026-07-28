@@ -8093,7 +8093,7 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.ok(itxContractValidationIndex >= 0, "ITX coverage contract validation step must exist");
   assert.ok(sourceFreshnessIndex >= 0, "source snapshot freshness step must exist");
   assert.ok(accessibilitySourceCoverageIndex > sourceFreshnessIndex, "accessibility source coverage must run after source freshness");
-  assert.match(workflow, /build-accessibility-source-coverage-report\.mjs[\s\S]*?--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"[\s\S]*?--manifest-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"[\s\S]*?--bundled-index apps\/mobile\/assets\/datapacks\/index\.json[\s\S]*?--inventory tools\/datapack\/source-inventory\.json/);
+  assert.match(workflow, /Data Pack Release \/ Validate accessibility source coverage[\s\S]*?evaluation_at="\$\(date -u \+%Y-%m-%dT%H:%M:%S\.000Z\)"[\s\S]*?build-accessibility-source-coverage-report\.mjs[\s\S]*?--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"[\s\S]*?--manifest-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"[\s\S]*?--bundled-index apps\/mobile\/assets\/datapacks\/index\.json[\s\S]*?--inventory tools\/datapack\/source-inventory\.json[\s\S]*?--evaluation-at "\$\{evaluation_at\}"[\s\S]*?--output "\$\{EASYSUBWAY_ACCESSIBILITY_SOURCE_COVERAGE_REPORT\}"/);
   assert.ok(
     itxContractValidationIndex < evidenceBundleIndex,
     "ITX coverage contract must be validated before release evidence is hashed",
@@ -10475,7 +10475,8 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
         "kric-subway-timetable-exp",
       ]).has(candidate.id) &&
       candidate.admissionStatus !== "admitted_to_production_inventory" &&
-      candidate.admissionStatus !== "production_route_map_positions_materialized",
+      candidate.admissionStatus !== "production_route_map_positions_materialized" &&
+      candidate.admissionStatus !== "superseded_by_standard_operation",
   );
 
   assert.equal(candidates.schemaVersion, 1);
@@ -10488,6 +10489,18 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
       "kric-transfer-movement-standard",
     ],
   );
+
+  for (const sourceId of [
+    "kric-station-elevator",
+    "kric-station-escalator",
+    "kric-wheelchair-lift-location",
+  ]) {
+    const source = inventory.sources.find(({ id }) => id === sourceId);
+    assert.equal(source.capabilities.facility.status, "CANDIDATE");
+    assert.equal(source.capabilities.facility.productionUseAllowed, false);
+    assert.equal(source.admissionEvidence.quotaEvidence.productionUseAllowed, false);
+    assert.match(source.admissionEvidence.productionUseNoteKo, /resultCode 30.*standard stationCnvFacl/);
+  }
 
   const newlyValidatedEvidence = {
     "kric-train-operation-organ": {
@@ -11282,13 +11295,15 @@ test("KRIC 편의정보 표준 후보는 상세 페이지 라이선스와 출력
   );
   assert.deepEqual(candidate.evidence.missingEvidence, [
     "credentialFreeRawArchive",
-    "licenseCommercialRedistributionEvidence",
-    "primarySourceDecisionEvidence",
-    "providerTermsOrQuotaApproval",
     "rawObjectUri",
   ]);
   assert.doesNotMatch(candidate.nextAction, /verify live sample response/);
-  assert.match(candidate.nextAction, /admin review.*inventory provenance.*#1701.*productionUseAllowed=false/);
+  assert.match(candidate.nextAction, /#2609.*EV\/ES\/WCLF.*static facility/);
+  assert.equal(candidate.capabilities.facility.status, "SUPPORTED");
+  assert.equal(candidate.capabilities.facility.productionUseAllowed, true);
+  assert.equal(candidate.evidence.accessibilityReview.decision, "APPROVED");
+  assert.equal(candidate.evidence.accessibilityReview.productionUseAllowed, true);
+  assert.equal(candidate.productionInventoryRelationship, "same_dataset_inventory_entry_admitted_for_static_facility_issue_2609");
 });
 
 test("KRIC 도시철도 전체노선정보 후보는 상세 페이지 라이선스와 출력변수 근거를 기록한다", () => {

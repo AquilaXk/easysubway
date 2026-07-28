@@ -333,7 +333,7 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       "--output", earlyOutputDir,
     ], { cwd: root, env });
     const earlyManifest = JSON.parse(await readFile(path.join(earlyOutputDir, "current.json"), "utf8"));
-    assert.equal(earlyManifest.expiresAt, "2026-07-29T12:42:27.741Z");
+    assert.equal(earlyManifest.expiresAt, "2026-08-01T00:00:00.000Z");
 
     const missingEdgeAdmission = structuredClone(spec);
     delete missingEdgeAdmission.networkEdgeEvidence.capitalTopologyAdmission;

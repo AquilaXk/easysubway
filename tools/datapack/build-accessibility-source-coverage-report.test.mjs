@@ -110,9 +110,16 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
     "facility-a", "station-a", "ELEVATOR", "official-accessibility",
     "official-accessibility-20260728", hash("facility-record"), hash("facility-evidence"),
   );
+  database.prepare("INSERT INTO facilities VALUES (?, ?, ?, ?, ?, ?, ?)").run(
+    "facility-without-provenance", "station-a", "ESCALATOR", "", "", "", "",
+  );
   database.prepare("INSERT INTO network_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
     "edge-entry-a", "station-a", "station-a:line-a", "ENTRY", "UNKNOWN", "UNKNOWN",
     "official-accessibility", "official-accessibility-20260728", hash("edge-record"), hash("edge-evidence"),
+  );
+  database.prepare("INSERT INTO network_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    "edge-without-provenance", "station-a", "station-a:line-a", "EXIT", "UNKNOWN", "UNKNOWN",
+    "", "", "", "",
   );
   database.close();
   const sqliteBytes = await readFile(sqlitePath);
@@ -165,6 +172,17 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
       providerRecordHash: hash("facility-record"),
       evidenceHash: hash("facility-evidence"),
     }, {
+      claimId: "facility-without-provenance",
+      stationId: "station-a",
+      lineId: "",
+      facilityType: "ESCALATOR",
+      domain: "FACILITY",
+      evidenceKind: "EXISTS",
+      sourceId: "",
+      sourceSnapshotId: "",
+      providerRecordHash: "",
+      evidenceHash: "",
+    }, {
       claimId: "edge-entry-a",
       stationId: "station-a",
       lineId: "line-a",
@@ -175,8 +193,49 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
       sourceSnapshotId: "official-accessibility-20260728",
       providerRecordHash: hash("edge-record"),
       evidenceHash: hash("edge-evidence"),
+    }, {
+      claimId: "edge-without-provenance",
+      stationId: "station-a",
+      lineId: "line-a",
+      facilityType: "EXIT",
+      domain: "NETWORK_EDGE",
+      evidenceKind: "EXISTS",
+      sourceId: "",
+      sourceSnapshotId: "",
+      providerRecordHash: "",
+      evidenceHash: "",
     }],
   }]);
+});
+
+test("서로 다른 facility type의 위반은 고유 claim ID를 가진다", () => {
+  const input = validInput();
+  input.artifacts = [input.artifacts[0]];
+  input.artifacts[0].claims = ["ELEVATOR", "ESCALATOR"].map((facilityType) => ({
+    ...input.artifacts[0].claims[0],
+    facilityType,
+    sourceId: "",
+  }));
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(new Set(report.violations.provenance).size, 2);
+});
+
+test("nullable Seoul line identity는 예외 대신 NO_GO로 판정한다", () => {
+  const input = validInput();
+  input.artifacts = [input.artifacts[0]];
+  const claim = input.artifacts[0].claims[0];
+  claim.lineId = null;
+  claim.stationName = "사당";
+  input.snapshots[0].artifactKind = "seoul-accessibility-snapshot";
+  input.snapshots[0].stations = [{ stationName: "사당", lineName: "4호선", facilities: [] }];
+  delete input.snapshots[0].claimBindings;
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(report.decision, "NO_GO");
+  assert.ok(report.violations.provenance.some((violation) => violation.endsWith("CLAIM_SNAPSHOT_BINDING_MISMATCH")));
 });
 
 test("snapshot content에서 재계산할 수 없는 임의 claim hash는 NO_GO다", () => {
@@ -187,7 +246,7 @@ test("snapshot content에서 재계산할 수 없는 임의 claim hash는 NO_GO�
 
   assert.equal(report.decision, "NO_GO");
   assert.deepEqual(report.violations.provenance, [
-    "bundled-capital:station-a|line-a|STATION_FACILITY_EVIDENCE:CLAIM_SNAPSHOT_BINDING_MISMATCH",
+    "bundled-capital:station-a|line-a|ELEVATOR|STATION_FACILITY_EVIDENCE:CLAIM_SNAPSHOT_BINDING_MISMATCH",
   ]);
 });
 
@@ -233,7 +292,7 @@ test("Seoul snapshot에 존재하는 역·노선은 NOT_EXISTS로 위조할 수 
 
   assert.equal(report.decision, "NO_GO");
   assert.deepEqual(report.violations.provenance, [
-    "bundled-capital:station-sadang|seoul-4|STATION_FACILITY_EVIDENCE:CLAIM_SNAPSHOT_BINDING_MISMATCH",
+    "bundled-capital:station-sadang|seoul-4|ELEVATOR|STATION_FACILITY_EVIDENCE:CLAIM_SNAPSHOT_BINDING_MISMATCH",
   ]);
 });
 
@@ -266,7 +325,7 @@ for (const { name, mutate, partition, expected } of [
     name: "claim provenance missing",
     mutate: (input) => { input.artifacts[0].claims[0].sourceId = ""; },
     partition: "provenance",
-    expected: "bundled-capital:station-a|line-a|STATION_FACILITY_EVIDENCE:PROVENANCE_MISSING",
+    expected: "bundled-capital:station-a|line-a|ELEVATOR|STATION_FACILITY_EVIDENCE:PROVENANCE_MISSING",
   },
   {
     name: "accessibility admission not approved",
@@ -281,13 +340,13 @@ for (const { name, mutate, partition, expected } of [
       delete input.inventory.sources[0].accessibilityAdmissionEvidence.absenceEvidenceMode;
     },
     partition: "absenceEvidence",
-    expected: "bundled-capital:station-a|line-a|STATION_FACILITY_EVIDENCE:ABSENCE_EVIDENCE_MISSING",
+    expected: "bundled-capital:station-a|line-a|ELEVATOR|STATION_FACILITY_EVIDENCE:ABSENCE_EVIDENCE_MISSING",
   },
   {
     name: "placeholder evidence hash",
     mutate: (input) => { input.artifacts[0].claims[0].evidenceHash = "a".repeat(64); },
     partition: "placeholder",
-    expected: "bundled-capital:station-a|line-a|STATION_FACILITY_EVIDENCE:EVIDENCE_HASH_PLACEHOLDER",
+    expected: "bundled-capital:station-a|line-a|ELEVATOR|STATION_FACILITY_EVIDENCE:EVIDENCE_HASH_PLACEHOLDER",
   },
   {
     name: "duplicate artifact identity",

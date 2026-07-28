@@ -40,22 +40,23 @@ export function normalizeAccessibilityRows(rows) {
     if (oprtngSitu !== undefined && oprtngSitu !== null && typeof oprtngSitu !== "string") {
       throw new Error(`${INVALID_RESPONSE}: requiredField:oprtngSitu`);
     }
-    if (oprtngSitu === REMOVED_OPERATION_SITUATION) {
+    const operationCode = oprtngSitu?.trim() ?? "";
+    if (operationCode === REMOVED_OPERATION_SITUATION) {
       continue;
     }
-    const state = !oprtngSitu?.trim()
+    const state = !operationCode
       ? { operational: null, situationCode: null, situation: "PROVIDER_STATUS_MISSING" }
-      : OPERATION_SITUATION_STATES.get(oprtngSitu);
+      : OPERATION_SITUATION_STATES.get(operationCode);
     if (!state) {
       throw new Error(`${INVALID_RESPONSE}: operationState`);
     }
     normalized.push({
-      stationName: stnNm,
-      lineName: lineNm,
+      stationName: stnNm.trim(),
+      lineName: lineNm.trim(),
       operational: state.operational,
       situationCode: state.situationCode,
       situation: state.situation,
-      pathDescription: dtlPstn,
+      pathDescription: dtlPstn.trim(),
     });
   }
   return normalized;
@@ -109,6 +110,9 @@ export function buildAccessibilitySnapshot(rows, retrievedAt, { rawRowCount, raw
   const stations = [...stationsByIdentity.values()].sort((left, right) => (
     compare(`${left.lineName}\0${left.stationName}`, `${right.lineName}\0${right.stationName}`)
   ));
+  for (const station of stations) {
+    station.facilities.sort((left, right) => compare(JSON.stringify(left), JSON.stringify(right)));
+  }
   const contentSha256 = hash(stations);
   return {
     schemaVersion: 1,

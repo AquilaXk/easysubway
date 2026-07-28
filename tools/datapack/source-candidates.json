@@ -3318,7 +3318,7 @@
         }
       },
       "productionInventoryReferenceId": "kric-station-convenience-standard",
-      "productionInventoryRelationship": "inventory_provenance_only_admin_reviewed_for_1397"
+      "productionInventoryRelationship": "same_dataset_inventory_entry_admitted_for_static_facility_issue_2609"
     },
     {
       "id": "kric-station-elevator",

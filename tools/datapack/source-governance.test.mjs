@@ -293,6 +293,41 @@ test("snapshot set refresh는 same-source parent lineage를 보존한다", async
   }
 });
 
+test("snapshot set explicit removal은 trim하고 unknown source를 거부한다", async () => {
+  const workDir = path.join(tmpdir(), `easysubway-source-remove-${process.pid}-${Date.now()}`);
+  const rawPath = path.join(workDir, "raw.csv");
+  const outputPath = path.join(workDir, "snapshot.json");
+  const snapshotSet = path.join(workDir, "snapshots.json");
+  await mkdir(workDir, { recursive: true });
+  await writeFile(rawPath, "station\nSadang\n");
+  const buildArgs = [
+    "--input", rawPath,
+    "--output", outputPath,
+    "--retrieved-at", "2026-07-01T03:00:00Z",
+    "--freshness-expires-at", "2026-09-29T03:00:00Z",
+    "--coverage-count", "1",
+    "--raw-object-uri", "s3://bucket/snapshot.csv",
+    "--snapshot-set", snapshotSet,
+  ];
+
+  try {
+    await writeFile(snapshotSet, `${JSON.stringify([{ snapshotId: "other-1", sourceId: "other" }])}\n`);
+    await buildSnapshot([...buildArgs, "--snapshot-id", "snapshot-a-1", "--remove-source-ids", " other "]);
+    assert.deepEqual(
+      JSON.parse(await readFile(snapshotSet, "utf8")).map(({ sourceId }) => sourceId),
+      ["kric-station-elevator"],
+    );
+
+    await writeFile(snapshotSet, `${JSON.stringify([{ snapshotId: "other-1", sourceId: "other" }])}\n`);
+    await assert.rejects(
+      buildSnapshot([...buildArgs, "--snapshot-id", "snapshot-a-2", "--remove-source-ids", "missing"]),
+      /snapshot removal source not found: missing/,
+    );
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
 test("승인된 legacy root는 rowCount를 결정적 coverage로 migration해 lineage를 연장한다", async () => {
   const snapshots = JSON.parse(await readFile(
     path.join(root, "tools/datapack/release/source-snapshots.json"),

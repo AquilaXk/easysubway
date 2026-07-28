@@ -3,6 +3,7 @@ import { createHash, randomUUID } from "node:crypto";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+import { pathToFileURL } from "node:url";
 import { DatabaseSync } from "node:sqlite";
 import { gunzipSync, gzipSync, constants as zlibConstants } from "node:zlib";
 
@@ -135,6 +136,7 @@ async function stripLegacyCore({ check }) {
     if (check && count !== 0) throw new Error("legacy core accessibility claims are stale");
     if (!check && count !== 0) database.exec("DELETE FROM facilities; VACUUM");
     database.close();
+    if (!check && count === 0) return;
     const sqliteBytes = await readFile(sqlitePath);
     if (check) {
       const index = JSON.parse(await readFile(indexPath, "utf8"));
@@ -260,17 +262,34 @@ async function syncReleaseEvidence({ check }) {
   return { spec, inventory };
 }
 
-function accessibilityIndexMetadata(pack, spec, inventory, currentFreshnessExpiresAt) {
+export function accessibilityIndexMetadata(pack, spec, inventory, currentFreshnessExpiresAt) {
   const evidenceBySource = new Map(inventory.sources.map((source) => [source.id, source.accessibilityAdmissionEvidence]));
   const snapshotBySource = new Map(spec.sourceSnapshots.map((snapshot) => [snapshot.sourceId, snapshot]));
-  const consumed = new Map(pack.stationFacilityEvidence.map(({ sourceId, sourceSnapshotId }) => [sourceId, sourceSnapshotId]));
+  const consumed = new Map();
+  for (const { sourceId, sourceSnapshotId } of [...pack.facilities, ...pack.stationFacilityEvidence]) {
+    if (consumed.has(sourceId) && consumed.get(sourceId) !== sourceSnapshotId) {
+      throw new Error(`accessibility snapshot mismatch: ${sourceId}`);
+    }
+    consumed.set(sourceId, sourceSnapshotId);
+  }
   const accessibilityFreshnessExpiresAt = [...consumed].map(([sourceId, snapshotId]) => {
+    const evidence = evidenceBySource.get(sourceId);
+    if (evidence?.snapshotId !== snapshotId
+      || !Number.isFinite(Date.parse(evidence.observedAt))
+      || !Number.isFinite(Date.parse(evidence.freshUntil))) {
+      throw new Error(`accessibility admission evidence missing: ${sourceId}`);
+    }
     const snapshot = snapshotBySource.get(sourceId);
     if (snapshot?.snapshotId !== snapshotId) throw new Error(`accessibility snapshot mismatch: ${sourceId}`);
+    if (!Number.isFinite(Date.parse(snapshot.freshnessExpiresAt))) {
+      throw new Error(`accessibility snapshot freshness missing: ${sourceId}`);
+    }
     return snapshot.freshnessExpiresAt;
   }).sort().at(0);
+  const qualityAsOf = [...consumed.keys()].map((sourceId) => evidenceBySource.get(sourceId).observedAt).sort().at(-1);
   return {
-    qualityAsOf: [...consumed.keys()].map((sourceId) => evidenceBySource.get(sourceId)?.observedAt).sort().at(-1),
+    builtAt: candidateBuildNow().toISOString(),
+    qualityAsOf,
     // ponytail: accessibility refresh may tighten, never extend another domain's pack expiry; the identity test owns extension.
     freshnessExpiresAt: new Date(Math.min(
       Date.parse(currentFreshnessExpiresAt),
@@ -338,9 +357,7 @@ async function main() {
       releaseEvidence.spec,
       releaseEvidence.inventory,
       index.freshnessExpiresAt,
-    ), {
-      builtAt: new Date().toISOString(),
-    });
+    ));
     await writeFile(packPath, gzipBytes);
     await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
   } finally {
@@ -348,4 +365,15 @@ async function main() {
   }
 }
 
-main().catch((error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
+function candidateBuildNow() {
+  const value = process.env.EASYSUBWAY_DATAPACK_BUILD_NOW;
+  const date = value ? new Date(value) : new Date();
+  if ((value && !value.endsWith("Z")) || !Number.isFinite(date.getTime())) {
+    throw new Error("EASYSUBWAY_DATAPACK_BUILD_NOW must be UTC ISO-8601");
+  }
+  return date;
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href) {
+  main().catch((error) => { process.stderr.write(`${error.stack ?? error.message}\n`); process.exitCode = 1; });
+}

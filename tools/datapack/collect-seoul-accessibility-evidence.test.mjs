@@ -229,6 +229,19 @@ test("collector keeps only station, location and operation evidence", () => {
   assert.doesNotMatch(JSON.stringify(snapshot), /serviceKey/);
 });
 
+test("normalizer stores trimmed provider identity values", () => {
+  assert.deepEqual(normalizeAccessibilityRows([
+    { lineNm: " 4호선 ", stnNm: " 사당 ", oprtngSitu: "M", dtlPstn: " 대합실-승강장 " },
+  ]), [{
+    stationName: "사당",
+    lineName: "4호선",
+    operational: true,
+    situationCode: "M",
+    situation: "사용가능",
+    pathDescription: "대합실-승강장",
+  }]);
+});
+
 test("normalizer records verified non-available maintenance states", () => {
   assert.deepEqual(
     normalizeAccessibilityRows([
@@ -329,6 +342,24 @@ test("snapshot contains sorted full-scope evidence and hashes", () => {
   assert.notEqual(snapshot.contentSha256, snapshot.rawSha256);
   assert.deepEqual(snapshot.stations.map(({ stationName }) => stationName), ["사당", "상록수"]);
   assert.doesNotMatch(JSON.stringify(snapshot), /serviceKey|https?:\/\//);
+});
+
+test("snapshot content identity is stable when provider facility order changes", () => {
+  const rows = [
+    { stationName: "사당", lineName: "4호선", operational: true, situationCode: "M", situation: "사용가능", pathDescription: "9번 출구" },
+    { stationName: "사당", lineName: "4호선", operational: false, situationCode: "S", situation: "보수중", pathDescription: "1번 출구" },
+  ];
+  const build = (input) => buildAccessibilitySnapshot(
+    input,
+    "2026-07-10T00:00:00.000Z",
+    { rawRowCount: 2, rawSha256: "a".repeat(64) },
+  );
+
+  const first = build(rows);
+  const reversed = build([...rows].reverse());
+
+  assert.deepEqual(first.stations, reversed.stations);
+  assert.equal(first.contentSha256, reversed.contentSha256);
 });
 
 test("snapshot rejects facilities without a verified or provider-missing status tuple", () => {

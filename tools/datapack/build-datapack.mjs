@@ -664,17 +664,17 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
   )).toISOString();
 }
 
-function productionAccessibilityFreshUntil(packs, inventory, sourceSnapshots) {
+export function productionAccessibilityFreshUntil(packs, inventory, sourceSnapshots) {
   const sources = new Map(inventory.sources.map((source) => [source.id, source]));
   const snapshots = new Map(sourceSnapshots.map((snapshot) => [snapshot.sourceId, snapshot]));
   const rows = packs.flatMap((pack) => [
     ...(pack.facilities ?? []),
     ...(pack.stationFacilityEvidence ?? []),
-    ...(pack.networkEdges ?? []).filter(({ edgeType }) => edgeType !== "RIDE"),
+    ...(pack.networkEdges ?? []).filter(({ edgeType }) => ["ENTRY", "EXIT"].includes(edgeType)),
   ]).filter(({ sourceId }) => sourceId);
   const expires = rows.map((row) => {
     const evidence = sources.get(row.sourceId)?.accessibilityAdmissionEvidence;
-    if (evidence?.snapshotId !== row.sourceSnapshotId || !Number.isFinite(Date.parse(evidence.freshUntil))) {
+    if (!evidence || evidence.snapshotId !== row.sourceSnapshotId || !Number.isFinite(Date.parse(evidence.freshUntil))) {
       throw new Error(`production accessibility evidence mismatch: ${row.sourceId}`);
     }
     if (Date.parse(evidence.freshUntil) <= candidateBuildNow().getTime()) {

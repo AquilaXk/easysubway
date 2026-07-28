@@ -193,7 +193,6 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
           SELECT id, station_id, type, source_id, source_snapshot_id,
                  provider_record_hash, evidence_hash
           FROM facilities
-          WHERE source_id <> ''
           ORDER BY station_id, type, id
         `
         : `SELECT id, station_id, type, '' AS source_id, '' AS source_snapshot_id,
@@ -217,7 +216,7 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
           SELECT id, from_node_id, to_node_id, edge_type, accessibility_status,
                  source_id, source_snapshot_id, provider_record_hash, evidence_hash
           FROM network_edges
-          WHERE source_id <> '' AND edge_type <> 'RIDE'
+          WHERE edge_type <> 'RIDE'
           ORDER BY id
         `
         : `SELECT id, from_node_id, to_node_id, edge_type, accessibility_status,
@@ -324,7 +323,7 @@ function validateSource(source, snapshotsByIdentity, evaluatedMillis, violations
 }
 
 function validateClaim(artifact, claim, sources, snapshotsByIdentity, violations) {
-  const claimId = `${artifact.artifactId}:${claim.stationId}|${claim.lineId}|${claim.domain}`;
+  const claimId = `${artifact.artifactId}:${claim.stationId}|${claim.lineId ?? ""}|${claim.facilityType}|${claim.domain}`;
   const source = sources.get(claim.sourceId);
   const evidence = source?.accessibilityAdmissionEvidence;
   const provenanceMissing = !source
@@ -379,7 +378,7 @@ function claimMatchesSnapshot(snapshot, claim) {
     });
   }
   if (snapshot.artifactKind === "seoul-accessibility-snapshot") {
-    const lineNumber = claim.lineId.match(/(\d+)$/)?.[1];
+    const lineNumber = String(claim.lineId ?? "").match(/(\d+)$/)?.[1];
     const lineName = lineNumber ? `${lineNumber}호선` : null;
     const matchingStations = lineName && claim.stationName
       ? (snapshot.stations ?? []).filter((station) => normalizeStationName(station.stationName) === normalizeStationName(claim.stationName)

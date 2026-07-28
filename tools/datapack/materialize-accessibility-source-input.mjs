@@ -24,8 +24,7 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
     if (!mapping || mapping.lineId !== query.lineId || !Array.isArray(query.rows)) {
       throw new Error(`KRIC snapshot canonical mapping missing: ${query?.stationId}`);
     }
-    const stationName = input.stationLineRows.find((row) => row.stationCode === mapping.sourceStationCode.split("-").at(-1))?.stationNameKo;
-    if (!stationName) throw new Error(`station name missing: ${query.stationId}`);
+    const stationName = stationLineIdentity(input, mapping).stationNameKo;
     const counts = new Map();
     for (const row of query.rows) {
       if (!KRIC_FACILITY_CODES.has(row.gubun)) throw new Error(`unknown KRIC facility code: ${row.gubun}`);
@@ -88,8 +87,10 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
   const seoulRows = (input.supportedV1Scope?.includedStationIds ?? []).map((stationId) => {
     const mapping = mappings.get(stationId);
     if (!mapping) throw new Error(`station mapping missing: ${stationId}`);
-    const stationName = input.stationLineRows.find((row) => row.stationCode === mapping.sourceStationCode.split("-").at(-1))?.stationNameKo;
-    const lineName = `${mapping.lineId.match(/(\d+)$/)?.[1]}호선`;
+    const stationName = stationLineIdentity(input, mapping).stationNameKo;
+    const lineNumber = mapping.lineId.match(/(\d+)$/)?.[1];
+    if (!lineNumber) throw new Error(`station line number missing: ${stationId}`);
+    const lineName = `${lineNumber}호선`;
     const station = seoulStations.get(`${normalize(stationName)}\0${lineName}`);
     const states = station?.facilities?.map(({ operational }) => operational) ?? [];
     const evidenceKind = station ? "EXISTS" : "NOT_EXISTS";
@@ -128,9 +129,12 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
   const statusByStation = new Map(seoulRows.map((row) => [row.stationId, row]));
   const routeEdges = (input.routeEdges ?? []).map((edge) => {
     if (edge.sourceId !== SEOUL_SOURCE_ID || !["ENTRY", "EXIT"].includes(edge.edgeType)) return edge;
-    const stationCode = (edge.edgeType === "ENTRY" ? edge.to : edge.from)?.sourceStationCode;
-    const mapping = [...mappings.values()].find((entry) => entry.sourceStationCode.endsWith(`-${stationCode}`));
-    const status = statusByStation.get(mapping?.stationId);
+    const endpoint = edge.edgeType === "ENTRY" ? edge.to : edge.from;
+    const stationCode = endpoint?.sourceStationCode;
+    const matchingMappings = [...mappings.values()].filter((entry) =>
+      entry.lineId === endpoint?.lineId && entry.sourceStationCode.endsWith(`-${stationCode}`));
+    if (matchingMappings.length !== 1) throw new Error(`Seoul edge station mapping invalid: ${edge.id}`);
+    const status = statusByStation.get(matchingMappings[0].stationId);
     if (!status) throw new Error(`Seoul edge station evidence missing: ${edge.id}`);
     return {
       ...edge,
@@ -161,6 +165,19 @@ function tuple(query) {
   return { railOprIsttCd: query.railOprIsttCd, lnCd: query.lnCd, stinCd: query.stinCd };
 }
 
+function stationLineIdentity(input, mapping) {
+  const stationCode = mapping.sourceStationCode.split("-").at(-1);
+  const matches = input.stationLineRows.filter((row) =>
+    row.sourceId === mapping.sourceId
+    && row.sourceStationCode === mapping.sourceStationCode
+    && row.stationCode === stationCode
+    && row.lineId === mapping.lineId);
+  if (matches.length !== 1 || typeof matches[0].stationNameKo !== "string" || matches[0].stationNameKo.trim() === "") {
+    throw new Error(`${matches.length > 1 ? "station identity ambiguous" : "station name missing"}: ${mapping.stationId}`);
+  }
+  return matches[0];
+}
+
 function normalize(value) {
   return String(value ?? "").normalize("NFKC").replace(/역$/u, "").replace(/[^\p{L}\p{N}]+/gu, "");
 }
@@ -170,7 +187,17 @@ function hash(value) {
 }
 
 async function main(argv) {
-  const args = Object.fromEntries(Array.from({ length: argv.length / 2 }, (_, index) => [argv[index * 2].slice(2), argv[index * 2 + 1]]));
+  const allowed = new Set(["input", "kric-snapshot", "seoul-snapshot", "output"]);
+  const args = {};
+  for (let index = 0; index < argv.length; index += 2) {
+    const key = argv[index];
+    const value = argv[index + 1];
+    if (!key?.startsWith("--") || value === undefined || !allowed.has(key.slice(2))) {
+      throw new Error(`unknown argument: ${key ?? ""}`);
+    }
+    if (Object.hasOwn(args, key.slice(2))) throw new Error(`duplicate argument: ${key}`);
+    args[key.slice(2)] = value;
+  }
   for (const name of ["input", "kric-snapshot", "seoul-snapshot", "output"]) if (!args[name]) throw new Error(`missing --${name}`);
   const [input, kricSnapshot, seoulSnapshot] = await Promise.all([
     readJson(args.input), readJson(args["kric-snapshot"]), readJson(args["seoul-snapshot"]),

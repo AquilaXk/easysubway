@@ -73,7 +73,17 @@ async function main() {
   if (args["snapshot-set"]) {
     const snapshotSetPath = path.resolve(args["snapshot-set"]);
     const snapshots = JSON.parse(await readFile(snapshotSetPath, "utf8"));
-    const removedSourceIds = new Set((args["remove-source-ids"] ?? "").split(",").filter(Boolean));
+    const requestedRemovals = args["remove-source-ids"] == null
+      ? []
+      : args["remove-source-ids"].split(",").map((sourceId) => sourceId.trim());
+    if (requestedRemovals.some((sourceId) => sourceId === "")) {
+      throw new Error("snapshot removal source must not be empty");
+    }
+    const availableSourceIds = new Set(snapshots.map(({ sourceId }) => sourceId));
+    for (const sourceId of requestedRemovals) {
+      if (!availableSourceIds.has(sourceId)) throw new Error(`snapshot removal source not found: ${sourceId}`);
+    }
+    const removedSourceIds = new Set(requestedRemovals);
     const next = snapshots
       .filter(({ sourceId, snapshotId }) => !removedSourceIds.has(sourceId) && snapshotId !== snapshot.snapshotId)
       .concat(snapshot);

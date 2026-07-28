@@ -58,6 +58,26 @@ test("canonical fixture와 official route roster를 station-line tuple로 결속
     () => buildKricAccessibilityRoster({ fixture, canonicalStationLines, routeRosters }),
     /ambiguous canonical KRIC station join/,
   );
+  assert.throws(
+    () => buildKricAccessibilityRoster({
+      fixture,
+      canonicalStationLines: canonicalStationLines.filter(({ stationId }) => stationId !== "station-duplicate")
+        .concat({ artifactId: "bundled-capital", stationId: "station-missing", lineId: "line-1", stationCode: "999", names: ["없는역"] }),
+      routeRosters,
+    }),
+    /canonical KRIC station join missing: bundled-capital\|station-missing\|line-1/,
+  );
+  assert.throws(
+    () => buildKricAccessibilityRoster({
+      fixture,
+      canonicalStationLines: [],
+      routeRosters: {
+        ...routeRosters,
+        providerScopes: [{ lineId: "line-x", mreaWideCd: "01", lnCd: "9", railOprIsttCd: "SX" }],
+      },
+    }),
+    /KRIC active provider scope missing from fixture: line-x\/SX/,
+  );
 });
 
 test("현재 standard source claim도 다음 snapshot roster 입력으로 다시 읽는다", async (t) => {
