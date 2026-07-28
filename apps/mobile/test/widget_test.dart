@@ -3603,6 +3603,18 @@ void main() {
     tester,
   ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    const viewId = 2570;
+    const channelName =
+        'com.easysubway.easysubway_mobile/route_map_viewport_webview/$viewId';
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    final nativeCalls = <MethodCall>[];
+    messenger.setMockMethodCallHandler(const MethodChannel(channelName), (
+      call,
+    ) async {
+      nativeCalls.add(call);
+      return null;
+    });
     try {
       await tester.pumpWidget(
         buildEasySubwayTestApp(
@@ -3617,10 +3629,39 @@ void main() {
       );
       await tester.pumpAndSettle();
 
+      final androidView = tester.widget<AndroidView>(find.byType(AndroidView));
+      androidView.onPlatformViewCreated!(viewId);
+      await messenger.handlePlatformMessage(
+        channelName,
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('framePresented', <String, Object>{
+            'revision': 0,
+            'frameToken': 0,
+          }),
+        ),
+        (_) {},
+      );
+      await tester.pump();
+
       final stationFinder = find.byKey(
         const Key('networkMapStation-sangnoksu-seoul-4'),
       );
       await tester.tapAt(tester.getCenter(stationFinder));
+      await tester.pump();
+      await tester.pump();
+      final selectionArguments =
+          nativeCalls.lastWhere((call) => call.method == 'setCamera').arguments
+              as Map;
+      await messenger.handlePlatformMessage(
+        channelName,
+        const StandardMethodCodec().encodeMethodCall(
+          MethodCall('framePresented', <String, Object>{
+            'revision': selectionArguments['revision'] as int,
+            'frameToken': selectionArguments['frameToken'] as int,
+          }),
+        ),
+        (_) {},
+      );
       await tester.pumpAndSettle();
       expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
       final basemap = tester.widget<RouteMapBasemapView>(
@@ -3638,6 +3679,10 @@ void main() {
       );
       expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
     } finally {
+      messenger.setMockMethodCallHandler(
+        const MethodChannel(channelName),
+        null,
+      );
       debugDefaultTargetPlatformOverride = null;
     }
   });
@@ -3688,6 +3733,15 @@ void main() {
       const viewId = 2571;
       const channelName =
           'com.easysubway.easysubway_mobile/route_map_viewport_webview/$viewId';
+      final messenger =
+          TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final nativeCalls = <MethodCall>[];
+      messenger.setMockMethodCallHandler(const MethodChannel(channelName), (
+        call,
+      ) async {
+        nativeCalls.add(call);
+        return null;
+      });
       final semanticsHandle = tester.ensureSemantics();
       primeNetworkMapOwnerLabelsCacheForTest(const {});
       try {
@@ -3756,17 +3810,16 @@ void main() {
           find.byType(AndroidView),
         );
         androidView.onPlatformViewCreated!(viewId);
-        await TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
-            .handlePlatformMessage(
-              channelName,
-              const StandardMethodCodec().encodeMethodCall(
-                MethodCall('framePresented', <String, Object>{
-                  'revision': 0,
-                  'frameToken': 0,
-                }),
-              ),
-              (_) {},
-            );
+        await messenger.handlePlatformMessage(
+          channelName,
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall('framePresented', <String, Object>{
+              'revision': 0,
+              'frameToken': 0,
+            }),
+          ),
+          (_) {},
+        );
         await tester.pump();
 
         final nativeVisualLayer = find.ancestor(
@@ -3794,10 +3847,84 @@ void main() {
           isTrue,
         );
 
+        final center = tester.getCenter(
+          find.byKey(const Key('networkMapSurface')),
+        );
+        final left = await tester.startGesture(
+          center - const Offset(30, 0),
+          pointer: 1,
+        );
+        final right = await tester.startGesture(
+          center + const Offset(30, 0),
+          pointer: 2,
+        );
+        await tester.pump();
+        await left.moveTo(center - const Offset(60, 0));
+        await right.moveTo(center + const Offset(60, 0));
+        await tester.pump();
+        expect(find.bySemanticsLabel('노선도'), findsOneWidget);
+        await left.up();
+        await right.up();
+        await tester.pump();
+        await tester.pump();
+
+        final pendingCamera = nativeCalls.lastWhere(
+          (call) => call.method == 'setCamera',
+        );
+        final pendingArguments = pendingCamera.arguments as Map;
+        expect(find.bySemanticsLabel('광주송정역'), findsNothing);
+        expect(
+          find.byKey(
+            const Key('networkMapStation-gwangju-songjeong-gwangju-1'),
+          ),
+          findsNothing,
+        );
+
+        await messenger.handlePlatformMessage(
+          channelName,
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall('framePresented', <String, Object>{
+              'revision': pendingArguments['revision'] as int,
+              'frameToken': pendingArguments['frameToken'] as int,
+            }),
+          ),
+          (_) {},
+        );
+        await tester.pump();
+        expect(find.bySemanticsLabel('광주송정역'), findsOneWidget);
+
+        final cameraCallCountBeforeTap = nativeCalls
+            .where((call) => call.method == 'setCamera')
+            .length;
         tester.semantics.tap(find.semantics.byLabel('광주송정역'));
+        await tester.pump();
+        await tester.pump();
+        expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+        final cameraCallsAfterTap = nativeCalls
+            .where((call) => call.method == 'setCamera')
+            .toList();
+        expect(
+          cameraCallsAfterTap.length,
+          greaterThan(cameraCallCountBeforeTap),
+        );
+        final selectionArguments = cameraCallsAfterTap.last.arguments as Map;
+        await messenger.handlePlatformMessage(
+          channelName,
+          const StandardMethodCodec().encodeMethodCall(
+            MethodCall('framePresented', <String, Object>{
+              'revision': selectionArguments['revision'] as int,
+              'frameToken': selectionArguments['frameToken'] as int,
+            }),
+          ),
+          (_) {},
+        );
         await tester.pumpAndSettle();
         expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
       } finally {
+        messenger.setMockMethodCallHandler(
+          const MethodChannel(channelName),
+          null,
+        );
         semanticsHandle.dispose();
         resetNetworkMapOwnerLabelsCacheForTest();
         debugDefaultTargetPlatformOverride = null;

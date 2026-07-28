@@ -170,6 +170,7 @@ class RouteMapSvgViewport extends StatefulWidget {
 class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
   late final RouteMapSvgViewportController _controller;
   bool _framePresented = false;
+  bool _hasPresentedFrame = false;
   bool _failed = false;
   int _frameToken = 0;
   Widget? _presentedOverlay;
@@ -214,6 +215,7 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
             frameToken == _frameToken) {
           setState(() {
             _framePresented = true;
+            _hasPresentedFrame = true;
             _presentedFrame = _frame;
             _presentedOverlay = widget.overlay;
           });
@@ -239,6 +241,7 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
     if (oldWidget.camera != widget.camera ||
         oldWidget.sourceOrigin != widget.sourceOrigin) {
       _frameToken += 1;
+      _framePresented = false;
       unawaited(
         _controller.update(
           widget.camera,
@@ -306,9 +309,9 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
     final nativeView = ExcludeSemantics(
       child: IgnorePointer(child: platformView),
     );
-    final overlay = _framePresented ? _presentedOverlay : widget.overlay;
+    final overlay = _framePresented ? _presentedOverlay : null;
     return Visibility(
-      visible: _framePresented,
+      visible: _hasPresentedFrame,
       maintainState: true,
       maintainAnimation: true,
       maintainSize: true,

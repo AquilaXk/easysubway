@@ -4743,13 +4743,19 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           if (_routeMapBasemapFailed || !_routeMapRendererActive) {
             return const _OriginalRouteMapUnavailable();
           }
-          final interactionCamera = _presentedRendererCamera;
+          final frameReady = identical(_presentedRendererCamera, camera);
+          final interactionCamera = frameReady
+              ? _presentedRendererCamera
+              : null;
+          final gestureCamera = _gestureActive
+              ? _presentedRendererCamera
+              : interactionCamera;
           return Stack(
             children: [
               Positioned.fill(
                 child: _buildStructuredRouteMapCanvas(camera, geometry.origin),
               ),
-              if (interactionCamera != null)
+              if (gestureCamera != null)
                 Positioned.fill(
                   child: Semantics(
                     label: '노선도',
@@ -4765,7 +4771,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                               _clearSelectionAndNotify();
                             });
                           }
-                          _gestureStartCamera = interactionCamera;
+                          _gestureStartCamera = gestureCamera;
                           _gestureStartFocalPoint = details.localFocalPoint;
                         },
                         onScaleUpdate: (details) {
@@ -4774,14 +4780,16 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                         onScaleEnd: (_) {
                           _endScaleGesture();
                         },
-                        onTapUp: (details) {
-                          _openNearestStation(
-                            details.localPosition,
-                            _stationLinesByIdCached(widget.data),
-                            geometry,
-                            interactionCamera,
-                          );
-                        },
+                        onTapUp: interactionCamera == null
+                            ? null
+                            : (details) {
+                                _openNearestStation(
+                                  details.localPosition,
+                                  _stationLinesByIdCached(widget.data),
+                                  geometry,
+                                  interactionCamera,
+                                );
+                              },
                       ),
                     ),
                   ),

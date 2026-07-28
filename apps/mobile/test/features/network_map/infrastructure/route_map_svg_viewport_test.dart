@@ -242,7 +242,9 @@ void main() {
     }
   });
 
-  testWidgets('첫 ack 뒤 camera 갱신은 이전 SVG와 overlay를 계속 표시한다', (tester) async {
+  testWidgets('pending camera는 native SVG만 유지하고 overlay는 ack까지 숨긴다', (
+    tester,
+  ) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     const viewId = 91;
     const channelName =
@@ -332,7 +334,8 @@ void main() {
         tester.widget<Visibility>(find.byType(Visibility)).visible,
         isTrue,
       );
-      expect(find.text('overlay-3'), findsOneWidget);
+      expect(find.byType(AndroidView), findsOneWidget);
+      expect(find.text('overlay-3'), findsNothing);
       expect(find.text('overlay-4'), findsNothing);
       expect(calls.last.method, 'setCamera');
       expect((calls.last.arguments as Map)['frameToken'], 1);
@@ -349,7 +352,7 @@ void main() {
           ),
         ),
       );
-      expect(find.text('overlay-3'), findsOneWidget);
+      expect(find.text('overlay-3'), findsNothing);
       expect(find.text('overlay-4'), findsNothing);
       expect(find.text('overlay-4b'), findsNothing);
 
@@ -364,7 +367,7 @@ void main() {
         (_) {},
       );
       await tester.pump();
-      expect(find.text('overlay-3'), findsOneWidget);
+      expect(find.text('overlay-3'), findsNothing);
       expect(find.text('overlay-4b'), findsNothing);
 
       await messenger.handlePlatformMessage(
@@ -382,7 +385,7 @@ void main() {
         tester.widget<Visibility>(find.byType(Visibility)).visible,
         isTrue,
       );
-      expect(find.text('overlay-3'), findsOneWidget);
+      expect(find.text('overlay-3'), findsNothing);
       expect(find.text('overlay-4'), findsNothing);
 
       await messenger.handlePlatformMessage(
