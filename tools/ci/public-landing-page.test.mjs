@@ -18,6 +18,8 @@ test("공개 랜딩은 한국어 기본값과 접근 가능한 KR/EN 전환 계�
 	assert.match(html, /src="\/js\/landing\.js" defer/);
 	assert.doesNotMatch(html, /onclick=/);
 	assert.doesNotMatch(html, /Product showcase/i);
+	assert.match(html, /상록수·사당 검증 pilot/);
+	assert.doesNotMatch(html, /Connected regions|Core offline route|100%/);
 });
 
 test("공개 랜딩은 승인된 실제 앱 화면 3종을 self-host한다", () => {
