@@ -16,7 +16,7 @@ void main() {
     expect(index.schemaVersion, 1);
     expect(index.builtAt, DateTime.utc(2026, 7, 12));
     expect(index.qualityAsOf, DateTime.utc(2026, 7, 12));
-    expect(index.freshnessExpiresAt, DateTime.utc(2026, 8, 11));
+    expect(index.freshnessExpiresAt, DateTime.utc(2026, 8, 2, 15));
     expect(index.sourceSnapshotSetHash, hasLength(64));
     expect(index.schemaIdentity, 'catalog-schema-v1');
     expect(index.packs.map((pack) => pack.id), contains('capital'));
