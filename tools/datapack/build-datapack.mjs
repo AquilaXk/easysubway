@@ -34,6 +34,7 @@ import { isUnchangedRefresh } from "./apply-itx-topology-to-bundled-pack.mjs";
 const root = path.resolve(import.meta.dirname, "../..");
 const canonicalSqliteHeaderVersion = 3_053_000;
 const validatedItxAdmissionPacks = new WeakSet();
+const validatedItxAdmissionOutputs = new WeakMap();
 const originalItxAdmissionOutput = Object.freeze({
   sha256: "dfe8420b2f26d2ca2948575098e0a6a5e278c3b203f7cd9c1f1b588a07e74b02",
   sqliteSha256: "c39f23cd6b8b20f88672d0456b72a4efbd3697b81035cfb49ded289e50f3a4aa",
@@ -110,6 +111,17 @@ async function main() {
     const compressedSha256 = sha256(compressedBytes);
     const sqliteSha256 = sha256(sqliteBytes);
     const sizeBytes = compressedBytes.length;
+    const admittedOutput = validatedItxAdmissionOutputs.get(pack);
+    if (admittedOutput && !samePackIdentity(admittedOutput, {
+      sha256: compressedSha256,
+      sqliteSha256,
+      byteSize: sizeBytes,
+    })) {
+      throw new Error(`built ITX pack identity does not match tracked readmission output: ${JSON.stringify({
+        expected: admittedOutput,
+        actual: { sha256: compressedSha256, sqliteSha256, byteSize: sizeBytes },
+      })}`);
+    }
     const representativeRouteRegressions = canonicalRepresentativeRouteRegressions(
       pack.representativeRouteRegressions,
     );
@@ -1030,7 +1042,7 @@ async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
     || evidence.sourceIssue !== 2135) {
     throw new Error("buildSpec ITX topology evidence must be the #2135 admission artifact");
   }
-  const { projection: admission } = validateTrackedItxReadmissionChain(evidence);
+  const { output, projection: admission } = validateTrackedItxReadmissionChain(evidence);
   for (const pack of packs) {
     const edges = (pack.networkEdges ?? [])
       .filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN")
@@ -1066,6 +1078,7 @@ async function validateTrackedItxTopologyEvidence(buildSpec, fixture) {
     if (sha256(Buffer.from(JSON.stringify(routeEvidence))) !== admission.evidenceSha256) {
       throw new Error("ITX_CHEONGCHUN route evidence projection does not match tracked topology evidence");
     }
+    validatedItxAdmissionOutputs.set(pack, output);
     validatedItxAdmissionPacks.add(pack);
   }
   return evidence;

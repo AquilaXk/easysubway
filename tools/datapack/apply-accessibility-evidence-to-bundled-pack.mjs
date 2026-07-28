@@ -223,6 +223,7 @@ async function syncReleaseEvidence({ check }) {
   });
   spec.sourceSnapshotSetHash = sha256(JSON.stringify(snapshots));
   spec.sourceInventorySha256 = sha256(JSON.stringify(inventory));
+  spec.itxTopologyEvidenceSha256 = sha256(await readFile(path.resolve(root, spec.itxTopologyEvidencePath)));
   spec.networkEdgeEvidence.sourceInventory.sha256 = sha256(inventoryBytes);
   const nextSpecBytes = Buffer.from(`${JSON.stringify(spec, null, 2)}\n`);
   request.buildSpecSha256 = sha256(nextSpecBytes);
@@ -249,13 +250,24 @@ async function syncReleaseEvidence({ check }) {
       ["release request", requestBytes, nextRequestBytes],
       ["hash evidence", hashBytes, nextHashBytes],
     ]) if (!actual.equals(expected)) throw new Error(`${label} is stale`);
-    return;
+    return { spec, inventory };
   }
   await Promise.all([
     writeFile(paths.spec, nextSpecBytes),
     writeFile(paths.request, nextRequestBytes),
     writeFile(paths.hashes, nextHashBytes),
   ]);
+  return { spec, inventory };
+}
+
+function accessibilityIndexMetadata(pack, spec, inventory) {
+  const evidenceBySource = new Map(inventory.sources.map((source) => [source.id, source.accessibilityAdmissionEvidence]));
+  const consumed = new Set(pack.stationFacilityEvidence.map(({ sourceId }) => sourceId));
+  return {
+    qualityAsOf: [...consumed].map((sourceId) => evidenceBySource.get(sourceId)?.observedAt).sort().at(-1),
+    freshnessExpiresAt: [...consumed].map((sourceId) => evidenceBySource.get(sourceId)?.freshUntil).sort().at(0),
+    sourceSnapshotSetHash: spec.sourceSnapshotSetHash,
+  };
 }
 
 async function main() {
@@ -274,7 +286,7 @@ async function main() {
   const canonical = JSON.parse(await readFile(canonicalPath, "utf8"));
   if (process.argv.includes("--check")) assertCanonicalFixture(canonical, pack);
   else await writeFile(canonicalPath, `${JSON.stringify(syncCanonicalFixture(canonical, pack))}\n`);
-  await syncReleaseEvidence({ check: process.argv.includes("--check") });
+  const releaseEvidence = await syncReleaseEvidence({ check: process.argv.includes("--check") });
   const directory = await mkdtemp(path.join(os.tmpdir(), `accessibility-pack-${randomUUID()}-`));
   try {
     const sqlitePath = path.join(directory, "capital.sqlite");
@@ -283,23 +295,16 @@ async function main() {
     if (process.argv.includes("--check")) {
       assertEvidence(sqlitePath, pack);
       const sqliteBytes = await readFile(sqlitePath);
-      const [index, spec, inventory] = await Promise.all([
-        readFile(indexPath, "utf8").then(JSON.parse),
-        readFile(path.join(root, "tools/datapack/release/candidate-build-spec.json"), "utf8").then(JSON.parse),
-        readFile(path.join(root, "tools/datapack/source-inventory.json"), "utf8").then(JSON.parse),
-      ]);
+      const index = JSON.parse(await readFile(indexPath, "utf8"));
       const entry = index.packs.find(({ id }) => id === "capital");
       if (!entry || entry.sha256 !== sha256(currentGzipBytes) || entry.sqliteSha256 !== sha256(sqliteBytes) || entry.byteSize !== currentGzipBytes.length) {
         throw new Error("bundled accessibility pack index is stale");
       }
-      const evidenceBySource = new Map(inventory.sources.map((source) => [source.id, source.accessibilityAdmissionEvidence]));
-      const consumed = new Set(pack.stationFacilityEvidence.map(({ sourceId }) => sourceId));
-      const qualityAsOf = [...consumed].map((sourceId) => evidenceBySource.get(sourceId)?.observedAt).sort().at(-1);
-      const freshnessExpiresAt = [...consumed].map((sourceId) => evidenceBySource.get(sourceId)?.freshUntil).sort().at(0);
-      if (index.qualityAsOf !== qualityAsOf
-        || index.freshnessExpiresAt !== freshnessExpiresAt
-        || index.sourceSnapshotSetHash !== spec.sourceSnapshotSetHash
-        || Date.parse(index.builtAt) < Date.parse(qualityAsOf)) {
+      const metadata = accessibilityIndexMetadata(pack, releaseEvidence.spec, releaseEvidence.inventory);
+      if (index.qualityAsOf !== metadata.qualityAsOf
+        || index.freshnessExpiresAt !== metadata.freshnessExpiresAt
+        || index.sourceSnapshotSetHash !== metadata.sourceSnapshotSetHash
+        || Date.parse(index.builtAt) < Date.parse(metadata.qualityAsOf)) {
         throw new Error("bundled accessibility pack metadata is stale");
       }
       return;
@@ -313,6 +318,9 @@ async function main() {
     const entry = index.packs.find(({ id }) => id === "capital");
     if (!entry) throw new Error("capital pack index entry is missing");
     Object.assign(entry, { sha256: sha256(gzipBytes), sqliteSha256: sha256(sqliteBytes), byteSize: gzipBytes.length });
+    Object.assign(index, accessibilityIndexMetadata(pack, releaseEvidence.spec, releaseEvidence.inventory), {
+      builtAt: new Date().toISOString(),
+    });
     await writeFile(packPath, gzipBytes);
     await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
   } finally {
