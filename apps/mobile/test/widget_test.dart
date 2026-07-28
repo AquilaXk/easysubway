@@ -7816,6 +7816,65 @@ void main() {
     expect(viewportRepository.selectedRegion, '수도권');
   });
 
+  testWidgets('GPS 자동·명시 target map load 중 생긴 경로 초안은 지역 전환을 막는다', (
+    tester,
+  ) async {
+    for (final automatic in [true, false]) {
+      final busanMap = Completer<NetworkMapData>();
+      final viewportRepository = FakeNetworkMapViewportRepository();
+      final repository = FakeStationSearchRepository(
+        networkMapData: _gpsNetworkMapData(
+          selectedRegion: '수도권',
+          regions: const ['수도권', '부산권'],
+        ),
+        networkMapCompletersByRegion: {'부산권': busanMap},
+        nearbyResults: [
+          _stationResult(id: 'station-sangnoksu', name: '상록수', region: '부산'),
+        ],
+      );
+      await _pumpNetworkMapForGpsTest(
+        tester,
+        repository: repository,
+        locationProvider: FakeCurrentLocationProvider(
+          location: _freshCurrentLocation(),
+          needsPermissionRequest: !automatic,
+        ),
+        viewportRepository: viewportRepository,
+      );
+      if (!automatic) {
+        await tester.tap(find.byKey(const Key('nearbyStationButton')));
+        await tester.pump();
+      }
+      expect(repository.requestedNetworkMapRegions, [null, '부산권']);
+
+      tester
+          .widget<NetworkMapScreen>(find.byType(NetworkMapScreen))
+          .routeDraftController
+          .setOrigin(const RouteDraftStation(id: 'origin', nameKo: '출발역'));
+      busanMap.complete(
+        _gpsNetworkMapData(
+          selectedRegion: '부산권',
+          regions: const ['수도권', '부산권'],
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(viewportRepository.selectedRegion, '수도권');
+      expect(
+        find.byKey(const Key('networkMapNearbyStationPanel')),
+        findsNothing,
+      );
+      expect(
+        tester
+            .widget<RouteMapBasemapView>(find.byType(RouteMapBasemapView))
+            .region,
+        '수도권',
+      );
+      await tester.pumpWidget(const SizedBox.shrink());
+      await tester.pump();
+    }
+  });
+
   testWidgets('저장 지역을 복원하고 없는 지역은 기본 지역 카메라로 복구한다', (tester) async {
     const fallbackViewport = Rect.fromLTWH(20, 30, 400, 240);
     final viewportRepository = FakeNetworkMapViewportRepository(
