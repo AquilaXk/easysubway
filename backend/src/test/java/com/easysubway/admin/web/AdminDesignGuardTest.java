@@ -188,7 +188,13 @@ class AdminDesignGuardTest {
 		assertThat(rule(read(CSS_SHELL),
 			"\\.admin-v3 \\.admin-sidebar \\.admin-nav-workspace-toggle:focus-visible,\\s*"
 				+ "\\.admin-v3 \\.admin-sidebar \\.admin-nav-item:focus-visible"))
-			.contains("outline-color: var(--admin-focus-on-signature);");
+			.contains("outline-color: var(--admin-on-primary);");
+		assertThat(rule(read(CSS_SHELL),
+			"\\.admin-v3 \\.admin-topbar \\.admin-sidebar-toggle:focus-visible,\\s*"
+				+ "\\.admin-v3 \\.admin-topbar \\.admin-mobile-search:focus-visible,\\s*"
+				+ "\\.admin-v3 \\.admin-topbar \\.admin-alert-bell:focus-visible,\\s*"
+				+ "\\.admin-v3 \\.admin-topbar \\.admin-user-menu-trigger:focus-visible"))
+			.contains("outline-color: var(--admin-on-primary);");
 		assertThat(rule(read(CSS_SHELL), "\\.admin-v3 \\.admin-nav-workspace-toggle"))
 			.contains("color: var(--admin-on-primary);");
 		assertThat(rule(read(CSS_SHELL), "(?m)^\\.admin-nav-item(?=\\s*\\{)"))

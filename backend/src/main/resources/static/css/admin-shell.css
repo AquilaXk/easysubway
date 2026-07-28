@@ -223,16 +223,16 @@
 	font-weight: var(--admin-w-strong);
 }
 
+.admin-v3 .admin-sidebar .admin-nav-workspace-toggle:focus-visible,
+.admin-v3 .admin-sidebar .admin-nav-item:focus-visible {
+	outline-color: var(--admin-on-primary);
+}
+
 .admin-nav-item:hover:focus-visible {
 	outline-color: var(--admin-focus-on-signature);
 }
 
 .admin-nav-item.is-active:focus-visible {
-	outline-color: var(--admin-focus-on-signature);
-}
-
-.admin-v3 .admin-sidebar .admin-nav-workspace-toggle:focus-visible,
-.admin-v3 .admin-sidebar .admin-nav-item:focus-visible {
 	outline-color: var(--admin-focus-on-signature);
 }
 
@@ -615,6 +615,13 @@
 	.admin-v3 .admin-topbar-actions .admin-alert-bell,
 	.admin-v3 .admin-topbar-actions .admin-user-menu-trigger {
 		color: var(--admin-on-primary);
+	}
+
+	.admin-v3 .admin-topbar .admin-sidebar-toggle:focus-visible,
+	.admin-v3 .admin-topbar .admin-mobile-search:focus-visible,
+	.admin-v3 .admin-topbar .admin-alert-bell:focus-visible,
+	.admin-v3 .admin-topbar .admin-user-menu-trigger:focus-visible {
+		outline-color: var(--admin-on-primary);
 	}
 
 	.admin-v3 .admin-topbar-actions .admin-alert-bell:hover,

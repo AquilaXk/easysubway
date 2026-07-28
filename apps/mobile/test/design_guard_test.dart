@@ -125,7 +125,7 @@ void main() {
         '0xFFB4BCFB',
         '0xFF949FE8',
         '0xFF7480D2',
-        '0xFF5C6BC0',
+        '0xFF6064F4',
         '0xFF4A58A9',
         '0xFF3B4890',
         '0xFF1F2340',
