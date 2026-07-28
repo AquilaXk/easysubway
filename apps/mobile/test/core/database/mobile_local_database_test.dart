@@ -473,7 +473,7 @@ void main() {
       networkEdges
           .map((row) => row.read<String>('accessibility_status'))
           .toSet(),
-      {'AVAILABLE'},
+      {'UNKNOWN'},
     );
     expect(
       networkEdges.map((row) => row.read<int>('reliability_score')).toSet(),
@@ -486,8 +486,10 @@ void main() {
       {null},
     );
     expect(
-      networkEdges.map((row) => row.read<int>('last_verified_at')).toSet(),
-      {1781827200},
+      networkEdges
+          .map((row) => row.readNullable<int>('last_verified_at'))
+          .toSet(),
+      {null},
     );
     expect(
       networkEdges.map((row) => row.read<int>('distance_meters')).toSet(),
@@ -607,7 +609,7 @@ void main() {
     final opener = CatalogDatabaseOpener(
       databaseDirectory: directory,
       assetBundle: rootBundle,
-      now: () => DateTime.utc(2026, 8, 11),
+      now: () => DateTime.utc(2026, 8, 2, 15),
     );
     final database = await opener.open();
     expect(opener.openedBundledDataPack, isTrue);
@@ -625,14 +627,14 @@ void main() {
     expect(state['status'], 'STALE');
     expect(state['reasonCode'], 'BUNDLED_PACK_EXPIRED');
     expect(state['labelKo'], '저장된 데이터 기준 · 갱신 필요');
-    expect(state['freshnessExpiresAt'], '2026-08-11T00:00:00.000Z');
+    expect(state['freshnessExpiresAt'], '2026-08-02T15:00:00.000Z');
     final freshness = await BundledDataPackFreshness.read(directory);
     expect(freshness.staleLabel, '저장된 데이터 기준 · 갱신 필요');
 
     final reopened = await CatalogDatabaseOpener(
       databaseDirectory: directory,
       assetBundle: rootBundle,
-      now: () => DateTime.utc(2026, 8, 11),
+      now: () => DateTime.utc(2026, 8, 2, 15),
     ).open();
     addTearDown(reopened.close);
     expect(sha256.convert(await installedPack.readAsBytes()), firstHash);
