@@ -80,10 +80,18 @@ private class RouteMapViewportPlatformView(
     private var documentReady = false
     private var fontReadinessAttempts = 0
     private var isDisposed = false
+    private var started = false
 
     init {
         channel.setMethodCallHandler { call, result ->
             when (call.method) {
+                "start" -> {
+                    if (!started) {
+                        started = true
+                        load()
+                    }
+                    result.success(null)
+                }
                 "setCamera" -> {
                     viewBox = call.argument<Any>("viewBox").asDoubleList()
                     revision = call.argument<Any>("revision").asInt()
@@ -106,8 +114,6 @@ private class RouteMapViewportPlatformView(
                 else -> result.notImplemented()
             }
         }
-        // The Dart per-view MethodChannel is attached immediately after creation.
-        mainHandler.post { if (!isDisposed) load() }
     }
 
     private fun load(assetPathOverride: String? = null) {

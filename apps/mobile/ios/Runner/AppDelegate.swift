@@ -339,6 +339,7 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
   private var fontURLs: [Int: URL] = [:]
   private var documentReady = false
   private var fontReadinessAttempts = 0
+  private var started = false
 
   init(
     frame: CGRect,
@@ -365,7 +366,6 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
     channel.setMethodCallHandler { [weak self] call, result in
       self?.handle(call, result: result)
     }
-    DispatchQueue.main.async { [weak self] in self?.load() }
   }
 
   func view() -> UIView {
@@ -374,6 +374,12 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
 
   private func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
     switch call.method {
+    case "start":
+      if !started {
+        started = true
+        load()
+      }
+      result(nil)
     case "setCamera":
       let params = call.arguments as? [String: Any] ?? [:]
       viewBox = params["viewBox"].asDoubleList()

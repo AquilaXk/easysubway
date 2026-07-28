@@ -68,6 +68,9 @@ const adEventEndpointOccurrence = /\/api\/ads\/events(?=["']|\?|$)/g;
 test("native route map은 canonical SVG 문서만 무수정 표시한다", () => {
   const android = read("apps/mobile/android/app/src/main/kotlin/com/easysubway/easysubway_mobile/RouteMapViewportWebView.kt");
   const ios = read("apps/mobile/ios/Runner/AppDelegate.swift");
+  const dartViewport = read(
+    "apps/mobile/lib/features/network_map/infrastructure/route_map_svg_viewport.dart",
+  );
   const iosProject = read("apps/mobile/ios/Runner.xcodeproj/project.pbxproj");
   const iosViewport = ios.slice(ios.indexOf("private final class RouteMapViewportWebViewFactory"));
   const runnerDebugConfiguration = iosProject.match(
@@ -144,7 +147,8 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   assert.match(android, /settings\.allowContentAccess = false/);
   assert.match(android, /settings\.allowFileAccess = true/);
   assert.match(android, /private var isDisposed = false/);
-  assert.match(android, /mainHandler\.post \{ if \(!isDisposed\) load\(\) \}/);
+  assert.match(android, /"start" -> \{[\s\S]*if \(!started\) \{[\s\S]*load\(\)/);
+  assert.doesNotMatch(android, /mainHandler\.post \{[\s\S]*load\(\)/);
   assert.match(android, /private fun load\([\s\S]*if \(isDisposed\) return/);
   assert.match(android, /isDisposed = true[\s\S]*mainHandler\.removeCallbacksAndMessages\(null\)/);
   assert.match(
@@ -188,12 +192,19 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   assert.doesNotMatch(runnerProfileConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS/);
   assert.match(iosViewport, /result as\? Bool == true/);
   assert.match(iosViewport, /private var loadGeneration = 0/);
+  assert.match(iosViewport, /case "start":[\s\S]*if !started \{[\s\S]*load\(\)/);
+  assert.doesNotMatch(iosViewport, /DispatchQueue\.main\.async \{[\s\S]*load\(\)/);
   assert.match(iosViewport, /private var isDisposed = false/);
   assert.match(iosViewport, /loadGeneration \+= 1[\s\S]*let generation = loadGeneration/);
   assert.match(iosViewport, /guard self\.isCurrentLoad\(generation, assetURL: assetURL\) else \{ return \}/);
   assert.match(iosViewport, /private func loadDocument\(_ assetURL: URL, generation: Int,/);
   assert.match(iosViewport, /guard isCurrentLoad\(generation, assetURL: assetURL\) else \{ return \}/);
   assert.match(iosViewport, /isDisposed = true[\s\S]*loadGeneration \+= 1[\s\S]*initialAssetURL = nil/);
+  assert.match(
+    dartViewport,
+    /setMethodCallHandler\(_handleMethodCall\)[\s\S]*invokeMethod<void>\('start'\)/,
+    "Dart must register its native event handler before starting the SVG document",
+  );
 });
 
 function containsAdEventEndpoint(source) {

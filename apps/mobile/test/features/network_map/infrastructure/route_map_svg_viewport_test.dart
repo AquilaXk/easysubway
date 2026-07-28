@@ -58,7 +58,7 @@ void main() {
     });
   });
 
-  test('camera revision 변경은 setCamera 하나만 전송한다', () async {
+  test('attach는 handler 등록 뒤 start하고 camera revision을 전송한다', () async {
     final calls = <MethodCall>[];
     const channelName =
         'com.easysubway.easysubway_mobile/route_map_viewport_webview/42';
@@ -84,9 +84,8 @@ void main() {
       sourceOrigin: origin,
     );
 
-    expect(calls, hasLength(1));
-    expect(calls.single.method, 'setCamera');
-    expect(calls.single.arguments, <String, Object>{
+    expect(calls.map((call) => call.method), ['start', 'setCamera']);
+    expect(calls.last.arguments, <String, Object>{
       'viewBox': routeMapSvgViewportCameraPayload(
         camera: camera.copyWith(revision: 4, center: const Offset(60.25, 55.5)),
         sourceOrigin: origin,
@@ -96,7 +95,7 @@ void main() {
     controller.dispose();
   });
 
-  test('attach 전 최신 camera는 attach 뒤 setCamera 한 번으로 따라잡는다', () async {
+  test('attach 전 최신 camera는 native start 전에 적용한다', () async {
     final calls = <MethodCall>[];
     const channelName =
         'com.easysubway.easysubway_mobile/route_map_viewport_webview/43';
@@ -120,9 +119,9 @@ void main() {
     await controller.update(latest, sourceOrigin: origin);
     await controller.attach(viewId: 43);
 
-    expect(calls, hasLength(1));
+    expect(calls.map((call) => call.method), ['setCamera', 'start']);
     expect(
-      calls.single.arguments,
+      calls.first.arguments,
       routeMapSvgViewportCameraPayload(camera: latest, sourceOrigin: origin),
     );
     controller.dispose();
@@ -139,6 +138,16 @@ void main() {
           'com.easysubway.easysubway_mobile/route_map_viewport_webview/7';
       final messenger =
           TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      messenger.setMockMethodCallHandler(
+        const MethodChannel(channelName),
+        (_) async => null,
+      );
+      addTearDown(
+        () => messenger.setMockMethodCallHandler(
+          const MethodChannel(channelName),
+          null,
+        ),
+      );
       final controller = RouteMapSvgViewportController(
         onUnavailable: () => unavailableCount++,
       );
@@ -155,6 +164,20 @@ void main() {
 
   test('invalid camera는 unavailable을 알린다', () async {
     var unavailableCount = 0;
+    const channelName =
+        'com.easysubway.easysubway_mobile/route_map_viewport_webview/7';
+    final messenger =
+        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(
+      const MethodChannel(channelName),
+      (_) async => null,
+    );
+    addTearDown(
+      () => messenger.setMockMethodCallHandler(
+        const MethodChannel(channelName),
+        null,
+      ),
+    );
     final controller = RouteMapSvgViewportController(
       onUnavailable: () => unavailableCount++,
     );
@@ -217,9 +240,7 @@ void main() {
     }
   });
 
-  testWidgets('camera revision ack 전에는 native SVG와 overlay를 함께 숨긴다', (
-    tester,
-  ) async {
+  testWidgets('첫 ack 뒤 camera 갱신은 이전 SVG와 overlay를 계속 표시한다', (tester) async {
     debugDefaultTargetPlatformOverride = TargetPlatform.android;
     const viewId = 91;
     const channelName =
@@ -239,7 +260,7 @@ void main() {
             camera: camera,
             sourceOrigin: origin,
             onUnavailable: () {},
-            overlay: const SizedBox(key: Key('synchronizedOverlay')),
+            overlay: const Text('overlay-3', key: Key('synchronizedOverlay')),
           ),
         ),
       );
@@ -294,14 +315,16 @@ void main() {
             camera: nextCamera,
             sourceOrigin: origin,
             onUnavailable: () {},
-            overlay: const SizedBox(key: Key('synchronizedOverlay')),
+            overlay: const Text('overlay-4', key: Key('synchronizedOverlay')),
           ),
         ),
       );
       expect(
         tester.widget<Visibility>(find.byType(Visibility)).visible,
-        isFalse,
+        isTrue,
       );
+      expect(find.text('overlay-3'), findsOneWidget);
+      expect(find.text('overlay-4'), findsNothing);
 
       await messenger.handlePlatformMessage(
         channelName,
@@ -313,8 +336,10 @@ void main() {
       await tester.pump();
       expect(
         tester.widget<Visibility>(find.byType(Visibility)).visible,
-        isFalse,
+        isTrue,
       );
+      expect(find.text('overlay-3'), findsOneWidget);
+      expect(find.text('overlay-4'), findsNothing);
 
       await messenger.handlePlatformMessage(
         channelName,
@@ -331,6 +356,8 @@ void main() {
         ),
       );
       expect(synchronizedVisibility.visible, isTrue);
+      expect(find.text('overlay-3'), findsNothing);
+      expect(find.text('overlay-4'), findsOneWidget);
     } finally {
       messenger.setMockMethodCallHandler(
         const MethodChannel(channelName),

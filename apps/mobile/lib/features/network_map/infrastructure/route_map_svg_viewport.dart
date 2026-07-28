@@ -57,12 +57,21 @@ class RouteMapSvgViewportController {
   bool _unavailable = false;
 
   Future<void> attach({required int viewId}) async {
-    _channel = MethodChannel('$_channelPrefix$viewId')
+    final channel = MethodChannel('$_channelPrefix$viewId')
       ..setMethodCallHandler(_handleMethodCall);
+    _channel = channel;
     final pending = _pendingCameraPayload;
     _pendingCameraPayload = null;
     if (pending != null && !_unavailable) {
       await _invokeSetCamera(pending);
+    }
+    if (_channel != channel || _unavailable) return;
+    try {
+      await channel.invokeMethod<void>('start');
+    } on PlatformException {
+      _fail();
+    } on MissingPluginException {
+      _fail();
     }
   }
 
@@ -149,6 +158,7 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
   late final RouteMapSvgViewportController _controller;
   bool _framePresented = false;
   bool _failed = false;
+  Widget? _presentedOverlay;
 
   @override
   void initState() {
@@ -157,7 +167,10 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
       onUnavailable: _fail,
       onFramePresented: (revision) {
         if (mounted && revision == widget.camera.revision) {
-          setState(() => _framePresented = true);
+          setState(() {
+            _framePresented = true;
+            _presentedOverlay = widget.overlay;
+          });
         }
       },
     );
@@ -178,10 +191,11 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.camera != widget.camera ||
         oldWidget.sourceOrigin != widget.sourceOrigin) {
-      _framePresented = false;
       unawaited(
         _controller.update(widget.camera, sourceOrigin: widget.sourceOrigin),
       );
+    } else if (_framePresented) {
+      _presentedOverlay = widget.overlay;
     }
   }
 
@@ -239,7 +253,7 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
     final nativeView = ExcludeSemantics(
       child: IgnorePointer(child: platformView),
     );
-    final overlay = widget.overlay;
+    final overlay = _framePresented ? _presentedOverlay : widget.overlay;
     return Visibility(
       visible: _framePresented,
       maintainState: true,
