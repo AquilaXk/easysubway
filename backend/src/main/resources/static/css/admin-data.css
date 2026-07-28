@@ -290,11 +290,19 @@
 	margin-top: 16px;
 }
 
-.admin-dashboard-page .dashboard-urgent,
-.admin-dashboard-page .dashboard-metric-panel,
-.admin-dashboard-page #dashboard-trends,
-.admin-dashboard-page .dashboard-readiness-grid {
-	display: none;
+.dashboard-operations-details {
+	margin-top: 16px;
+}
+
+.dashboard-operations-details > summary {
+	cursor: pointer;
+	color: var(--admin-ink-2);
+	font-size: var(--admin-fs-control);
+	font-weight: var(--admin-w-strong);
+}
+
+.dashboard-operations-details[open] > summary {
+	margin-bottom: 16px;
 }
 
 .dashboard-reference-lower > section + section {

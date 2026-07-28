@@ -285,13 +285,11 @@ class AdminOverviewPageController {
 		LocalDate today = LocalDate.parse(chart.labels().getLast());
 		LocalDate monday = today.with(TemporalAdjusters.previousOrSame(java.time.DayOfWeek.MONDAY));
 		List<WeeklyReportDay> days = new ArrayList<>(7);
-		long weeklyTotal = 0;
 		int presentDays = 0;
 		for (int index = 0; index < 7; index++) {
 			LocalDate date = monday.plusDays(index);
 			Double value = valuesByDate.get(date);
 			if (value != null) {
-				weeklyTotal += Math.round(value);
 				presentDays++;
 			}
 			days.add(new WeeklyReportDay(
@@ -302,15 +300,11 @@ class AdminOverviewPageController {
 				date.getDayOfWeek() == java.time.DayOfWeek.SATURDAY
 					|| date.getDayOfWeek() == java.time.DayOfWeek.SUNDAY));
 		}
-		return new WeeklyReportView(days, weeklyTotalLabel(weeklyTotal, presentDays));
+		return new WeeklyReportView(days, weeklyCoverageLabel(presentDays));
 	}
 
-	static String weeklyTotalLabel(long weeklyTotal, int presentDays) {
-		return switch (presentDays) {
-			case 0 -> "집계 대기";
-			case 7 -> "총 %d건".formatted(weeklyTotal);
-			default -> "부분 집계 %d건".formatted(weeklyTotal);
-		};
+	static String weeklyCoverageLabel(int presentDays) {
+		return presentDays == 0 ? "집계 대기" : "%d일 집계".formatted(presentDays);
 	}
 
 	private static String weekdayLabel(LocalDate date) {
@@ -388,7 +382,7 @@ class AdminOverviewPageController {
 	record WeeklyReportDay(String weekday, String dateLabel, String value, boolean today, boolean weekend) {
 	}
 
-	record WeeklyReportView(List<WeeklyReportDay> days, String totalLabel) {
+	record WeeklyReportView(List<WeeklyReportDay> days, String summaryLabel) {
 	}
 
 	record DashboardView(

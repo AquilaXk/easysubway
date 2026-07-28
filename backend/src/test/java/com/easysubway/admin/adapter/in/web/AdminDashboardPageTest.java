@@ -69,8 +69,8 @@ class AdminDashboardPageTest {
 			.contains("data-weekday=\"토\"")
 			.contains("data-weekday=\"일\"")
 			.containsPattern("class=\"dashboard-week-day\\s+is-today\"")
-			.contains("class=\"dashboard-weekly-total\">부분 집계 ")
-			.contains("aria-label=\"이번 주 제보 접수 현황\"")
+			.containsPattern("class=\"dashboard-weekly-total\">[1-2]일 집계")
+			.contains("aria-label=\"이번 주 최근 24시간 제보 스냅샷\"")
 			.doesNotContain("aria-label=\"최근 7일 제보 접수 현황\"")
 			.doesNotContain("처리 완료")
 			.doesNotContain("미처리")
@@ -83,11 +83,11 @@ class AdminDashboardPageTest {
 	}
 
 	@Test
-	@DisplayName("주간 제보 합계는 전체·부분·완전 집계를 구분한다")
-	void labelsWeeklyTotalByCoverage() {
-		assertThat(AdminOverviewPageController.weeklyTotalLabel(0, 0)).isEqualTo("집계 대기");
-		assertThat(AdminOverviewPageController.weeklyTotalLabel(11, 2)).isEqualTo("부분 집계 11건");
-		assertThat(AdminOverviewPageController.weeklyTotalLabel(21, 7)).isEqualTo("총 21건");
+	@DisplayName("주간 제보 스냅샷은 합계 대신 집계된 날짜 수를 표시한다")
+	void labelsWeeklySnapshotCoverage() {
+		assertThat(AdminOverviewPageController.weeklyCoverageLabel(0)).isEqualTo("집계 대기");
+		assertThat(AdminOverviewPageController.weeklyCoverageLabel(2)).isEqualTo("2일 집계");
+		assertThat(AdminOverviewPageController.weeklyCoverageLabel(7)).isEqualTo("7일 집계");
 	}
 
 	@Test
@@ -107,7 +107,7 @@ class AdminDashboardPageTest {
 			.contains("class=\"dashboard-card metric-cell\"")
 			.contains("오늘의 운영 현황")
 			.doesNotContain("지금 급한 것 → 추세 → 상세 순으로 신고·시설·경로·알림·시스템을 모읍니다.")
-			.contains("class=\"dashboard-refresh-form\"")
+			.contains("class=\"dashboard-refresh-form\" data-dashboard-refresh-form")
 			.contains("확인할 제보")
 			.contains("href=\"/admin/reports/page\"")
 			.contains("dashboard-spark")
@@ -129,6 +129,10 @@ class AdminDashboardPageTest {
 
 		assertThat(html)
 			.contains("class=\"dashboard-reference-lower\"")
+			.contains("class=\"dashboard-operations-details\"")
+			.contains("상세 운영 지표 보기")
+			.contains("id=\"dashboard-trends\"")
+			.contains("class=\"admin-grid-2 dashboard-readiness-grid")
 			.doesNotContain("dashboard-reference-trend")
 			.doesNotContain("최근 7일 운영 추이");
 	}

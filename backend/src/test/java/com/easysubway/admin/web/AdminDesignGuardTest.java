@@ -221,6 +221,7 @@ class AdminDesignGuardTest {
 
 		String dashboardCharts = read(JS_DASHBOARD_CHARTS);
 		assertThat(dashboardCharts)
+			.contains("document.querySelector('[data-dashboard-refresh-form]')")
 			.contains("tokenColor('--admin-chart-series')")
 			.doesNotContain("tokenColor('--admin-good')")
 			.doesNotContain("tokenColor('--admin-warn')")
@@ -890,6 +891,9 @@ class AdminDesignGuardTest {
 		assertThat(rule(data, "\\.dashboard-triage-list"))
 			.contains("display: grid;")
 			.contains("grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));");
+		assertThat(data)
+			.contains(".dashboard-operations-details")
+			.doesNotContain(".admin-dashboard-page .dashboard-urgent,");
 	}
 
 	@Test
