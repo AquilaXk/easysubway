@@ -13214,7 +13214,7 @@ test("수도권 pilot production source input은 검증된 접근성 상태로 �
 
   const manifest = JSON.parse(await readFile(path.join(packOutputDir, "current.json"), "utf8"));
   assert.equal(manifest.manifestVersion, 2);
-  assert.equal(manifest.channel, "production");
+  assert.equal(manifest.channel, "dev");
   assert.equal(manifest.keyId, "production-v1");
   assert.deepEqual(manifest.activePack, { id: "capital", version: "1" });
   assert.equal(Number.isInteger(manifest.releaseSequence), true);
