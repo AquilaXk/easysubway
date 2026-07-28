@@ -7777,6 +7777,55 @@ void main() {
     expect(camera.center, const Offset(430, 280));
   });
 
+  testWidgets('GPS 자동 타 권역 전환은 부모 지역 라벨도 갱신한다', (tester) async {
+    final regionLabels = <String>[];
+    await tester.pumpWidget(
+      MaterialApp(
+        home: NetworkMapScreen(
+          repository: FakeStationSearchRepository(
+            networkMapData: _gpsNetworkMapData(
+              selectedRegion: '수도권',
+              regions: const ['수도권', '부산'],
+            ),
+            networkMapDataByRegion: {
+              '부산': _gpsNetworkMapData(
+                selectedRegion: '부산',
+                regions: const ['수도권', '부산'],
+              ),
+            },
+            nearbyResults: [
+              _stationResult(
+                id: 'station-sangnoksu',
+                name: '상록수',
+                region: '부산',
+              ),
+            ],
+          ),
+          routeDraftController: RouteDraftController(),
+          viewportRepository: FakeNetworkMapViewportRepository(),
+          locationProvider: FakeCurrentLocationProvider(
+            location: _freshCurrentLocation(),
+            needsPermissionRequest: false,
+          ),
+          stationSearchRepository: FakeStationSearchRepository(
+            nearbyResults: [
+              _stationResult(
+                id: 'station-sangnoksu',
+                name: '상록수',
+                region: '부산',
+              ),
+            ],
+          ),
+          onOpenStationSearch: (_, _) {},
+          onRegionLabelChanged: regionLabels.add,
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(regionLabels, contains('부산'));
+  });
+
   testWidgets('GPS 자동 타 권역 응답은 진행 중 생긴 경로 초안을 바꾸지 않는다', (tester) async {
     final nearbyCompleter = Completer<List<StationSearchResult>>();
     final viewportRepository = FakeNetworkMapViewportRepository();
@@ -7881,11 +7930,19 @@ void main() {
       viewports: const {'부산': fallbackViewport},
       selectedRegion: '삭제된 지역',
     );
+    final fallbackMap = _gpsNetworkMapData(
+      selectedRegion: '부산',
+      regions: const ['부산'],
+    );
     final repository = FakeStationSearchRepository(
-      networkMapData: _gpsNetworkMapData(
-        selectedRegion: '부산',
-        regions: const ['부산'],
-      ),
+      networkMapData: fallbackMap,
+      networkMapDataByRegion: {
+        '삭제된 지역': _gpsNetworkMapData(
+          selectedRegion: '삭제된 지역',
+          regions: const ['부산'],
+          includeNearestStation: false,
+        ),
+      },
     );
 
     await tester.pumpWidget(
@@ -7900,7 +7957,7 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(repository.requestedNetworkMapRegions, ['삭제된 지역']);
+    expect(repository.requestedNetworkMapRegions, ['삭제된 지역', null]);
     expect(viewportRepository.selectedRegion, '부산');
     expect(viewportRepository.loadedRegions, ['부산']);
     expect(find.byType(RouteMapBasemapView), findsOneWidget);

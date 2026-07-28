@@ -950,10 +950,12 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   Future<_NetworkMapLoadResult> _loadMap() async {
     var requestedRegion = _selectedRegion;
+    var restoringSavedRegion = false;
     final viewportRepository = widget.viewportRepository;
     if (requestedRegion == null && viewportRepository != null) {
       try {
         requestedRegion = await viewportRepository.loadSelectedRegion();
+        restoringSavedRegion = requestedRegion != null;
       } catch (error, stackTrace) {
         reportMobileError(
           error,
@@ -962,7 +964,14 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         );
       }
     }
-    final data = await widget.repository.getNetworkMap(region: requestedRegion);
+    var data = await widget.repository.getNetworkMap(region: requestedRegion);
+    if (restoringSavedRegion &&
+        !data.regions.any(
+          (region) =>
+              region.displayName == _displayRegionName(data.selectedRegion),
+        )) {
+      data = await widget.repository.getNetworkMap();
+    }
     // #2082/#2083 후속: 저장된(persisted) 지역이 있는 사용자는 세션 중
     // 지역 선택기를 조작하지 않는 한 _selectedRegion이 계속 null이라, 로드된
     // 실제 지역(data.selectedRegion)을 여기서 동기화해둔다. 사용자가 이미
@@ -1378,6 +1387,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           _future = Future.value(targetMap);
           _initialNearbyFocusStarted = true;
         });
+        _notifyRegionLabelChanged();
         unawaited(_saveSelectedRegion(targetMap.data.selectedRegion));
       }
       // 역 확정 후 공통 오픈으로 즉시 표시(기본 탭 시간표). 실시간/시간표 await 금지.
@@ -1502,6 +1512,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         _preserveFocusedStationScale = true;
       });
       if (regionChanged) {
+        _notifyRegionLabelChanged();
         unawaited(_saveSelectedRegion(targetMap.data.selectedRegion));
       }
     } on CurrentLocationException {
