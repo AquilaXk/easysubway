@@ -148,6 +148,52 @@ void main() {
     expect(find.text('지도 미리보기를 불러오지 못했어요.'), findsOneWidget);
   });
 
+  testWidgets('SDK 오류는 진행 중인 지도 구성을 중단한다', (tester) async {
+    final firstPoiGate = Completer<void>();
+    final controller = _FakeKakaoMapController(firstPoiGate: firstPoiGate);
+    late ValueChanged<Error> reportError;
+
+    await _pumpPreview(
+      tester,
+      exits: [
+        _exit(id: 'exit-1', number: '1', latitude: 37.301, longitude: 126.861),
+        _exit(id: 'exit-2', number: '2', latitude: 37.302, longitude: 126.862),
+      ],
+      nativeMapBuilder:
+          ({
+            required key,
+            required option,
+            required onMapReady,
+            required onMapError,
+          }) {
+            reportError = onMapError;
+            return _MapReadyStub(
+              key: key,
+              controller: controller,
+              onReady: onMapReady,
+            );
+          },
+    );
+    await _pumpUntil(
+      tester,
+      () => controller.labels.addPoiCount == 1,
+      reason: '첫 marker 구성이 시작되어야 한다',
+    );
+
+    await runWithMobileErrorReporter((_) {}, () async {
+      reportError(_FakeMapError());
+      await tester.pump();
+    });
+    firstPoiGate.complete();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump();
+
+    expect(controller.labels.addPoiCount, 1);
+    expect(controller.moveCameraCount, 0);
+  });
+
   testWidgets('SDK 오류 안내는 live region으로 전환된다', (tester) async {
     final semanticsHandle = tester.ensureSemantics();
     void Function(Error)? reportError;

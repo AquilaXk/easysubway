@@ -370,6 +370,7 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
 
   void _onMapError(Error error) {
     _reportSanitizedError(error, StackTrace.current, '카카오맵 미리보기 렌더 오류');
+    _generation++;
     _finishController();
     if (mounted) {
       setState(() => _mapFailed = true);
