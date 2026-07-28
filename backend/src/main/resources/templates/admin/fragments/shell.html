@@ -123,7 +123,7 @@
 		<form class="admin-topbar-search" role="search" method="get" th:action="@{/admin/search}">
 			<svg th:replace="~{admin/fragments/icon :: icon('search')}"></svg>
 			<input type="search" name="q" placeholder="메뉴·역 검색" aria-label="메뉴·역 검색" autocomplete="off">
-			<button type="submit" class="sr-only">검색</button>
+			<button type="submit" class="sr-only" tabindex="-1">검색</button>
 		</form>
 		<a class="admin-mobile-search" th:href="@{/admin/search}" aria-label="검색">
 			<svg th:replace="~{admin/fragments/icon :: icon('search')}"></svg>

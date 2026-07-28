@@ -180,6 +180,7 @@ class AdminAccessibilitySmokeTest {
 			.contains("class=\"admin-topbar-row\" aria-label=\"관리자 실행 환경\"")
 			.contains("class=\"admin-topbar-brand\">쉬운 지하철 관리자</strong>")
 			.contains("class=\"admin-topbar-search\" role=\"search\"")
+			.contains("type=\"submit\" class=\"sr-only\" tabindex=\"-1\"")
 			.contains("class=\"admin-mobile-search\"")
 			.contains("aria-label=\"검색\"")
 			.contains("id=\"admin-content\" class=\"admin-content-anchor\" tabindex=\"-1\"")
