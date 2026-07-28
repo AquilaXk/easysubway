@@ -82,8 +82,30 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
   Future<void> _selectionStyleQueue = Future<void>.value();
   int _generation = 0;
 
-  List<StationExitPreviewPoint> get _points =>
-      stationExitPreviewPoints(widget.exits);
+  List<StationExitPreviewPoint> get _points => _previewPointsFor(widget);
+
+  List<StationExitPreviewPoint> _previewPointsFor(
+    StationExitMapPreview preview,
+  ) {
+    final points = stationExitPreviewPoints(preview.exits);
+    final selectedExit = preview.exits.firstWhere(
+      (exit) => exit.id == preview.selectedExitId,
+    );
+    if (selectedExit.hasCoordinate ||
+        preview.station.latitude == null ||
+        preview.station.longitude == null) {
+      return points;
+    }
+    return [
+      (
+        id: selectedExit.id,
+        number: selectedExit.exitNumber,
+        latitude: preview.station.latitude!,
+        longitude: preview.station.longitude!,
+      ),
+      ...points,
+    ];
+  }
 
   @override
   void initState() {
@@ -107,7 +129,7 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
   @override
   void didUpdateWidget(covariant StationExitMapPreview oldWidget) {
     super.didUpdateWidget(oldWidget);
-    final oldPoints = stationExitPreviewPoints(oldWidget.exits);
+    final oldPoints = _previewPointsFor(oldWidget);
     if (oldWidget.station.id != widget.station.id ||
         oldWidget.station.latitude != widget.station.latitude ||
         oldWidget.station.longitude != widget.station.longitude ||
@@ -472,7 +494,7 @@ class _MapMessagePanel extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     return Container(
       key: const Key('stationExitMapPreview'),
-      height: 144,
+      constraints: const BoxConstraints(minHeight: 144),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,

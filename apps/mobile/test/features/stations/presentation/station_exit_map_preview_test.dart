@@ -69,6 +69,32 @@ void main() {
     );
   });
 
+  testWidgets('선택 출구 좌표만 없으면 역 fallback marker를 지도에 포함한다', (tester) async {
+    final controller = _FakeKakaoMapController();
+    await _pumpPreview(
+      tester,
+      exits: [
+        _exit(id: 'exit-1', number: '1', latitude: 37.301, longitude: 126.861),
+        _exit(id: 'exit-2', number: '2'),
+      ],
+      selectedExitId: 'exit-2',
+      nativeMapBuilder: _readyMapBuilder(controller),
+    );
+    for (
+      var attempt = 0;
+      attempt < 10 && controller.labels.addPoiCount < 2;
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+
+    expect(controller.labels.positions['exit-2']!.latitude, 37.302795);
+    expect(controller.labels.positions['exit-2']!.longitude, 126.866489);
+  });
+
   testWidgets('SDK 오류는 다시 시도 가능한 안내로 바뀐다', (tester) async {
     final keys = <Key>[];
     final reportedErrors = <FlutterErrorDetails>[];
@@ -106,6 +132,35 @@ void main() {
 
     expect(keys, hasLength(2));
     expect(keys[0], isNot(keys[1]));
+  });
+
+  testWidgets('SDK 오류 안내는 큰 글자에서 144dp보다 높게 확장된다', (tester) async {
+    void Function(Error)? reportError;
+    await _pumpPreview(
+      tester,
+      textScaler: const TextScaler.linear(3),
+      nativeMapBuilder:
+          ({
+            required key,
+            required option,
+            required onMapReady,
+            required onMapError,
+          }) {
+            reportError = onMapError;
+            return const ColoredBox(color: Colors.grey);
+          },
+    );
+
+    await runWithMobileErrorReporter((_) {}, () async {
+      reportError!(_FakeMapError());
+      await tester.pump();
+    });
+
+    expect(tester.takeException(), isNull);
+    expect(
+      tester.getSize(find.byKey(const Key('stationExitMapPreview'))).height,
+      greaterThan(144),
+    );
   });
 
   testWidgets('미리보기 전체 탭은 선택 출구 callback을 호출한다', (tester) async {
@@ -509,7 +564,9 @@ Future<void> _pumpPreview(
   WidgetTester tester, {
   StationDetail? station,
   List<StationExitInfo>? exits,
+  String? selectedExitId,
   String nativeAppKey = 'test-native-map-key',
+  TextScaler textScaler = TextScaler.noScaling,
   VoidCallback? onOpenSelected,
   StationExitNativeMapBuilder? nativeMapBuilder,
 }) {
@@ -518,14 +575,17 @@ Future<void> _pumpPreview(
       [_exit(id: 'exit-1', number: '1', latitude: 37.301, longitude: 126.861)];
   return tester.pumpWidget(
     MaterialApp(
-      home: Scaffold(
-        body: StationExitMapPreview(
-          station: station ?? _station(),
-          exits: resolvedExits,
-          selectedExitId: resolvedExits.first.id,
-          onOpenSelected: onOpenSelected ?? () {},
-          nativeAppKey: nativeAppKey,
-          nativeMapBuilder: nativeMapBuilder,
+      home: MediaQuery(
+        data: MediaQueryData(textScaler: textScaler),
+        child: Scaffold(
+          body: StationExitMapPreview(
+            station: station ?? _station(),
+            exits: resolvedExits,
+            selectedExitId: selectedExitId ?? resolvedExits.first.id,
+            onOpenSelected: onOpenSelected ?? () {},
+            nativeAppKey: nativeAppKey,
+            nativeMapBuilder: nativeMapBuilder,
+          ),
         ),
       ),
     ),
@@ -667,6 +727,7 @@ final class _FakeLabelController implements LabelController {
 
   final Completer<void>? firstPoiGate;
   final pois = <String, _FakePoi>{};
+  final positions = <String, LatLng>{};
   int addPoiCount = 0;
   int get changeStyleCount =>
       pois.values.fold(0, (count, poi) => count + poi.changeStyleCount);
@@ -691,6 +752,7 @@ final class _FakeLabelController implements LabelController {
     }
     final poi = _FakePoi(style);
     pois[id!] = poi;
+    positions[id] = position;
     return poi;
   }
 

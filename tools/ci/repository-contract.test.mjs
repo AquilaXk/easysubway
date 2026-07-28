@@ -8001,6 +8001,15 @@ test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정
   );
   assert.match(androidInstallCheck.command, /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY/);
   assert.match(androidInstallCheck.command, /--target-platform=android-arm,android-arm64/);
+  const iosBuildChecks = gate.checks.filter(
+    (check) => check.platform === "ios" && /flutter build (?:ios|ipa)/.test(check.command ?? ""),
+  );
+  assert.equal(iosBuildChecks.length, 4);
+  for (const check of iosBuildChecks) {
+    assert.match(check.command, /validate-release-dart-defines\.sh/);
+    assert.match(check.command, /--dart-define=EASYSUBWAY_API_BASE_URL=/);
+    assert.match(check.command, /--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=/);
+  }
 
   for (const check of gate.checks) {
     if (check.id === "android_app_start_backend_down") {
