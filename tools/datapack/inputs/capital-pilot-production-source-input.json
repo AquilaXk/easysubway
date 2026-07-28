@@ -300,7 +300,7 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "NOT_VERIFIED",
-      "lastVerifiedAt": "2026-07-28T12:42:43.944Z",
+      "lastVerifiedAt": "2026-07-28T15:35:25.704Z",
       "sourceSnapshotId": "seoul-metro-accessibility-20260728",
       "providerRecordHash": "c1da7c506dd301574f4055c171f2d318cce83e9a8dfb21cc075f37322827966e",
       "evidenceHash": "a2dc85e38a3f0206f6433ac6d1aa60a2fbb60c06cff6cede95c54c04ded84965"
@@ -329,7 +329,7 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "NOT_VERIFIED",
-      "lastVerifiedAt": "2026-07-28T12:42:43.944Z",
+      "lastVerifiedAt": "2026-07-28T15:35:25.704Z",
       "sourceSnapshotId": "seoul-metro-accessibility-20260728",
       "providerRecordHash": "c1da7c506dd301574f4055c171f2d318cce83e9a8dfb21cc075f37322827966e",
       "evidenceHash": "c0dcb024d98f96d7b21e061dd2b4ec52ae16609fdb0907ede7eb48c423c0c0cd"
@@ -358,7 +358,7 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "NOT_VERIFIED",
-      "lastVerifiedAt": "2026-07-28T12:42:43.944Z",
+      "lastVerifiedAt": "2026-07-28T15:35:25.704Z",
       "sourceSnapshotId": "seoul-metro-accessibility-20260728",
       "providerRecordHash": "f87f18d5916f4eba37a04fb8c01d3b607f8e5ec887789f7c3e9a299b2f44eea1",
       "evidenceHash": "6a295d4dbadac75431cee28254c5a8914512646d7f847f06fdb3fe950a597815"
@@ -387,7 +387,7 @@
       "reliabilityScore": 90,
       "provenanceKind": "OFFICIAL_SOURCE",
       "verificationStatus": "NOT_VERIFIED",
-      "lastVerifiedAt": "2026-07-28T12:42:43.944Z",
+      "lastVerifiedAt": "2026-07-28T15:35:25.704Z",
       "sourceSnapshotId": "seoul-metro-accessibility-20260728",
       "providerRecordHash": "f87f18d5916f4eba37a04fb8c01d3b607f8e5ec887789f7c3e9a299b2f44eea1",
       "evidenceHash": "d9a70a25c8beb6dca1ee218ffbaf7571a615ab4aa7ccf88f332f6c12fbbe8d52"
@@ -674,8 +674,8 @@
       "operationalStatus": "NOT_COVERED",
       "statusMeaning": "FEED_ABSENCE_RECORD",
       "confidence": 100,
-      "verifiedAt": "2026-07-28T12:42:43.944Z",
-      "retrievedAt": "2026-07-28T12:42:43.944Z",
+      "verifiedAt": "2026-07-28T15:35:25.704Z",
+      "retrievedAt": "2026-07-28T15:35:25.704Z",
       "strictRouteEligibleReason": "NO_OFFICIAL_STATUS_FEED",
       "note": "서울교통공사 운행상황 feed의 구조적 미커버."
     },
@@ -693,8 +693,8 @@
       "operationalStatus": "AVAILABLE",
       "statusMeaning": "REALTIME_OPERATION",
       "confidence": 100,
-      "verifiedAt": "2026-07-28T12:42:43.944Z",
-      "retrievedAt": "2026-07-28T12:42:43.944Z",
+      "verifiedAt": "2026-07-28T15:35:25.704Z",
+      "retrievedAt": "2026-07-28T15:35:25.704Z",
       "strictRouteEligibleReason": "STATUS_PROBE_NOT_ROUTE_EVIDENCE",
       "note": "서울교통공사 전체 승강기 운행상황 snapshot 실측."
     }

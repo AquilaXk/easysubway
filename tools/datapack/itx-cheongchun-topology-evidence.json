@@ -28,8 +28,8 @@
     "inputSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
     "inputSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
     "inputByteSize": 359319,
-    "outputSha256": "1f73c48d5602e9ff96d2ffad648104405920521b8a4f5692fd942f780f173c37",
-    "outputSqliteSha256": "bfde80b874709844abbbd31bf3401540d6e7679a75ff56bc7a236dec74e3ff24",
+    "outputSha256": "efab4ef34f01557c6bd58c7e8d5d14da2b6653313a219d55ab727491e2225e33",
+    "outputSqliteSha256": "190c82d95a51f6fe46b518d850cf7aee1bb42ca4eb35e7c0c873b02365965af1",
     "byteSize": 1461955,
     "byteSizeDelta": 1102636
   },
@@ -3577,6 +3577,123 @@
                   "retrieved_at": 1785242547,
                   "strict_route_eligible": 0,
                   "strict_route_eligible_reason": "FACILITY_NOT_INSTALLED"
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "readmittedAt": "2026-07-28T15:42:12.400Z",
+      "provenance": "PR #2665 Review 4799046157 Seoul raw pagination identity와 source lineage 보완; ITX subgraph 불변",
+      "previousPack": {
+        "sha256": "1f73c48d5602e9ff96d2ffad648104405920521b8a4f5692fd942f780f173c37",
+        "sqliteSha256": "bfde80b874709844abbbd31bf3401540d6e7679a75ff56bc7a236dec74e3ff24",
+        "byteSize": 1461955
+      },
+      "newPack": {
+        "sha256": "efab4ef34f01557c6bd58c7e8d5d14da2b6653313a219d55ab727491e2225e33",
+        "sqliteSha256": "190c82d95a51f6fe46b518d850cf7aee1bb42ca4eb35e7c0c873b02365965af1",
+        "byteSize": 1461955
+      },
+      "byteSizeDelta": 0,
+      "itxSubgraph": {
+        "unchanged": true,
+        "edgeCount": 48,
+        "edgesSha256": "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+        "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
+      },
+      "rowDiff": [
+        {
+          "table": "station_facility_evidence",
+          "previousRowCount": 8,
+          "newRowCount": 8,
+          "rowsRemoved": 0,
+          "rowsAdded": 0,
+          "rowsChanged": 2,
+          "detail": {
+            "removed": [],
+            "added": [],
+            "changed": [
+              {
+                "previous": {
+                  "station_id": "station-sangnoksu",
+                  "line_id": "seoul-4",
+                  "facility_type": "ACCESSIBILITY_STATUS_PROBE",
+                  "evidence_kind": "NOT_EXISTS",
+                  "source_id": "seoul-metro-accessibility",
+                  "source_snapshot_id": "seoul-metro-accessibility-20260728",
+                  "provider_record_hash": "c1da7c506dd301574f4055c171f2d318cce83e9a8dfb21cc075f37322827966e",
+                  "evidence_hash": "70c81dab799d0f8d999bd2afe832a23337014fabc075efb309d7501bd5f59497",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "installation_status": "NOT_COVERED",
+                  "operational_status": "NOT_COVERED",
+                  "status_meaning": "FEED_ABSENCE_RECORD",
+                  "confidence": 100,
+                  "verified_at": 1785242563,
+                  "retrieved_at": 1785242563,
+                  "strict_route_eligible": 0,
+                  "strict_route_eligible_reason": "NO_OFFICIAL_STATUS_FEED"
+                },
+                "new": {
+                  "station_id": "station-sangnoksu",
+                  "line_id": "seoul-4",
+                  "facility_type": "ACCESSIBILITY_STATUS_PROBE",
+                  "evidence_kind": "NOT_EXISTS",
+                  "source_id": "seoul-metro-accessibility",
+                  "source_snapshot_id": "seoul-metro-accessibility-20260728",
+                  "provider_record_hash": "c1da7c506dd301574f4055c171f2d318cce83e9a8dfb21cc075f37322827966e",
+                  "evidence_hash": "70c81dab799d0f8d999bd2afe832a23337014fabc075efb309d7501bd5f59497",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "installation_status": "NOT_COVERED",
+                  "operational_status": "NOT_COVERED",
+                  "status_meaning": "FEED_ABSENCE_RECORD",
+                  "confidence": 100,
+                  "verified_at": 1785252925,
+                  "retrieved_at": 1785252925,
+                  "strict_route_eligible": 0,
+                  "strict_route_eligible_reason": "NO_OFFICIAL_STATUS_FEED"
+                }
+              },
+              {
+                "previous": {
+                  "station_id": "station-sadang",
+                  "line_id": "seoul-4",
+                  "facility_type": "ACCESSIBILITY_STATUS_PROBE",
+                  "evidence_kind": "EXISTS",
+                  "source_id": "seoul-metro-accessibility",
+                  "source_snapshot_id": "seoul-metro-accessibility-20260728",
+                  "provider_record_hash": "f87f18d5916f4eba37a04fb8c01d3b607f8e5ec887789f7c3e9a299b2f44eea1",
+                  "evidence_hash": "eecb07eda087dfdf9c7cbe48409ef564e279bab65637efbb08859af6aab93cfa",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "installation_status": "INSTALLED",
+                  "operational_status": "AVAILABLE",
+                  "status_meaning": "REALTIME_OPERATION",
+                  "confidence": 100,
+                  "verified_at": 1785242563,
+                  "retrieved_at": 1785242563,
+                  "strict_route_eligible": 0,
+                  "strict_route_eligible_reason": "STATUS_PROBE_NOT_ROUTE_EVIDENCE"
+                },
+                "new": {
+                  "station_id": "station-sadang",
+                  "line_id": "seoul-4",
+                  "facility_type": "ACCESSIBILITY_STATUS_PROBE",
+                  "evidence_kind": "EXISTS",
+                  "source_id": "seoul-metro-accessibility",
+                  "source_snapshot_id": "seoul-metro-accessibility-20260728",
+                  "provider_record_hash": "f87f18d5916f4eba37a04fb8c01d3b607f8e5ec887789f7c3e9a299b2f44eea1",
+                  "evidence_hash": "eecb07eda087dfdf9c7cbe48409ef564e279bab65637efbb08859af6aab93cfa",
+                  "provenance_kind": "OFFICIAL_SOURCE",
+                  "installation_status": "INSTALLED",
+                  "operational_status": "AVAILABLE",
+                  "status_meaning": "REALTIME_OPERATION",
+                  "confidence": 100,
+                  "verified_at": 1785252925,
+                  "retrieved_at": 1785252925,
+                  "strict_route_eligible": 0,
+                  "strict_route_eligible_reason": "STATUS_PROBE_NOT_ROUTE_EVIDENCE"
                 }
               }
             ]

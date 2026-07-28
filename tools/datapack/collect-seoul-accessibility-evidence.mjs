@@ -61,7 +61,7 @@ export function normalizeAccessibilityRows(rows) {
   return normalized;
 }
 
-export function buildAccessibilitySnapshot(rows, retrievedAt) {
+export function buildAccessibilitySnapshot(rows, retrievedAt, { rawRowCount, rawSha256 }) {
   if (
     !Array.isArray(rows) ||
     rows.some(
@@ -86,6 +86,9 @@ export function buildAccessibilitySnapshot(rows, retrievedAt) {
     )
   ) {
     throw new Error(INVALID_RESPONSE);
+  }
+  if (!Number.isSafeInteger(rawRowCount) || rawRowCount < rows.length || !/^[0-9a-f]{64}$/.test(rawSha256 ?? "")) {
+    throw new Error(`${INVALID_RESPONSE}: rawIdentity`);
   }
   const stationsByIdentity = new Map();
   for (const row of rows) {
@@ -118,8 +121,9 @@ export function buildAccessibilitySnapshot(rows, retrievedAt) {
     freshUntil: new Date(Date.parse(retrievedAt) + 86_400_000).toISOString(),
     credentialRedacted: true,
     absenceEvidenceMode: "EXHAUSTIVE_LIST",
-    rowCount: rows.length,
-    rawSha256: contentSha256,
+    rowCount: rawRowCount,
+    normalizedRowCount: rows.length,
+    rawSha256,
     contentSha256,
     schemaFingerprint: hash(["dtlPstn", "lineNm", "oprtngSitu", "stnNm"]),
     stations,
@@ -137,6 +141,7 @@ export async function collectSeoulAccessibility({
     throw new Error("HTTPS endpoint is required");
   }
   const collected = [];
+  const rawPages = [];
   let receivedCount = 0;
   let pageNo = 1;
   let totalCount;
@@ -160,8 +165,10 @@ export async function collectSeoulAccessibility({
       throw new Error(`Seoul accessibility API HTTP ${response.status}`);
     }
     let payload;
+    let raw;
     try {
-      payload = await response.json();
+      raw = await response.text();
+      payload = JSON.parse(raw);
     } catch {
       throw new Error(INVALID_RESPONSE);
     }
@@ -178,6 +185,7 @@ export async function collectSeoulAccessibility({
       throw new Error(`${INVALID_RESPONSE}: totalCount`);
     }
     totalCount = pageTotal;
+    rawPages.push({ pageNo, totalCount: pageTotal, rawSha256: hashText(raw) });
     const normalizedRows = normalizeAccessibilityRows(rows);
     collected.push(...normalizedRows);
     receivedCount += rows.length;
@@ -186,7 +194,7 @@ export async function collectSeoulAccessibility({
     }
     pageNo += 1;
   }
-  return collected;
+  return { rows: collected, rawRowCount: totalCount, rawSha256: hash(rawPages) };
 }
 
 export async function writeSeoulAccessibilityEvidence({
@@ -198,8 +206,8 @@ export async function writeSeoulAccessibilityEvidence({
   retrievedAt = new Date().toISOString(),
 }) {
   const { outputPath, canonicalRoot } = await validatedOutputPath(output, outputRoot);
-  const rows = await collectSeoulAccessibility({ endpoint, serviceKey, fetchImpl });
-  const snapshot = buildAccessibilitySnapshot(rows, retrievedAt);
+  const collected = await collectSeoulAccessibility({ endpoint, serviceKey, fetchImpl });
+  const snapshot = buildAccessibilitySnapshot(collected.rows, retrievedAt, collected);
   await mkdir(dirname(outputPath), { recursive: true });
   const canonicalParent = await realpath(dirname(outputPath));
   if (!isPathWithin(canonicalRoot, canonicalParent)) {
@@ -288,6 +296,10 @@ function isPathWithin(root, candidate) {
 
 function hash(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function hashText(value) {
+  return createHash("sha256").update(value).digest("hex");
 }
 
 function compare(left, right) {

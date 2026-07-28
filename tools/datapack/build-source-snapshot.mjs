@@ -73,11 +73,10 @@ async function main() {
   if (args["snapshot-set"]) {
     const snapshotSetPath = path.resolve(args["snapshot-set"]);
     const snapshots = JSON.parse(await readFile(snapshotSetPath, "utf8"));
-    const replacedSourceIds = new Set([
-      snapshot.sourceId,
-      ...(args["remove-source-ids"] ?? "").split(",").filter(Boolean),
-    ]);
-    const next = snapshots.filter(({ sourceId }) => !replacedSourceIds.has(sourceId)).concat(snapshot);
+    const removedSourceIds = new Set((args["remove-source-ids"] ?? "").split(",").filter(Boolean));
+    const next = snapshots
+      .filter(({ sourceId, snapshotId }) => !removedSourceIds.has(sourceId) && snapshotId !== snapshot.snapshotId)
+      .concat(snapshot);
     await writeFileWithParents(snapshotSetPath, `${JSON.stringify(next, null, 2)}\n`);
   }
 }

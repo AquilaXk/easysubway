@@ -74,8 +74,9 @@ export function buildAccessibilitySourceCoverageReport({
 
   for (const values of Object.values(violations)) values.sort(compareStrings);
   const blockedSources = new Set(
-    [violations.freshness, violations.license, violations.snapshot]
+    [violations.freshness, violations.license, violations.snapshot, violations.provenance]
       .flat()
+      .filter((value) => value.split(":").length === 2)
       .map((value) => value.split(":", 1)[0]),
   );
   const providerDomainMatrix = [...providerDomains.values()]

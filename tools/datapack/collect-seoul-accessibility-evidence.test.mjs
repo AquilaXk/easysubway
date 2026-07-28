@@ -72,7 +72,7 @@ test("collector rejects HTTP 403 before reading the response body", async () => 
       fetchImpl: async () => ({
         ok: false,
         status: 403,
-        json: async () => {
+        text: async () => {
           bodyRead = true;
           throw new Error("serviceKey=secret raw body");
         },
@@ -90,7 +90,7 @@ test("collector redacts raw body and request details from invalid JSON", async (
       serviceKey: "secret",
       fetchImpl: async () => ({
         ok: true,
-        json: async () => {
+        text: async () => {
           throw new Error("raw body https://apis.data.go.kr/example?serviceKey=secret");
         },
       }),
@@ -110,7 +110,7 @@ test("collector rejects API-level error envelopes without exposing the provider 
       serviceKey: "secret",
       fetchImpl: async () => ({
         ok: true,
-        json: async () => ({
+        text: async () => JSON.stringify({
           response: {
             header: { resultCode: "99", resultMsg: "serviceKey=secret raw provider message" },
             body: {
@@ -137,7 +137,7 @@ test("collector rejects malformed items with a fixed credential-free error", asy
       serviceKey: "secret",
       fetchImpl: async () => ({
         ok: true,
-        json: async () => ({
+        text: async () => JSON.stringify({
           response: {
             header: { resultCode: "00" },
             body: { items: { item: { reflected: "serviceKey=secret" } } },
@@ -155,14 +155,14 @@ test("collector rejects malformed items with a fixed credential-free error", asy
 
 test("full-scope collector는 station filter 없이 pagination total을 보존한다", async () => {
   const requestUrls = [];
-  const rows = await collectSeoulAccessibility({
+  const { rows, rawRowCount, rawSha256 } = await collectSeoulAccessibility({
     endpoint: "https://apis.data.go.kr/example",
     serviceKey: "secret",
     fetchImpl: async (url) => {
       requestUrls.push(new URL(url));
       return {
         ok: true,
-        json: async () => ({
+        text: async () => JSON.stringify({
           response: {
             header: { resultCode: "00" },
             body: {
@@ -180,11 +180,43 @@ test("full-scope collector는 station filter 없이 pagination total을 보존�
   });
 
   assert.equal(rows.length, 2);
+  assert.equal(rawRowCount, 3);
+  assert.match(rawSha256, /^[0-9a-f]{64}$/);
   assert.equal(requestUrls.length, 1);
   assert.equal(requestUrls[0].searchParams.has("lineNm"), false);
   assert.equal(requestUrls[0].searchParams.has("stnNm"), false);
   assert.equal(requestUrls[0].searchParams.get("pageNo"), "1");
   assert.equal(requestUrls[0].searchParams.get("numOfRows"), "1000");
+});
+
+test("collector는 normalized content와 별도로 raw pagination identity를 보존한다", async () => {
+  const payload = (deletedPath) => ({
+    response: {
+      header: { resultCode: "00" },
+      body: {
+        totalCount: 2,
+        items: { item: [
+          { lineNm: "4호선", stnNm: "사당", oprtngSitu: "M", dtlPstn: "대합실-승강장" },
+          { lineNm: "4호선", stnNm: "폐기", oprtngSitu: "D", dtlPstn: deletedPath },
+        ] },
+      },
+    },
+  });
+  const collect = async (deletedPath) => collectSeoulAccessibility({
+    endpoint: "https://apis.data.go.kr/example",
+    serviceKey: "secret",
+    fetchImpl: async () => {
+      const body = JSON.stringify(payload(deletedPath));
+      return { ok: true, json: async () => JSON.parse(body), text: async () => body };
+    },
+  });
+
+  const first = await collect("삭제 시설 A");
+  const second = await collect("삭제 시설 B");
+
+  assert.equal(first.rawRowCount, 2);
+  assert.deepEqual(first.rows, second.rows);
+  assert.notEqual(first.rawSha256, second.rawSha256);
 });
 
 test("collector keeps only station, location and operation evidence", () => {
@@ -283,6 +315,7 @@ test("snapshot contains sorted full-scope evidence and hashes", () => {
       { stationName: "상록수", lineName: "4호선", operational: false, situationCode: "S", situation: "보수중", pathDescription: "1번 출구-대합실" },
     ],
     "2026-07-10T00:00:00.000Z",
+    { rawRowCount: 2, rawSha256: "a".repeat(64) },
   );
 
   assert.equal(snapshot.sourceId, "seoul-metro-accessibility");
@@ -293,7 +326,7 @@ test("snapshot contains sorted full-scope evidence and hashes", () => {
   assert.equal(snapshot.freshUntil, "2026-07-11T00:00:00.000Z");
   assert.equal(snapshot.rowCount, 2);
   assert.match(snapshot.rawSha256, /^[0-9a-f]{64}$/);
-  assert.equal(snapshot.contentSha256, snapshot.rawSha256);
+  assert.notEqual(snapshot.contentSha256, snapshot.rawSha256);
   assert.deepEqual(snapshot.stations.map(({ stationName }) => stationName), ["사당", "상록수"]);
   assert.doesNotMatch(JSON.stringify(snapshot), /serviceKey|https?:\/\//);
 });
@@ -312,7 +345,7 @@ test("snapshot rejects facilities without a verified or provider-missing status 
     operational: null,
     situationCode: null,
     situation: "PROVIDER_STATUS_MISSING",
-  }], "2026-07-10T00:00:00.000Z"));
+  }], "2026-07-10T00:00:00.000Z", { rawRowCount: 1, rawSha256: "a".repeat(64) }));
   for (const row of [
     { ...validSadang, operational: undefined },
     { ...validSadang, operational: "Y" },
@@ -324,7 +357,11 @@ test("snapshot rejects facilities without a verified or provider-missing status 
     { ...validSadang, stationName: undefined },
   ]) {
     assert.throws(
-      () => buildAccessibilitySnapshot([row], "2026-07-10T00:00:00.000Z"),
+      () => buildAccessibilitySnapshot(
+        [row],
+        "2026-07-10T00:00:00.000Z",
+        { rawRowCount: 1, rawSha256: "a".repeat(64) },
+      ),
       /Seoul accessibility API response invalid/,
     );
   }
@@ -335,13 +372,13 @@ test("invalid provider evidence never reaches the output write", async () => {
   const valid = { lineNm: "4호선", stnNm: "사당", oprtngSitu: "M", dtlPstn: "대합실-승강장" };
   const jsonResponse = (item, resultCode = "00") => async () => ({
     ok: true,
-    json: async () => ({ response: { header: { resultCode }, body: { items: { item } } } }),
+    text: async () => JSON.stringify({ response: { header: { resultCode }, body: { items: { item } } } }),
   });
   const cases = [
     async () => ({ ok: false, status: 403 }),
     async () => ({
       ok: true,
-      json: async () => {
+      text: async () => {
         throw new Error("raw serviceKey=secret");
       },
     }),

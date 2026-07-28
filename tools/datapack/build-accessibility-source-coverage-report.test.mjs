@@ -35,6 +35,16 @@ test("selectable artifact의 모든 claim이 fresh official snapshot에 결속�
   assert.deepEqual(report.violations, emptyViolations());
 });
 
+test("미승인 source는 provider-domain matrix에서도 BLOCKED다", () => {
+  const input = validInput();
+  input.inventory.sources[0].accessibilityAdmissionEvidence.decision = "PENDING";
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(report.decision, "NO_GO");
+  assert.equal(report.providerDomainMatrix[0].status, "BLOCKED");
+});
+
 test("tracked snapshot bytes와 inventory file SHA가 일치해야 한다", async (t) => {
   const repositoryRoot = await mkdtemp(path.join(tmpdir(), "easysubway-accessibility-snapshot-"));
   t.after(() => rm(repositoryRoot, { recursive: true, force: true }));

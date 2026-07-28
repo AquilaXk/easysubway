@@ -6844,13 +6844,13 @@
         "licenseEvidenceHash": "cd1063d4aa4b6290b1f4edabb9a74e62d70f8da5044aa4608b7f1e45e10c5963",
         "snapshotId": "seoul-metro-accessibility-20260728",
         "snapshotPath": "tools/datapack/sources/seoul-metro-accessibility-20260728.json",
-        "capturedAt": "2026-07-28T12:42:43.944Z",
-        "observedAt": "2026-07-28T12:42:43.944Z",
-        "freshUntil": "2026-07-29T12:42:43.944Z",
-        "rawSha256": "bedfd9067948539b6285dba3ad24cd1ae0dac0166095466fb7f4b2df4e31b8aa",
+        "capturedAt": "2026-07-28T15:35:25.704Z",
+        "observedAt": "2026-07-28T15:35:25.704Z",
+        "freshUntil": "2026-07-29T15:35:25.704Z",
+        "rawSha256": "07e91cc7d035dd60e753c25b1a4dd4a306b757f3a74f7364eb38f9c3ef43c1ba",
         "contentSha256": "bedfd9067948539b6285dba3ad24cd1ae0dac0166095466fb7f4b2df4e31b8aa",
         "schemaFingerprint": "89175633c9f84c1593c92cfcb89dc25a64030d970be6c8970d51097dc7075982",
-        "snapshotFileSha256": "dac597d070dd4f4296340d2f2a272bc52ae5d47042e09e3349b933449ed04f40",
+        "snapshotFileSha256": "9b55ab8e99a1ad2a11274f684b445dc1eb7f47f82abaca8f567985351324dd11",
         "absenceEvidenceMode": "EXHAUSTIVE_LIST"
       }
     },

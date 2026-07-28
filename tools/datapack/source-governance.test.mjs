@@ -251,6 +251,48 @@ test("snapshot producer는 previous snapshot에서 diff를 직접 생성한다",
   }
 });
 
+test("snapshot set refresh는 same-source parent lineage를 보존한다", async () => {
+  const workDir = path.join(tmpdir(), `easysubway-source-set-${process.pid}-${Date.now()}`);
+  const firstRaw = path.join(workDir, "first.csv");
+  const secondRaw = path.join(workDir, "second.csv");
+  const firstOutput = path.join(workDir, "first.json");
+  const secondOutput = path.join(workDir, "second.json");
+  const snapshotSet = path.join(workDir, "snapshots.json");
+  await mkdir(workDir, { recursive: true });
+  await writeFile(firstRaw, "station\nSadang\n");
+  await writeFile(secondRaw, "station\nSadang\nSangnoksu\n");
+
+  try {
+    await buildSnapshot([
+      "--input", firstRaw,
+      "--output", firstOutput,
+      "--snapshot-id", "snapshot-a-1",
+      "--retrieved-at", "2026-06-30T03:00:00Z",
+      "--freshness-expires-at", "2026-09-28T03:00:00Z",
+      "--coverage-count", "1",
+      "--raw-object-uri", "s3://bucket/snapshot-a-1.csv",
+    ]);
+    await writeFile(snapshotSet, `[${await readFile(firstOutput, "utf8")}]`);
+    await buildSnapshot([
+      "--input", secondRaw,
+      "--output", secondOutput,
+      "--snapshot-id", "snapshot-a-2",
+      "--retrieved-at", "2026-07-01T03:00:00Z",
+      "--freshness-expires-at", "2026-09-29T03:00:00Z",
+      "--coverage-count", "2",
+      "--raw-object-uri", "s3://bucket/snapshot-a-2.csv",
+      "--previous-snapshot", firstOutput,
+      "--snapshot-set", snapshotSet,
+    ]);
+
+    const snapshots = JSON.parse(await readFile(snapshotSet, "utf8"));
+    assert.deepEqual(snapshots.map(({ snapshotId }) => snapshotId), ["snapshot-a-1", "snapshot-a-2"]);
+    assert.doesNotThrow(() => validateLineage(snapshots));
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
 test("승인된 legacy root는 rowCount를 결정적 coverage로 migration해 lineage를 연장한다", async () => {
   const snapshots = JSON.parse(await readFile(
     path.join(root, "tools/datapack/release/source-snapshots.json"),
@@ -279,7 +321,7 @@ test("tracked production legacy root는 승인 bytes를 바꾸지 않고 검증�
     "utf8",
   ));
 
-  assert.equal(snapshots.filter((entry) => entry.coverageCount == null).length, 5);
+  assert.equal(snapshots.filter((entry) => entry.coverageCount == null).length, 6);
   assert.doesNotThrow(() => validateLineage(snapshots));
 });
 

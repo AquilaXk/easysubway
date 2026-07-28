@@ -338,11 +338,7 @@
         "sourceIngestAdapter": "official-source-ingest-v1",
         "sourceInventoryRetrievedAt": "2026-06-22",
         "movementPathCandidateCount": "2",
-        "productionCoverageEvidence": "[{\"regionId\":\"capital\",\"operatorId\":\"seoul-metro\",\"sourceDomain\":\"accessibility_facilities\",\"sourceIds\":[\"kric-station-convenience-standard\",\"kric-station-elevator-movement\",\"kric-wheelchair-lift-movement\",\"seoul-metro-accessibility\"]},{\"regionId\":\"capital\",\"operatorId\":\"seoul-metro\",\"sourceDomain\":\"route_map_positions\",\"sourceIds\":[\"seoulmetro-cyberstation-route-map\"]},{\"regionId\":\"capital\",\"operatorId\":\"seoul-metro\",\"sourceDomain\":\"schedule_timetable\",\"sourceIds\":[\"kric-subway-timetable\"]},{\"regionId\":\"capital\",\"operatorId\":\"seoul-metro\",\"sourceDomain\":\"station_line_membership\",\"sourceIds\":[\"molit-urban-rail-full-route\",\"seoulmetro-station-line-info\"]}]",
-        "adminReviewOverrideSource": "facility-report-admin-review",
-        "adminReviewOverrideLedgerSource": "manual_overrides",
-        "adminReviewOverrideCount": "0",
-        "adminReviewOverrideExportedAt": "2026-06-21T00:00:00.000Z"
+        "productionCoverageEvidence": "[{\"regionId\":\"capital\",\"operatorId\":\"seoul-metro\",\"sourceDomain\":\"accessibility_facilities\",\"sourceIds\":[\"kric-station-convenience-standard\",\"kric-station-elevator-movement\",\"kric-wheelchair-lift-movement\",\"seoul-metro-accessibility\"]},{\"regionId\":\"capital\",\"operatorId\":\"seoul-metro\",\"sourceDomain\":\"route_map_positions\",\"sourceIds\":[\"seoulmetro-cyberstation-route-map\"]},{\"regionId\":\"capital\",\"operatorId\":\"seoul-metro\",\"sourceDomain\":\"schedule_timetable\",\"sourceIds\":[\"kric-subway-timetable\"]},{\"regionId\":\"capital\",\"operatorId\":\"seoul-metro\",\"sourceDomain\":\"station_line_membership\",\"sourceIds\":[\"molit-urban-rail-full-route\",\"seoulmetro-station-line-info\"]}]"
       },
       "operators": [
         {
@@ -437,7 +433,7 @@
           "providerRecordHash": "c1da7c506dd301574f4055c171f2d318cce83e9a8dfb21cc075f37322827966e",
           "provenanceKind": "OFFICIAL_SOURCE",
           "verificationStatus": "NOT_VERIFIED",
-          "lastVerifiedAt": "2026-07-28T12:42:43.944Z",
+          "lastVerifiedAt": "2026-07-28T15:35:25.704Z",
           "evidenceHash": "a2dc85e38a3f0206f6433ac6d1aa60a2fbb60c06cff6cede95c54c04ded84965"
         },
         {
@@ -457,7 +453,7 @@
           "providerRecordHash": "c1da7c506dd301574f4055c171f2d318cce83e9a8dfb21cc075f37322827966e",
           "provenanceKind": "OFFICIAL_SOURCE",
           "verificationStatus": "NOT_VERIFIED",
-          "lastVerifiedAt": "2026-07-28T12:42:43.944Z",
+          "lastVerifiedAt": "2026-07-28T15:35:25.704Z",
           "evidenceHash": "c0dcb024d98f96d7b21e061dd2b4ec52ae16609fdb0907ede7eb48c423c0c0cd"
         },
         {
@@ -477,7 +473,7 @@
           "providerRecordHash": "f87f18d5916f4eba37a04fb8c01d3b607f8e5ec887789f7c3e9a299b2f44eea1",
           "provenanceKind": "OFFICIAL_SOURCE",
           "verificationStatus": "NOT_VERIFIED",
-          "lastVerifiedAt": "2026-07-28T12:42:43.944Z",
+          "lastVerifiedAt": "2026-07-28T15:35:25.704Z",
           "evidenceHash": "6a295d4dbadac75431cee28254c5a8914512646d7f847f06fdb3fe950a597815"
         },
         {
@@ -497,7 +493,7 @@
           "providerRecordHash": "f87f18d5916f4eba37a04fb8c01d3b607f8e5ec887789f7c3e9a299b2f44eea1",
           "provenanceKind": "OFFICIAL_SOURCE",
           "verificationStatus": "NOT_VERIFIED",
-          "lastVerifiedAt": "2026-07-28T12:42:43.944Z",
+          "lastVerifiedAt": "2026-07-28T15:35:25.704Z",
           "evidenceHash": "d9a70a25c8beb6dca1ee218ffbaf7571a615ab4aa7ccf88f332f6c12fbbe8d52"
         }
       ],
@@ -821,8 +817,8 @@
           "operationalStatus": "NOT_COVERED",
           "statusMeaning": "FEED_ABSENCE_RECORD",
           "confidence": 100,
-          "verifiedAt": "2026-07-28T12:42:43.944Z",
-          "retrievedAt": "2026-07-28T12:42:43.944Z",
+          "verifiedAt": "2026-07-28T15:35:25.704Z",
+          "retrievedAt": "2026-07-28T15:35:25.704Z",
           "strictRouteEligible": false,
           "strictRouteEligibleReason": "NO_OFFICIAL_STATUS_FEED"
         },
@@ -840,8 +836,8 @@
           "operationalStatus": "AVAILABLE",
           "statusMeaning": "REALTIME_OPERATION",
           "confidence": 100,
-          "verifiedAt": "2026-07-28T12:42:43.944Z",
-          "retrievedAt": "2026-07-28T12:42:43.944Z",
+          "verifiedAt": "2026-07-28T15:35:25.704Z",
+          "retrievedAt": "2026-07-28T15:35:25.704Z",
           "strictRouteEligible": false,
           "strictRouteEligibleReason": "STATUS_PROBE_NOT_ROUTE_EVIDENCE"
         }
