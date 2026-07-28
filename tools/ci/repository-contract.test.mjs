@@ -8079,6 +8079,8 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   const artifactIndex = workflow.indexOf("Data Pack Release / Upload staged data packs");
   const manifestIndex = workflow.indexOf("Data Pack Release / Stage manifest");
   const itxContractValidationIndex = workflow.indexOf("Data Pack Release / Validate ITX-청춘 coverage contract");
+  const sourceFreshnessIndex = workflow.indexOf("Data Pack Release / Validate source snapshot freshness");
+  const accessibilitySourceCoverageIndex = workflow.indexOf("Data Pack Release / Validate accessibility source coverage");
   const evidenceBundleIndex = workflow.indexOf("Data Pack Release / Write release evidence bundle");
   const jobEnvBlock = workflow.match(/\n    env:\n[\s\S]*?\n\n    steps:/)?.[0] ?? "";
 
@@ -8089,6 +8091,9 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.doesNotMatch(jobEnvBlock, /runner\.temp/, "job-level env cannot use runner context");
   assert.match(workflow, /Data Pack Release \/ Configure temp directories/);
   assert.ok(itxContractValidationIndex >= 0, "ITX coverage contract validation step must exist");
+  assert.ok(sourceFreshnessIndex >= 0, "source snapshot freshness step must exist");
+  assert.ok(accessibilitySourceCoverageIndex > sourceFreshnessIndex, "accessibility source coverage must run after source freshness");
+  assert.match(workflow, /build-accessibility-source-coverage-report\.mjs[\s\S]*?--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"[\s\S]*?--manifest-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"[\s\S]*?--bundled-index apps\/mobile\/assets\/datapacks\/index\.json[\s\S]*?--inventory tools\/datapack\/source-inventory\.json/);
   assert.ok(
     itxContractValidationIndex < evidenceBundleIndex,
     "ITX coverage contract must be validated before release evidence is hashed",
@@ -8158,6 +8163,7 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.ok(routeMapAuditIndex > prepareIndex, "workflow must audit reviewed route map coordinates after release fixture preparation");
   assert.ok(buildIndex > routeMapAuditIndex, "workflow must build data packs after route map coordinate audit");
   assert.ok(validateIndex >= 0, "workflow must validate generated data packs");
+  assert.ok(accessibilitySourceCoverageIndex > validateIndex, "accessibility source coverage must validate the generated manifest");
   assert.ok(packIndex > validateIndex, "workflow must stage pack files after validation");
   assert.ok(verifyIndex > packIndex, "workflow must verify staged pack checksums before manifest staging");
   assert.ok(manifestIndex > verifyIndex, "workflow must stage manifest after pack checksum verification");
@@ -10168,8 +10174,11 @@ test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 
     (row) => row.facilityType !== "ACCESSIBILITY_STATUS_PROBE",
   );
   assert.equal(requiredFacilityEvidence.length, input.supportedV1Scope.facilityCoverageDenominator.expectedRows);
+  assert.ok(requiredFacilityEvidence.filter(({ evidenceKind }) => evidenceKind === "NOT_EXISTS")
+    .every(({ strictRouteEligibleReason }) => strictRouteEligibleReason === "FACILITY_NOT_INSTALLED"));
   // #1996: 접근성 상태 실측 증거(ACCESSIBILITY_STATUS_PROBE)는 별도 행으로 추가된다.
-  // 사당 UNDER_MAINTENANCE(EXISTS·보수중·strict 부적격), 상록수 NO_OFFICIAL_FEED(NOT_EXISTS·부재 기록).
+  // fresh snapshot 기준 사당 AVAILABLE(EXISTS)이지만 route edge 실측이 아니므로 strict 부적격,
+  // 상록수는 NO_OFFICIAL_FEED(NOT_EXISTS·부재 기록)다.
   const probeEvidence = importedPack.stationFacilityEvidence.filter(
     (row) => row.facilityType === "ACCESSIBILITY_STATUS_PROBE",
   );
@@ -10180,11 +10189,12 @@ test("strict route coverage는 UNKNOWN edge와 unpromoted movement candidate를 
         evidenceKind: row.evidenceKind,
         operationalStatus: row.operationalStatus,
         strictRouteEligible: row.strictRouteEligible,
+        strictRouteEligibleReason: row.strictRouteEligibleReason,
       }))
       .sort((left, right) => codepointCompare(left.stationId, right.stationId)),
     [
-      { stationId: "station-sadang", evidenceKind: "EXISTS", operationalStatus: "UNDER_MAINTENANCE", strictRouteEligible: false },
-      { stationId: "station-sangnoksu", evidenceKind: "NOT_EXISTS", operationalStatus: "NOT_COVERED", strictRouteEligible: false },
+      { stationId: "station-sadang", evidenceKind: "EXISTS", operationalStatus: "AVAILABLE", strictRouteEligible: false, strictRouteEligibleReason: "OPERATION_STATUS_NOT_AVAILABLE" },
+      { stationId: "station-sangnoksu", evidenceKind: "NOT_EXISTS", operationalStatus: "NOT_COVERED", strictRouteEligible: false, strictRouteEligibleReason: "NO_OFFICIAL_STATUS_FEED" },
     ],
   );
 });

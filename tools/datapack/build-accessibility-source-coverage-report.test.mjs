@@ -1,0 +1,281 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
+import test from "node:test";
+import { gzipSync } from "node:zlib";
+
+import {
+  buildAccessibilitySourceCoverageReport,
+  loadAccessibilityAdmissionSnapshots,
+  loadSelectableAccessibilityArtifacts,
+} from "./build-accessibility-source-coverage-report.mjs";
+
+const EVALUATED_AT = "2026-07-28T00:00:00.000Z";
+
+test("selectable artifact의 모든 claim이 fresh official snapshot에 결속되면 GO다", () => {
+  const input = validInput();
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(report.decision, "GO");
+  assert.deepEqual(report.artifacts, [
+    { artifactId: "bundled-capital", sqliteSha256: hash("sqlite-a"), searchableStationCount: 1, claimCount: 1 },
+    { artifactId: "remote-capital", sqliteSha256: hash("sqlite-b"), searchableStationCount: 1, claimCount: 1 },
+  ]);
+  assert.deepEqual(report.providerDomainMatrix, [{
+    sourceId: "official-accessibility",
+    domain: "FACILITY",
+    artifactIds: ["bundled-capital", "remote-capital"],
+    claimCount: 2,
+    status: "ADMITTED",
+  }]);
+  assert.deepEqual(report.violations, emptyViolations());
+});
+
+test("tracked snapshot bytes와 inventory file SHA가 일치해야 한다", async (t) => {
+  const repositoryRoot = await mkdtemp(path.join(tmpdir(), "easysubway-accessibility-snapshot-"));
+  t.after(() => rm(repositoryRoot, { recursive: true, force: true }));
+  const snapshotPath = "official-accessibility-20260728.json";
+  const snapshot = {
+    sourceId: "official-accessibility",
+    snapshotId: "official-accessibility-20260728",
+    capturedAt: "2026-07-27T23:00:00.000Z",
+    observedAt: "2026-07-27T23:00:00.000Z",
+    freshUntil: "2026-07-29T23:00:00.000Z",
+    rawSha256: hash("raw"),
+    contentSha256: hash("content"),
+    schemaFingerprint: hash("schema"),
+  };
+  const bytes = `${JSON.stringify(snapshot)}\n`;
+  await writeFile(path.join(repositoryRoot, snapshotPath), bytes);
+  const sources = [{
+    id: snapshot.sourceId,
+    accessibilityAdmissionEvidence: { snapshotPath, snapshotFileSha256: hashBytes(bytes) },
+  }];
+
+  const [loaded] = await loadAccessibilityAdmissionSnapshots({
+    sources,
+    referencedSourceIds: new Set([snapshot.sourceId]),
+    repositoryRoot,
+  });
+
+  assert.equal(loaded.snapshotFileSha256, hashBytes(bytes));
+  assert.equal(loaded.snapshotId, snapshot.snapshotId);
+});
+
+test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면 artifact 하나로 읽는다", async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), "easysubway-accessibility-source-report-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  const gzipPath = path.join(directory, "catalog", "capital.sqlite.gz");
+  await mkdir(path.dirname(gzipPath));
+  const database = new DatabaseSync(sqlitePath);
+  database.exec(`
+    CREATE TABLE stations (id TEXT PRIMARY KEY);
+    CREATE TABLE station_lines (station_id TEXT, line_id TEXT);
+    CREATE TABLE station_facility_evidence (
+      station_id TEXT, line_id TEXT, facility_type TEXT, evidence_kind TEXT,
+      source_id TEXT, source_snapshot_id TEXT, provider_record_hash TEXT, evidence_hash TEXT
+    );
+  `);
+  database.prepare("INSERT INTO stations VALUES (?)").run("station-a");
+  database.prepare("INSERT INTO station_lines VALUES (?, ?)").run("station-a", "line-a");
+  database.prepare("INSERT INTO station_facility_evidence VALUES (?, ?, ?, ?, ?, ?, ?, ?)").run(
+    "station-a", "line-a", "ELEVATOR", "VERIFIED_PRESENT", "official-accessibility",
+    "official-accessibility-20260728", hash("record"), hash("evidence"),
+  );
+  database.close();
+  const sqliteBytes = await readFile(sqlitePath);
+  await writeFile(gzipPath, gzipSync(sqliteBytes));
+  const index = {
+    packs: [{
+      id: "capital",
+      asset: "catalog/capital.sqlite.gz",
+      sqliteSha256: hashBytes(sqliteBytes),
+    }],
+  };
+  const manifest = {
+    packs: [{
+      id: "capital",
+      url: "https://datapack.example/catalog/capital.sqlite.gz",
+      sqliteSha256: hashBytes(sqliteBytes),
+    }],
+  };
+
+  const artifacts = await loadSelectableAccessibilityArtifacts({
+    manifest,
+    manifestRoot: directory,
+    bundledIndex: index,
+    bundledRoot: directory,
+  });
+
+  assert.deepEqual(artifacts, [{
+    artifactId: "bundled-capital",
+    sqliteSha256: hashBytes(sqliteBytes),
+    searchableStationIds: ["station-a"],
+    claims: [{
+      stationId: "station-a",
+      lineId: "line-a",
+      domain: "FACILITY",
+      evidenceKind: "VERIFIED_PRESENT",
+      sourceId: "official-accessibility",
+      sourceSnapshotId: "official-accessibility-20260728",
+      providerRecordHash: hash("record"),
+      evidenceHash: hash("evidence"),
+    }],
+  }]);
+});
+
+for (const { name, mutate, partition, expected } of [
+  {
+    name: "expired snapshot",
+    mutate: (input) => { input.inventory.sources[0].accessibilityAdmissionEvidence.freshUntil = EVALUATED_AT; },
+    partition: "freshness",
+    expected: "official-accessibility:SNAPSHOT_STALE",
+  },
+  {
+    name: "missing redistribution permission",
+    mutate: (input) => { input.inventory.sources[0].license.redistributionAllowed = false; },
+    partition: "license",
+    expected: "official-accessibility:LICENSE_NOT_REDISTRIBUTABLE",
+  },
+  {
+    name: "snapshot digest mismatch",
+    mutate: (input) => { input.snapshots[0].rawSha256 = hash("different-raw"); },
+    partition: "snapshot",
+    expected: "official-accessibility:SNAPSHOT_IDENTITY_MISMATCH",
+  },
+  {
+    name: "snapshot file digest mismatch",
+    mutate: (input) => { input.snapshots[0].snapshotFileSha256 = hash("different-file"); },
+    partition: "snapshot",
+    expected: "official-accessibility:SNAPSHOT_IDENTITY_MISMATCH",
+  },
+  {
+    name: "claim provenance missing",
+    mutate: (input) => { input.artifacts[0].claims[0].sourceId = ""; },
+    partition: "provenance",
+    expected: "bundled-capital:station-a|line-a|FACILITY:PROVENANCE_MISSING",
+  },
+  {
+    name: "row absence without completeness evidence",
+    mutate: (input) => {
+      input.artifacts[0].claims[0].evidenceKind = "NOT_EXISTS";
+      delete input.inventory.sources[0].accessibilityAdmissionEvidence.absenceEvidenceMode;
+    },
+    partition: "absenceEvidence",
+    expected: "bundled-capital:station-a|line-a|FACILITY:ABSENCE_EVIDENCE_MISSING",
+  },
+  {
+    name: "placeholder evidence hash",
+    mutate: (input) => { input.artifacts[0].claims[0].evidenceHash = "a".repeat(64); },
+    partition: "placeholder",
+    expected: "bundled-capital:station-a|line-a|FACILITY:EVIDENCE_HASH_PLACEHOLDER",
+  },
+  {
+    name: "duplicate artifact identity",
+    mutate: (input) => { input.artifacts[1].artifactId = "bundled-capital"; },
+    partition: "artifactIdentity",
+    expected: "bundled-capital:DUPLICATE_ARTIFACT_ID",
+  },
+]) {
+  test(`${name}는 ${partition} violation으로 NO_GO다`, () => {
+    const input = validInput();
+    mutate(input);
+
+    const report = buildAccessibilitySourceCoverageReport(input);
+
+    assert.equal(report.decision, "NO_GO");
+    assert.deepEqual(report.violations[partition], [expected]);
+  });
+}
+
+function validInput() {
+  const rawSha256 = hash("raw-snapshot");
+  const contentSha256 = hash("normalized-snapshot");
+  const schemaFingerprint = hash("schema");
+  const snapshotFileSha256 = hash("snapshot-file");
+  const snapshotId = "official-accessibility-20260728";
+  const sourceId = "official-accessibility";
+  const claim = (stationId) => ({
+    stationId,
+    lineId: "line-a",
+    domain: "FACILITY",
+    evidenceKind: "VERIFIED_PRESENT",
+    sourceId,
+    sourceSnapshotId: snapshotId,
+    providerRecordHash: hash(`${stationId}-record`),
+    evidenceHash: contentSha256,
+  });
+  return {
+    evaluatedAt: EVALUATED_AT,
+    artifacts: [
+      {
+        artifactId: "bundled-capital",
+        sqliteSha256: hash("sqlite-a"),
+        searchableStationIds: ["station-a"],
+        claims: [claim("station-a")],
+      },
+      {
+        artifactId: "remote-capital",
+        sqliteSha256: hash("sqlite-b"),
+        searchableStationIds: ["station-b"],
+        claims: [claim("station-b")],
+      },
+    ],
+    inventory: {
+      sources: [{
+        id: sourceId,
+        productionUseAllowed: true,
+        license: { redistributionAllowed: true, attribution: "공식 제공기관" },
+        accessibilityAdmissionEvidence: {
+          snapshotId,
+          snapshotPath: "tools/datapack/sources/official-accessibility-20260728.json",
+          capturedAt: "2026-07-27T23:00:00.000Z",
+          observedAt: "2026-07-27T23:00:00.000Z",
+          freshUntil: "2026-07-29T23:00:00.000Z",
+          rawSha256,
+          contentSha256,
+          schemaFingerprint,
+          snapshotFileSha256,
+          absenceEvidenceMode: "EXPLICIT_ZERO",
+        },
+      }],
+    },
+    snapshots: [{
+      sourceId,
+      snapshotId,
+      snapshotPath: "tools/datapack/sources/official-accessibility-20260728.json",
+      capturedAt: "2026-07-27T23:00:00.000Z",
+      observedAt: "2026-07-27T23:00:00.000Z",
+      freshUntil: "2026-07-29T23:00:00.000Z",
+      rawSha256,
+      contentSha256,
+      schemaFingerprint,
+      snapshotFileSha256,
+    }],
+  };
+}
+
+function emptyViolations() {
+  return {
+    freshness: [],
+    license: [],
+    provenance: [],
+    snapshot: [],
+    absenceEvidence: [],
+    placeholder: [],
+    artifactIdentity: [],
+  };
+}
+
+function hash(value) {
+  return createHash("sha256").update(value).digest("hex");
+}
+
+function hashBytes(value) {
+  return createHash("sha256").update(value).digest("hex");
+}

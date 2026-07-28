@@ -75,6 +75,7 @@ jobs:
             echo "EASYSUBWAY_ROUTE_MAP_AUDIT_REPORT=${{ runner.temp }}/easysubway-datapack-stage/route-map-audit.json"
             echo "EASYSUBWAY_COVERAGE_GAP_REPORT=${{ runner.temp }}/easysubway-datapack-stage/coverage-gap-report.json"
             echo "EASYSUBWAY_ROUTE_GRAPH_TOPOLOGY_REPORT=${{ runner.temp }}/easysubway-datapack-stage/route-graph-topology-report.json"
+            echo "EASYSUBWAY_ACCESSIBILITY_SOURCE_COVERAGE_REPORT=${{ runner.temp }}/easysubway-datapack-stage/accessibility-source-coverage.json"
             echo "EASYSUBWAY_HEADWAY_REPORT=${{ runner.temp }}/easysubway-datapack-stage/datapack-headways.json"
             echo "EASYSUBWAY_RELEASE_EVIDENCE_BUNDLE=${{ runner.temp }}/easysubway-datapack-stage/release-evidence-bundle.json"
             echo "EASYSUBWAY_LAUNCH_DENOMINATOR_REPORT=${{ runner.temp }}/easysubway-datapack-stage/launch-denominator-report.json"
@@ -573,6 +574,19 @@ jobs:
               --manifest "${EASYSUBWAY_DATAPACK_OUTPUT}/current.json"
           fi
           node -e "const manifest=require(process.env.EASYSUBWAY_DATAPACK_OUTPUT + '/current.json'); if (!manifest.packs.every((pack) => Array.isArray(pack.sourceInventory) && pack.sourceInventory.length > 0)) throw new Error('sourceInventory missing');"
+
+      - name: Data Pack Release / Validate accessibility source coverage
+        if: ${{ steps.release-mode.outputs.mode == 'release-candidate' || steps.release-mode.outputs.mode == 'production-publish' }}
+        run: |
+          set -euo pipefail
+          evaluation_at="${EASYSUBWAY_SOURCE_GOVERNANCE_EVALUATION_AT:-$(date -u +%Y-%m-%dT%H:%M:%S.000Z)}"
+          node tools/datapack/build-accessibility-source-coverage-report.mjs \
+            --manifest "${EASYSUBWAY_DATAPACK_OUTPUT}/current.json" \
+            --manifest-root "${EASYSUBWAY_DATAPACK_OUTPUT}" \
+            --bundled-index apps/mobile/assets/datapacks/index.json \
+            --inventory tools/datapack/source-inventory.json \
+            --evaluation-at "${evaluation_at}" \
+            --output "${EASYSUBWAY_ACCESSIBILITY_SOURCE_COVERAGE_REPORT}"
 
       - name: Data Pack Release / Write coverage gap evidence
         if: ${{ steps.release-mode.outputs.is-pointer-only != 'true' }}
