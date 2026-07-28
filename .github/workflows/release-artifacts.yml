@@ -232,6 +232,7 @@ jobs:
             --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY="${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}" \
             --dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false
           flutter build appbundle --release \
+            --target-platform=android-arm,android-arm64 \
             --dart-define=EASYSUBWAY_API_BASE_URL="${DEPLOY_PUBLIC_API_BASE_URL}" \
             --dart-define=EASYSUBWAY_TERMS_OF_SERVICE_URL="${EASYSUBWAY_TERMS_OF_SERVICE_URL}" \
             --dart-define=EASYSUBWAY_PRIVACY_POLICY_URL="${EASYSUBWAY_PRIVACY_POLICY_URL}" \
@@ -450,6 +451,7 @@ jobs:
             --dart-define=EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER="${EASYSUBWAY_PLAY_INTEGRITY_CLOUD_PROJECT_NUMBER}" \
             --dart-define=EASYSUBWAY_ENABLE_PUSH_NOTIFICATIONS=false
           flutter build appbundle --release \
+            --target-platform=android-arm,android-arm64 \
             --dart-define=EASYSUBWAY_API_BASE_URL="${DEPLOY_PUBLIC_API_BASE_URL}" \
             --dart-define=EASYSUBWAY_TERMS_OF_SERVICE_URL="${EASYSUBWAY_TERMS_OF_SERVICE_URL}" \
             --dart-define=EASYSUBWAY_PRIVACY_POLICY_URL="${EASYSUBWAY_PRIVACY_POLICY_URL}" \

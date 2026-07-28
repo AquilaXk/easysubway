@@ -142,7 +142,7 @@
       "platform": "android",
       "titleKo": "Android internal test track install",
       "finalAcceptanceIds": ["app_starts_without_backend"],
-      "command": "cd apps/mobile && flutter build appbundle --release",
+      "command": "cd apps/mobile && ../../tools/mobile/validate-release-dart-defines.sh --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\" && flutter build appbundle --release --target-platform=android-arm,android-arm64 --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\"",
       "manualTarget": "installable internal-test-track build or documented Play App Signing path",
       "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/internal-test-track-install",
       "evidence": ["appbundle_build_output", "install_result"],

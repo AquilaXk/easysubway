@@ -3077,7 +3077,10 @@ test("release dart-define guard는 public API URL과 demo flag를 검증한다",
   ];
   for (const args of rejectedArgs) {
     await assert.rejects(
-      execFileAsync("tools/mobile/validate-release-dart-defines.sh", args, { cwd: root }),
+      execFileAsync("tools/mobile/validate-release-dart-defines.sh", [
+        ...args,
+        "--dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=test-native-map-key",
+      ], { cwd: root }),
       /EASYSUBWAY_API_BASE_URL/,
     );
   }
@@ -7911,6 +7914,10 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(datapackWorkflow, /remote_publish_enabled=\$\{remotePublishEnabled \|\| "unknown"\}/);
   assert.match(datapackWorkflow, /remotePublishResult === "success" \? "success" : "failed"/);
   assert.match(releaseArtifactsWorkflow, /mapping_retention_days=90/);
+  assert.equal(
+    (releaseArtifactsWorkflow.match(/--target-platform=android-arm,android-arm64/g) ?? []).length,
+    2,
+  );
   assert.doesNotMatch(releaseArtifactsWorkflow, /dsym_retention_days=90/);
   assert.match(releaseArtifactsWorkflow, /retention-days: 90/);
 });
@@ -7989,6 +7996,11 @@ test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정
   ]);
   assert.deepEqual(idsByPlatform.get("android"), requiredAndroidChecks.toSorted());
   assert.deepEqual(idsByPlatform.get("ios"), requiredIosChecks.toSorted());
+  const androidInstallCheck = gate.checks.find(
+    (check) => check.id === "android_internal_test_track_install",
+  );
+  assert.match(androidInstallCheck.command, /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY/);
+  assert.match(androidInstallCheck.command, /--target-platform=android-arm,android-arm64/);
 
   for (const check of gate.checks) {
     if (check.id === "android_app_start_backend_down") {
@@ -15756,6 +15768,7 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   const androidDebugManifest = read("apps/mobile/android/app/src/debug/AndroidManifest.xml");
   const androidProfileManifest = read("apps/mobile/android/app/src/profile/AndroidManifest.xml");
   const androidBuildGradle = read("apps/mobile/android/app/build.gradle.kts");
+  const androidProguardRules = read("apps/mobile/android/app/proguard-rules.pro");
   const envExample = read(".env.example");
   const iosInfoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const main = read("apps/mobile/lib/main.dart");
@@ -15877,6 +15890,9 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(androidBuildGradle, /"EASYSUBWAY_ANDROID_KEY_PASSWORD"/);
   assert.match(androidBuildGradle, /providers\.environmentVariable\(name\)/);
   assert.match(androidBuildGradle, /throw GradleException\([\s\S]*Android release signing values are missing:/);
+  assert.match(androidProguardRules, /-keep class com\.kakao\.vectormap\.\*\* \{ \*; \}/);
+  assert.match(androidProguardRules, /-keep interface com\.kakao\.vectormap\.\*\*/);
+  assert.match(envExample, /^EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=$/m);
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEYSTORE_PATH=$/m);
   assert.match(envExample, /^EASYSUBWAY_ANDROID_STORE_PASSWORD=$/m);
   assert.match(envExample, /^EASYSUBWAY_ANDROID_KEY_ALIAS=$/m);

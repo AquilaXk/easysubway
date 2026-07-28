@@ -152,11 +152,7 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
       );
     }
 
-    final option = KakaoMapOption(
-      position: _initialPosition,
-      zoomLevel: 16,
-      viewName: 'station-exit-${widget.station.id}-$_generation',
-    );
+    final option = KakaoMapOption(position: _initialPosition, zoomLevel: 16);
     final builder = widget.nativeMapBuilder ?? _buildNativeMap;
     final selectedExit = widget.exits.firstWhere(
       (exit) => exit.id == widget.selectedExitId,
@@ -235,14 +231,22 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
         if (!mounted || generation != _generation) {
           return;
         }
-        _pois[point.id] = await controller.labelLayer.addPoi(
+        final style = await _markerStyle(
+          point.number,
+          selected: point.id == selectedExitIdAtStart,
+        );
+        if (!mounted || generation != _generation) {
+          return;
+        }
+        final poi = await controller.labelLayer.addPoi(
           LatLng(point.latitude, point.longitude),
           id: point.id,
-          style: await _markerStyle(
-            point.number,
-            selected: point.id == selectedExitIdAtStart,
-          ),
+          style: style,
         );
+        if (!mounted || generation != _generation) {
+          return;
+        }
+        _pois[point.id] = poi;
       }
       final positions = [
         for (final point in _points) LatLng(point.latitude, point.longitude),

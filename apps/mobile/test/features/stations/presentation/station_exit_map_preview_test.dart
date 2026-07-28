@@ -62,6 +62,7 @@ void main() {
     expect(capturedOption!.position.latitude, 37.302795);
     expect(capturedOption!.position.longitude, 126.866489);
     expect(capturedOption!.zoomLevel, 16);
+    expect(capturedOption!.viewName, isNull);
     expect(
       find.bySemanticsLabel('1번 출구 카카오맵에서 보기, 출구 좌표가 없어 역 위치 기준으로 새 앱이 열립니다'),
       findsOneWidget,
@@ -405,6 +406,102 @@ void main() {
 
     expect(controller.labels.pois['exit-1']!.lastStyle.icon!.width, 32);
     expect(controller.labels.pois['exit-2']!.lastStyle.icon!.width, 36);
+  });
+
+  testWidgets('재시도 전 addPoi 결과가 새 지도 marker를 덮어쓰지 않는다', (tester) async {
+    final firstPoiGate = Completer<void>();
+    final oldController = _FakeKakaoMapController(firstPoiGate: firstPoiGate);
+    final newController = _FakeKakaoMapController();
+    final exits = [
+      _exit(id: 'exit-1', number: '1', latitude: 37.301, longitude: 126.861),
+      _exit(id: 'exit-2', number: '2', latitude: 37.302, longitude: 126.862),
+    ];
+    var selectedExitId = 'exit-1';
+    var buildCount = 0;
+    late StateSetter updateHost;
+    late ValueChanged<Error> failMap;
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: StatefulBuilder(
+          builder: (context, setState) {
+            updateHost = setState;
+            return Scaffold(
+              body: StationExitMapPreview(
+                station: _station(),
+                exits: exits,
+                selectedExitId: selectedExitId,
+                onOpenSelected: () {},
+                nativeAppKey: 'test-native-map-key',
+                nativeMapBuilder:
+                    ({
+                      required key,
+                      required option,
+                      required onMapReady,
+                      required onMapError,
+                    }) {
+                      buildCount++;
+                      failMap = onMapError;
+                      return _MapReadyStub(
+                        key: key,
+                        controller: buildCount == 1
+                            ? oldController
+                            : newController,
+                        onReady: onMapReady,
+                      );
+                    },
+              ),
+            );
+          },
+        ),
+      ),
+    );
+    await tester.pump();
+    for (
+      var attempt = 0;
+      attempt < 10 && oldController.labels.addPoiCount == 0;
+      attempt++
+    ) {
+      await tester.pump(const Duration(milliseconds: 1));
+    }
+
+    await runWithMobileErrorReporter((_) {}, () async {
+      failMap(_FakeMapError());
+      await tester.pump();
+    });
+    await tester.tap(find.widgetWithText(TextButton, '다시 시도'));
+    await tester.pump();
+    for (
+      var attempt = 0;
+      attempt < 10 && newController.labels.addPoiCount < 2;
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+
+    firstPoiGate.complete();
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump();
+    updateHost(() => selectedExitId = 'exit-2');
+    await tester.pump();
+    for (
+      var attempt = 0;
+      attempt < 10 && newController.labels.changeStyleCount < 2;
+      attempt++
+    ) {
+      await tester.runAsync(
+        () => Future<void>.delayed(const Duration(milliseconds: 10)),
+      );
+      await tester.pump();
+    }
+
+    expect(newController.labels.pois['exit-1']!.lastStyle.icon!.width, 32);
+    expect(newController.labels.pois['exit-2']!.lastStyle.icon!.width, 36);
   });
 }
 
