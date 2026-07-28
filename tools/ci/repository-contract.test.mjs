@@ -18300,7 +18300,7 @@ test("iOS 위치 권한은 앱 사용 중 목적만 설명한다", () => {
   assert.doesNotMatch(infoPlist, /UIBackgroundModes/);
 });
 
-test("전화 앱은 일반 세로 모드만 지원한다", () => {
+test("전화 앱은 세로 모드, 대화면은 자유 회전을 지원한다", () => {
   const androidManifest = read("apps/mobile/android/app/src/main/AndroidManifest.xml");
   const activityDeclarations = [
     ...androidManifest.matchAll(/<activity\b[^>]*>/g),
@@ -18310,8 +18310,19 @@ test("전화 앱은 일반 세로 모드만 지원한다", () => {
       candidate.includes(`android:name="${activity}"`),
     );
     assert.ok(declaration, `${activity} declaration is missing`);
-    assert.match(declaration, /android:screenOrientation="portrait"/);
+    assert.match(
+      declaration,
+      /android:screenOrientation="@integer\/app_screen_orientation"/,
+    );
   }
+  assert.match(
+    read("apps/mobile/android/app/src/main/res/values/orientation.xml"),
+    /<integer name="app_screen_orientation">1<\/integer>/,
+  );
+  assert.match(
+    read("apps/mobile/android/app/src/main/res/values-sw600dp/orientation.xml"),
+    /<integer name="app_screen_orientation">-1<\/integer>/,
+  );
 
   const infoPlist = read("apps/mobile/ios/Runner/Info.plist");
   const orientations = (key) => {
