@@ -469,7 +469,7 @@ test("SVG geometry extractor returns transformed visible text polygons", async (
   );
 });
 
-test("SVG geometry extractor rejects an empty --output path before browser launch", async () => {
+test("SVG geometry extractor rejects an invalid --output path before browser launch", async () => {
   await assert.rejects(
     execFileAsync(
       process.execPath,
@@ -479,6 +479,9 @@ test("SVG geometry extractor rejects an empty --output path before browser launc
         "--region",
         "fixture",
         "--output",
+        "--pretty",
+        "--browser",
+        "/definitely/missing",
       ],
       { cwd: root, maxBuffer: 1024 * 1024 },
     ),

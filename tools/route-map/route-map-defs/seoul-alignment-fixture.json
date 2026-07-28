@@ -9,6 +9,14 @@
   },
   "stationCount": 799,
   "unmatchedCount": 1,
+  "unmatched": [
+    {
+      "stationId": "station-4c48e8115728",
+      "lineId": "line-6e39be0cb6e2",
+      "name": "도라산",
+      "reason": "오너 도식이 임진강까지 수록·도라산 제외(설계 결정). 카탈로그 유지(역 검색 가능)."
+    }
+  ],
   "maxDeltaPx": 0,
   "entries": [
     {

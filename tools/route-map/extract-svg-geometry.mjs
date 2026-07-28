@@ -46,7 +46,9 @@ function parseArgs(argv) {
       options.region = argv[++index] ?? "";
     } else if (arg === "--output") {
       const output = argv[++index] ?? "";
-      if (!output.trim()) throw new Error("--output requires a non-empty path.");
+      if (!output.trim() || output.startsWith("--")) {
+        throw new Error("--output requires a non-empty path.");
+      }
       options.output = output;
     } else if (arg.startsWith("--")) {
       throw new Error(`Unknown option: ${arg}`);
