@@ -181,6 +181,52 @@ test("snapshot content에서 재계산할 수 없는 임의 claim hash는 NO_GO�
   ]);
 });
 
+test("Seoul snapshot에 존재하는 역·노선은 NOT_EXISTS로 위조할 수 없다", () => {
+  const input = validInput();
+  const sourceId = "seoul-metro-accessibility";
+  const snapshotId = "seoul-metro-accessibility-20260728";
+  const claim = input.artifacts[0].claims[0];
+  input.artifacts = [input.artifacts[0]];
+  Object.assign(claim, {
+    stationId: "station-sadang",
+    stationName: "사당",
+    lineId: "seoul-4",
+    evidenceKind: "NOT_EXISTS",
+    sourceId,
+    sourceSnapshotId: snapshotId,
+  });
+  claim.providerRecordHash = hash(JSON.stringify({
+    stationId: claim.stationId,
+    lineName: "4호선",
+    status: "NOT_COVERED",
+  }));
+  claim.evidenceHash = hash(JSON.stringify({
+    snapshotId,
+    stationId: claim.stationId,
+    lineId: claim.lineId,
+    providerRecordHash: claim.providerRecordHash,
+  }));
+  Object.assign(input.inventory.sources[0], { id: sourceId });
+  Object.assign(input.inventory.sources[0].accessibilityAdmissionEvidence, {
+    snapshotId,
+    absenceEvidenceMode: "EXHAUSTIVE_LIST",
+  });
+  Object.assign(input.snapshots[0], {
+    artifactKind: "seoul-accessibility-snapshot",
+    sourceId,
+    snapshotId,
+    stations: [{ stationName: "사당", lineName: "4호선", facilities: [] }],
+  });
+  delete input.snapshots[0].claimBindings;
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(report.decision, "NO_GO");
+  assert.deepEqual(report.violations.provenance, [
+    "bundled-capital:station-sadang|seoul-4|STATION_FACILITY_EVIDENCE:CLAIM_SNAPSHOT_BINDING_MISMATCH",
+  ]);
+});
+
 for (const { name, mutate, partition, expected } of [
   {
     name: "expired snapshot",

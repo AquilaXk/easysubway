@@ -159,6 +159,9 @@ export async function loadAccessibilityAdmissionSnapshots({ sources, referencedS
 function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
   const database = new DatabaseSync(sqlitePath, { readOnly: true });
   try {
+    const stationNames = tableHasColumns(database, "stations", ["name_ko"])
+      ? new Map(database.prepare("SELECT id, name_ko FROM stations").all().map(({ id, name_ko }) => [id, name_ko]))
+      : new Map();
     const searchableStationIds = database.prepare(`
       SELECT DISTINCT stations.id
       FROM stations
@@ -236,7 +239,10 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
           };
         })
       : [];
-    const claims = [...evidenceClaims, ...facilityClaims, ...edgeClaims];
+    const claims = [...evidenceClaims, ...facilityClaims, ...edgeClaims].map((claim) => {
+      const stationName = stationNames.get(claim.stationId);
+      return stationName ? { ...claim, stationName } : claim;
+    });
     return { artifactId, sqliteSha256, searchableStationIds, claims };
   } finally {
     database.close();
@@ -369,12 +375,20 @@ function claimMatchesSnapshot(snapshot, claim) {
     });
   }
   if (snapshot.artifactKind === "seoul-accessibility-snapshot") {
-    const stationHashes = new Set((snapshot.stations ?? []).map((station) => digest(JSON.stringify(station))));
     const lineNumber = claim.lineId.match(/(\d+)$/)?.[1];
+    const lineName = lineNumber ? `${lineNumber}호선` : null;
+    const matchingStations = lineName && claim.stationName
+      ? (snapshot.stations ?? []).filter((station) => normalizeStationName(station.stationName) === normalizeStationName(claim.stationName)
+        && station.lineName === lineName)
+      : [];
     const absentHash = lineNumber
-      ? digest(JSON.stringify({ stationId: claim.stationId, lineName: `${lineNumber}호선`, status: "NOT_COVERED" }))
+      ? digest(JSON.stringify({ stationId: claim.stationId, lineName, status: "NOT_COVERED" }))
       : null;
-    if (!stationHashes.has(claim.providerRecordHash) && claim.providerRecordHash !== absentHash) return false;
+    if (claim.evidenceKind === "NOT_EXISTS") {
+      if (!claim.stationName || matchingStations.length > 0 || claim.providerRecordHash !== absentHash) return false;
+    } else if (!matchingStations.some((station) => digest(JSON.stringify(station)) === claim.providerRecordHash)) {
+      return false;
+    }
     const expectedEvidenceHash = claim.domain === "NETWORK_EDGE"
       ? digest(JSON.stringify({
         edgeId: claim.claimId,
@@ -390,6 +404,10 @@ function claimMatchesSnapshot(snapshot, claim) {
     return expectedEvidenceHash === claim.evidenceHash;
   }
   return false;
+}
+
+function normalizeStationName(value) {
+  return String(value ?? "").normalize("NFKC").replace(/역$/u, "").replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
 function sha256(value) {
