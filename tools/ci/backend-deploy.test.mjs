@@ -777,8 +777,12 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
       .matchAll(/"([0-9.]+\/[0-9]+)"/g),
   ].map((match) => match[1]);
 
-  const httpServer = host.slice(0, host.indexOf("server {", 1));
-  const httpsServer = host.slice(host.indexOf("server {", 1));
+  const defaultHttpsStart = host.indexOf("server {", 1);
+  const namedHttpsStart = host.indexOf("server {", defaultHttpsStart + 1);
+  const httpServer = host.slice(0, defaultHttpsStart);
+  const defaultHttpsServer = host.slice(defaultHttpsStart, namedHttpsStart);
+  const httpsServer = host.slice(namedHttpsStart);
+  assert.match(httpServer, /server_name easysubway-api\.aquilaxk\.site easysubway\.aquilaxk\.site;/);
   assert.match(httpServer, /location \^~ \/\.well-known\/acme-challenge\//);
   assert.match(httpServer, /location \/ \{\s*return 308 https:\/\/\$host\$request_uri;\s*\}/);
   assert.doesNotMatch(httpServer, /proxy_pass|__ROUTE_V2_ACTION__/);
@@ -795,11 +799,12 @@ test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 �
   assert.match(routeHeaders, /proxy_set_header CF-Connecting-IP \$remote_addr;/);
   assert.doesNotMatch(routeHeaders, /proxy_set_header CF-Connecting-IP \$http_cf_connecting_ip;/);
   assert.match(routeHeaders, /proxy_set_header X-Forwarded-For "";/);
-  assert.match(host, /listen 443 ssl default_server;[\s\S]*server_name _;[\s\S]*return 444;/);
-  assert.equal(
-    (host.match(/server_name easysubway-api\.aquilaxk\.site easysubway\.aquilaxk\.site;/g) ?? []).length,
-    2,
-  );
+  assert.match(defaultHttpsServer, /listen 443 ssl default_server;/);
+  assert.match(defaultHttpsServer, /server_name _;/);
+  assert.match(defaultHttpsServer, /return 444;/);
+  assert.doesNotMatch(defaultHttpsServer, /easysubway\.aquilaxk\.site/);
+  assert.match(httpsServer, /listen 443 ssl;/);
+  assert.match(httpsServer, /server_name easysubway-api\.aquilaxk\.site easysubway\.aquilaxk\.site;/);
   assert.equal((host.match(/listen 443 ssl default_server;/g) ?? []).length, 1);
   assert.match(deploy, /sudo nginx -t/);
   assert.match(deploy, /sudo systemctl reload nginx/);
