@@ -232,7 +232,7 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
         channel: "dev",
         releaseSequence: 1,
         publishedAt: fixture.manifest.publishedAt ?? buildPublishedAt(),
-        keyId: "validation-only",
+        keyId: process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID?.trim() || "production-v1",
       };
     }
     if (args["test-only-itx-admission"] != null) {

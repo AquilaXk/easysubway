@@ -1955,9 +1955,10 @@ test("데이터팩 생성기는 buildSpec과 fixture 동시 입력을 거부한�
 
 test("데이터팩 생성기는 일반 fixture 입력으로 production channel을 만들지 않는다", async () => {
   const workspace = await mkdtemp(path.join(tmpdir(), "easysubway-production-fixture-bypass-"));
-  const fixture = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
-  markFixturePackProduction(fixture);
-  fixture.manifest.channel = "production";
+  const fixture = JSON.parse(await readFile(
+    "tools/datapack/release/capital-production-reviewed-pack.json",
+    "utf8",
+  ));
   const fixturePath = path.join(workspace, "fixture.json");
   await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
 
@@ -1992,6 +1993,12 @@ test("데이터팩 생성기는 일반 fixture 입력으로 production channel�
       "utf8",
     ));
     assert.equal(manifest.channel, "dev");
+    await execFileAsync(process.execPath, [
+      "tools/datapack/validate-datapack.mjs",
+      "--manifest", path.join(workspace, "validation-output/current.json"),
+      "--root", path.join(workspace, "validation-output"),
+      "--require-production",
+    ], { cwd: root, env: productionEnv });
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
