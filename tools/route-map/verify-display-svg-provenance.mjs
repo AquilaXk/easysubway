@@ -22,6 +22,15 @@ function sha256(bytes) {
 
 function assertNoExternalSubresources(bytes, label) {
   const svg = bytes.toString("utf8");
+  for (const [pattern, construct] of [
+    [/<!DOCTYPE\b/i, "DOCTYPE"],
+    [/<!ENTITY\b/i, "ENTITY"],
+    [/<script\b/i, "script"],
+    [/<foreignObject\b/i, "foreignObject"],
+    [/@import\b/i, "CSS @import"],
+  ]) {
+    assert.ok(!pattern.test(svg), `${label}: self-contained SVG forbids ${construct}`);
+  }
   const references = [
     ...svg.matchAll(/\b(?:href|xlink:href)\s*=\s*["']([^"']*)["']/gi),
     ...svg.matchAll(/\burl\(\s*["']?([^)'"\s]+)["']?\s*\)/gi),

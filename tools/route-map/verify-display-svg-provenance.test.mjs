@@ -82,3 +82,27 @@ test("verifyDisplaySvgProvenance: external SVG subresources fail closed", () => 
     assert.throws(() => verifyDisplaySvgProvenance(root, "manifest.json"), /external SVG subresource/);
   });
 });
+
+test("verifyDisplaySvgProvenance: self-contained SVG contract rejects dynamic loaders", () => {
+  for (const [label, markup] of [
+    ["string CSS import", '<svg><style>@import "https://example.test/map.css";</style></svg>\n'],
+    ["DOCTYPE", '<!DOCTYPE svg SYSTEM "https://example.test/map.dtd"><svg/>\n'],
+    ["ENTITY", '<!ENTITY map SYSTEM "https://example.test/map.ent"><svg/>\n'],
+    ["script", "<svg><script>fetch('https://example.test')</script></svg>\n"],
+    ["foreignObject", "<svg><foreignObject><div/></foreignObject></svg>\n"],
+  ]) {
+    withFixture(({ root, maps }) => {
+      const bytes = Buffer.from(markup);
+      writeFileSync(path.join(root, maps[0].source), bytes);
+      writeFileSync(path.join(root, maps[0].displaySvg), bytes);
+      maps[0].sourceSvgSha256 = digest(bytes);
+      maps[0].displaySvgSha256 = digest(bytes);
+      writeFileSync(path.join(root, "manifest.json"), `${JSON.stringify({ maps })}\n`);
+      assert.throws(
+        () => verifyDisplaySvgProvenance(root, "manifest.json"),
+        /external SVG subresource|self-contained SVG/,
+        label,
+      );
+    });
+  }
+});
