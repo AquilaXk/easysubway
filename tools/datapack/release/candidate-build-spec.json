@@ -5,7 +5,7 @@
   "productionScopeId": "capital_pilot_android_v1",
   "fixturePath": "tools/datapack/release/capital-production-canonical-pack.json",
   "itxTopologyEvidencePath": "tools/datapack/itx-cheongchun-topology-evidence.json",
-  "itxTopologyEvidenceSha256": "f5c271c16536f865727b1230dcefa7d4719972bba8fbb93f1b18f09aa4b5c8fe",
+  "itxTopologyEvidenceSha256": "c72494853d6937d0f6583f0e83b72e261cc6eb7a9dd6263dbd7ec4b058077c53",
   "networkEdgeEvidence": {
     "sourceInventory": {
       "path": "tools/datapack/source-inventory.json",

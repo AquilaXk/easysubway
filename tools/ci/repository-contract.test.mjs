@@ -7615,8 +7615,8 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     currentImplementation: {
       status: "SATISFIED",
       fields: ["snapshotSha256", "freshUntil"],
-      snapshotId: "server-timetable-snapshot-990d16f424b25f92",
-      snapshotSha256: "990d16f424b25f92727c5d35665a839161fb107d81c55101b3ac113b988af4c5",
+      snapshotId: "server-timetable-snapshot-1a837b51aaa1f6b5",
+      snapshotSha256: "1a837b51aaa1f6b537c7a3117fba5c832e4825ae8814e02ed5a4cee63a11e1d3",
       freshUntil: "2026-08-03T00:00:00+09:00",
       evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
     },
@@ -20042,7 +20042,7 @@ test("#2609 accessibility release canonical pins는 tracked source와 exact-matc
     ...pack.stationFacilityEvidence.map(({ sourceSnapshotId }) => sourceSnapshotId),
   ]);
   assert.deepEqual([...accessibilitySnapshots].sort(), [
-    "kric-station-convenience-standard-20260728",
+    "kric-station-convenience-standard-20260728T184503338Z",
     "seoul-metro-accessibility-20260728",
   ]);
 });

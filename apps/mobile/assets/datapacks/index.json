@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "builtAt": "2026-07-28T19:01:07.400Z",
+  "builtAt": "2026-07-28T19:07:21.579Z",
   "qualityAsOf": "2026-07-28T18:45:03.338Z",
   "freshnessExpiresAt": "2026-08-02T15:00:00.000Z",
   "sourceSnapshotSetHash": "cd85827d6f90e7084f76ac63e376758eb72dd76f3247f46d5b9c77ec267f498e",
@@ -16,9 +16,9 @@
     {
       "id": "capital",
       "asset": "assets/datapacks/capital.sqlite.gz",
-      "sha256": "d7d71928bdc52bc360dc31f7c9cbc8b74be4627865c2995e2fb540023fb4cd1f",
-      "sqliteSha256": "db0dc881e265d2e0eb16f032fd93ee91fa921d450082c230cea619e268d321e8",
-      "byteSize": 1465088
+      "sha256": "d229ace06818a2759920268837d57cb7394d4bdde134e1bf92377307400f6148",
+      "sqliteSha256": "45300019e19b5ff0e25c4e84bb95245bb3ab914c5256dadf0d45ef38743f58bc",
+      "byteSize": 1464433
     }
   ]
 }

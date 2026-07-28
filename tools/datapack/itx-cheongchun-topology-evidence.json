@@ -28,10 +28,10 @@
     "inputSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
     "inputSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
     "inputByteSize": 359319,
-    "outputSha256": "d7d71928bdc52bc360dc31f7c9cbc8b74be4627865c2995e2fb540023fb4cd1f",
-    "outputSqliteSha256": "db0dc881e265d2e0eb16f032fd93ee91fa921d450082c230cea619e268d321e8",
-    "byteSize": 1465088,
-    "byteSizeDelta": 1105769
+    "outputSha256": "d229ace06818a2759920268837d57cb7394d4bdde134e1bf92377307400f6148",
+    "outputSqliteSha256": "45300019e19b5ff0e25c4e84bb95245bb3ab914c5256dadf0d45ef38743f58bc",
+    "byteSize": 1464433,
+    "byteSizeDelta": 1105114
   },
   "readmissions": [
     {
@@ -3846,19 +3846,19 @@
       ]
     },
     {
-      "readmittedAt": "2026-07-28T19:01:14.252Z",
-      "provenance": "#2609 Review 4800727306 + independent review: immutable KRIC lineage, raw/content hash, stable deduplicated facility identity and numbering; ITX subgraph 불변",
+      "readmittedAt": "2026-07-28T19:07:39.737Z",
+      "provenance": "#2609 Review 4800727306 + independent review: clean canonical builder identity, immutable KRIC lineage, raw/content hash, stable deduplicated facility numbering; ITX subgraph 불변",
       "previousPack": {
         "sha256": "17f91a262e6061db4a074b38c16d42304562cec7214c964e45211d0939b2c2bb",
         "sqliteSha256": "262956dcb41115307430c5dc29efb4c4edcec5e2e92253fc144c31a74df23c71",
         "byteSize": 1463760
       },
       "newPack": {
-        "sha256": "d7d71928bdc52bc360dc31f7c9cbc8b74be4627865c2995e2fb540023fb4cd1f",
-        "sqliteSha256": "db0dc881e265d2e0eb16f032fd93ee91fa921d450082c230cea619e268d321e8",
-        "byteSize": 1465088
+        "sha256": "d229ace06818a2759920268837d57cb7394d4bdde134e1bf92377307400f6148",
+        "sqliteSha256": "45300019e19b5ff0e25c4e84bb95245bb3ab914c5256dadf0d45ef38743f58bc",
+        "byteSize": 1464433
       },
-      "byteSizeDelta": 1328,
+      "byteSizeDelta": 673,
       "itxSubgraph": {
         "unchanged": true,
         "edgeCount": 48,
