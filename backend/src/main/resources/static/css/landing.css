@@ -224,7 +224,7 @@ body.is-english .release-state[data-copy="en"] { display: inline-block; }
 	.feature { min-height: 970px; }
 	.feature-number, .feature-number--right { top: 45px; right: auto; left: 15px; font-size: 150px; text-align: left; }
 	.feature-copy, .feature-copy--left, .feature-copy--right { top: 170px; right: auto; left: 15px; width: calc(100% - 30px); }
-	.feature-copy h2 { font-size: 45px; }
+	.feature-copy h2 { font-size: clamp(33px, 9.5vw, 43px); }
 	.feature-copy p { font-size: 16px; }
 	.feature-device, .feature-device--left, .feature-device--right { top: 420px; right: auto; left: 50%; width: 250px; height: 505px; transform: translateX(-50%) rotate(4deg); }
 	.mini-data { display: none; }

@@ -14,12 +14,15 @@ test("공개 랜딩은 한국어 기본값과 접근 가능한 KR/EN 전환 계�
 	assert.match(html, /aria-pressed="false"/);
 	assert.match(html, /class="skip-link"[^>]*lang="ko"/);
 	assert.match(html, /class="site-footer" lang="ko"/);
+	assert.match(html, /class="kicker" lang="en">Mobility without barriers/);
+	assert.match(html, /class="process-title" lang="en"/);
+	assert.match(html, /class="frame wall-heading" lang="en"/);
 	assert.doesNotMatch(html, /class="screen-wall" aria-label=/);
 	assert.match(html, /src="\/js\/landing\.js" defer/);
 	assert.doesNotMatch(html, /onclick=/);
 	assert.doesNotMatch(html, /Product showcase/i);
 	assert.match(html, /상록수·사당 검증 pilot/);
-	assert.doesNotMatch(html, /Connected regions|Core offline route|100%/);
+	assert.doesNotMatch(html, /Connected regions|Core offline route|100%|5 regions|nationwide/i);
 });
 
 test("공개 랜딩은 승인된 실제 앱 화면 3종을 self-host한다", () => {
@@ -38,6 +41,7 @@ test("공개 랜딩 스타일은 공식 브랜드와 읽기 쉬운 디바이스 
 	assert.doesNotMatch(css.toLowerCase(), /#0a705a/);
 	assert.match(css, /\.hero-copy\s*>\s*p\[data-copy\]/);
 	assert.doesNotMatch(css, /\.hero-copy\s*>\s*p:last-child/);
+	assert.match(css, /\.feature-copy h2\s*\{[^}]*font-size:\s*clamp\(33px,\s*9\.5vw,\s*43px\)/);
 	assert.match(css, /\.device--map img\s*\{[^}]*width:\s*122%;[^}]*height:\s*122%/);
 	assert.match(css, /\.device--route img,[\s\S]*\.device--station img[\s\S]*object-fit:\s*contain/);
 	assert.match(css, /@media\s*\(max-width:\s*720px\)[\s\S]*\.process-lead[\s\S]*\.feature-device/);
