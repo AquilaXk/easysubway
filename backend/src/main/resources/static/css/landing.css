@@ -40,7 +40,7 @@ body.is-english [data-copy="en"] { display: revert; }
 .hero-copy { position: absolute; z-index: 4; top: 130px; left: max(24px, calc((100vw - 1240px) / 2)); }
 .kicker { margin: 0; color: #e2e5ef; font-size: 13px; font-weight: 800; letter-spacing: .11em; text-transform: uppercase; }
 .hero-copy h1 { margin: 18px 0 0; font-size: clamp(38px, 4.2vw, 62px); font-weight: 850; line-height: .96; letter-spacing: -.045em; }
-.hero-copy > p:last-child { max-width: 390px; margin: 28px 0 0; color: #c3c8d8; font-size: 16px; line-height: 1.7; word-break: keep-all; }
+.hero-copy > p[data-copy] { max-width: 390px; margin: 28px 0 0; color: #c3c8d8; font-size: 16px; line-height: 1.7; word-break: keep-all; }
 .scroll-label { position: absolute; z-index: 4; bottom: 46px; left: max(24px, calc((100vw - 1240px) / 2)); color: #bdc2d1; font-size: 13px; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
 
 .device { position: absolute; z-index: 5; overflow: hidden; border: 9px solid #080a10; border-radius: 49px; background: #f7f8fa; box-shadow: 0 70px 130px #000b, 0 0 0 1px #ffffff45, inset 0 0 0 1px #ffffff24; }
@@ -201,7 +201,7 @@ body.is-english .release-state[data-copy="en"] { display: inline-block; }
 	.hero { min-height: 930px; }
 	.hero-copy { top: 98px; left: 15px; }
 	.hero-copy h1 { font-size: 38px; }
-	.hero-copy > p:last-child { max-width: 330px; font-size: 15px; }
+	.hero-copy > p[data-copy] { max-width: 330px; font-size: 15px; }
 	.device--hero { top: 360px; right: -53px; width: 270px; height: 548px; }
 	.scroll-label { left: 15px; }
 	.intro { padding: 110px 0; }
