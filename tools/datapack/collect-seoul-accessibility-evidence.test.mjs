@@ -407,7 +407,7 @@ test("same-day captures keep distinct timestamped files and explicit lineage", a
     outputRoot,
     fetchImpl,
     retrievedAt: "2026-07-28T16:35:25.704Z",
-    previousSnapshotId: first.snapshotId,
+    previousSnapshot: first,
   });
 
   assert.equal(first.snapshotId, "seoul-metro-accessibility-20260728T153525704Z");
@@ -415,6 +415,27 @@ test("same-day captures keep distinct timestamped files and explicit lineage", a
   assert.equal(second.previousSnapshotId, first.snapshotId);
   assert.equal(await readFile(firstPath, "utf8"), firstBytes);
   await access(join(outputRoot, "snapshots", `${second.snapshotId}.json`));
+
+  const rows = normalizeAccessibilityRows([
+    { lineNm: "4호선", stnNm: "사당", oprtngSitu: "M", dtlPstn: "대합실-승강장" },
+  ]);
+  for (const previousSnapshot of [
+    { ...first, snapshotId: "seoul-metro-accessibility-20260728T010203004Z" },
+    {
+      ...first,
+      snapshotId: "seoul-metro-accessibility-20260728T183525704Z",
+      retrievedAt: "2026-07-28T18:35:25.704Z",
+    },
+  ]) {
+    assert.throws(
+      () => buildAccessibilitySnapshot(rows, "2026-07-28T17:35:25.704Z", {
+        rawRowCount: 1,
+        rawSha256: "a".repeat(64),
+        previousSnapshot,
+      }),
+      /snapshotIdentity/,
+    );
+  }
 });
 
 test("snapshot content identity is stable when provider facility order changes", () => {

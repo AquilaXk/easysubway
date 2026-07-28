@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { constants as fileSystemConstants } from "node:fs";
 import { createHash } from "node:crypto";
-import { lstat, mkdir, open, realpath } from "node:fs/promises";
+import { lstat, mkdir, open, readFile, realpath } from "node:fs/promises";
 import { basename, dirname, extname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -10,6 +10,7 @@ const DEFAULT_REQUEST_TIMEOUT_MS = 30_000;
 const INVALID_RESPONSE = "Seoul accessibility API response invalid";
 const INVALID_OUTPUT_PATH = "output path must stay within allowed root";
 const REPOSITORY_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
+const SOURCE_SNAPSHOT_ROOT = resolve(REPOSITORY_ROOT, "tools/datapack/sources");
 
 // 공식 oprtngSitu 코드(서울교통공사 wksnElvtr): M 사용가능 / D 삭제 / S 보수중 / T 중지 / I 점검중 / B 공사중.
 // M만 실측 가동, S/T/I/B는 실측 비가동(검증된 비가용), D는 폐기 행이므로 증거에서 제외한다.
@@ -62,7 +63,7 @@ export function normalizeAccessibilityRows(rows) {
   return normalized;
 }
 
-export function buildAccessibilitySnapshot(rows, retrievedAt, { rawRowCount, rawSha256, previousSnapshotId = null }) {
+export function buildAccessibilitySnapshot(rows, retrievedAt, { rawRowCount, rawSha256, previousSnapshot = null }) {
   if (
     !Array.isArray(rows) ||
     rows.some(
@@ -95,12 +96,26 @@ export function buildAccessibilitySnapshot(rows, retrievedAt, { rawRowCount, raw
   const snapshotId = `seoul-metro-accessibility-${typeof retrievedAt === "string" ? retrievedAt.replaceAll(/[-:.]/g, "") : ""}`;
   if (typeof retrievedAt !== "string"
     || !Number.isFinite(retrievedMillis)
-    || new Date(retrievedMillis).toISOString() !== retrievedAt
-    || (previousSnapshotId !== null
-      && (typeof previousSnapshotId !== "string"
-        || !previousSnapshotId.startsWith("seoul-metro-accessibility-")
-        || previousSnapshotId === snapshotId))) {
+    || new Date(retrievedMillis).toISOString() !== retrievedAt) {
     throw new Error(`${INVALID_RESPONSE}: snapshotIdentity`);
+  }
+  let previousSnapshotId = null;
+  if (previousSnapshot !== null) {
+    const previousMillis = Date.parse(previousSnapshot?.retrievedAt);
+    const previousFullId = `seoul-metro-accessibility-${typeof previousSnapshot?.retrievedAt === "string"
+      ? previousSnapshot.retrievedAt.replaceAll(/[-:.]/g, "") : ""}`;
+    const previousLegacyId = `seoul-metro-accessibility-${typeof previousSnapshot?.retrievedAt === "string"
+      ? previousSnapshot.retrievedAt.slice(0, 10).replaceAll("-", "") : ""}`;
+    if (previousSnapshot?.schemaVersion !== 1
+      || previousSnapshot?.artifactKind !== "seoul-accessibility-snapshot"
+      || previousSnapshot?.sourceId !== "seoul-metro-accessibility"
+      || !Number.isFinite(previousMillis)
+      || new Date(previousMillis).toISOString() !== previousSnapshot.retrievedAt
+      || ![previousFullId, previousLegacyId].includes(previousSnapshot.snapshotId)
+      || previousMillis >= retrievedMillis) {
+      throw new Error(`${INVALID_RESPONSE}: snapshotIdentity`);
+    }
+    previousSnapshotId = previousSnapshot.snapshotId;
   }
   const stationsByIdentity = new Map();
   for (const row of rows) {
@@ -223,11 +238,11 @@ export async function writeSeoulAccessibilityEvidence({
   outputRoot = REPOSITORY_ROOT,
   fetchImpl = fetch,
   retrievedAt = new Date().toISOString(),
-  previousSnapshotId = null,
+  previousSnapshot = null,
 }) {
   const { outputPath: requestedOutputPath } = await validatedOutputPath(output, outputRoot);
   const collected = await collectSeoulAccessibility({ endpoint, serviceKey, fetchImpl });
-  const snapshot = buildAccessibilitySnapshot(collected.rows, retrievedAt, { ...collected, previousSnapshotId });
+  const snapshot = buildAccessibilitySnapshot(collected.rows, retrievedAt, { ...collected, previousSnapshot });
   const outputPath = extname(requestedOutputPath) === ".json"
     ? requestedOutputPath
     : join(requestedOutputPath, `${snapshot.snapshotId}.json`);
@@ -336,26 +351,35 @@ function compare(left, right) {
 
 async function main() {
   const previousSnapshotArgument = process.argv.length === 8
-    && process.argv[6] === "--previous-snapshot-id";
+    && process.argv[6] === "--previous-snapshot";
   if (
     (process.argv.length !== 6 && !previousSnapshotArgument) ||
     process.argv[2] !== "--output" ||
     process.argv[4] !== "--output-root"
   ) {
     throw new Error(
-      "usage: collect-seoul-accessibility-evidence.mjs --output <path-or-directory> --output-root <path> [--previous-snapshot-id <id>]",
+      "usage: collect-seoul-accessibility-evidence.mjs --output <path-or-directory> --output-root <path> [--previous-snapshot <repository-relative-path>]",
     );
   }
   const serviceKey = process.env.DATA_GO_KR_SERVICE_KEY;
   if (!serviceKey) {
     throw new Error("DATA_GO_KR_SERVICE_KEY env is required");
   }
+  let previousSnapshot = null;
+  if (previousSnapshotArgument) {
+    const canonicalSourceRoot = await realpath(SOURCE_SNAPSHOT_ROOT);
+    const canonicalPreviousPath = await realpath(resolve(REPOSITORY_ROOT, process.argv[7]));
+    if (!isPathWithin(canonicalSourceRoot, canonicalPreviousPath)) {
+      throw new Error(`${INVALID_RESPONSE}: snapshotIdentity`);
+    }
+    previousSnapshot = JSON.parse(await readFile(canonicalPreviousPath, "utf8"));
+  }
   await writeSeoulAccessibilityEvidence({
     endpoint: DEFAULT_ENDPOINT,
     serviceKey,
     output: process.argv[3],
     outputRoot: process.argv[5],
-    previousSnapshotId: previousSnapshotArgument ? process.argv[7] : null,
+    previousSnapshot,
   });
 }
 
