@@ -26,6 +26,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.boot.test.web.client.TestRestTemplate;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -127,6 +128,31 @@ class HealthCheckControllerTest {
 			// alerts.yml의 freshness 경보가 참조하는 라이브 게이지가 실제로 scrape 본문에 렌더링된다.
 			.andExpect(content().string(
 				org.hamcrest.Matchers.containsString("easysubway_timetable_snapshot_remaining_seconds")));
+	}
+
+	@Test
+	@DisplayName("제품 소개 페이지를 인증 없이 노출한다")
+	void productLandingPageIsPublic() {
+		ResponseEntity<String> response = restTemplate.getForEntity(
+			"http://127.0.0.1:" + port + "/",
+			String.class
+		);
+
+		assertThat(response.getStatusCode()).isEqualTo(HttpStatus.OK);
+		assertThat(response.getHeaders().getContentType()).isNotNull();
+		assertThat(response.getHeaders().getContentType().isCompatibleWith(MediaType.TEXT_HTML)).isTrue();
+		assertThat(response.getBody()).contains(
+			"쉬운 지하철",
+			"빠른 길보다,",
+			"갈 수 있는 길.",
+			"Android 출시 준비 중",
+			"https://github.com/AquilaXk/easysubway",
+			"/privacy",
+			"/terms",
+			"/location-terms",
+			"mailto:aquila@aquilaxk.site",
+			"mailto:support@aquilaxk.site"
+		);
 	}
 
 	@Test

@@ -424,6 +424,8 @@ public class SecurityConfig {
 					"/api/v1/trains/search"
 				).permitAll()
 				.requestMatchers(
+					"/",
+					"/index.html",
 					"/api/health",
 					"/actuator/health",
 					"/actuator/health/liveness",
