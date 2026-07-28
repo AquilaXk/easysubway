@@ -350,6 +350,11 @@ void main() {
           )
           ORDER BY target_id
           ''').get();
+    final facilityQualityCount = await database.customSelect('''
+          SELECT COUNT(*) AS count
+          FROM data_quality_records
+          WHERE target_type = 'facility'
+          ''').getSingle();
     final networkEdges = await database.customSelect('''
           SELECT id, from_node_id, to_node_id, edge_type, service_pattern,
                  includes_stairs, accessibility_status, reliability_score,
@@ -412,23 +417,22 @@ void main() {
       facilities.map((row) => row.read<String>('name')),
       containsAll(['상록수역 ELEVATOR 1', '상록수역 ELEVATOR 2']),
     );
+    expect(facilities, hasLength(2));
+    expect(facilityQualityCount.read<int>('count'), 0);
     expect(
       fieldValidationRecords
           .map((row) => row.read<String>('target_type'))
           .toSet(),
-      {'facility', 'internal_route_edge', 'station_exit'},
+      {'internal_route_edge', 'station_exit'},
     );
     expect(
       fieldValidationRecords
           .map((row) => row.read<String>('quality_level'))
           .toSet(),
-      {'FIELD_STALE', 'FIELD_UNKNOWN', 'FIELD_VERIFIED'},
+      {'FIELD_VERIFIED'},
     );
     final expectedFieldValidationRecords = {
       'exit-sangnoksu-1': ('station_exit', 'FIELD_VERIFIED'),
-      'facility-sangnoksu-elevator-1': ('facility', 'FIELD_VERIFIED'),
-      'facility-sangnoksu-escalator-1': ('facility', 'FIELD_UNKNOWN'),
-      'facility-sangnoksu-accessible-toilet-1': ('facility', 'FIELD_STALE'),
       'edge-sangnoksu-concourse-exit-1': (
         'internal_route_edge',
         'FIELD_VERIFIED',
