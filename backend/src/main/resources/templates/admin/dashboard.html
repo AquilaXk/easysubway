@@ -55,16 +55,16 @@
 				</div>
 				<dl class="dashboard-current-metrics">
 					<div>
-						<dd th:text="|${dashboard.recentReports}건|">0건</dd>
 						<dt>제보</dt>
+						<dd th:text="|${dashboard.recentReports}건|">0건</dd>
 					</div>
 					<div class="is-warn">
-						<dd th:text="|${dashboard.totalFacilities}건|">0건</dd>
 						<dt>데이터</dt>
+						<dd th:text="|${dashboard.totalFacilities}건|">0건</dd>
 					</div>
-					<div class="is-good">
-						<dd th:text="${snapshotStatus == null ? '대기' : (snapshotStatus.success ? '정상' : '실패')}">대기</dd>
+					<div th:classappend="${snapshotStatus == null ? ' is-waiting' : (snapshotStatus.success ? ' is-good' : ' is-bad')}">
 						<dt>배치</dt>
+						<dd th:text="${snapshotStatus == null ? '대기' : (snapshotStatus.success ? '정상' : '실패')}">대기</dd>
 					</div>
 				</dl>
 			</div>

@@ -152,6 +152,7 @@
 }
 
 .dashboard-current-metrics dt {
+	order: 2;
 	margin-top: 7px;
 	padding: 0;
 	border: 0;
@@ -161,6 +162,7 @@
 }
 
 .dashboard-current-metrics dd {
+	order: 1;
 	display: grid;
 	place-items: center;
 	width: 54px;
@@ -182,6 +184,14 @@
 
 .dashboard-current-metrics .is-good dd {
 	background: var(--admin-good);
+}
+
+.dashboard-current-metrics .is-waiting dd {
+	background: var(--admin-warn);
+}
+
+.dashboard-current-metrics .is-bad dd {
+	background: var(--admin-danger);
 }
 
 .dashboard-api-health {
@@ -808,6 +818,15 @@
 @media (max-width: 1200px) {
 	.dashboard-overview-grid {
 		grid-template-columns: 1fr;
+	}
+}
+
+@media (max-width: 1024px) {
+	.admin-v3 .dashboard-refresh {
+		width: 44px;
+		min-width: 44px;
+		height: 44px;
+		min-height: 44px;
 	}
 }
 

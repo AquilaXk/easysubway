@@ -220,6 +220,11 @@ class AdminDesignGuardTest {
 		}
 
 		String dashboardCharts = read(JS_DASHBOARD_CHARTS);
+		assertThat(read(CSS_DATA))
+			.contains("@media (max-width: 1024px)")
+			.contains(".admin-v3 .dashboard-refresh {")
+			.contains("width: 44px;")
+			.contains("height: 44px;");
 		assertThat(dashboardCharts)
 			.contains("document.querySelector('[data-dashboard-refresh-form]')")
 			.contains("tokenColor('--admin-chart-series')")
