@@ -30,7 +30,7 @@ function assertNoExternalSubresources(bytes, label) {
     [/@import\b/i, "CSS @import"],
     // Inkscape namedview metadata, not an event-handler attribute.
     [/(?:^|\s)on(?!ly_selected\s*=)[a-z][\w:.-]*\s*=/i, "event handler attribute"],
-    [/<(?:[A-Za-z_][\w.-]*:)?(?:animate|set|animateMotion|animateTransform)\b/i, "SMIL mutation element"],
+    [/<(?:[A-Za-z_][\w.-]*:)?(?:animateColor|animateMotion|animateTransform|animate|set|discard)\b/i, "SMIL mutation element"],
   ]) {
     assert.ok(!pattern.test(svg), `${label}: self-contained SVG forbids ${construct}`);
   }
