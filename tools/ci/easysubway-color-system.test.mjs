@@ -12,7 +12,7 @@ const expectedPrimitives = {
   "brand.400": "#B4BCFB",
   "brand.500": "#949FE8",
   "brand.600": "#7480D2",
-  "brand.700": "#5C6BC0",
+  "brand.700": "#6064F4",
   "brand.800": "#4A58A9",
   "brand.900": "#3B4890",
   "brand.950": "#1F2340",

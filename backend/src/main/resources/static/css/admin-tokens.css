@@ -26,8 +26,6 @@
 	--es-ink-muted: #697089;
 	--es-status-success: #0A705A;
 	--es-status-warning: #9A5600;
-	--es-status-success-vivid: #56CD72;
-	--es-status-warning-vivid: #F2B44F;
 	--es-status-danger: #B42318;
 	--es-status-info: #215EA8;
 	--es-status-success-soft: #F0FBF7;
@@ -60,10 +58,8 @@
 	--es-focus-on-signature: var(--es-brand-900);
 	--es-decorative-divider: var(--es-brand-300);
 	--es-status-success-content: var(--es-status-success);
-	--es-status-success-vivid-content: var(--es-status-success-vivid);
 	--es-status-success-surface: var(--es-status-success-soft);
 	--es-status-warning-content: var(--es-status-warning);
-	--es-status-warning-vivid-content: var(--es-status-warning-vivid);
 	--es-status-warning-surface: var(--es-status-warning-soft);
 	--es-status-danger-content: var(--es-status-danger);
 	--es-status-danger-surface: var(--es-status-danger-soft);
@@ -104,8 +100,6 @@
 	--admin-warn-soft: var(--es-status-warning-surface);
 	--admin-danger-soft: var(--es-status-danger-surface);
 	--admin-info-soft: var(--es-status-info-surface);
-	--admin-good-vivid: var(--es-status-success-vivid-content);
-	--admin-warn-vivid: var(--es-status-warning-vivid-content);
 	--admin-chart-series: #2F6F9F; /* 차트 보조 시리즈색(상태 의미 없음) */
 
 	/* radius — 2단계 토큰(컨트롤/카드) + 뱃지·칩 전용 */
