@@ -148,6 +148,7 @@ function parseArgs(argv) {
       }
       case "--out": o.out = argv[++i]; break;
       case "--require-content-equal": o.requireContentEqual = true; break;
+      default: throw new Error(`Unknown option: ${argv[i]}`);
     }
   }
   if (!o.old || !o.new) throw new Error("--old and --new geometry JSON required");

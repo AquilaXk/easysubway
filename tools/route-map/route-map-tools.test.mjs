@@ -489,6 +489,28 @@ test("SVG geometry extractor rejects an invalid --output path before browser lau
   );
 });
 
+test("SMA geometry diff rejects unknown options", async () => {
+  const geometry = path.join(
+    root,
+    "tools/route-map/route-map-defs/easy-subway-sma-v4-geometry.json",
+  );
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        "tools/route-map/diff-sma-versions.mjs",
+        "--old",
+        geometry,
+        "--new",
+        geometry,
+        "--require-content-equl",
+      ],
+      { cwd: root, maxBuffer: 1024 * 1024 },
+    ),
+    (error) => /Unknown option: --require-content-equl/.test(error.stderr),
+  );
+});
+
 test("SVG label polygon join applies only unambiguous station labels", async () => {
   const tmp = await mkdtemp(path.join(tmpdir(), "easysubway-route-map-join-"));
   try {
