@@ -100,7 +100,9 @@ class _Segment extends StatelessWidget {
       button: true,
       selected: selected,
       enabled: enabled,
-      label: '$label${selected ? ' 선택됨' : '로 전환'}',
+      label: selected
+          ? '$label 선택됨'
+          : '${label == '실시간' ? '실시간으로' : '$label로'} 전환',
       onTap: tappable ? onToggle : null,
       excludeSemantics: true,
       child: InkWell(

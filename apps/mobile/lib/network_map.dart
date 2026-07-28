@@ -50,6 +50,10 @@ abstract interface class NetworkMapRepository {
 }
 
 abstract interface class NetworkMapViewportRepository {
+  Future<String?> loadSelectedRegion();
+
+  Future<void> saveSelectedRegion(String region);
+
   Future<Rect?> loadViewport(String region);
 
   Future<void> saveViewport({required String region, required Rect viewport});
@@ -525,6 +529,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   // #2109: 인플레이스 검색 결과 탭으로 연 팬 메뉴의 대상 역 id. 캔버스의
   // selectedStationId(팬 메뉴)와 focusedStationId(카메라 이동)에 함께 실린다.
   String? _searchFanMenuStationId;
+  bool _preserveFocusedStationScale = false;
   String? _nearbyLookupMessage;
   Timer? _nearbyLookupMessageTimer;
   bool _initialNearbyFocusStarted = false;
@@ -584,7 +589,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   /// 하단 패널 실시간은 API 기본 8초보다 짧게 끊고 시간표로 넘긴다.
   static const _nearbyRealtimeTimeout = Duration(seconds: 2);
-  late Future<_NetworkMapLoadResult> _future = _loadMap();
+  int _mapLoadGeneration = 0;
+  late Future<_NetworkMapLoadResult> _future = _startMapLoad();
 
   /// 지도 탭 → draft 슬롯 지정 시 역의 [NetworkMapStation.lineId]로 노선
   /// 이름·색을 채우기 위해 마지막으로 로드된 맵 데이터를 캐시한다.
@@ -769,6 +775,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
   void _openNearbyStationPanel(
     StationSearchResult station, {
     StationSearchLine? preferredLine,
+    bool preserveFocusedStationScale = false,
   }) {
     // 인접 역 해석 중 다른 경로로 패널이 열리면 늦은 neighbor 응답을 버린다.
     _neighborSelectPanelToken++;
@@ -802,6 +809,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         _nearbyTimetableInFlightGeneration = null;
       }
       _searchFanMenuStationId = station.id;
+      _preserveFocusedStationScale = preserveFocusedStationScale;
     });
     if (request != null && selectedLine != null) {
       _startNearbyPanelDataLoads(station, selectedLine, request);
@@ -941,8 +949,37 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     super.dispose();
   }
 
-  Future<_NetworkMapLoadResult> _loadMap() async {
-    final data = await widget.repository.getNetworkMap(region: _selectedRegion);
+  Future<_NetworkMapLoadResult> _startMapLoad() {
+    return _loadMap(++_mapLoadGeneration);
+  }
+
+  Future<_NetworkMapLoadResult> _loadMap(int generation) async {
+    var requestedRegion = _selectedRegion;
+    var restoringSavedRegion = false;
+    final viewportRepository = widget.viewportRepository;
+    if (requestedRegion == null && viewportRepository != null) {
+      try {
+        requestedRegion = await viewportRepository.loadSelectedRegion();
+        restoringSavedRegion = requestedRegion != null;
+      } catch (error, stackTrace) {
+        reportMobileError(
+          error,
+          stackTrace,
+          context: '노선도 최근 지역 불러오기 중 예외가 발생했습니다.',
+        );
+      }
+    }
+    var data = await widget.repository.getNetworkMap(region: requestedRegion);
+    if (restoringSavedRegion &&
+        !data.regions.any(
+          (region) =>
+              region.displayName == _displayRegionName(data.selectedRegion),
+        )) {
+      data = await widget.repository.getNetworkMap();
+    }
+    if (generation != _mapLoadGeneration) {
+      return _NetworkMapLoadResult(data: data, initialViewport: null);
+    }
     // #2082/#2083 후속: 저장된(persisted) 지역이 있는 사용자는 세션 중
     // 지역 선택기를 조작하지 않는 한 _selectedRegion이 계속 null이라, 로드된
     // 실제 지역(data.selectedRegion)을 여기서 동기화해둔다. 사용자가 이미
@@ -954,19 +991,48 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     if (mounted) {
       _notifyRegionLabelChanged();
     }
-    final viewport = await widget.viewportRepository?.loadViewport(
-      _displayRegionName(data.selectedRegion),
-    );
+    await _saveSelectedRegion(data.selectedRegion);
+    final viewport = await _loadSavedViewport(data.selectedRegion);
     return _NetworkMapLoadResult(data: data, initialViewport: viewport);
   }
 
-  Future<_NetworkMapLoadResult> _loadMapForRegion(String region) async {
+  Future<_NetworkMapLoadResult> _loadMapForRegion(
+    String region, {
+    bool loadStoredViewport = true,
+  }) async {
     final data = await widget.repository.getNetworkMap(region: region);
     _cacheAvailableRegionLabels(data.regions);
-    final viewport = await widget.viewportRepository?.loadViewport(
-      _displayRegionName(data.selectedRegion),
-    );
+    final viewport = loadStoredViewport
+        ? await _loadSavedViewport(data.selectedRegion)
+        : null;
     return _NetworkMapLoadResult(data: data, initialViewport: viewport);
+  }
+
+  Future<void> _saveSelectedRegion(String region) async {
+    try {
+      await widget.viewportRepository?.saveSelectedRegion(region);
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 최근 지역 저장 중 예외가 발생했습니다.',
+      );
+    }
+  }
+
+  Future<Rect?> _loadSavedViewport(String region) async {
+    try {
+      return await widget.viewportRepository?.loadViewport(
+        _displayRegionName(region),
+      );
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 최근 화면 위치 불러오기 중 예외가 발생했습니다.',
+      );
+      return null;
+    }
   }
 
   void _cacheAvailableRegionLabels(List<NetworkMapRegion> regions) {
@@ -985,7 +1051,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       _selectedRegion = region ?? _selectedRegion;
       _resetNearbyPanelState();
       _initialNearbyFocusStarted = false;
-      _future = _loadMap();
+      _future = _startMapLoad();
     });
     _notifyRegionLabelChanged();
   }
@@ -1200,6 +1266,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
                     initialViewport: loadResult.initialViewport,
                     focusedStationId:
                         _searchFanMenuStationId ?? _nearbySelectedStationId,
+                    preserveFocusedStationScale: _preserveFocusedStationScale,
                     selectedStationId: _searchFanMenuStationId,
                     selectionClearRevision: _selectionClearRevision,
                     onSelectionDismissed: _dismissSearchFanMenu,
@@ -1301,7 +1368,10 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
           _showNearbyLookupMessage('주변 역을 불러오지 못했어요.');
           return;
         }
-        targetMap = await _loadMapForRegion(matchingRegions.single.name);
+        targetMap = await _loadMapForRegion(
+          matchingRegions.single.name,
+          loadStoredViewport: false,
+        );
         if (!isCurrentRequest()) {
           return;
         }
@@ -1316,16 +1386,23 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       }
 
       if (regionChanged) {
+        if (!widget.routeDraftController.draft.isEmpty) {
+          _showNearbyLookupMessage('경로를 정한 뒤에는 지역을 바꿀 수 없어요.');
+          return;
+        }
         setState(() {
           _selectedRegion = targetMap.data.selectedRegion;
           _future = Future.value(targetMap);
           _initialNearbyFocusStarted = true;
         });
+        _notifyRegionLabelChanged();
+        unawaited(_saveSelectedRegion(targetMap.data.selectedRegion));
       }
       // 역 확정 후 공통 오픈으로 즉시 표시(기본 탭 시간표). 실시간/시간표 await 금지.
       _openNearbyStationPanel(
         pendingResult,
         preferredLine: pendingResult.lines.firstOrNull,
+        preserveFocusedStationScale: true,
       );
     } on CurrentLocationException catch (error) {
       if (!isCurrentRequest()) {
@@ -1386,6 +1463,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     CurrentLocationProvider locationProvider,
     StationSearchRepository stationRepository,
   ) async {
+    final mapFuture = _future;
     try {
       if (await locationProvider.needsLocationPermissionRequest()) {
         return;
@@ -1398,16 +1476,63 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
         location,
         limit: 1,
       );
-      if (!mounted || results.isEmpty || _nearbyPanelVisible) {
+      if (!mounted ||
+          results.isEmpty ||
+          _nearbyPanelVisible ||
+          _future != mapFuture) {
+        return;
+      }
+
+      final result = results.first;
+      var targetMap = await mapFuture;
+      var regionChanged = false;
+      if (_displayRegionName(targetMap.data.selectedRegion) != result.region) {
+        if (!widget.routeDraftController.draft.isEmpty) {
+          return;
+        }
+        final matchingRegions = targetMap.data.regions
+            .where((region) => region.displayName == result.region)
+            .toList(growable: false);
+        if (matchingRegions.length != 1) {
+          return;
+        }
+        targetMap = await _loadMapForRegion(
+          matchingRegions.single.name,
+          loadStoredViewport: false,
+        );
+        regionChanged = true;
+      }
+      if (!mounted ||
+          _nearbyPanelVisible ||
+          _future != mapFuture ||
+          (regionChanged && !widget.routeDraftController.draft.isEmpty)) {
+        return;
+      }
+      if (!targetMap.data.stations.any((station) => station.id == result.id)) {
         return;
       }
       setState(() {
-        _nearbySelectedStationId = results.first.id;
+        if (regionChanged) {
+          _selectedRegion = targetMap.data.selectedRegion;
+          _future = Future.value(targetMap);
+        }
+        _nearbySelectedStationId = result.id;
+        _preserveFocusedStationScale = true;
       });
+      if (regionChanged) {
+        _notifyRegionLabelChanged();
+        unawaited(_saveSelectedRegion(targetMap.data.selectedRegion));
+      }
     } on CurrentLocationException {
       return;
     } on StationSearchException {
       return;
+    } catch (error, stackTrace) {
+      reportMobileError(
+        error,
+        stackTrace,
+        context: '노선도 초기 주변 역 확인 중 예외가 발생했습니다.',
+      );
     }
   }
 
@@ -1436,6 +1561,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     _nearbyPanelVisible = false;
     _nearbyPanelExpanded = false;
     _nearbySelectedStationId = null;
+    _preserveFocusedStationScale = false;
     _nearbySelectedLineId = null;
     _nearbyPanelData = const _NetworkMapNearbyPanelData.idle();
     _nearbyRealtimeDisplay = null;
@@ -1719,7 +1845,13 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     unawaited(_loadNearbyTimetable(station, line, request: request));
   }
 
-  void _hideNearbyPanel() => setState(_resetNearbyPanelState);
+  void _hideNearbyPanel() {
+    final preserveFocusedStationScale = _preserveFocusedStationScale;
+    setState(() {
+      _resetNearbyPanelState();
+      _preserveFocusedStationScale = preserveFocusedStationScale;
+    });
+  }
 
   /// 저장소가 있을 때만 "상세 보기"를 탭 가능 컨트롤로 노출한다.
   VoidCallback? get _nearbyStationDetailAction =>
@@ -4209,6 +4341,7 @@ class _NetworkMapCanvas extends StatefulWidget {
     required this.data,
     required this.initialViewport,
     required this.focusedStationId,
+    required this.preserveFocusedStationScale,
     required this.selectedStationId,
     required this.selectionClearRevision,
     required this.onSetOrigin,
@@ -4228,6 +4361,7 @@ class _NetworkMapCanvas extends StatefulWidget {
   final NetworkMapData data;
   final Rect? initialViewport;
   final String? focusedStationId;
+  final bool preserveFocusedStationScale;
   final String? selectedStationId;
   final int selectionClearRevision;
 
@@ -4319,6 +4453,7 @@ void _logRouteMapFrameTimings(List<FrameTiming> timings) {
 class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     with WidgetsBindingObserver {
   String? _layoutKey;
+  String? _layoutRegion;
   MapCameraState? _camera;
   MapCameraState? _pendingCamera;
   MapCameraState? _requestedRendererCamera;
@@ -4329,7 +4464,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   bool _cameraFrameCallbackScheduled = false;
   bool _forceRendererCameraCommit = false;
   bool _gestureActive = false;
-  String? _cameraFocusedStationId;
+  (String, bool)? _cameraFocusedStationKey;
   MapCameraState? _gestureStartCamera;
   Offset? _gestureStartFocalPoint;
   String? _geometryCacheKey;
@@ -4495,22 +4630,46 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             widget.data.selectedRegion,
             initialFitScale: _containFitScale(initialCameraBounds, constraints),
           );
+          final initialCamera = _cameraForBounds(
+            widget.initialViewport ?? initialCameraBounds,
+            constraints,
+            sourceBounds: fullBounds,
+            contain: true,
+            minScale: minScale,
+          );
           final layoutKey =
               '${widget.data.selectedRegion}:${geometry.width}:${geometry.height}:${constraints.maxWidth}:${constraints.maxHeight}:$readableScale';
           if (_layoutKey != layoutKey) {
+            final previousCamera = _camera;
+            final preserveCamera =
+                widget.preserveFocusedStationScale &&
+                widget.focusedStationId != null &&
+                _layoutRegion == widget.data.selectedRegion &&
+                previousCamera != null;
             _layoutKey = layoutKey;
+            _layoutRegion = widget.data.selectedRegion;
             _pendingCamera = null;
             _routeMapRendererActive = widget.data.stations.isNotEmpty;
             _gestureActive = false;
-            _cameraFocusedStationId = null;
-            final initialCamera = _cameraForBounds(
-              widget.initialViewport ?? initialCameraBounds,
-              constraints,
-              sourceBounds: fullBounds,
-              contain: true,
-              minScale: minScale,
-            );
-            _camera = initialCamera;
+            _cameraFocusedStationKey = null;
+            _camera = preserveCamera
+                ? previousCamera
+                      .copyWith(
+                        sourceBounds: fullBounds,
+                        viewportSize: Size(
+                          constraints.hasBoundedWidth
+                              ? constraints.maxWidth
+                              : 0,
+                          constraints.hasBoundedHeight
+                              ? constraints.maxHeight
+                              : 0,
+                        ),
+                        minScale: math.min(previousCamera.scale, minScale),
+                        initialScale: initialCamera.initialScale,
+                        revision: previousCamera.revision + 1,
+                      )
+                      .clamped(viewportMargin: 220)
+                : initialCamera;
           }
           var camera =
               _camera ??
@@ -4538,30 +4697,43 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           final focusedStation = widget.focusedStationId == null
               ? null
               : _stationById(widget.data.stations, widget.focusedStationId);
+          final focusedStationKey = focusedStation == null
+              ? null
+              : (focusedStation.id, widget.preserveFocusedStationScale);
           if (!_gestureActive &&
               focusedStation != null &&
-              _cameraFocusedStationId != focusedStation.id) {
-            final focusedCamera = _cameraForBounds(
-              _stationFocusBoundsFor(
-                focusedStation,
-                geometry,
-                initialBounds: initialCameraBounds,
-              ),
-              constraints,
-              sourceBounds: fullBounds,
-              contain: true,
-              minScale: minScale,
-              revision: camera.revision + 1,
-              // 역 focus 후에도 LOD 기준은 지역 초기 화면 baseline을 유지한다.
-              initialScaleOverride: camera.initialScale,
-            );
-            _cameraFocusedStationId = focusedStation.id;
+              _cameraFocusedStationKey != focusedStationKey) {
+            final focusedCamera = widget.preserveFocusedStationScale
+                ? camera
+                      .copyWith(
+                        center: Offset(
+                          geometry.x(focusedStation),
+                          geometry.y(focusedStation),
+                        ),
+                        revision: camera.revision + 1,
+                      )
+                      .clamped(viewportMargin: 220)
+                : _cameraForBounds(
+                    _stationFocusBoundsFor(
+                      focusedStation,
+                      geometry,
+                      initialBounds: initialCameraBounds,
+                    ),
+                    constraints,
+                    sourceBounds: fullBounds,
+                    contain: true,
+                    minScale: minScale,
+                    revision: camera.revision + 1,
+                    // 역 focus 후에도 LOD 기준은 지역 초기 화면 baseline을 유지한다.
+                    initialScaleOverride: camera.initialScale,
+                  );
+            _cameraFocusedStationKey = focusedStationKey;
             _pendingCamera = null;
             _camera = focusedCamera;
             camera = focusedCamera;
             widget.onViewportChanged(focusedCamera.visibleSourceRect);
           } else if (focusedStation == null) {
-            _cameraFocusedStationId = null;
+            _cameraFocusedStationKey = null;
           }
           return Stack(
             children: [

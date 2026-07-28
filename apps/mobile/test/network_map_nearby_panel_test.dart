@@ -270,7 +270,7 @@ void main() {
           .getSemanticsData();
       expect(selected.flagsCollection.isSelected, Tristate.isTrue);
       final unselected = tester
-          .getSemantics(find.bySemanticsLabel('실시간로 전환'))
+          .getSemantics(find.bySemanticsLabel('실시간으로 전환'))
           .getSemanticsData();
       expect(unselected.flagsCollection.isSelected, isNot(Tristate.isTrue));
       handle.dispose();
