@@ -4460,6 +4460,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   MapCameraState? _presentedRendererCamera;
   final _requestedRendererCamerasByRevision = <int, MapCameraState>{};
   bool _routeMapRendererActive = false;
+  bool _routeMapBasemapFailed = false;
   DateTime? _lastRendererCameraRequestAt;
   bool _cameraFrameCallbackScheduled = false;
   bool _forceRendererCameraCommit = false;
@@ -4648,6 +4649,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                 previousCamera != null;
             _layoutKey = layoutKey;
             _layoutRegion = widget.data.selectedRegion;
+            _routeMapBasemapFailed = false;
             _pendingCamera = null;
             _routeMapRendererActive = widget.data.stations.isNotEmpty;
             _gestureActive = false;
@@ -4735,12 +4737,13 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           } else if (focusedStation == null) {
             _cameraFocusedStationKey = null;
           }
+          if (_routeMapBasemapFailed || !_routeMapRendererActive) {
+            return const _OriginalRouteMapUnavailable();
+          }
           return Stack(
             children: [
               Positioned.fill(
-                child: !_routeMapRendererActive
-                    ? const _OriginalRouteMapUnavailable()
-                    : _buildStructuredRouteMapCanvas(camera, geometry.origin),
+                child: _buildStructuredRouteMapCanvas(camera, geometry.origin),
               ),
               Positioned.fill(
                 child: Semantics(
@@ -5270,6 +5273,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           camera: camera,
           sourceOrigin: sourceOrigin,
           attributionText: attribution,
+          onUnavailable: _markRouteMapBasemapUnavailable,
         ),
         StructuredRouteMapView(
           map: map,
@@ -5283,6 +5287,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
         ),
       ],
     );
+  }
+
+  void _markRouteMapBasemapUnavailable() {
+    if (!mounted || _routeMapBasemapFailed) return;
+    setState(() => _routeMapBasemapFailed = true);
   }
 
   void _ensureStructuredRouteMap() {

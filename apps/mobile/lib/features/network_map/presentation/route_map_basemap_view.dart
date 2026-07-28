@@ -2,9 +2,8 @@ import 'dart:math' as math;
 import 'dart:ui' as ui;
 
 import 'package:flutter/widgets.dart';
-import 'package:vector_graphics/vector_graphics.dart';
-
 import '../domain/map_camera.dart';
+import '../infrastructure/route_map_svg_viewport.dart';
 
 // 하이브리드 노선도 바탕층(#2068 트랙 2번째 PR).
 //
@@ -18,21 +17,10 @@ import '../domain/map_camera.dart';
 // 구조화 painter는 충돌 회피 역명·뱃지를 같은 카메라 좌표계에 그린다.
 // SVG의 제목·범례·역명·미개통 형상은 컴파일 입력에서 제외한다.
 
-/// `widget.data.selectedRegion`(한글) → manifest map id. .vec 자산 파일명 결정.
-/// 매핑에 없는 region은 basemap 미표시(빈 화면)로 안전 폴백한다(크래시 금지).
-const Map<String, String> kRouteMapBasemapRegionToId = {
-  '수도권': 'seoul',
-  '부산': 'busan',
-  '광주': 'gwangju',
-  '대구': 'daegu',
-  '대전': 'daejeon',
-};
+const kRouteMapBasemapRegionToId = kRouteMapSvgRegionToId;
 
-/// region → .vec 자산 경로. 매핑에 없으면 null(바탕 미표시 폴백).
-String? routeMapBasemapAssetForRegion(String region) {
-  final id = kRouteMapBasemapRegionToId[region];
-  return id == null ? null : 'assets/datapacks/metro_map_pack/basemap/$id.vec';
-}
+String? routeMapBasemapAssetForRegion(String region) =>
+    routeMapSvgAssetForRegion(region);
 
 const TextStyle _attributionStyle = TextStyle(
   color: Color(0xFF466467),
@@ -134,6 +122,7 @@ class RouteMapBasemapView extends StatefulWidget {
     required this.camera,
     this.sourceOrigin = Offset.zero,
     this.attributionText,
+    this.onUnavailable,
     super.key,
   });
 
@@ -145,84 +134,15 @@ class RouteMapBasemapView extends StatefulWidget {
   final Offset sourceOrigin;
 
   final String? attributionText;
+  final VoidCallback? onUnavailable;
 
   @override
   State<RouteMapBasemapView> createState() => _RouteMapBasemapViewState();
 }
 
 class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
-  ui.Picture? _picture;
-  String? _loadedAsset;
-  // 진행 중 로드 토큰. region이 로드 완료 전에 바뀌면 stale 결과를 버린다.
-  Object? _loadToken;
   TextPainter? _attributionPainter;
   String? _attributionPainterText;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    // initState가 아닌 여기서 로드한다(로드가 inherited widget에 의존할 수 있으므로).
-    // region 미변경 시 _ensureBasemap이 조기 반환해 중복 로드가 없다.
-    _ensureBasemap();
-  }
-
-  @override
-  void didUpdateWidget(RouteMapBasemapView oldWidget) {
-    super.didUpdateWidget(oldWidget);
-    if (oldWidget.region != widget.region) {
-      _ensureBasemap();
-    }
-  }
-
-  void _ensureBasemap() {
-    final asset = routeMapBasemapAssetForRegion(widget.region);
-    if (_loadedAsset == asset && (asset == null || _picture != null)) {
-      return;
-    }
-    // 매핑에 없는 region: 바탕 미표시로 안전 폴백(크래시 금지).
-    if (asset == null) {
-      _loadToken = null;
-      _loadedAsset = null;
-      final previous = _picture;
-      _picture = null;
-      previous?.dispose();
-      return;
-    }
-    final token = Object();
-    _loadToken = token;
-    _loadedAsset = asset;
-    final previous = _picture;
-    _picture = null;
-    previous?.dispose();
-    // context=null: 바탕은 정적 도식이라 locale/textDirection 의존이 없고, null을
-    // 넘겨 inherited widget 의존(및 그로 인한 재로드)을 피한다(플랫폼 로케일·LTR 폴백).
-    vg
-        .loadPicture(AssetBytesLoader(asset), null)
-        .then((info) {
-          if (!mounted || !identical(_loadToken, token)) {
-            info.picture.dispose();
-            return;
-          }
-          setState(() {
-            _picture?.dispose();
-            _picture = info.picture;
-          });
-        })
-        .catchError((Object error, StackTrace stack) {
-          if (!mounted || !identical(_loadToken, token)) {
-            return;
-          }
-          // 로드 실패 시 바탕만 비고 인터랙션은 계속 동작한다(무해 폴백).
-          FlutterError.reportError(
-            FlutterErrorDetails(
-              exception: error,
-              stack: stack,
-              library: 'network_map',
-              context: ErrorDescription('노선도 바탕 .vec 로드 실패($asset)'),
-            ),
-          );
-        });
-  }
 
   void _ensureAttributionPainter() {
     final text = widget.attributionText;
@@ -247,8 +167,6 @@ class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
 
   @override
   void dispose() {
-    _loadToken = null;
-    _picture?.dispose();
     _attributionPainter?.dispose();
     super.dispose();
   }
@@ -261,19 +179,29 @@ class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
     // willChange=true는 다음 프레임에 다시 바뀔 것임을(래스터 캐시를 유지하지
     // 말라는 힌트 — isComplex 캐싱을 억제) 엔진에 알린다. 이 바탕은 카메라
     // 팬/줌마다 매 프레임 repaint되는 레이어라 willChange가 적절하다.
-    return RepaintBoundary(
-      child: CustomPaint(
-        size: widget.camera.viewportSize,
-        isComplex: true,
-        willChange: true,
-        painter: RouteMapBasemapPainter(
-          picture: _picture,
+    return Stack(
+      fit: StackFit.expand,
+      children: [
+        RouteMapSvgViewport(
+          key: ValueKey(widget.region),
+          region: widget.region,
           camera: widget.camera,
           sourceOrigin: widget.sourceOrigin,
-          attributionText: widget.attributionText,
-          attributionPainter: _attributionPainter,
+          onUnavailable: widget.onUnavailable ?? () {},
         ),
-      ),
+        IgnorePointer(
+          child: CustomPaint(
+            size: widget.camera.viewportSize,
+            painter: RouteMapBasemapPainter(
+              picture: null,
+              camera: widget.camera,
+              sourceOrigin: widget.sourceOrigin,
+              attributionText: widget.attributionText,
+              attributionPainter: _attributionPainter,
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

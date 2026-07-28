@@ -31,18 +31,18 @@ import 'package:flutter_test/flutter_test.dart';
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
-  test('5권역 표시명을 각 바탕 .vec 자산에 매핑한다', () {
+  test('5권역 표시명을 각 canonical .svg 자산에 매핑한다', () {
     expect(
       {
         for (final region in ['수도권', '부산', '대구', '대전', '광주'])
           region: routeMapBasemapAssetForRegion(region),
       },
       {
-        '수도권': 'assets/datapacks/metro_map_pack/basemap/seoul.vec',
-        '부산': 'assets/datapacks/metro_map_pack/basemap/busan.vec',
-        '대구': 'assets/datapacks/metro_map_pack/basemap/daegu.vec',
-        '대전': 'assets/datapacks/metro_map_pack/basemap/daejeon.vec',
-        '광주': 'assets/datapacks/metro_map_pack/basemap/gwangju.vec',
+        '수도권': 'assets/datapacks/metro_map_pack/basemap/seoul.svg',
+        '부산': 'assets/datapacks/metro_map_pack/basemap/busan.svg',
+        '대구': 'assets/datapacks/metro_map_pack/basemap/daegu.svg',
+        '대전': 'assets/datapacks/metro_map_pack/basemap/daejeon.svg',
+        '광주': 'assets/datapacks/metro_map_pack/basemap/gwangju.svg',
       },
     );
   });

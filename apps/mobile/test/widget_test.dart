@@ -862,7 +862,7 @@ void main() {
           initialOnboardingState: _completedOnboardingState(),
         ),
       );
-      await tester.pumpAndSettle();
+      await tester.pump();
     });
 
     expect(reportedErrors, isEmpty);
@@ -3590,6 +3590,32 @@ void main() {
     expect(decoration.borderRadius, isNull);
     expect(find.byType(RouteMapBasemapView), findsOneWidget);
     expect(find.byKey(const Key('networkMapPainter')), findsNothing);
+  });
+
+  testWidgets('SVG 바탕 실패는 지도 상호작용 전체를 unavailable surface로 교체한다', (tester) async {
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      await tester.pumpWidget(
+        buildEasySubwayTestApp(
+          repository: FakeStationSearchRepository(
+            networkMapRegionNames: const ['수도권'],
+          ),
+          reportRepository: FakeFacilityReportRepository(),
+          routeRepository: FakeRouteSearchRepository(),
+          notificationRepository: FakeNotificationSettingsRepository(),
+          initialOnboardingState: _completedOnboardingState(),
+        ),
+      );
+      await tester.pumpAndSettle();
+
+      expect(find.text('노선도를 불러오지 못했어요'), findsOneWidget);
+      expect(find.byType(RouteMapBasemapView), findsNothing);
+      expect(find.bySemanticsLabel('노선도'), findsNothing);
+      expect(find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')), findsNothing);
+      expect(find.byKey(const Key('networkMapStationSheet')), findsNothing);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 
   testWidgets('수도권 노선도는 Android에서 구조화 canvas 렌더러로 전체 크기를 채운다', (tester) async {
