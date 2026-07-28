@@ -3,7 +3,9 @@ import 'dart:ui';
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_svg_viewport.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/widgets.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
@@ -72,7 +74,50 @@ void main() {
     controller.dispose();
   });
 
-  test('invalid camera와 native 실패 이벤트는 unavailable을 한 번만 알린다', () async {
+  test('attach 전 최신 camera는 attach 뒤 setCamera 한 번으로 따라잡는다', () async {
+    final calls = <MethodCall>[];
+    const channelName =
+        'com.easysubway.easysubway_mobile/route_map_viewport_webview/43';
+    final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+    messenger.setMockMethodCallHandler(const MethodChannel(channelName), (call) async {
+      calls.add(call);
+    });
+    addTearDown(() => messenger.setMockMethodCallHandler(const MethodChannel(channelName), null));
+    final controller = RouteMapSvgViewportController(onUnavailable: () {});
+    final latest = camera.copyWith(revision: 5, center: const Offset(61, 56));
+
+    await controller.update(latest, sourceOrigin: origin);
+    await controller.attach(viewId: 43, camera: camera, sourceOrigin: origin);
+
+    expect(calls, hasLength(1));
+    expect(calls.single.arguments, routeMapSvgViewportCameraPayload(
+      camera: latest,
+      sourceOrigin: origin,
+    ));
+    controller.dispose();
+  });
+
+  for (final method in ['assetLoadFailed', 'cameraApplyFailed', 'processGone']) {
+    test('$method는 unavailable을 알린다', () async {
+      var unavailableCount = 0;
+      const channelName =
+          'com.easysubway.easysubway_mobile/route_map_viewport_webview/7';
+      final messenger = TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
+      final controller = RouteMapSvgViewportController(
+        onUnavailable: () => unavailableCount++,
+      );
+      await controller.attach(viewId: 7, camera: camera, sourceOrigin: origin);
+      await messenger.handlePlatformMessage(
+        channelName,
+        const StandardMethodCodec().encodeMethodCall(MethodCall(method)),
+        (_) {},
+      );
+      expect(unavailableCount, 1);
+      controller.dispose();
+    });
+  }
+
+  test('invalid camera는 unavailable을 알린다', () async {
     var unavailableCount = 0;
     const channelName =
         'com.easysubway.easysubway_mobile/route_map_viewport_webview/7';
@@ -82,13 +127,6 @@ void main() {
     );
     controller.attach(viewId: 7, camera: camera, sourceOrigin: origin);
 
-    for (final method in ['assetLoadFailed', 'cameraApplyFailed', 'processGone']) {
-      await messenger.handlePlatformMessage(
-        channelName,
-        const StandardMethodCodec().encodeMethodCall(MethodCall(method)),
-        (_) {},
-      );
-    }
     await controller.update(
       camera.copyWith(viewportSize: const Size(double.nan, 800), revision: 4),
       sourceOrigin: origin,
@@ -96,5 +134,41 @@ void main() {
 
     expect(unavailableCount, 1);
     controller.dispose();
+  });
+
+  testWidgets('unknown region은 widget unavailable callback을 호출한다', (tester) async {
+    var unavailableCount = 0;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
+    try {
+      await tester.pumpWidget(Directionality(
+        textDirection: TextDirection.ltr,
+        child: RouteMapSvgViewport(
+          region: '알 수 없음', camera: camera, sourceOrigin: origin,
+          onUnavailable: () => unavailableCount++,
+        ),
+      ));
+      await tester.pump();
+      expect(unavailableCount, 1);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
+  });
+
+  testWidgets('unsupported platform은 widget unavailable callback을 호출한다', (tester) async {
+    var unavailableCount = 0;
+    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    try {
+      await tester.pumpWidget(Directionality(
+        textDirection: TextDirection.ltr,
+        child: RouteMapSvgViewport(
+          region: '수도권', camera: camera, sourceOrigin: origin,
+          onUnavailable: () => unavailableCount++,
+        ),
+      ));
+      await tester.pump();
+      expect(unavailableCount, 1);
+    } finally {
+      debugDefaultTargetPlatformOverride = null;
+    }
   });
 }

@@ -50,15 +50,21 @@ class RouteMapSvgViewportController {
   final VoidCallback onUnavailable;
   final ValueChanged<int>? onFramePresented;
   MethodChannel? _channel;
+  Map<String, Object>? _pendingCameraPayload;
   bool _unavailable = false;
 
-  void attach({
+  Future<void> attach({
     required int viewId,
     required MapCameraState camera,
     required Offset sourceOrigin,
-  }) {
+  }) async {
     _channel = MethodChannel('$_channelPrefix$viewId')
       ..setMethodCallHandler(_handleMethodCall);
+    final pending = _pendingCameraPayload;
+    _pendingCameraPayload = null;
+    if (pending != null && !_unavailable) {
+      await _invokeSetCamera(pending);
+    }
   }
 
   Future<void> update(
@@ -69,16 +75,24 @@ class RouteMapSvgViewportController {
       _fail();
       return;
     }
+    final payload = routeMapSvgViewportCameraPayload(
+      camera: camera,
+      sourceOrigin: sourceOrigin,
+    );
+    final channel = _channel;
+    if (channel == null) {
+      _pendingCameraPayload = payload;
+      return;
+    }
+    if (_unavailable) return;
+    await _invokeSetCamera(payload);
+  }
+
+  Future<void> _invokeSetCamera(Map<String, Object> payload) async {
     final channel = _channel;
     if (channel == null || _unavailable) return;
     try {
-      await channel.invokeMethod<void>(
-        'setCamera',
-        routeMapSvgViewportCameraPayload(
-          camera: camera,
-          sourceOrigin: sourceOrigin,
-        ),
-      );
+      await channel.invokeMethod<void>('setCamera', payload);
     } on PlatformException {
       _fail();
     }
@@ -108,7 +122,7 @@ class RouteMapSvgViewportController {
     _channel = null;
     if (channel == null) return;
     channel.setMethodCallHandler(null);
-    unawaited(channel.invokeMethod<void>('dispose'));
+    unawaited(channel.invokeMethod<void>('dispose').catchError((_) {}));
   }
 }
 
@@ -159,7 +173,8 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
   @override
   void didUpdateWidget(RouteMapSvgViewport oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.camera.revision != widget.camera.revision) {
+    if (oldWidget.camera != widget.camera ||
+        oldWidget.sourceOrigin != widget.sourceOrigin) {
       unawaited(_controller.update(widget.camera, sourceOrigin: widget.sourceOrigin));
     }
   }
@@ -201,22 +216,16 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
         layoutDirection: TextDirection.ltr,
         creationParams: params,
         creationParamsCodec: const StandardMessageCodec(),
-        onPlatformViewCreated: (id) => _controller.attach(
-          viewId: id,
-          camera: widget.camera,
-          sourceOrigin: widget.sourceOrigin,
-        ),
+        onPlatformViewCreated: (id) => unawaited(_controller.attach(
+          viewId: id, camera: widget.camera, sourceOrigin: widget.sourceOrigin)),
       ),
       TargetPlatform.iOS => UiKitView(
         viewType: _viewType,
         layoutDirection: TextDirection.ltr,
         creationParams: params,
         creationParamsCodec: const StandardMessageCodec(),
-        onPlatformViewCreated: (id) => _controller.attach(
-          viewId: id,
-          camera: widget.camera,
-          sourceOrigin: widget.sourceOrigin,
-        ),
+        onPlatformViewCreated: (id) => unawaited(_controller.attach(
+          viewId: id, camera: widget.camera, sourceOrigin: widget.sourceOrigin)),
       ),
       _ => const SizedBox.expand(),
     };

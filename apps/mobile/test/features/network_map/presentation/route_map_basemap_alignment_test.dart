@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
+import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_svg_viewport.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
 import 'package:flutter/painting.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -107,24 +108,17 @@ void main() {
   for (final entry in cameras.entries) {
     test('(A) 바탕 재생 변환 == 오버레이 앵커(<1e-6): ${entry.key}', () {
       final camera = entry.value;
-      // sourceOrigin을 geometry origin으로 넘긴 painter가 실제 렌더 상태.
-      final painter = RouteMapBasemapPainter(
-        picture: null, // 변환 수식 검증에는 picture 불필요.
+      final expected = camera.visibleSourceRect.shift(origin);
+      final viewBox = routeMapSvgViewportCameraPayload(
         camera: camera,
         sourceOrigin: origin,
-      );
-      for (final p in viewBoxPoints) {
-        final canvasPoint = painter.sourceToViewport(p);
-        final overlayPoint = camera.sourceToViewportPoint(p - origin);
-        expect(
-          (canvasPoint - overlayPoint).distance,
-          lessThan(1e-6),
-          reason:
-              '${entry.key} / viewBox=$p: '
-              'canvas=$canvasPoint overlay=$overlayPoint '
-              'delta=${canvasPoint - overlayPoint}',
-        );
-      }
+      )['viewBox'] as List<double>;
+      expect(viewBox, <double>[
+        expected.left,
+        expected.top,
+        expected.width,
+        expected.height,
+      ], reason: '${entry.key} viewBox must preserve the shifted camera rect');
     });
   }
 

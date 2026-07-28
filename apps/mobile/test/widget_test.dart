@@ -3593,7 +3593,7 @@ void main() {
   });
 
   testWidgets('SVG 바탕 실패는 지도 상호작용 전체를 unavailable surface로 교체한다', (tester) async {
-    debugDefaultTargetPlatformOverride = TargetPlatform.macOS;
+    debugDefaultTargetPlatformOverride = TargetPlatform.android;
     try {
       await tester.pumpWidget(
         buildEasySubwayTestApp(
@@ -3607,6 +3607,15 @@ void main() {
         ),
       );
       await tester.pumpAndSettle();
+
+      await tester.tap(find.byKey(const Key('networkMapStation-sangnoksu-seoul-4')));
+      await tester.pumpAndSettle();
+      expect(find.byKey(const Key('networkMapStationSheet')), findsOneWidget);
+      final basemap = tester.widget<RouteMapBasemapView>(
+        find.byType(RouteMapBasemapView),
+      );
+      basemap.onUnavailable!();
+      await tester.pump();
 
       expect(find.text('노선도를 불러오지 못했어요'), findsOneWidget);
       expect(find.byType(RouteMapBasemapView), findsNothing);

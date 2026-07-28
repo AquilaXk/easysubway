@@ -4743,7 +4743,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           return Stack(
             children: [
               Positioned.fill(
-                child: _buildStructuredRouteMapCanvas(camera, geometry.origin),
+                child: _buildStructuredRouteMapCanvas(
+                  camera,
+                  geometry.origin,
+                  _layoutKey!,
+                ),
               ),
               Positioned.fill(
                 child: Semantics(
@@ -5258,6 +5262,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   Widget _buildStructuredRouteMapCanvas(
     MapCameraState camera,
     Offset sourceOrigin,
+    String rendererKey,
   ) {
     final attribution = _attributionTextByRegion?[widget.data.selectedRegion];
     _ensureStructuredRouteMap();
@@ -5274,6 +5279,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           sourceOrigin: sourceOrigin,
           attributionText: attribution,
           onUnavailable: _markRouteMapBasemapUnavailable,
+          rendererKey: rendererKey,
         ),
         StructuredRouteMapView(
           map: map,

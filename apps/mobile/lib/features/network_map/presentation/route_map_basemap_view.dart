@@ -1,5 +1,4 @@
 import 'dart:math' as math;
-import 'dart:ui' as ui;
 
 import 'package:flutter/widgets.dart';
 import '../domain/map_camera.dart';
@@ -27,20 +26,15 @@ const TextStyle _attributionStyle = TextStyle(
   fontSize: 10,
 );
 
-/// 바탕 .vec [picture]를 카메라 transform으로 재생한다(재생 전용).
-/// vec는 viewBox=source 좌표라 structured painter와 달리 designScale로 나누지
-/// 않는다 — translate 동일 + `canvas.scale(camera.scale)` + drawPicture.
+/// Native SVG 위의 Flutter attribution overlay painter.
 class RouteMapBasemapPainter extends CustomPainter {
   RouteMapBasemapPainter({
-    required this.picture,
     required this.camera,
     this.sourceOrigin = Offset.zero,
     this.attributionText,
     this.attributionPainter,
   });
 
-  /// 디코드된 바탕 Picture. 로드 완료 전에는 null이라 바탕을 그리지 않는다.
-  final ui.Picture? picture;
   final MapCameraState camera;
 
   /// 오버레이·카메라의 geometry origin(#1970). Picture 재생을 origin-뺀 공간으로
@@ -61,20 +55,6 @@ class RouteMapBasemapPainter extends CustomPainter {
 
   @override
   void paint(Canvas canvas, Size size) {
-    final basemap = picture;
-    if (basemap != null) {
-      canvas.save();
-      final vc = camera.viewportSize.center(Offset.zero);
-      // viewport = vc + (viewBox − sourceOrigin − camera.center)·scale.
-      // vec는 viewBox=source 좌표라 designScale 배율이 없다.
-      canvas.translate(
-        vc.dx - (camera.center.dx + sourceOrigin.dx) * camera.scale,
-        vc.dy - (camera.center.dy + sourceOrigin.dy) * camera.scale,
-      );
-      canvas.scale(camera.scale);
-      canvas.drawPicture(basemap);
-      canvas.restore();
-    }
     _paintAttribution(canvas, size); // 화면 고정.
   }
 
@@ -106,16 +86,14 @@ class RouteMapBasemapPainter extends CustomPainter {
   @override
   bool shouldRepaint(RouteMapBasemapPainter oldDelegate) {
     return oldDelegate.camera.revision != camera.revision ||
-        !identical(oldDelegate.picture, picture) ||
         oldDelegate.sourceOrigin != sourceOrigin ||
         oldDelegate.attributionText != attributionText ||
         !identical(oldDelegate.attributionPainter, attributionPainter);
   }
 }
 
-/// 하이브리드 노선도 바탕층 뷰. [region]에 매핑된 .vec를 런타임 디코드해
-/// [ui.Picture]를 State에 캐시하고(region 변경 시에만 재로드), 카메라 변경 시
-/// transform만 재생한다.
+/// 하이브리드 노선도 바탕층 뷰. canonical SVG는 native viewport가 그리고,
+/// Flutter는 attribution overlay와 map interaction을 소유한다.
 class RouteMapBasemapView extends StatefulWidget {
   const RouteMapBasemapView({
     required this.region,
@@ -123,6 +101,7 @@ class RouteMapBasemapView extends StatefulWidget {
     this.sourceOrigin = Offset.zero,
     this.attributionText,
     this.onUnavailable,
+    this.rendererKey,
     super.key,
   });
 
@@ -135,6 +114,7 @@ class RouteMapBasemapView extends StatefulWidget {
 
   final String? attributionText;
   final VoidCallback? onUnavailable;
+  final String? rendererKey;
 
   @override
   State<RouteMapBasemapView> createState() => _RouteMapBasemapViewState();
@@ -174,16 +154,11 @@ class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
   @override
   Widget build(BuildContext context) {
     _ensureAttributionPainter();
-    // RepaintBoundary로 바탕 레이어를 형제 오버레이 rebuild와 분리한다.
-    // isComplex=true는 이 레이어가 값비싼 그리기임을(래스터 캐시 가치 있음),
-    // willChange=true는 다음 프레임에 다시 바뀔 것임을(래스터 캐시를 유지하지
-    // 말라는 힌트 — isComplex 캐싱을 억제) 엔진에 알린다. 이 바탕은 카메라
-    // 팬/줌마다 매 프레임 repaint되는 레이어라 willChange가 적절하다.
     return Stack(
       fit: StackFit.expand,
       children: [
         RouteMapSvgViewport(
-          key: ValueKey(widget.region),
+          key: ValueKey('${widget.region}:${widget.rendererKey}'),
           region: widget.region,
           camera: widget.camera,
           sourceOrigin: widget.sourceOrigin,
@@ -193,7 +168,6 @@ class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
           child: CustomPaint(
             size: widget.camera.viewportSize,
             painter: RouteMapBasemapPainter(
-              picture: null,
               camera: widget.camera,
               sourceOrigin: widget.sourceOrigin,
               attributionText: widget.attributionText,
