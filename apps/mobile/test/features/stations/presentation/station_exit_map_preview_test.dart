@@ -188,6 +188,44 @@ void main() {
     expect(controller.resumeCount, 1);
   });
 
+  testWidgets('가려진 route는 foreground 복귀 뒤에도 지도를 멈춘다', (tester) async {
+    final controller = _FakeKakaoMapController();
+    await tester.pumpWidget(
+      MaterialApp(
+        home: TickerMode(
+          enabled: false,
+          child: Scaffold(
+            body: StationExitMapPreview(
+              station: _station(),
+              exits: [
+                _exit(
+                  id: 'exit-1',
+                  number: '1',
+                  latitude: 37.301,
+                  longitude: 126.861,
+                ),
+              ],
+              selectedExitId: 'exit-1',
+              onOpenSelected: () {},
+              nativeAppKey: 'test-native-map-key',
+              nativeMapBuilder: _readyMapBuilder(controller),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+    final initialPauseCount = controller.pauseCount;
+
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+    await tester.pump();
+    tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.resumed);
+    await tester.pump();
+
+    expect(controller.resumeCount, 0);
+    expect(controller.pauseCount, greaterThan(initialPauseCount));
+  });
+
   testWidgets('지도 구성 중 출구를 바꿔도 현재 출구 marker만 강조한다', (tester) async {
     final firstPoiGate = Completer<void>();
     final controller = _FakeKakaoMapController(firstPoiGate: firstPoiGate);

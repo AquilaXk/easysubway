@@ -31,6 +31,7 @@ Future<void> main() async {
     isReleaseMode: kReleaseMode,
   );
   installMobileErrorHandlers();
+  await initializeMobileCrashReporting(isReleaseMode: kReleaseMode);
   if (kakaoMapNativeAppKey.trim().isNotEmpty) {
     try {
       await KakaoMapSdk.instance.initialize(kakaoMapNativeAppKey);
@@ -42,7 +43,6 @@ Future<void> main() async {
       );
     }
   }
-  await initializeMobileCrashReporting(isReleaseMode: kReleaseMode);
   registerBundledAssetLicenses();
   validateReleaseBuildFlags(
     isReleaseMode: kReleaseMode,

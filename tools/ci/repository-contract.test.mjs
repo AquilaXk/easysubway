@@ -15736,7 +15736,7 @@ test("모바일 async lint 기준선은 Future 처리 누락을 analyzer에서 �
   const asyncLintBaseline = readJson("apps/mobile/analysis/async-lint-baseline.json");
 
   assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
-  assert.match(analysisOptions, /^analyzer:\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
+  assert.match(analysisOptions, /^analyzer:\n  exclude:\n    - build\/\*\*\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
   assert.match(analysisOptions, /^\s{4}unawaited_futures: true$/m);
   assert.match(analysisOptions, /^\s{4}discarded_futures: false # staged in apps\/mobile\/analysis\/async-lint-baseline\.json$/m);
   assert.equal(asyncLintBaseline.schema, "easysubway.mobile_async_lint_baseline.v1");
@@ -15851,7 +15851,11 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(pubspec, /kakao_map_sdk: \^1\.2\.6/);
   assert.match(pubspec, /uses-material-design: true/);
   assert.match(analysisOptions, /package:flutter_lints\/flutter\.yaml/);
-  assert.match(analysisOptions, /^analyzer:\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
+  assert.match(analysisOptions, /^analyzer:\n  exclude:\n    - build\/\*\*\n  language:\n    strict-casts: true\n    strict-inference: true\n    strict-raw-types: true$/m);
+  assert.ok(
+    main.indexOf("await initializeMobileCrashReporting") <
+      main.indexOf("await KakaoMapSdk.instance.initialize"),
+  );
   assert.match(androidManifest, /android:label="쉬운 지하철"/);
   assert.match(androidManifest, /android:allowBackup="false"/);
   assert.match(androidManifest, /android:fullBackupContent="false"/);

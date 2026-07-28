@@ -126,6 +126,7 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     _appActive = state == AppLifecycleState.resumed;
+    _controllerRunning = null;
     _syncControllerLifecycle();
   }
 
