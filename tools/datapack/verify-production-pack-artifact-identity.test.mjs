@@ -164,6 +164,11 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
     assert.equal(report.sqliteSha256, pack.sqliteSha256);
     assert.equal(report.byteSize, pack.sizeBytes);
     assert.ok(report.rowCounts.stations > 0);
+    assert.deepEqual(report.networkEdgeCounts, {
+      total: 2178,
+      provenanceComplete: 652,
+      strictEligible: 652,
+    });
 
     const index = JSON.parse(await readFile(indexPath, "utf8"));
     index.packs[0].sha256 = "f".repeat(64);
