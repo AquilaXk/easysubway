@@ -175,7 +175,14 @@ private class RouteMapViewportPlatformView(
         }
     }
 
-    private fun routeMapWebViewClient(): WebViewClient = object : WebViewClient() {
+    private fun routeMapWebViewClient(): WebViewClient =
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            Api26RouteMapWebViewClient()
+        } else {
+            RouteMapWebViewClient()
+        }
+
+    private open inner class RouteMapWebViewClient : WebViewClient() {
         override fun shouldOverrideUrlLoading(view: WebView, request: WebResourceRequest): Boolean {
             val allowed = request.url.toString() == initialAssetUrl
             if (!allowed && request.isForMainFrame) reportAssetLoadFailed()
@@ -207,7 +214,10 @@ private class RouteMapViewportPlatformView(
         override fun onReceivedError(view: WebView, request: WebResourceRequest, error: WebResourceError) {
             if (request.isForMainFrame) reportAssetLoadFailed()
         }
+    }
 
+    @android.annotation.TargetApi(Build.VERSION_CODES.O)
+    private inner class Api26RouteMapWebViewClient : RouteMapWebViewClient() {
         override fun onRenderProcessGone(view: WebView, detail: RenderProcessGoneDetail): Boolean {
             handleProcessGone(view, detail.didCrash())
             return true

@@ -49,6 +49,10 @@ test("verifyDisplaySvgProvenance: canonical source bytes and display bundle byte
   withFixture(({ root }) => assert.doesNotThrow(() => verifyDisplaySvgProvenance(root, "manifest.json")));
 });
 
+test("verifyDisplaySvgProvenance: repository display artifacts match canonical sources", () => {
+  assert.doesNotThrow(() => verifyDisplaySvgProvenance());
+});
+
 test("Gwangju canonical SVG retains 광주송정역 text without duplicated station accessibility labels", () => {
   const svg = readFileSync(`${sourceDir}/easy-subway-gwangju-v3.svg`, "utf8");
   const ariaLabels = [...svg.matchAll(/(?:^|\s)aria-label="([^"]*)"/g)].map((match) => match[1]);

@@ -145,6 +145,11 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   assert.match(android, /settings\.allowFileAccess = true/);
   assert.match(
     android,
+    /if \(Build\.VERSION\.SDK_INT >= Build\.VERSION_CODES\.O\)[\s\S]*Api26RouteMapWebViewClient\(\)[\s\S]*else[\s\S]*RouteMapWebViewClient\(\)/,
+    "Android API 24–25 must not load the API 26 renderer-loss callback type",
+  );
+  assert.match(
+    android,
     /if \(!isDebuggable\) \{[\s\S]*result\.error\("debugUnavailable"[\s\S]*return/,
   );
   assert.match(
