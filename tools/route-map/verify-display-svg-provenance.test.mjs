@@ -90,6 +90,9 @@ test("verifyDisplaySvgProvenance: self-contained SVG contract rejects dynamic lo
     ["ENTITY", '<!ENTITY map SYSTEM "https://example.test/map.ent"><svg/>\n'],
     ["script", "<svg><script>fetch('https://example.test')</script></svg>\n"],
     ["foreignObject", "<svg><foreignObject><div/></foreignObject></svg>\n"],
+    ["event handler", '<svg onload="fetch(\'https://example.test/map\')"/>\n'],
+    ["event handler boundary", "<svg onbeforematch=\"fetch()\"/>\n"],
+    ["SMIL mutation", "<svg><svg:animate attributeName=\"href\"/></svg>\n"],
   ]) {
     withFixture(({ root, maps }) => {
       const bytes = Buffer.from(markup);
