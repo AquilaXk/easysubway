@@ -15937,6 +15937,10 @@ test("모바일 스캐폴드는 Flutter Android와 iOS 앱 구조를 가진다",
   assert.match(kakaoMapConfiguration, /EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY/);
   assert.match(main, /validateKakaoMapConfiguration/);
   assert.match(main, /KakaoMapSdk\.instance\.initialize\(kakaoMapNativeAppKey\)/);
+  assert.ok(
+    main.indexOf("await KakaoMapSdk.instance.initialize(kakaoMapNativeAppKey)") <
+      main.indexOf("markKakaoMapSdkInitialized()"),
+  );
   assert.match(main, /defaultValue: false/);
   assert.match(main, /enablePushNotifications/);
   assert.doesNotMatch(`${main}\n${appDependencies}`, /AnonymousAuth|enableAnonymousAuth|anonymousAuth/);

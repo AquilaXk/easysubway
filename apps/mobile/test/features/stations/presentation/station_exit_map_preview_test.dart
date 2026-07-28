@@ -34,6 +34,21 @@ void main() {
     expect(mapBuildCount, 0);
   });
 
+  testWidgets('SDK 초기화 실패는 native map 대신 unavailable 안내를 보여준다', (tester) async {
+    var nativeMapBuilt = false;
+    await _pumpPreview(
+      tester,
+      nativeSdkInitialized: false,
+      nativeMapBuilder: _recordingMapBuilder(
+        onBuild: (_) => nativeMapBuilt = true,
+      ),
+    );
+
+    expect(nativeMapBuilt, isFalse);
+    expect(find.text('지도 미리보기를 사용할 수 없어요.'), findsOneWidget);
+    expect(find.text('다시 시도'), findsNothing);
+  });
+
   testWidgets('출구와 역 좌표가 모두 없으면 미리보기를 생략한다', (tester) async {
     var mapBuildCount = 0;
     await _pumpPreview(
@@ -729,6 +744,7 @@ Future<void> _pumpPreview(
   String nativeAppKey = 'test-native-map-key',
   TextScaler textScaler = TextScaler.noScaling,
   VoidCallback? onOpenSelected,
+  bool? nativeSdkInitialized,
   StationExitNativeMapBuilder? nativeMapBuilder,
 }) {
   final resolvedExits =
@@ -745,6 +761,7 @@ Future<void> _pumpPreview(
             selectedExitId: selectedExitId ?? resolvedExits.first.id,
             onOpenSelected: onOpenSelected ?? () {},
             nativeAppKey: nativeAppKey,
+            nativeSdkInitialized: nativeSdkInitialized,
             nativeMapBuilder: nativeMapBuilder,
           ),
         ),

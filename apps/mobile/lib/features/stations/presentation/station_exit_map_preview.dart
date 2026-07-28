@@ -55,6 +55,7 @@ class StationExitMapPreview extends StatefulWidget {
     required this.selectedExitId,
     required this.onOpenSelected,
     this.nativeAppKey = kakaoMapNativeAppKey,
+    this.nativeSdkInitialized,
     this.nativeMapBuilder,
     super.key,
   });
@@ -64,6 +65,7 @@ class StationExitMapPreview extends StatefulWidget {
   final String selectedExitId;
   final VoidCallback onOpenSelected;
   final String nativeAppKey;
+  final bool? nativeSdkInitialized;
   final StationExitNativeMapBuilder? nativeMapBuilder;
 
   @override
@@ -160,7 +162,10 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
     )) {
       return const SizedBox.shrink();
     }
-    if (widget.nativeAppKey.trim().isEmpty) {
+    final nativeSdkInitialized =
+        widget.nativeSdkInitialized ??
+        (widget.nativeMapBuilder != null || kakaoMapSdkInitialized);
+    if (widget.nativeAppKey.trim().isEmpty || !nativeSdkInitialized) {
       return const _MapMessagePanel(
         message: '지도 미리보기를 사용할 수 없어요.',
         detail: '아래 카카오맵에서 보기 버튼은 계속 사용할 수 있어요.',

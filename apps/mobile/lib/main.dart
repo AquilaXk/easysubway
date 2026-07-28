@@ -35,6 +35,7 @@ Future<void> main() async {
   if (kakaoMapNativeAppKey.trim().isNotEmpty) {
     try {
       await KakaoMapSdk.instance.initialize(kakaoMapNativeAppKey);
+      markKakaoMapSdkInitialized();
     } catch (error, stackTrace) {
       reportMobileError(
         StateError('Kakao Map SDK initialization failed: ${error.runtimeType}'),
