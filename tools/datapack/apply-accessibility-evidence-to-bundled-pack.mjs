@@ -285,8 +285,9 @@ export function accessibilityIndexMetadata(pack, spec, inventory, currentFreshne
       throw new Error(`accessibility snapshot freshness missing: ${sourceId}`);
     }
     return snapshot.freshnessExpiresAt;
-  }).sort().at(0);
-  const qualityAsOf = [...consumed.keys()].map((sourceId) => evidenceBySource.get(sourceId).observedAt).sort().at(-1);
+  }).sort((left, right) => Date.parse(left) - Date.parse(right)).at(0);
+  const qualityAsOf = [...consumed.keys()].map((sourceId) => evidenceBySource.get(sourceId).observedAt)
+    .sort((left, right) => Date.parse(left) - Date.parse(right)).at(-1);
   const currentFreshnessMillis = Date.parse(currentFreshnessExpiresAt);
   const accessibilityFreshnessMillis = Date.parse(accessibilityFreshnessExpiresAt);
   if (!Number.isFinite(currentFreshnessMillis)) throw new Error("bundled pack freshness missing");

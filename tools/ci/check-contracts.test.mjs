@@ -61,6 +61,29 @@ test("번들 source-inventory 실물이 계약 스키마를 통과한다", () =>
   assert.deepEqual(validateSchema(schema, inventory).errors, []);
 });
 
+test("accessibility admission evidence는 기존형과 source-governance형 필수 필드를 각각 유지한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  for (const [selector, requiredField] of [
+    [(evidence) => evidence.materializer != null, "materializer"],
+    [(evidence) => evidence.decision != null, "decision"],
+  ]) {
+    const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+    const source = inventory.sources.find(({ accessibilityAdmissionEvidence: evidence }) => evidence && selector(evidence));
+    delete source.accessibilityAdmissionEvidence[requiredField];
+    assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+      error.includes("accessibilityAdmissionEvidence: oneOf")
+    )));
+  }
+
+  const combined = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const legacy = combined.sources.find((source) => source.accessibilityAdmissionEvidence?.materializer != null);
+  const governed = combined.sources.find((source) => source.accessibilityAdmissionEvidence?.decision != null);
+  Object.assign(legacy.accessibilityAdmissionEvidence, governed.accessibilityAdmissionEvidence);
+  assert.ok(validateSchema(schema, combined).errors.some((error) => (
+    error.includes("accessibilityAdmissionEvidence: oneOf")
+  )));
+});
+
 test("source quota defaultDailyLimit는 허용된 scalar만 받는다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");

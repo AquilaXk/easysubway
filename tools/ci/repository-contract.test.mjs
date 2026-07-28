@@ -9518,11 +9518,9 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   );
 
   assert.deepEqual(scope.productionSourceSet.requiredSourceIds.sort(), [
-    "kric-station-elevator",
+    "kric-station-convenience-standard",
     "kric-station-elevator-movement",
-    "kric-station-escalator",
     "kric-subway-timetable",
-    "kric-wheelchair-lift-location",
     "kric-wheelchair-lift-movement",
     "molit-urban-rail-full-route",
     "seoul-metro-accessibility",
@@ -9777,7 +9775,7 @@ test("official source importer는 production placeholder evidence hash를 거부
       ],
       { cwd: root },
     ),
-    /facilityRows\.evidenceHash is placeholder evidence: facility-sangnoksu-elevator-kric-1/,
+    /facilityRows\.evidenceHash is placeholder evidence: facility-station-sangnoksu-elevator-kric-standard-1/,
   );
 });
 
@@ -10005,6 +10003,10 @@ test("official source importer는 production facility confidence 범위를 검�
 
 test("production row provenance는 snapshot/provider/evidence hash gate를 유지한다", () => {
   const input = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
+  const inventory = readJson("tools/datapack/source-inventory.json");
+  const accessibilitySnapshotBySource = new Map(inventory.sources
+    .filter((source) => source.accessibilityAdmissionEvidence != null)
+    .map((source) => [source.id, source.accessibilityAdmissionEvidence.snapshotId]));
   const schema = read("tools/datapack/schema/catalog-schema.sql");
   const builder = read("tools/datapack/build-datapack.mjs");
   const validator = read("tools/datapack/validate-datapack.mjs");
@@ -10016,14 +10018,14 @@ test("production row provenance는 snapshot/provider/evidence hash gate를 유�
   const pathwayH2Migration = read("backend/src/main/resources/db/migration/h2/V30__canonical_station_pathways.sql");
 
   for (const row of input.facilityRows) {
-    assert.match(row.sourceSnapshotId, /^[a-z0-9-]+-snapshot-\d{8}$/);
+    assert.equal(row.sourceSnapshotId, accessibilitySnapshotBySource.get(row.sourceId));
     assert.match(row.providerRecordHash, /^[0-9a-f]{64}$/);
     assert.match(row.evidenceHash, /^[0-9a-f]{64}$/);
     assert.doesNotMatch(row.providerRecordHash, /^([0-9a-f])\1{63}$/);
     assert.doesNotMatch(row.evidenceHash, /^([0-9a-f])\1{63}$/);
   }
   for (const row of input.routeEdges) {
-    assert.match(row.sourceSnapshotId, /^[a-z0-9-]+-snapshot-\d{8}$/);
+    assert.equal(row.sourceSnapshotId, accessibilitySnapshotBySource.get(row.sourceId));
     assert.match(row.providerRecordHash, /^[0-9a-f]{64}$/);
     assert.match(row.evidenceHash, /^[0-9a-f]{64}$/);
     assert.doesNotMatch(row.providerRecordHash, /^([0-9a-f])\1{63}$/);
@@ -10221,14 +10223,10 @@ test("official source importer는 locked production denominator 밖 station을 �
     stationCode: "999",
     lineSequence: 99,
   });
-  for (const [sourceId, type] of [
-    ["kric-station-elevator", "ELEVATOR"],
-    ["kric-station-escalator", "ESCALATOR"],
-    ["kric-wheelchair-lift-location", "WHEELCHAIR_LIFT"],
-  ]) {
+  for (const type of ["ELEVATOR", "ESCALATOR", "WHEELCHAIR_LIFT"]) {
     input.facilityRows.push({
       ...input.facilityRows[0],
-      sourceId,
+      sourceId: "kric-station-convenience-standard",
       id: `facility-extra-${type.toLowerCase()}`,
       station: {
         sourceId: "molit-urban-rail-full-route",

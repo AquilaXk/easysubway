@@ -6,6 +6,7 @@ import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { pathToFileURL } from "node:url";
 import { gunzipSync } from "node:zlib";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 export const KRIC_ACCESSIBILITY_OPERATIONS = Object.freeze([
   {
@@ -294,8 +295,10 @@ async function requestRows({ operation, tuple, serviceKey, fetchImpl, requestTim
     return [];
   } else {
     const safeCode = /^[A-Za-z0-9._-]{1,32}$/.test(resultCode ?? "") ? resultCode : "UNKNOWN";
-    const safeKeys = Object.keys(payload ?? {}).filter((key) => /^[A-Za-z0-9._-]{1,32}$/.test(key)).sort().slice(0, 12);
-    const safeBodyKeys = Object.keys(payload?.body ?? {}).filter((key) => /^[A-Za-z0-9._-]{1,32}$/.test(key)).sort().slice(0, 12);
+    const safeKeys = Object.keys(payload ?? {}).filter((key) => /^[A-Za-z0-9._-]{1,32}$/.test(key))
+      .sort(codepointCompare).slice(0, 12);
+    const safeBodyKeys = Object.keys(payload?.body ?? {}).filter((key) => /^[A-Za-z0-9._-]{1,32}$/.test(key))
+      .sort(codepointCompare).slice(0, 12);
     throw new Error(`KRIC accessibility provider result invalid: ${operation.sourceId}/${safeCode}; keys=${safeKeys.join(",")}; bodyKeys=${safeBodyKeys.join(",")}`);
   }
   const tupleIdentityFields = operation.tupleIdentityFields ?? ["railOprIsttCd", "lnCd", "stinCd"];
