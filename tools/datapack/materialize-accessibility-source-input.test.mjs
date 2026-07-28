@@ -38,4 +38,12 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
   assert.throws(() => materializeAccessibilitySourceInput({
     input: { ...input, minimumProductionCoverage: { facilities: 2 } }, kricSnapshot, seoulSnapshot,
   }), /accessibility facility coverage below declared minimum: 1\/2/);
+  assert.throws(() => materializeAccessibilitySourceInput({
+    input,
+    kricSnapshot: {
+      ...kricSnapshot,
+      queries: [{ ...kricSnapshot.queries[0], rows: [{ gubun: "DRIFT" }] }],
+    },
+    seoulSnapshot,
+  }), /unknown KRIC facility code: DRIFT/);
 });

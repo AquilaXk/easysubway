@@ -8,6 +8,7 @@ const KRIC_SOURCE_ID = "kric-station-convenience-standard";
 const SEOUL_SOURCE_ID = "seoul-metro-accessibility";
 // KRIC official stationCnvFacl contract: EV/ES/WCLF are the only route-relevant facility codes.
 const FACILITY_TYPES = new Map([["EV", "ELEVATOR"], ["ES", "ESCALATOR"], ["WCLF", "WHEELCHAIR_LIFT"]]);
+const KRIC_FACILITY_CODES = new Set([...FACILITY_TYPES.keys(), "ELEC", "FEED", "INFO", "TOLT"]);
 
 export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoulSnapshot }) {
   if (kricSnapshot?.sourceId !== KRIC_SOURCE_ID || seoulSnapshot?.sourceId !== SEOUL_SOURCE_ID) {
@@ -27,6 +28,7 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
     if (!stationName) throw new Error(`station name missing: ${query.stationId}`);
     const counts = new Map();
     for (const row of query.rows) {
+      if (!KRIC_FACILITY_CODES.has(row.gubun)) throw new Error(`unknown KRIC facility code: ${row.gubun}`);
       const type = FACILITY_TYPES.get(row.gubun);
       if (!type) continue;
       const number = (counts.get(type) ?? 0) + 1;

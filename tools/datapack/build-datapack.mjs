@@ -651,7 +651,11 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     applyItxNetworkEdgeEvidence(pack, itxAdmission);
     normalizeUnverifiedNetworkEdgeStates(pack);
   }
-  const accessibilityFreshUntil = productionAccessibilityFreshUntil(productionPacks, sourceInventory.value);
+  const accessibilityFreshUntil = productionAccessibilityFreshUntil(
+    productionPacks,
+    sourceInventory.value,
+    buildSpec.sourceSnapshots,
+  );
   return new Date(Math.min(
     Date.parse(topologyAdmission.freshUntil),
     Date.parse(itxAdmission.freshUntil),
@@ -660,8 +664,9 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
   )).toISOString();
 }
 
-function productionAccessibilityFreshUntil(packs, inventory) {
+function productionAccessibilityFreshUntil(packs, inventory, sourceSnapshots) {
   const sources = new Map(inventory.sources.map((source) => [source.id, source]));
+  const snapshots = new Map(sourceSnapshots.map((snapshot) => [snapshot.sourceId, snapshot]));
   const rows = packs.flatMap((pack) => [
     ...(pack.facilities ?? []),
     ...(pack.stationFacilityEvidence ?? []),
@@ -675,7 +680,12 @@ function productionAccessibilityFreshUntil(packs, inventory) {
     if (Date.parse(evidence.freshUntil) <= candidateBuildNow().getTime()) {
       throw new Error(`production accessibility evidence is stale: ${row.sourceId}`);
     }
-    return Date.parse(evidence.freshUntil);
+    const snapshot = snapshots.get(row.sourceId);
+    if (snapshot?.snapshotId !== row.sourceSnapshotId
+      || !Number.isFinite(Date.parse(snapshot.freshnessExpiresAt))) {
+      throw new Error(`production accessibility snapshot mismatch: ${row.sourceId}`);
+    }
+    return Date.parse(snapshot.freshnessExpiresAt);
   });
   if (expires.length === 0) throw new Error("production accessibility evidence is missing");
   return new Date(Math.min(...expires)).toISOString();

@@ -164,7 +164,7 @@
     ]
   },
   "buildDryRun": {
-    "result": "PASS — #2609 candidate-build-spec로 capital@1을 생성했다. searchable station 947, facility 4, station evidence 8이며 gzip sha256=1f73c48d5602e9ff96d2ffad648104405920521b8a4f5692fd942f780f173c37, sqlite sha256=bfde80b874709844abbbd31bf3401540d6e7679a75ff56bc7a236dec74e3ff24, expiresAt=2026-07-29T12:42:27.741Z다.",
+    "result": "PASS — #2609 candidate-build-spec로 capital@1을 생성했다. searchable station 947, facility 4, station evidence 8이며 gzip sha256=1f73c48d5602e9ff96d2ffad648104405920521b8a4f5692fd942f780f173c37, sqlite sha256=bfde80b874709844abbbd31bf3401540d6e7679a75ff56bc7a236dec74e3ff24, expiresAt=2026-08-02T15:00:00.000Z다.",
     "gateResolution": "KRIC stationCnvFacl standard snapshot은 2개 역의 elevator 4건과 ES/WCLF 명시적 부재를 증명하고, 서울교통공사 full snapshot은 2개 상태 probe를 제공한다. ENTRY/EXIT route availability는 추론하지 않으며 route-relevant edge 평가는 #2611에서 수행한다."
   }
 }

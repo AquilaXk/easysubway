@@ -64,7 +64,7 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       path.join(root, "apps/mobile/assets/datapacks/index.json"),
       "utf8",
     ));
-    assert.equal(manifest.expiresAt, "2026-07-29T12:42:27.741Z");
+    assert.equal(manifest.expiresAt, "2026-08-02T15:00:00.000Z");
     assert.equal(bundledIndex.freshnessExpiresAt, manifest.expiresAt);
     const pack = manifest.packs.find(({ id }) => id === "capital");
     const topologySource = pack.sourceInventory.find(({ id }) => id === "capital-route-topology");

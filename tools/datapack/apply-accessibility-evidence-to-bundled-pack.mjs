@@ -260,12 +260,22 @@ async function syncReleaseEvidence({ check }) {
   return { spec, inventory };
 }
 
-function accessibilityIndexMetadata(pack, spec, inventory) {
+function accessibilityIndexMetadata(pack, spec, inventory, currentFreshnessExpiresAt) {
   const evidenceBySource = new Map(inventory.sources.map((source) => [source.id, source.accessibilityAdmissionEvidence]));
-  const consumed = new Set(pack.stationFacilityEvidence.map(({ sourceId }) => sourceId));
+  const snapshotBySource = new Map(spec.sourceSnapshots.map((snapshot) => [snapshot.sourceId, snapshot]));
+  const consumed = new Map(pack.stationFacilityEvidence.map(({ sourceId, sourceSnapshotId }) => [sourceId, sourceSnapshotId]));
+  const accessibilityFreshnessExpiresAt = [...consumed].map(([sourceId, snapshotId]) => {
+    const snapshot = snapshotBySource.get(sourceId);
+    if (snapshot?.snapshotId !== snapshotId) throw new Error(`accessibility snapshot mismatch: ${sourceId}`);
+    return snapshot.freshnessExpiresAt;
+  }).sort().at(0);
   return {
-    qualityAsOf: [...consumed].map((sourceId) => evidenceBySource.get(sourceId)?.observedAt).sort().at(-1),
-    freshnessExpiresAt: [...consumed].map((sourceId) => evidenceBySource.get(sourceId)?.freshUntil).sort().at(0),
+    qualityAsOf: [...consumed.keys()].map((sourceId) => evidenceBySource.get(sourceId)?.observedAt).sort().at(-1),
+    // ponytail: accessibility refresh may tighten, never extend another domain's pack expiry; the identity test owns extension.
+    freshnessExpiresAt: new Date(Math.min(
+      Date.parse(currentFreshnessExpiresAt),
+      Date.parse(accessibilityFreshnessExpiresAt),
+    )).toISOString(),
     sourceSnapshotSetHash: spec.sourceSnapshotSetHash,
   };
 }
@@ -300,7 +310,12 @@ async function main() {
       if (!entry || entry.sha256 !== sha256(currentGzipBytes) || entry.sqliteSha256 !== sha256(sqliteBytes) || entry.byteSize !== currentGzipBytes.length) {
         throw new Error("bundled accessibility pack index is stale");
       }
-      const metadata = accessibilityIndexMetadata(pack, releaseEvidence.spec, releaseEvidence.inventory);
+      const metadata = accessibilityIndexMetadata(
+        pack,
+        releaseEvidence.spec,
+        releaseEvidence.inventory,
+        index.freshnessExpiresAt,
+      );
       if (index.qualityAsOf !== metadata.qualityAsOf
         || index.freshnessExpiresAt !== metadata.freshnessExpiresAt
         || index.sourceSnapshotSetHash !== metadata.sourceSnapshotSetHash
@@ -318,7 +333,12 @@ async function main() {
     const entry = index.packs.find(({ id }) => id === "capital");
     if (!entry) throw new Error("capital pack index entry is missing");
     Object.assign(entry, { sha256: sha256(gzipBytes), sqliteSha256: sha256(sqliteBytes), byteSize: gzipBytes.length });
-    Object.assign(index, accessibilityIndexMetadata(pack, releaseEvidence.spec, releaseEvidence.inventory), {
+    Object.assign(index, accessibilityIndexMetadata(
+      pack,
+      releaseEvidence.spec,
+      releaseEvidence.inventory,
+      index.freshnessExpiresAt,
+    ), {
       builtAt: new Date().toISOString(),
     });
     await writeFile(packPath, gzipBytes);
