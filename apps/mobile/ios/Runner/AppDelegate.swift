@@ -609,7 +609,29 @@ private final class RouteMapViewportPlatformView: NSObject, FlutterPlatformView,
         self?.reportCameraApplyFailed()
         return
       }
-      self.channel.invokeMethod("framePresented", arguments: ["revision": frameRevision])
+      currentWebView.callAsyncJavaScript(
+        """
+        await new Promise((resolve) => {
+          requestAnimationFrame(() => requestAnimationFrame(resolve));
+        });
+        return true;
+        """,
+        arguments: [:],
+        in: nil,
+        in: WKContentWorld.page
+      ) { [weak self, weak currentWebView] result in
+        guard
+          let self,
+          let currentWebView,
+          self.webView === currentWebView,
+          self.revision == frameRevision
+        else { return }
+        guard case .success(let value) = result, value as? Bool == true else {
+          self.reportCameraApplyFailed()
+          return
+        }
+        self.channel.invokeMethod("framePresented", arguments: ["revision": frameRevision])
+      }
     }
   }
 

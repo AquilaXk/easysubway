@@ -162,7 +162,7 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   );
   assert.match(
     android,
-    /if \(webView !== currentWebView \|\| result != "true"\) \{[\s\S]*reportCameraApplyFailed\(\)[\s\S]*\} else \{[\s\S]*framePresented/,
+    /if \(webView !== currentWebView \|\| result != "true"\) \{[\s\S]*reportCameraApplyFailed\(\)[\s\S]*\} else \{[\s\S]*postVisualStateCallback[\s\S]*framePresented/,
   );
 
   assert.match(iosViewport, /loadFileURL\(assetURL, allowingReadAccessTo: readAccessURL\)/);
@@ -191,6 +191,8 @@ test("native route map은 canonical SVG 문서만 무수정 표시한다", () =>
   assert.doesNotMatch(runnerReleaseConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS/);
   assert.doesNotMatch(runnerProfileConfiguration, /SWIFT_ACTIVE_COMPILATION_CONDITIONS/);
   assert.match(iosViewport, /result as\? Bool == true/);
+  assert.match(iosViewport, /callAsyncJavaScript/);
+  assert.match(iosViewport, /requestAnimationFrame/);
   assert.match(iosViewport, /private var loadGeneration = 0/);
   assert.match(iosViewport, /case "start":[\s\S]*if !started \{[\s\S]*load\(\)/);
   assert.doesNotMatch(iosViewport, /DispatchQueue\.main\.async \{[\s\S]*load\(\)/);

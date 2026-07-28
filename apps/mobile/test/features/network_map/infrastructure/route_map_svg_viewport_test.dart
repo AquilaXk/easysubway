@@ -326,6 +326,22 @@ void main() {
       expect(find.text('overlay-3'), findsOneWidget);
       expect(find.text('overlay-4'), findsNothing);
 
+      await tester.pumpWidget(
+        Directionality(
+          textDirection: TextDirection.ltr,
+          child: RouteMapSvgViewport(
+            region: '수도권',
+            camera: nextCamera,
+            sourceOrigin: origin,
+            onUnavailable: () {},
+            overlay: const Text('overlay-4b', key: Key('synchronizedOverlay')),
+          ),
+        ),
+      );
+      expect(find.text('overlay-3'), findsOneWidget);
+      expect(find.text('overlay-4'), findsNothing);
+      expect(find.text('overlay-4b'), findsNothing);
+
       await messenger.handlePlatformMessage(
         channelName,
         const StandardMethodCodec().encodeMethodCall(
@@ -357,7 +373,8 @@ void main() {
       );
       expect(synchronizedVisibility.visible, isTrue);
       expect(find.text('overlay-3'), findsNothing);
-      expect(find.text('overlay-4'), findsOneWidget);
+      expect(find.text('overlay-4'), findsNothing);
+      expect(find.text('overlay-4b'), findsOneWidget);
     } finally {
       messenger.setMockMethodCallHandler(
         const MethodChannel(channelName),

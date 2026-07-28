@@ -3750,6 +3750,8 @@ void main() {
         );
         await tester.pump();
 
+        expect(find.bySemanticsLabel('광주송정역'), findsNothing);
+
         final androidView = tester.widget<AndroidView>(
           find.byType(AndroidView),
         );

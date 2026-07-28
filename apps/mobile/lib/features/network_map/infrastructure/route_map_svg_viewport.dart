@@ -140,6 +140,7 @@ class RouteMapSvgViewport extends StatefulWidget {
     required this.camera,
     required this.sourceOrigin,
     required this.onUnavailable,
+    this.onFramePresented,
     this.overlay,
     super.key,
   });
@@ -148,6 +149,7 @@ class RouteMapSvgViewport extends StatefulWidget {
   final MapCameraState camera;
   final Offset sourceOrigin;
   final VoidCallback onUnavailable;
+  final ValueChanged<int>? onFramePresented;
   final Widget? overlay;
 
   @override
@@ -159,6 +161,20 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
   bool _framePresented = false;
   bool _failed = false;
   Widget? _presentedOverlay;
+  ({int revision, double left, double top, double width, double height})?
+  _presentedFrame;
+
+  ({int revision, double left, double top, double width, double height})
+  get _frame {
+    final rect = widget.camera.visibleSourceRect.shift(widget.sourceOrigin);
+    return (
+      revision: widget.camera.revision,
+      left: rect.left,
+      top: rect.top,
+      width: rect.width,
+      height: rect.height,
+    );
+  }
 
   @override
   void initState() {
@@ -169,8 +185,10 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
         if (mounted && revision == widget.camera.revision) {
           setState(() {
             _framePresented = true;
+            _presentedFrame = _frame;
             _presentedOverlay = widget.overlay;
           });
+          widget.onFramePresented?.call(revision);
         }
       },
     );
@@ -194,7 +212,7 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
       unawaited(
         _controller.update(widget.camera, sourceOrigin: widget.sourceOrigin),
       );
-    } else if (_framePresented) {
+    } else if (_framePresented && _presentedFrame == _frame) {
       _presentedOverlay = widget.overlay;
     }
   }

@@ -331,7 +331,23 @@ private class RouteMapViewportPlatformView(
             if (webView !== currentWebView || result != "true") {
                 reportCameraApplyFailed()
             } else {
-                channel.invokeMethod("framePresented", mapOf("revision" to frameRevision))
+                currentWebView.postVisualStateCallback(
+                    frameRevision.toLong(),
+                    object : WebView.VisualStateCallback() {
+                        override fun onComplete(requestId: Long) {
+                            if (
+                                webView === currentWebView &&
+                                revision == frameRevision &&
+                                requestId == frameRevision.toLong()
+                            ) {
+                                channel.invokeMethod(
+                                    "framePresented",
+                                    mapOf("revision" to frameRevision),
+                                )
+                            }
+                        }
+                    },
+                )
             }
         }
     }

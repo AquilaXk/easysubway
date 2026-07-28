@@ -72,6 +72,7 @@ class RouteMapBasemapView extends StatefulWidget {
     this.sourceOrigin = Offset.zero,
     this.attributionText,
     this.onUnavailable,
+    this.onFramePresented,
     this.overlay,
     super.key,
   });
@@ -85,6 +86,7 @@ class RouteMapBasemapView extends StatefulWidget {
 
   final String? attributionText;
   final VoidCallback? onUnavailable;
+  final ValueChanged<int>? onFramePresented;
   final Widget? overlay;
 
   @override
@@ -131,6 +133,7 @@ class _RouteMapBasemapViewState extends State<RouteMapBasemapView> {
       camera: widget.camera,
       sourceOrigin: widget.sourceOrigin,
       onUnavailable: widget.onUnavailable ?? () {},
+      onFramePresented: widget.onFramePresented,
       overlay: Stack(
         fit: StackFit.expand,
         children: [
