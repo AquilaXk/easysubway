@@ -6802,8 +6802,8 @@
       {
         "station": "거제",
         "role": "transfer",
-        "x": 5945.5801,
-        "y": 3356.9746,
+        "x": 5928.8101,
+        "y": 3374.8623,
         "anchor": "end",
         "fontSizePx": 54.6,
         "lines": []
@@ -6896,8 +6896,8 @@
       {
         "station": "교대",
         "role": "transfer",
-        "x": 6356.3135,
-        "y": 3003.011,
+        "x": 6344.0156,
+        "y": 3013.0728,
         "anchor": "end",
         "fontSizePx": 54.6,
         "lines": []
@@ -7152,8 +7152,8 @@
       {
         "station": "대저",
         "role": "transfer",
-        "x": 1616.9707,
-        "y": 2641.5122,
+        "x": 1641.8585,
+        "y": 2649.2156,
         "anchor": "end",
         "fontSizePx": 54.6,
         "lines": []
@@ -7179,8 +7179,8 @@
       {
         "station": "덕천",
         "role": "transfer",
-        "x": 3615.3167,
-        "y": 2644.5078,
+        "x": 3597.4878,
+        "y": 2662.3367,
         "anchor": "end",
         "fontSizePx": 54.6,
         "lines": []
@@ -7224,8 +7224,8 @@
       {
         "station": "동래",
         "role": "transfer",
-        "x": 6354.7534,
-        "y": 2635.5723,
+        "x": 6344.6914,
+        "y": 2659.05,
         "anchor": "end",
         "fontSizePx": 54.6,
         "lines": []
@@ -7636,7 +7636,7 @@
         "station": "서면",
         "role": "transfer",
         "x": 6298.7227,
-        "y": 4373.5942,
+        "y": 4325.041,
         "anchor": "middle",
         "fontSizePx": 54.6,
         "lines": []
@@ -7727,8 +7727,8 @@
       {
         "station": "수영",
         "role": "transfer",
-        "x": 9140.0479,
-        "y": 3748.0854,
+        "x": 9117.8438,
+        "y": 3744.6694,
         "anchor": "start",
         "fontSizePx": 54.6,
         "lines": []
@@ -7828,8 +7828,8 @@
       {
         "station": "연산",
         "role": "transfer",
-        "x": 6248.4565,
-        "y": 3373.583,
+        "x": 6250.6924,
+        "y": 3374.7009,
         "anchor": "start",
         "fontSizePx": 54.6,
         "lines": []

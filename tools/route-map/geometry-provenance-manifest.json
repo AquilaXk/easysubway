@@ -1,0 +1,116 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "route-map-geometry-provenance-manifest",
+  "regions": {
+    "seoul": {
+      "sourceSvgSha256": "821b636eac0f3b04c5baa995d39ae938d7648d04f7c32802fbef22e60537bf08",
+      "normalizedSvgSha256": "ec72dbfbb4f07d73dc78b945d7240a67aafe056e9d05d4aa6ba69337bd19d45b",
+      "sourceViewBox": [
+        0,
+        0,
+        3688,
+        2972
+      ],
+      "fullInkBounds": {
+        "minX": 114.21684062500071,
+        "minY": 309.5063286718897,
+        "maxX": 3608.8837050752736,
+        "maxY": 2892.0747332008973
+      },
+      "extractorVersion": "route-map-svg-geometry-v3",
+      "geometrySha256": "f95b0898ea43e81498f3278bdcc16ec3e98f0e66ea4c66544d6b2c00c87d1c49",
+      "routeMapPositionsSha256": "8c0a7fde1d7efe982b7a315400ca1b559d89d03ab9ab444c127adc26a7fda188",
+      "labelSourceCount": 967,
+      "stationNodeCount": 655,
+      "generatorContractVersion": 1
+    },
+    "busan": {
+      "sourceSvgSha256": "8bd04aa7e94c8e6cd5c1a2dd83fda605e7d892bc66078db57ba8291cee80cdb0",
+      "normalizedSvgSha256": "9dadd2baf3408952e17117aed448364bdac00b2fb4370c2ae8d5e3c84e77e827",
+      "sourceViewBox": [
+        0,
+        0,
+        11156,
+        5980
+      ],
+      "fullInkBounds": {
+        "minX": 725.4487999999997,
+        "minY": 976.8334699999999,
+        "maxX": 11009.098357,
+        "maxY": 5833.8928731640635
+      },
+      "extractorVersion": "route-map-svg-geometry-v3",
+      "geometrySha256": "d775eaf2be7220c32b0f88bbab07e80fc330a22da677ee8b43240f6a9f8163bc",
+      "routeMapPositionsSha256": "972053ccab6d2f8f7d7a131e3a6bfccebf94618d422c072902846b85bc73096e",
+      "labelSourceCount": 179,
+      "stationNodeCount": 147,
+      "generatorContractVersion": 1
+    },
+    "daegu": {
+      "sourceSvgSha256": "145804d2c9d1de679d7d63937c942b714af02a6ed58562969b5ace5a0f077874",
+      "normalizedSvgSha256": "553a906daa48b8b80e0f4bb3f17f1c2d8c026416fe7e101978b1ef68f6090efe",
+      "sourceViewBox": [
+        0,
+        0,
+        4560,
+        2268
+      ],
+      "fullInkBounds": {
+        "minX": 34.54506699999999,
+        "minY": 30,
+        "maxX": 4510,
+        "maxY": 2191.870270875
+      },
+      "extractorVersion": "route-map-svg-geometry-v3",
+      "geometrySha256": "1704eb883b4e3f723572f5a6c8158db9a5bb1b2b80ad9bf0aa8e1656e104d607",
+      "routeMapPositionsSha256": "775465da141bd2c85957ad7f8fa53c061fbaa749c1e54c9f79f6085a5bd8fde6",
+      "labelSourceCount": 115,
+      "stationNodeCount": 97,
+      "generatorContractVersion": 1
+    },
+    "daejeon": {
+      "sourceSvgSha256": "f0b1c04e6f5ee390738414702e9a4b60fd6e77ddcc775eb08b66e740af5839b8",
+      "normalizedSvgSha256": "53c4162bf721bacafe0f528e800a842de1a0415b53f1ca7b7552205e624d8edd",
+      "sourceViewBox": [
+        0,
+        0,
+        1828,
+        1748
+      ],
+      "fullInkBounds": {
+        "minX": 513,
+        "minY": 273.806353125,
+        "maxX": 1786.71259375,
+        "maxY": 1703.534171875
+      },
+      "extractorVersion": "route-map-svg-geometry-v3",
+      "geometrySha256": "744a59d20902310f8271bf816700ad5c85c402cfbeeacb74309ab36851eb1532",
+      "routeMapPositionsSha256": "b703f88f1eefa5218ce158ab6d96cdead36b28d6e15f27e7d3222483e71aea5f",
+      "labelSourceCount": 25,
+      "stationNodeCount": 22,
+      "generatorContractVersion": 1
+    },
+    "gwangju": {
+      "sourceSvgSha256": "ea28449f9cd4c7c96aeba413f7977932c78f9c56c0e2e17f173df046ef7695d9",
+      "normalizedSvgSha256": "24518dd687b9e8c9fca58c31d885ad61569b77bb613d5c6dc1f00e991d11f9a0",
+      "sourceViewBox": [
+        0,
+        0,
+        2016,
+        1628
+      ],
+      "fullInkBounds": {
+        "minX": 443,
+        "minY": 252.626953125,
+        "maxX": 1976.869140625,
+        "maxY": 1587.201171875
+      },
+      "extractorVersion": "route-map-svg-geometry-v3",
+      "geometrySha256": "2831a30185d100c6a7d309b9441244316f9b88e32a2c116d77341f23d7a63b5f",
+      "routeMapPositionsSha256": "30dd2f204f52c2b142d4d49b4139a607512e44f2d6c8a4bcac6c3ccc76b0a12e",
+      "labelSourceCount": 22,
+      "stationNodeCount": 20,
+      "generatorContractVersion": 1
+    }
+  }
+}
