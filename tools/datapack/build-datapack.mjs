@@ -800,7 +800,7 @@ function applyCapitalNetworkEdgeEvidence(pack, topology, snapshotId, admissions)
 
 function assertExactCapitalTopologyProjection(pack, admittedLineIds, expectedEdgeIds) {
   const actualEdgeIds = (pack.networkEdges ?? [])
-    .filter((edge) => edge.edgeType === "RIDE" && edge.servicePattern === "LOCAL" && edge.serviceClass === "SUBWAY"
+    .filter((edge) => edge.edgeType === "RIDE" && edge.servicePattern === "LOCAL" && (edge.serviceClass ?? "SUBWAY") === "SUBWAY"
       && lineIdsForNodes([edge.fromNodeId, edge.toNodeId]).some((lineId) => admittedLineIds.has(lineId)))
     .map(({ id }) => id);
   if (actualEdgeIds.length !== expectedEdgeIds.size || actualEdgeIds.some((id) => !expectedEdgeIds.has(id))) {
