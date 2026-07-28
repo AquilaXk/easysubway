@@ -52,6 +52,7 @@ export function checkProjectionReport(report) {
       (item) => !seen.has(`${item.stationId}:${item.lineId}`),
     ),
     missingTracks: report.withoutTrack,
+    emptyRegion: report.nodes === 0 ? [report.region] : [],
   };
 }
 

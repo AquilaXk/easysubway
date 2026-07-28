@@ -47,6 +47,7 @@ test("projectPointToPolylines는 여러 조각 중 최근접에 투영", () => {
 test("checkProjectionReport는 기존 도라산만 허용하고 신규·악화·누락·stale을 실패시킨다", () => {
   const report = (overThreshold, withoutTrack = []) => ({
     region: "수도권",
+    nodes: 1,
     nodesWithoutTrack: withoutTrack.length,
     withoutTrack,
     overThreshold,
@@ -62,6 +63,7 @@ test("checkProjectionReport는 기존 도라산만 허용하고 신규·악화·
     exceededBaseline: [],
     staleBaseline: [],
     missingTracks: [],
+    emptyRegion: [],
   });
   assert.deepEqual(
     checkProjectionReport(report([{ ...dorasan, dist: 407 }])).exceededBaseline,
@@ -91,4 +93,13 @@ test("checkProjectionReport는 기존 도라산만 허용하고 신규·악화·
       reason: "도라산은 오너 SMA SVG 미수록 topology exception; #2571에서 기존 실측만 동결",
     },
   ]);
+});
+
+test("checkProjectionReport는 역이 하나도 없는 권역을 실패시킨다", () => {
+  assert.deepEqual(checkProjectionReport({
+    region: "부산권",
+    nodes: 0,
+    withoutTrack: [],
+    overThreshold: [],
+  }).emptyRegion, ["부산권"]);
 });

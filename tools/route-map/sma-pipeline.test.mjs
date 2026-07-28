@@ -566,9 +566,26 @@ test("수도권 유지보수 도구의 기본 --svg/--geometry가 컴파일 정�
 test("5권역 alignment fixture는 raw geometry·pack SHA-256과 결속된다", () => {
   const sha256 = (bytes) => createHash("sha256").update(bytes).digest("hex");
   const defs = path.join(import.meta.dirname, "route-map-defs");
-  for (const fixtureName of ["seoul", "busan", "daegu", "daejeon", "gwangju"]) {
+  const canonicalGeometry = {
+    seoul: "easy-subway-sma-v4",
+    busan: "easy-subway-busan-v3",
+    daegu: "easy-subway-daegu-v3",
+    daejeon: "easy-subway-daejeon-v3",
+    gwangju: "easy-subway-gwangju-v3",
+  };
+  for (const [fixtureName, geometryName] of Object.entries(canonicalGeometry)) {
     const fixture = JSON.parse(
       readFileSync(path.join(defs, `${fixtureName}-alignment-fixture.json`)),
+    );
+    assert.equal(
+      fixture.generatedFrom.geometry,
+      `tools/route-map/route-map-defs/${geometryName}-geometry.json`,
+      `${fixtureName}: canonical geometry path drift`,
+    );
+    assert.equal(
+      fixture.generatedFrom.pack,
+      "apps/mobile/assets/datapacks/capital.sqlite.gz",
+      `${fixtureName}: production pack path drift`,
     );
     const geometryPath = path.resolve(import.meta.dirname, "../..", fixture.generatedFrom.geometry);
     const packPath = path.resolve(import.meta.dirname, "../..", fixture.generatedFrom.pack);
