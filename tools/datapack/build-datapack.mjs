@@ -229,7 +229,7 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
       fixture.manifest = {
         ...fixture.manifest,
         manifestVersion: 2,
-        channel: "dev",
+        channel: fixture.manifest.channel === "candidate" ? "candidate" : "dev",
         releaseSequence: 1,
         publishedAt: fixture.manifest.publishedAt ?? buildPublishedAt(),
         keyId: process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID?.trim() || "production-v1",

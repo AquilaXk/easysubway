@@ -1999,6 +1999,18 @@ test("데이터팩 생성기는 일반 fixture 입력으로 production channel�
       "--root", path.join(workspace, "validation-output"),
       "--require-production",
     ], { cwd: root, env: productionEnv });
+    fixture.manifest.channel = "candidate";
+    await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
+    await execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture", fixturePath,
+      "--output", path.join(workspace, "candidate-output"),
+    ], { cwd: root, env: productionEnv });
+    const candidateManifest = JSON.parse(await readFile(
+      path.join(workspace, "candidate-output/current.json"),
+      "utf8",
+    ));
+    assert.equal(candidateManifest.channel, "candidate");
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
@@ -15640,6 +15652,7 @@ async function writeCoverageCandidate(outputDir, provenance) {
 }
 
 function markFixturePackProduction(fixture) {
+  process.env.EASYSUBWAY_DATAPACK_PRODUCTION_FIXTURE_VALIDATION_ONLY = "true";
   const pack = fixture.packs[0];
   const officialOdFareSource = pack.sourceInventory.find(
     (source) => source.id === "seoul-metro-official-od-fares",
