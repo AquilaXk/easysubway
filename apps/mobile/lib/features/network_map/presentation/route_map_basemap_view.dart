@@ -6,12 +6,8 @@ import '../infrastructure/route_map_svg_viewport.dart';
 
 // 하이브리드 노선도 바탕층(#2068 트랙 2번째 PR).
 //
-// canonical SVG viewport는 native가 그리며, Flutter의 station interaction과 같은
-// source 좌표계라 camera viewBox만 origin 이동해 전달한다.
-//
-// [설계 결정: 병존] 이 위젯은 노선 형상과 오너 SVG의 기존 역·환승 심벌을 그리고,
-// 구조화 painter는 충돌 회피 역명·뱃지를 같은 카메라 좌표계에 그린다.
-// SVG의 제목·범례·역명·미개통 형상은 컴파일 입력에서 제외한다.
+// canonical SVG의 시각·텍스트·표장은 native viewport가 그대로 그리고, Flutter
+// sibling은 station interaction overlay만 담당한다.
 
 const kRouteMapBasemapRegionToId = kRouteMapSvgRegionToId;
 
@@ -82,7 +78,7 @@ class RouteMapBasemapView extends StatefulWidget {
     super.key,
   });
 
-  /// 앱 region(한글). 매핑에 없으면 바탕 미표시(빈 화면).
+  /// 앱 region(한글). 매핑에 없으면 onUnavailable을 거쳐 explicit unavailable을 보인다.
   final String region;
   final MapCameraState camera;
 

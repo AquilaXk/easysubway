@@ -206,7 +206,6 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
       'sourceWidth': widget.camera.sourceBounds.width,
       'sourceHeight': widget.camera.sourceBounds.height,
       ...cameraPayload,
-      'labelCollisionScript': '',
     };
     final Widget platformView = switch (defaultTargetPlatform) {
       TargetPlatform.android => AndroidView(
@@ -232,7 +231,7 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
       maintainState: true,
       maintainAnimation: true,
       maintainSize: true,
-      child: IgnorePointer(child: platformView),
+      child: ExcludeSemantics(child: IgnorePointer(child: platformView)),
     );
   }
 }

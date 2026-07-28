@@ -194,6 +194,13 @@ void main() {
         ),
         findsAtLeastNWidgets(1),
       );
+      expect(
+        find.descendant(
+          of: find.byType(Visibility),
+          matching: find.byType(ExcludeSemantics),
+        ),
+        findsAtLeastNWidgets(1),
+      );
       final androidView = tester.widget<AndroidView>(find.byType(AndroidView));
       expect(androidView.creationParams, <String, Object>{
         'assetPath': 'assets/datapacks/metro_map_pack/basemap/seoul.svg',
@@ -201,7 +208,6 @@ void main() {
         'sourceWidth': 200.0,
         'sourceHeight': 200.0,
         ...routeMapSvgViewportCameraPayload(camera: camera, sourceOrigin: origin),
-        'labelCollisionScript': '',
       });
 
       androidView.onPlatformViewCreated!(viewId);
