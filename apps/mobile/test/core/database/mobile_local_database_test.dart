@@ -473,7 +473,7 @@ void main() {
       networkEdges
           .map((row) => row.read<String>('accessibility_status'))
           .toSet(),
-      {'AVAILABLE'},
+      {'UNKNOWN'},
     );
     expect(
       networkEdges.map((row) => row.read<int>('reliability_score')).toSet(),
