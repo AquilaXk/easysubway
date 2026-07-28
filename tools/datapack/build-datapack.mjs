@@ -232,12 +232,12 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
         throw new Error("production fixture builds are validation-only; release builds require --build-spec");
       }
     }
-    if (hasProductionPack || fixtureChannel === "production") {
+    if (fixture.manifest.manifestVersion === 2 && (hasProductionPack || fixtureChannel === "production")) {
       fixture.manifest = {
         ...fixture.manifest,
         manifestVersion: 2,
         channel: fixtureChannel === "candidate" ? "candidate" : "dev",
-        releaseSequence: 1,
+        releaseSequence: fixture.manifest.releaseSequence ?? 1,
         publishedAt: fixture.manifest.publishedAt ?? buildPublishedAt(),
         ...(hasProductionPack
           ? { keyId: process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID?.trim() || "production-v1" }
