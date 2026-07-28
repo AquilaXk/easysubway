@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 import { tmpdir } from "node:os";
@@ -47,6 +47,14 @@ function withFixture(run) {
 
 test("verifyDisplaySvgProvenance: canonical source bytes and display bundle bytes must match", () => {
   withFixture(({ root }) => assert.doesNotThrow(() => verifyDisplaySvgProvenance(root, "manifest.json")));
+});
+
+test("Gwangju canonical SVG retains 광주송정역 text without duplicated station accessibility labels", () => {
+  const svg = readFileSync(`${sourceDir}/easy-subway-gwangju-v3.svg`, "utf8");
+  const ariaLabels = [...svg.matchAll(/\baria-label="([^"]*)"/g)].map((match) => match[1]);
+
+  assert.match(svg, />광주송정역\s*<\/tspan>/);
+  assert.deepEqual(ariaLabels.filter((label) => label.includes("광주송정역역")), []);
 });
 
 test("verifyDisplaySvgProvenance: source byte drift fails", () => {

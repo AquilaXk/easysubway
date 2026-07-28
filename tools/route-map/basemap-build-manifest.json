@@ -91,8 +91,8 @@
       "source": "tools/route-map/route-map-defs/svg-sources/easy-subway-gwangju-v3.svg",
       "compiledVector": "apps/mobile/assets/datapacks/metro_map_pack/basemap/gwangju.vec",
       "displaySvg": "apps/mobile/assets/datapacks/metro_map_pack/basemap/gwangju.svg",
-      "sourceSvgSha256": "ea28449f9cd4c7c96aeba413f7977932c78f9c56c0e2e17f173df046ef7695d9",
-      "displaySvgSha256": "ea28449f9cd4c7c96aeba413f7977932c78f9c56c0e2e17f173df046ef7695d9",
+      "sourceSvgSha256": "3cb836387f9be56398a9a8d09ea85c3af142140182daddca24a1a7385645d7a7",
+      "displaySvgSha256": "3cb836387f9be56398a9a8d09ea85c3af142140182daddca24a1a7385645d7a7",
       "normalizedSvgSha256": "24518dd687b9e8c9fca58c31d885ad61569b77bb613d5c6dc1f00e991d11f9a0",
       "compiledVectorSha256": "1b2d8b6b37a240202c414499e96e482da31dc4f3561d1cb8f911361f5d980bcb",
       "viewBox": [
