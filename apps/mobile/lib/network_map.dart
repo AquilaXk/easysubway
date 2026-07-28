@@ -589,7 +589,8 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
 
   /// 하단 패널 실시간은 API 기본 8초보다 짧게 끊고 시간표로 넘긴다.
   static const _nearbyRealtimeTimeout = Duration(seconds: 2);
-  late Future<_NetworkMapLoadResult> _future = _loadMap();
+  int _mapLoadGeneration = 0;
+  late Future<_NetworkMapLoadResult> _future = _startMapLoad();
 
   /// 지도 탭 → draft 슬롯 지정 시 역의 [NetworkMapStation.lineId]로 노선
   /// 이름·색을 채우기 위해 마지막으로 로드된 맵 데이터를 캐시한다.
@@ -948,7 +949,11 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
     super.dispose();
   }
 
-  Future<_NetworkMapLoadResult> _loadMap() async {
+  Future<_NetworkMapLoadResult> _startMapLoad() {
+    return _loadMap(++_mapLoadGeneration);
+  }
+
+  Future<_NetworkMapLoadResult> _loadMap(int generation) async {
     var requestedRegion = _selectedRegion;
     var restoringSavedRegion = false;
     final viewportRepository = widget.viewportRepository;
@@ -971,6 +976,9 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
               region.displayName == _displayRegionName(data.selectedRegion),
         )) {
       data = await widget.repository.getNetworkMap();
+    }
+    if (generation != _mapLoadGeneration) {
+      return _NetworkMapLoadResult(data: data, initialViewport: null);
     }
     // #2082/#2083 후속: 저장된(persisted) 지역이 있는 사용자는 세션 중
     // 지역 선택기를 조작하지 않는 한 _selectedRegion이 계속 null이라, 로드된
@@ -1043,7 +1051,7 @@ class _NetworkMapScreenState extends State<NetworkMapScreen> {
       _selectedRegion = region ?? _selectedRegion;
       _resetNearbyPanelState();
       _initialNearbyFocusStarted = false;
-      _future = _loadMap();
+      _future = _startMapLoad();
     });
     _notifyRegionLabelChanged();
   }
@@ -4628,6 +4636,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             final previousCamera = _camera;
             final preserveCamera =
                 widget.preserveFocusedStationScale &&
+                widget.focusedStationId != null &&
                 _layoutRegion == widget.data.selectedRegion &&
                 previousCamera != null;
             _layoutKey = layoutKey;
