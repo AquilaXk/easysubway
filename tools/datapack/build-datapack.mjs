@@ -706,13 +706,13 @@ export function productionAccessibilityFreshUntil(packs, inventory, sourceSnapsh
     if (!evidence || evidence.snapshotId !== row.sourceSnapshotId || !Number.isFinite(Date.parse(evidence.freshUntil))) {
       throw new Error(`production accessibility evidence mismatch: ${row.sourceId}`);
     }
-    if (Date.parse(evidence.freshUntil) <= candidateBuildNow().getTime()) {
-      throw new Error(`production accessibility evidence is stale: ${row.sourceId}`);
-    }
     const snapshot = snapshots.get(row.sourceId);
     if (snapshot?.snapshotId !== row.sourceSnapshotId
       || !Number.isFinite(Date.parse(snapshot.freshnessExpiresAt))) {
       throw new Error(`production accessibility snapshot mismatch: ${row.sourceId}`);
+    }
+    if (Date.parse(snapshot.freshnessExpiresAt) <= candidateBuildNow().getTime()) {
+      throw new Error(`production accessibility snapshot is stale: ${row.sourceId}`);
     }
     return Date.parse(snapshot.freshnessExpiresAt);
   });

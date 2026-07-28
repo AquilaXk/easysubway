@@ -44,7 +44,7 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
       counts.set(type, number);
       facilityRows.push({
         sourceId: KRIC_SOURCE_ID,
-        id: `facility-${query.stationId}-${type.toLowerCase()}-kric-standard-${providerRecordHash}`,
+        id: `facility-${query.stationId}-${type.toLowerCase()}-kric-standard-${number}`,
         station: { sourceId: mapping.sourceId, sourceStationCode: mapping.sourceStationCode, lineId: mapping.lineId },
         type,
         name: `${stationName}역 ${type} ${number}`,

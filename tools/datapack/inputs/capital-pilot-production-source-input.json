@@ -480,7 +480,7 @@
   "facilityRows": [
     {
       "sourceId": "kric-station-convenience-standard",
-      "id": "facility-station-sangnoksu-elevator-kric-standard-117ba2cb0916c2b668e1db8b4bb068dc14e94d009357c1f4bd87844ff8a5252b",
+      "id": "facility-station-sangnoksu-elevator-kric-standard-1",
       "station": {
         "sourceId": "molit-urban-rail-full-route",
         "sourceStationCode": "MOLIT-SEOUL-4-448",
@@ -506,7 +506,7 @@
     },
     {
       "sourceId": "kric-station-convenience-standard",
-      "id": "facility-station-sangnoksu-elevator-kric-standard-6ac9fbc76de61a110d84eed388c39e8e6321b4b8a78b3b02659f8b0f278f5804",
+      "id": "facility-station-sangnoksu-elevator-kric-standard-2",
       "station": {
         "sourceId": "molit-urban-rail-full-route",
         "sourceStationCode": "MOLIT-SEOUL-4-448",
@@ -532,7 +532,7 @@
     },
     {
       "sourceId": "kric-station-convenience-standard",
-      "id": "facility-station-sadang-elevator-kric-standard-11d17c54523cfd7a4fbfde5cf7a9219627134062ec2aa5f8da22bf84cb52ec94",
+      "id": "facility-station-sadang-elevator-kric-standard-1",
       "station": {
         "sourceId": "molit-urban-rail-full-route",
         "sourceStationCode": "MOLIT-SEOUL-4-433",
@@ -558,7 +558,7 @@
     },
     {
       "sourceId": "kric-station-convenience-standard",
-      "id": "facility-station-sadang-elevator-kric-standard-5776566157f0895223bc122333e18e36cf55a99f2f3f760a9e4dfb048f23bc8f",
+      "id": "facility-station-sadang-elevator-kric-standard-2",
       "station": {
         "sourceId": "molit-urban-rail-full-route",
         "sourceStationCode": "MOLIT-SEOUL-4-433",

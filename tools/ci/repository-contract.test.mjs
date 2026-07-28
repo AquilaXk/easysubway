@@ -7615,8 +7615,8 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     currentImplementation: {
       status: "SATISFIED",
       fields: ["snapshotSha256", "freshUntil"],
-      snapshotId: "server-timetable-snapshot-1a837b51aaa1f6b5",
-      snapshotSha256: "1a837b51aaa1f6b537c7a3117fba5c832e4825ae8814e02ed5a4cee63a11e1d3",
+      snapshotId: "server-timetable-snapshot-8df609567ff154a5",
+      snapshotSha256: "8df609567ff154a55668cc8cff9172ebfe6e5e2e2763d1a26d78f5e136198cbd",
       freshUntil: "2026-08-03T00:00:00+09:00",
       evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
     },
@@ -8094,7 +8094,7 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.ok(itxContractValidationIndex >= 0, "ITX coverage contract validation step must exist");
   assert.ok(sourceFreshnessIndex >= 0, "source snapshot freshness step must exist");
   assert.ok(accessibilitySourceCoverageIndex > sourceFreshnessIndex, "accessibility source coverage must run after source freshness");
-  assert.match(workflow, /Data Pack Release \/ Validate accessibility source coverage[\s\S]*?evaluation_at="\$\(date -u \+%Y-%m-%dT%H:%M:%S\.000Z\)"[\s\S]*?build-accessibility-source-coverage-report\.mjs[\s\S]*?--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"[\s\S]*?--manifest-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"[\s\S]*?--bundled-index apps\/mobile\/assets\/datapacks\/index\.json[\s\S]*?--inventory tools\/datapack\/source-inventory\.json[\s\S]*?--evaluation-at "\$\{evaluation_at\}"[\s\S]*?--output "\$\{EASYSUBWAY_ACCESSIBILITY_SOURCE_COVERAGE_REPORT\}"/);
+  assert.match(workflow, /Data Pack Release \/ Validate accessibility source coverage[\s\S]*?evaluation_at="\$\(date -u \+%Y-%m-%dT%H:%M:%S\.000Z\)"[\s\S]*?build-accessibility-source-coverage-report\.mjs[\s\S]*?--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"[\s\S]*?--manifest-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"[\s\S]*?--bundled-index apps\/mobile\/assets\/datapacks\/index\.json[\s\S]*?--inventory tools\/datapack\/source-inventory\.json[\s\S]*?--source-snapshots tools\/datapack\/release\/source-snapshots\.json[\s\S]*?--evaluation-at "\$\{evaluation_at\}"[\s\S]*?--output "\$\{EASYSUBWAY_ACCESSIBILITY_SOURCE_COVERAGE_REPORT\}"/);
   assert.ok(
     itxContractValidationIndex < evidenceBundleIndex,
     "ITX coverage contract must be validated before release evidence is hashed",

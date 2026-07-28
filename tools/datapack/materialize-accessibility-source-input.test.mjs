@@ -58,6 +58,17 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
     seoulSnapshot,
   }).facilityRows.map(({ description, id, name, providerFacilityRef }) => [description, { id, name, providerFacilityRef }]));
   assert.deepEqual(facilitiesByDescription(sameTypeRows), facilitiesByDescription(sameTypeRows.toReversed()));
+  assert.deepEqual(
+    Object.values(facilitiesByDescription(sameTypeRows)).map(({ id }) => id).sort(),
+    ["facility-station-a-elevator-kric-standard-1", "facility-station-a-elevator-kric-standard-2"],
+  );
+  assert.ok(Object.values(facilitiesByDescription(sameTypeRows)).every(({ id }) => id.length <= 120));
+  const nextSnapshotIds = materializeAccessibilitySourceInput({
+    input,
+    kricSnapshot: { ...kricSnapshot, snapshotId: "kric-2", queries: [{ ...kricSnapshot.queries[0], rows: sameTypeRows }] },
+    seoulSnapshot,
+  }).facilityRows.map(({ id }) => id);
+  assert.deepEqual(nextSnapshotIds.sort(), Object.values(facilitiesByDescription(sameTypeRows)).map(({ id }) => id).sort());
   const duplicated = materializeAccessibilitySourceInput({
     input,
     kricSnapshot: { ...kricSnapshot, queries: [{ ...kricSnapshot.queries[0], rows: [sameTypeRows[0], sameTypeRows[0]] }] },

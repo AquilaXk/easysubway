@@ -22,17 +22,23 @@ export function buildAccessibilitySourceCoverageReport({
   artifacts,
   inventory,
   snapshots,
+  sourceSnapshotPolicies,
   evaluatedAt,
 }) {
   const evaluatedMillis = Date.parse(evaluatedAt);
   if (!Number.isFinite(evaluatedMillis)) throw new TypeError("evaluatedAt must be an ISO instant");
-  if (!Array.isArray(artifacts) || !Array.isArray(inventory?.sources) || !Array.isArray(snapshots)) {
-    throw new TypeError("artifacts, inventory.sources, and snapshots must be arrays");
+  if (!Array.isArray(artifacts) || !Array.isArray(inventory?.sources) || !Array.isArray(snapshots)
+    || !Array.isArray(sourceSnapshotPolicies)) {
+    throw new TypeError("artifacts, inventory.sources, snapshots, and sourceSnapshotPolicies must be arrays");
   }
 
   const violations = Object.fromEntries(VIOLATION_KEYS.map((key) => [key, []]));
   const sources = new Map(inventory.sources.map((source) => [source.id, source]));
   const snapshotsByIdentity = new Map(snapshots.map((snapshot) => [
+    `${snapshot.sourceId}\0${snapshot.snapshotId}`,
+    snapshot,
+  ]));
+  const policiesByIdentity = new Map(sourceSnapshotPolicies.map((snapshot) => [
     `${snapshot.sourceId}\0${snapshot.snapshotId}`,
     snapshot,
   ]));
@@ -44,7 +50,7 @@ export function buildAccessibilitySourceCoverageReport({
 
   for (const source of inventory.sources) {
     if (referencedSourceIds.has(source.id)) {
-      validateSource(source, snapshotsByIdentity, evaluatedMillis, violations);
+      validateSource(source, snapshotsByIdentity, policiesByIdentity, evaluatedMillis, violations);
     }
   }
 
@@ -279,7 +285,7 @@ function digest(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-function validateSource(source, snapshotsByIdentity, evaluatedMillis, violations) {
+function validateSource(source, snapshotsByIdentity, policiesByIdentity, evaluatedMillis, violations) {
   const evidence = source.accessibilityAdmissionEvidence;
   if (source.productionUseAllowed !== true
     || source.license?.redistributionAllowed !== true
@@ -301,9 +307,8 @@ function validateSource(source, snapshotsByIdentity, evaluatedMillis, violations
     || !Number.isFinite(observedMillis)
     || !Number.isFinite(freshUntilMillis)
     || capturedMillis > evaluatedMillis
-    || observedMillis > evaluatedMillis
-    || evaluatedMillis >= freshUntilMillis) {
-    violations.freshness.push(`${source.id}:SNAPSHOT_STALE`);
+    || observedMillis > evaluatedMillis) {
+    violations.freshness.push(`${source.id}:SNAPSHOT_TIME_INVALID`);
   }
   const snapshot = snapshotsByIdentity.get(`${source.id}\0${evidence.snapshotId}`);
   if (!snapshot || [
@@ -319,6 +324,17 @@ function validateSource(source, snapshotsByIdentity, evaluatedMillis, violations
     || !sha256(evidence.rawSha256)
     || !sha256(evidence.contentSha256)) {
     violations.snapshot.push(`${source.id}:SNAPSHOT_IDENTITY_MISMATCH`);
+  }
+  const policy = policiesByIdentity.get(`${source.id}\0${evidence.snapshotId}`);
+  if (!policy
+    || policy.snapshotStatus !== "LOCKED"
+    || policy.fetchStatus !== "SUCCESS"
+    || policy.schemaStatus !== "PASS"
+    || policy.licenseStatus !== "PASS") {
+    violations.snapshot.push(`${source.id}:SNAPSHOT_POLICY_MISMATCH`);
+  } else if (!Number.isFinite(Date.parse(policy.freshnessExpiresAt))
+    || evaluatedMillis >= Date.parse(policy.freshnessExpiresAt)) {
+    violations.freshness.push(`${source.id}:SNAPSHOT_STALE`);
   }
 }
 
@@ -427,13 +443,14 @@ function compareStrings(left, right) {
 
 async function main(argv) {
   const args = parseArgs(argv);
-  for (const name of ["manifest", "bundled-index", "inventory", "evaluation-at", "output"]) {
+  for (const name of ["manifest", "bundled-index", "inventory", "source-snapshots", "evaluation-at", "output"]) {
     if (!args[name]) throw new Error(`missing --${name}`);
   }
-  const [manifest, bundledIndex, inventory] = await Promise.all([
+  const [manifest, bundledIndex, inventory, sourceSnapshotPolicies] = await Promise.all([
     readJson(args.manifest),
     readJson(args["bundled-index"]),
     readJson(args.inventory),
+    readJson(args["source-snapshots"]),
   ]);
   const artifacts = await loadSelectableAccessibilityArtifacts({
     manifest,
@@ -453,6 +470,7 @@ async function main(argv) {
     artifacts,
     inventory,
     snapshots,
+    sourceSnapshotPolicies,
     evaluatedAt: args["evaluation-at"],
   });
   await mkdir(path.dirname(args.output), { recursive: true });

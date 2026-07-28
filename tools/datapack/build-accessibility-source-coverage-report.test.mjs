@@ -299,7 +299,7 @@ test("Seoul snapshot에 존재하는 역·노선은 NOT_EXISTS로 위조할 수 
 for (const { name, mutate, partition, expected } of [
   {
     name: "expired snapshot",
-    mutate: (input) => { input.inventory.sources[0].accessibilityAdmissionEvidence.freshUntil = EVALUATED_AT; },
+    mutate: (input) => { input.sourceSnapshotPolicies[0].freshnessExpiresAt = EVALUATED_AT; },
     partition: "freshness",
     expected: "official-accessibility:SNAPSHOT_STALE",
   },
@@ -320,6 +320,12 @@ for (const { name, mutate, partition, expected } of [
     mutate: (input) => { input.snapshots[0].snapshotFileSha256 = hash("different-file"); },
     partition: "snapshot",
     expected: "official-accessibility:SNAPSHOT_IDENTITY_MISMATCH",
+  },
+  {
+    name: "snapshot policy identity mismatch",
+    mutate: (input) => { input.sourceSnapshotPolicies[0].snapshotId = "other-snapshot"; },
+    partition: "snapshot",
+    expected: "official-accessibility:SNAPSHOT_POLICY_MISMATCH",
   },
   {
     name: "claim provenance missing",
@@ -365,6 +371,17 @@ for (const { name, mutate, partition, expected } of [
     assert.deepEqual(report.violations[partition], [expected]);
   });
 }
+
+test("expired live admission remains valid while its locked snapshot policy is fresh", () => {
+  const input = validInput();
+  input.inventory.sources[0].accessibilityAdmissionEvidence.freshUntil = EVALUATED_AT;
+  input.snapshots[0].freshUntil = EVALUATED_AT;
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(report.decision, "GO");
+  assert.deepEqual(report.violations.freshness, []);
+});
 
 function validInput() {
   const rawSha256 = hash("raw-snapshot");
@@ -439,6 +456,15 @@ function validInput() {
         providerRecordHash: hash(`${stationId}-record`),
         evidenceHash: hash(`${stationId}-evidence`),
       })),
+    }],
+    sourceSnapshotPolicies: [{
+      sourceId,
+      snapshotId,
+      snapshotStatus: "LOCKED",
+      fetchStatus: "SUCCESS",
+      schemaStatus: "PASS",
+      licenseStatus: "PASS",
+      freshnessExpiresAt: "2026-10-26T23:00:00.000Z",
     }],
   };
 }

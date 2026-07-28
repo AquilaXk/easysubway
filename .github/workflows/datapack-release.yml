@@ -585,6 +585,7 @@ jobs:
             --manifest-root "${EASYSUBWAY_DATAPACK_OUTPUT}" \
             --bundled-index apps/mobile/assets/datapacks/index.json \
             --inventory tools/datapack/source-inventory.json \
+            --source-snapshots tools/datapack/release/source-snapshots.json \
             --evaluation-at "${evaluation_at}" \
             --output "${EASYSUBWAY_ACCESSIBILITY_SOURCE_COVERAGE_REPORT}"
 

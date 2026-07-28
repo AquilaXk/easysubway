@@ -293,8 +293,8 @@
           "currentImplementation": {
             "status": "SATISFIED",
             "fields": ["snapshotSha256", "freshUntil"],
-            "snapshotId": "server-timetable-snapshot-1a837b51aaa1f6b5",
-            "snapshotSha256": "1a837b51aaa1f6b537c7a3117fba5c832e4825ae8814e02ed5a4cee63a11e1d3",
+            "snapshotId": "server-timetable-snapshot-8df609567ff154a5",
+            "snapshotSha256": "8df609567ff154a55668cc8cff9172ebfe6e5e2e2763d1a26d78f5e136198cbd",
             "freshUntil": "2026-08-03T00:00:00+09:00",
             "evidencePath": "tools/datapack/server-timetable-snapshot-evidence.json"
           },
