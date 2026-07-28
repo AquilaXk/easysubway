@@ -42,6 +42,7 @@ ADB="${ADB:-}"
 COLD_START_ITERATIONS=3
 REGION_TARGET="부산"
 SETTLE_SECONDS=4
+ONBOARDING_MAX_STEPS=8
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -147,27 +148,27 @@ robust_tap() {
   adb_device shell input motionevent UP "$x" "$y" >/dev/null 2>&1
 }
 
-# 온보딩 자동 통과. 이 빌드(profile)는 cold start 마다 온보딩 2페이지(시작하기 →
-# 이대로 시작, 둘 다 하단중앙 CTA (WIDTH/2, HEIGHT*0.87 부근))가 다시 뜬다 —
-# 온보딩 완료가 cold 재시작에 persist 되지 않으므로, cold start 첫 표시를 측정하려면
-# CTA 를 눌러 노선도 홈까지 도달해야 한다. UI 트리에서 '시작하기'/'이대로 시작'
-# content-desc 를 찾아 탭한다(좌표 하드코딩 회귀 방지). onboarding 완료 시각(ns)을
-# echo 로 반환(없으면 공란) — cold start의 순수 map-load 구간 측정에 쓴다.
+onboarding_cta_bounds() {
+  adb_device shell uiautomator dump /sdcard/ob.xml >/dev/null
+  adb_device pull /sdcard/ob.xml "$ARTIFACT_DIR/onboarding-dump.xml" >/dev/null
+  if [[ -s "$ARTIFACT_DIR/onboarding-dump.xml" ]]; then
+    grep -o 'content-desc="[^"]*\(시작하기\|이대로 시작\)[^"]*"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' "$ARTIFACT_DIR/onboarding-dump.xml" | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | head -1 || true
+  fi
+}
+
+# 온보딩 CTA를 UI 트리에서 찾아 bounded loop로 통과한다. 마지막 CTA 탭 시각(ns)은
+# cold start의 순수 map-load 구간 측정에 쓴다.
 dismiss_onboarding() {
   local completed_ns=""
-  for _ in 1 2 3; do
+  local cta_bounds=""
+  for ((step = 1; step <= ONBOARDING_MAX_STEPS; step += 1)); do
     # grep -q 는 첫 매치에서 종료해 pipefail 하 logcat 을 SIGPIPE 로 죽인다 —
     # grep -c 로 입력을 끝까지 읽어 매치 수를 세고, 0 초과면 프레임이 이미 떴다고
     # 판정한다(로그 존재 시 온보딩 단계 종료).
     if [[ "$(adb_device logcat -d | grep -c routeMapFrame)" -gt 0 ]]; then
       break
     fi
-    adb_device shell uiautomator dump /sdcard/ob.xml >/dev/null 2>&1 || true
-    adb_device pull /sdcard/ob.xml "$ARTIFACT_DIR/onboarding-dump.xml" >/dev/null 2>&1 || true
-    local cta_bounds=""
-    if [[ -s "$ARTIFACT_DIR/onboarding-dump.xml" ]]; then
-      cta_bounds="$(grep -o 'content-desc="[^"]*\(시작하기\|이대로 시작\)[^"]*"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' "$ARTIFACT_DIR/onboarding-dump.xml" | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | head -1 || true)"
-    fi
+    cta_bounds="$(onboarding_cta_bounds)"
     if [[ -z "$cta_bounds" ]]; then
       # UI 트리에 CTA 가 없으면 온보딩이 아니거나 이미 지나감 — 종료.
       break
@@ -182,6 +183,11 @@ dismiss_onboarding() {
       break
     fi
   done
+  cta_bounds="$(onboarding_cta_bounds)"
+  if [[ -n "$cta_bounds" ]]; then
+    echo "Onboarding did not finish within $ONBOARDING_MAX_STEPS steps." >&2
+    exit 1
+  fi
   # 마지막 CTA 탭 시각(ns)을 파일로 남긴다 — $(…) stdout 캡처보다 견고.
   echo "$completed_ns" > "$ARTIFACT_DIR/.onboarding-done-ns"
 }
@@ -190,9 +196,7 @@ dismiss_onboarding() {
 COLD_LOG="$ARTIFACT_DIR/cold-start.csv"
 # launch_to_frame_ms : am start → 첫 routeMapFrame (온보딩 자동 통과 포함, 실사용
 #   returning-user 관점의 총 cold start). map_load_ms : 온보딩 완료(마지막 CTA 탭)
-#   → 첫 routeMapFrame (데이터팩 해제·레이아웃 등 순수 노선도 로드 구간). 이 빌드는
-#   온보딩 완료가 cold 재시작에 persist 되지 않아(측정 중 확인) 매 회 온보딩을
-#   자동 통과한다 — 사람 탭 지연을 배제한 순수 로드 비용은 map_load_ms 로 본다.
+#   → 첫 routeMapFrame (데이터팩 해제·레이아웃 등 순수 노선도 로드 구간).
 echo "iteration,am_total_time_ms,launch_to_frame_ms,map_load_ms" > "$COLD_LOG"
 
 for ((it = 1; it <= COLD_START_ITERATIONS; it += 1)); do
