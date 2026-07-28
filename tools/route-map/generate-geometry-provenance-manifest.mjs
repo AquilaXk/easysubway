@@ -17,6 +17,17 @@ const REGIONS = [
   { id: "daejeon", region: "대전권", source: "easy-subway-daejeon-v3" },
   { id: "gwangju", region: "광주권", source: "easy-subway-gwangju-v3" },
 ];
+const GEOMETRY_SCHEMA_KEYS = [
+  "schemaVersion",
+  "region",
+  "sourceSvgSha256",
+  "extractorVersion",
+  "browser",
+  "sourceViewBox",
+  "labels",
+  "strokes",
+  "stationNodes",
+];
 
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const compareText = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
@@ -24,6 +35,19 @@ const compareRows = (a, b) =>
   compareText(String(a.station_id), String(b.station_id)) ||
   compareText(String(a.line_id), String(b.line_id)) ||
   compareText(String(a.region), String(b.region));
+
+function canonicalGeometryContent(geometry) {
+  const keys = Object.keys(geometry);
+  const missing = GEOMETRY_SCHEMA_KEYS.filter((key) => !keys.includes(key));
+  const unexpected = keys.filter((key) => !GEOMETRY_SCHEMA_KEYS.includes(key));
+  if (missing.length > 0 || unexpected.length > 0) {
+    throw new Error(
+      `geometry schema keys mismatch: missing=${missing.join(",")} unexpected=${unexpected.join(",")}`,
+    );
+  }
+  const { browser, ...content } = geometry;
+  return canonicalJson(content);
+}
 
 export function buildRegionProvenance({ svg, geometryBytes, routeMapPositionRows }) {
   const geometry = JSON.parse(Buffer.from(geometryBytes).toString("utf8"));
@@ -55,7 +79,7 @@ export function buildRegionProvenance({ svg, geometryBytes, routeMapPositionRows
       maxY: ink.maxY,
     },
     extractorVersion: geometry.extractorVersion,
-    geometrySha256: sha256(geometryBytes),
+    geometrySha256: sha256(canonicalGeometryContent(geometry)),
     routeMapPositionsSha256: sha256(canonicalJson(rows)),
     labelSourceCount: (geometry.labels ?? []).filter(
       ({ classification }) => classification === "STATION_LABEL",

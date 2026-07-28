@@ -78,21 +78,59 @@ test("5권역 geometry provenance manifest가 current source·pack과 exact matc
   }
 });
 
-test("geometry provenance verifier는 source·geometry·positions mutation을 fail-closed로 막는다", () => {
+test("geometry provenance digest는 browser metadata·JSON formatting과 무관하다", () => {
   const svg = '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="1"/></svg>';
   const sourceSvgSha256 = createHash("sha256").update(svg).digest("hex");
   const geometry = {
+    schemaVersion: 1,
+    region: "fixture",
     sourceSvgSha256,
-    sourceViewBox: [0, 0, 10, 10],
     extractorVersion: "fixture-v1",
+    browser: { product: "Chrome", version: "150.0.0.0" },
+    sourceViewBox: [0, 0, 10, 10],
     labels: [{ classification: "STATION_LABEL" }],
     strokes: [],
     stationNodes: [{ x: 5, y: 5 }],
   };
+  const rows = [{ station_id: "s1", line_id: "l1", region: "fixture", x: 5, y: 5 }];
+  const compact = buildRegionProvenance({
+    svg,
+    geometryBytes: Buffer.from(JSON.stringify(geometry)),
+    routeMapPositionRows: rows,
+  });
+  const reformatted = structuredClone(geometry);
+  reformatted.browser.version = "151.0.0.0";
+  const pretty = buildRegionProvenance({
+    svg,
+    geometryBytes: Buffer.from(`${JSON.stringify(reformatted, null, 2)}\n`),
+    routeMapPositionRows: rows,
+  });
+
+  assert.equal(pretty.geometrySha256, compact.geometrySha256);
+});
+
+test("geometry provenance verifier는 geometry content와 non-key position mutation을 fail-closed로 막는다", () => {
+  const svg = '<svg viewBox="0 0 10 10"><circle cx="5" cy="5" r="1"/></svg>';
+  const sourceSvgSha256 = createHash("sha256").update(svg).digest("hex");
+  const geometry = {
+    schemaVersion: 1,
+    region: "fixture",
+    sourceSvgSha256,
+    extractorVersion: "fixture-v1",
+    browser: { product: "Chrome", version: "150.0.0.0" },
+    sourceViewBox: [0, 0, 10, 10],
+    labels: [{ classification: "STATION_LABEL", polygon: [[5, 5]] }],
+    strokes: [],
+    stationNodes: [{ x: 5, y: 5 }],
+  };
+  const rows = [
+    { station_id: "s2", line_id: "l1", region: "fixture", x: 6, y: 5 },
+    { station_id: "s1", line_id: "l1", region: "fixture", x: 5, y: 5 },
+  ];
   const expected = buildRegionProvenance({
     svg,
     geometryBytes: Buffer.from(JSON.stringify(geometry)),
-    routeMapPositionRows: [{ station_id: "s1", line_id: "l1", region: "fixture", x: 5, y: 5 }],
+    routeMapPositionRows: rows,
   });
 
   assert.throws(
@@ -104,19 +142,38 @@ test("geometry provenance verifier는 source·geometry·positions mutation을 fa
     /sourceSvgSha256/,
   );
 
-  const geometryMutation = structuredClone(expected);
-  geometryMutation.geometrySha256 = "0".repeat(64);
+  const geometryMutation = structuredClone(geometry);
+  geometryMutation.stationNodes[0].x = 6;
+  const mutatedGeometry = buildRegionProvenance({
+    svg,
+    geometryBytes: Buffer.from(JSON.stringify(geometryMutation)),
+    routeMapPositionRows: rows,
+  });
+  assert.notEqual(mutatedGeometry.geometrySha256, expected.geometrySha256);
   assert.throws(
-    () => verifyGeometryProvenanceManifest(expected, geometryMutation),
+    () => verifyGeometryProvenanceManifest(expected, mutatedGeometry),
     /provenance drift/,
   );
 
-  const positionsMutation = structuredClone(expected);
-  positionsMutation.routeMapPositionsSha256 = "f".repeat(64);
+  const positionsMutation = structuredClone(rows);
+  positionsMutation[0].x = 99;
+  const mutatedPositions = buildRegionProvenance({
+    svg,
+    geometryBytes: Buffer.from(JSON.stringify(geometry)),
+    routeMapPositionRows: positionsMutation,
+  });
+  assert.notEqual(mutatedPositions.routeMapPositionsSha256, expected.routeMapPositionsSha256);
   assert.throws(
-    () => verifyGeometryProvenanceManifest(expected, positionsMutation),
+    () => verifyGeometryProvenanceManifest(expected, mutatedPositions),
     /provenance drift/,
   );
+
+  const reversedRows = buildRegionProvenance({
+    svg,
+    geometryBytes: Buffer.from(JSON.stringify(geometry)),
+    routeMapPositionRows: rows.slice().reverse(),
+  });
+  assert.equal(reversedRows.routeMapPositionsSha256, expected.routeMapPositionsSha256);
 });
 
 /**

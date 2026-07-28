@@ -18,7 +18,7 @@
         "maxY": 2892.0747332008973
       },
       "extractorVersion": "route-map-svg-geometry-v3",
-      "geometrySha256": "f95b0898ea43e81498f3278bdcc16ec3e98f0e66ea4c66544d6b2c00c87d1c49",
+      "geometrySha256": "60b4f7f7b3932b27dde1c2169a0b918189279d384d1897cb7a6e4d2787ec478a",
       "routeMapPositionsSha256": "8c0a7fde1d7efe982b7a315400ca1b559d89d03ab9ab444c127adc26a7fda188",
       "labelSourceCount": 967,
       "stationNodeCount": 655,
@@ -40,7 +40,7 @@
         "maxY": 5833.8928731640635
       },
       "extractorVersion": "route-map-svg-geometry-v3",
-      "geometrySha256": "d775eaf2be7220c32b0f88bbab07e80fc330a22da677ee8b43240f6a9f8163bc",
+      "geometrySha256": "0c448836327ac7afc254b8f0dbf37b445415c920808a053920e3c53203946531",
       "routeMapPositionsSha256": "972053ccab6d2f8f7d7a131e3a6bfccebf94618d422c072902846b85bc73096e",
       "labelSourceCount": 179,
       "stationNodeCount": 147,
@@ -62,7 +62,7 @@
         "maxY": 2191.870270875
       },
       "extractorVersion": "route-map-svg-geometry-v3",
-      "geometrySha256": "1704eb883b4e3f723572f5a6c8158db9a5bb1b2b80ad9bf0aa8e1656e104d607",
+      "geometrySha256": "a51d697222e96c7bd84c457e33c460465967542e7210f6dbf2965cb6a8f063a2",
       "routeMapPositionsSha256": "775465da141bd2c85957ad7f8fa53c061fbaa749c1e54c9f79f6085a5bd8fde6",
       "labelSourceCount": 115,
       "stationNodeCount": 97,
@@ -84,7 +84,7 @@
         "maxY": 1703.534171875
       },
       "extractorVersion": "route-map-svg-geometry-v3",
-      "geometrySha256": "744a59d20902310f8271bf816700ad5c85c402cfbeeacb74309ab36851eb1532",
+      "geometrySha256": "146d705b303f47ac09d4a2865e7d3718ba0d380f2ebeb41a23ca3a3f56e188d1",
       "routeMapPositionsSha256": "b703f88f1eefa5218ce158ab6d96cdead36b28d6e15f27e7d3222483e71aea5f",
       "labelSourceCount": 25,
       "stationNodeCount": 22,
@@ -106,7 +106,7 @@
         "maxY": 1587.201171875
       },
       "extractorVersion": "route-map-svg-geometry-v3",
-      "geometrySha256": "2831a30185d100c6a7d309b9441244316f9b88e32a2c116d77341f23d7a63b5f",
+      "geometrySha256": "c6bc5ac8262bd5e74ead4e807c8f2c290d3d25a3aacbada4fb69c26d663aeeac",
       "routeMapPositionsSha256": "30dd2f204f52c2b142d4d49b4139a607512e44f2d6c8a4bcac6c3ccc76b0a12e",
       "labelSourceCount": 22,
       "stationNodeCount": 20,
