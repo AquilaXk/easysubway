@@ -187,6 +187,7 @@ function main() {
         console.error(JSON.stringify(findings, null, 2));
         process.exitCode = 1;
       }
+      database.close();
       console.log("(--check: 팩 미기록)");
       return;
     }
