@@ -9039,9 +9039,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       .sort(),
     [
       "kric-station-convenience-standard",
-      "kric-station-elevator",
       "kric-station-elevator-movement",
-      "kric-station-escalator",
       "kric-station-info",
       "kric-station-movement-detailed",
       "kric-station-movement-standard",
@@ -9051,7 +9049,6 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       "kric-subway-timetable",
       "kric-train-operation-organ",
       "kric-transfer-movement-detailed",
-      "kric-wheelchair-lift-location",
       "kric-wheelchair-lift-movement",
       "molit-tago-subway-info",
       "molit-urban-rail-full-route",
@@ -9063,7 +9060,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
       "seoulmetro-station-line-info",
     ],
   );
-  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 23);
+  assert.equal(targets.roadmapEvidenceLedger.sourceCandidateAdmission.admittedCandidateCount, 20);
   // admittedCandidateCount는 P0 후보 전용 카운트다. #1397에서 함께 승격된 P1 route_map_positions
   // 후보(seoulmetro-cyberstation-route-map, capital pilot deferred domain)는 이 카운트에 포함되지 않는다.
   assert.equal(
