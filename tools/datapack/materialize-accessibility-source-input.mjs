@@ -23,6 +23,8 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
     if (!mapping || mapping.lineId !== query.lineId || !Array.isArray(query.rows)) {
       throw new Error(`KRIC snapshot canonical mapping missing: ${query?.stationId}`);
     }
+    const stationName = input.stationLineRows.find((row) => row.stationCode === mapping.sourceStationCode.split("-").at(-1))?.stationNameKo;
+    if (!stationName) throw new Error(`station name missing: ${query.stationId}`);
     const counts = new Map();
     for (const row of query.rows) {
       const type = FACILITY_TYPES.get(row.gubun);
@@ -35,7 +37,7 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
         id: `facility-${query.stationId}-${type.toLowerCase()}-kric-standard-${number}`,
         station: { sourceId: mapping.sourceId, sourceStationCode: mapping.sourceStationCode, lineId: mapping.lineId },
         type,
-        name: `${query.stationId} ${type} ${number}`,
+        name: `${stationName}역 ${type} ${number}`,
         status: "UNKNOWN",
         statusMeaning: "STATIC_LOCATION",
         operationalStatus: "UNKNOWN",

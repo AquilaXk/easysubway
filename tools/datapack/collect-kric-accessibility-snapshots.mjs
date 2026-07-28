@@ -17,6 +17,7 @@ export const KRIC_ACCESSIBILITY_OPERATIONS = Object.freeze([
 ]);
 
 const CONSUMED_KRIC_FACILITY_SOURCE_IDS = Object.freeze([
+  "kric-station-convenience-standard",
   "kric-station-elevator",
   "kric-station-escalator",
   "kric-wheelchair-lift-location",

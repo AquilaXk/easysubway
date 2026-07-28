@@ -486,7 +486,7 @@
         "lineId": "seoul-4"
       },
       "type": "ELEVATOR",
-      "name": "station-sangnoksu ELEVATOR 1",
+      "name": "상록수역 ELEVATOR 1",
       "status": "UNKNOWN",
       "statusMeaning": "STATIC_LOCATION",
       "operationalStatus": "UNKNOWN",
@@ -512,7 +512,7 @@
         "lineId": "seoul-4"
       },
       "type": "ELEVATOR",
-      "name": "station-sangnoksu ELEVATOR 2",
+      "name": "상록수역 ELEVATOR 2",
       "status": "UNKNOWN",
       "statusMeaning": "STATIC_LOCATION",
       "operationalStatus": "UNKNOWN",
@@ -538,7 +538,7 @@
         "lineId": "seoul-4"
       },
       "type": "ELEVATOR",
-      "name": "station-sadang ELEVATOR 1",
+      "name": "사당역 ELEVATOR 1",
       "status": "UNKNOWN",
       "statusMeaning": "STATIC_LOCATION",
       "operationalStatus": "UNKNOWN",
@@ -564,7 +564,7 @@
         "lineId": "seoul-4"
       },
       "type": "ELEVATOR",
-      "name": "station-sadang ELEVATOR 2",
+      "name": "사당역 ELEVATOR 2",
       "status": "UNKNOWN",
       "statusMeaning": "STATIC_LOCATION",
       "operationalStatus": "UNKNOWN",

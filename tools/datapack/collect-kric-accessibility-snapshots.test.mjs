@@ -1,9 +1,16 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { DatabaseSync } from "node:sqlite";
 import test from "node:test";
+import { gzipSync } from "node:zlib";
 
 import {
   buildKricAccessibilityRoster,
   collectKricAccessibilitySnapshots,
+  loadCanonicalStationLinesFromBundledIndex,
 } from "./collect-kric-accessibility-snapshots.mjs";
 
 const operation = {
@@ -51,6 +58,36 @@ test("canonical fixture와 official route roster를 station-line tuple로 결속
     () => buildKricAccessibilityRoster({ fixture, canonicalStationLines, routeRosters }),
     /ambiguous canonical KRIC station join/,
   );
+});
+
+test("현재 standard source claim도 다음 snapshot roster 입력으로 다시 읽는다", async (t) => {
+  const directory = await mkdtemp(path.join(tmpdir(), "easysubway-kric-current-claim-"));
+  t.after(() => rm(directory, { recursive: true, force: true }));
+  const sqlitePath = path.join(directory, "capital.sqlite");
+  const gzipPath = `${sqlitePath}.gz`;
+  const database = new DatabaseSync(sqlitePath);
+  database.exec(`
+    CREATE TABLE stations (id TEXT PRIMARY KEY, name_ko TEXT);
+    CREATE TABLE station_lines (station_id TEXT, line_id TEXT, station_code TEXT);
+    CREATE TABLE station_aliases (station_id TEXT, alias TEXT);
+    CREATE TABLE station_facility_evidence (station_id TEXT, line_id TEXT, source_id TEXT);
+  `);
+  database.prepare("INSERT INTO stations VALUES (?,?)").run("station-a", "현재역");
+  database.prepare("INSERT INTO station_lines VALUES (?,?,?)").run("station-a", "line-a", "101");
+  database.prepare("INSERT INTO station_aliases VALUES (?,?)").run("station-a", "옛이름역");
+  database.prepare("INSERT INTO station_facility_evidence VALUES (?,?,?)").run("station-a", "line-a", "kric-station-convenience-standard");
+  database.close();
+  const sqliteBytes = await readFile(sqlitePath);
+  await writeFile(gzipPath, gzipSync(sqliteBytes));
+
+  const memberships = await loadCanonicalStationLinesFromBundledIndex({
+    bundledIndex: { packs: [{ id: "capital", asset: path.basename(gzipPath), sqliteSha256: createHash("sha256").update(sqliteBytes).digest("hex") }] },
+    bundledRoot: directory,
+  });
+
+  assert.deepEqual(memberships, [{
+    artifactId: "bundled-capital", stationId: "station-a", lineId: "line-a", stationCode: "101", names: ["옛이름역", "현재역"],
+  }]);
 });
 
 test("KRIC accessibility snapshot은 tuple을 정렬하고 present/explicit-zero를 보존한다", async () => {
