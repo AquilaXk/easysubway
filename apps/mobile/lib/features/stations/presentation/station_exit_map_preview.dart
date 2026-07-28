@@ -176,6 +176,7 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
 
     final option = KakaoMapOption(position: _initialPosition, zoomLevel: 16);
     final builder = widget.nativeMapBuilder ?? _buildNativeMap;
+    final mapGeneration = _generation;
     final selectedExit = widget.exits.firstWhere(
       (exit) => exit.id == widget.selectedExitId,
     );
@@ -196,8 +197,16 @@ class _StationExitMapPreviewState extends State<StationExitMapPreview>
               child: builder(
                 key: ValueKey('stationExitNativeMap-$_generation'),
                 option: option,
-                onMapReady: _onMapReady,
-                onMapError: _onMapError,
+                onMapReady: (controller) {
+                  if (mounted && mapGeneration == _generation) {
+                    _onMapReady(controller);
+                  }
+                },
+                onMapError: (error) {
+                  if (mounted && mapGeneration == _generation) {
+                    _onMapError(error);
+                  }
+                },
               ),
             ),
             if (selectedTarget != null)

@@ -558,6 +558,51 @@ void main() {
     expect(newController.labels.pois['exit-1']!.lastStyle.icon!.width, 32);
     expect(newController.labels.pois['exit-2']!.lastStyle.icon!.width, 36);
   });
+
+  testWidgets('재시도 전 지도 late callback은 새 지도를 건드리지 않는다', (tester) async {
+    final readyCallbacks = <ValueChanged<KakaoMapController>>[];
+    final errorCallbacks = <ValueChanged<Error>>[];
+    final oldController = _FakeKakaoMapController();
+    final newController = _FakeKakaoMapController();
+
+    await _pumpPreview(
+      tester,
+      nativeMapBuilder:
+          ({
+            required key,
+            required option,
+            required onMapReady,
+            required onMapError,
+          }) {
+            readyCallbacks.add(onMapReady);
+            errorCallbacks.add(onMapError);
+            return ColoredBox(key: key, color: Colors.grey);
+          },
+    );
+
+    await runWithMobileErrorReporter((_) {}, () async {
+      errorCallbacks.first(_FakeMapError());
+      await tester.pump();
+    });
+    await tester.tap(find.widgetWithText(TextButton, '다시 시도'));
+    await tester.pump();
+    readyCallbacks.last(newController);
+    await tester.pump();
+
+    readyCallbacks.first(oldController);
+    await tester.runAsync(
+      () => Future<void>.delayed(const Duration(milliseconds: 20)),
+    );
+    await tester.pump();
+    await runWithMobileErrorReporter((_) {}, () async {
+      errorCallbacks.first(_FakeMapError());
+      await tester.pump();
+    });
+
+    expect(oldController.labels.addPoiCount, 0);
+    expect(newController.finishCount, 0);
+    expect(find.text('지도 미리보기를 불러오지 못했어요.'), findsNothing);
+  });
 }
 
 Future<void> _pumpPreview(
@@ -693,6 +738,7 @@ final class _FakeKakaoMapController implements KakaoMapController {
   int pauseCount = 0;
   int resumeCount = 0;
   int moveCameraCount = 0;
+  int finishCount = 0;
 
   @override
   LabelController get labelLayer => labels;
@@ -716,7 +762,7 @@ final class _FakeKakaoMapController implements KakaoMapController {
   Future<void> resume() async => resumeCount++;
 
   @override
-  Future<void> finish() async {}
+  Future<void> finish() async => finishCount++;
 
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
