@@ -103,9 +103,6 @@
             "operatorIds": [
               "seoul-metro"
             ],
-            "lineIds": [
-              "seoul-4"
-            ],
             "sourceDomains": [
               "route_map_positions"
             ]
