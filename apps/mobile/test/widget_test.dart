@@ -50,7 +50,6 @@ import 'package:easysubway_mobile/mobile_error_reporter.dart';
 import 'package:easysubway_mobile/network_map.dart';
 import 'package:easysubway_mobile/search_field.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
-import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_svg_viewport.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/nearby_direction_title.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/structured_route_map_painter.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/station_fan_menu_geometry.dart'

@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_svg_viewport.dart';
 import 'package:flutter/services.dart';
@@ -70,6 +68,7 @@ void main() {
       call,
     ) async {
       calls.add(call);
+      return null;
     });
     addTearDown(
       () => messenger.setMockMethodCallHandler(
@@ -79,7 +78,7 @@ void main() {
     );
 
     final controller = RouteMapSvgViewportController(onUnavailable: () {});
-    controller.attach(viewId: 42);
+    await controller.attach(viewId: 42);
     await controller.update(
       camera.copyWith(revision: 4, center: const Offset(60.25, 55.5)),
       sourceOrigin: origin,
@@ -107,6 +106,7 @@ void main() {
       call,
     ) async {
       calls.add(call);
+      return null;
     });
     addTearDown(
       () => messenger.setMockMethodCallHandler(
@@ -155,14 +155,10 @@ void main() {
 
   test('invalid camera는 unavailable을 알린다', () async {
     var unavailableCount = 0;
-    const channelName =
-        'com.easysubway.easysubway_mobile/route_map_viewport_webview/7';
-    final messenger =
-        TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger;
     final controller = RouteMapSvgViewportController(
       onUnavailable: () => unavailableCount++,
     );
-    controller.attach(viewId: 7);
+    await controller.attach(viewId: 7);
 
     await controller.update(
       camera.copyWith(viewportSize: const Size(double.nan, 800), revision: 4),

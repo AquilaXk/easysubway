@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
 import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_svg_viewport.dart';
 import 'package:flutter/material.dart';
@@ -41,7 +39,10 @@ void main() {
     ) async {
       await tester.pumpWidget(const _FailureBoundaryHarness());
       await tester.pumpAndSettle();
-      expect(find.byKey(const Key('routeMapInteractiveSurface')), findsOneWidget);
+      expect(
+        find.byKey(const Key('routeMapInteractiveSurface')),
+        findsOneWidget,
+      );
 
       await _triggerNativeFault(fault);
       await tester.pumpAndSettle();
@@ -76,10 +77,9 @@ Future<void> _triggerNativeFault(String kind) async {
   // attached before the deferred debug fault is delivered.
   for (var viewId = 0; viewId < 16; viewId++) {
     try {
-      await MethodChannel('$_channelPrefix$viewId').invokeMethod<void>(
-        'debugFault',
-        <String, Object>{'kind': kind},
-      );
+      await MethodChannel(
+        '$_channelPrefix$viewId',
+      ).invokeMethod<void>('debugFault', <String, Object>{'kind': kind});
       return;
     } on MissingPluginException {
       continue;
@@ -92,7 +92,8 @@ class _FailureBoundaryHarness extends StatefulWidget {
   const _FailureBoundaryHarness();
 
   @override
-  State<_FailureBoundaryHarness> createState() => _FailureBoundaryHarnessState();
+  State<_FailureBoundaryHarness> createState() =>
+      _FailureBoundaryHarnessState();
 }
 
 class _FailureBoundaryHarnessState extends State<_FailureBoundaryHarness> {
