@@ -160,17 +160,17 @@ void main() {
     });
   });
 
-  group('팬 메뉴 꼬리 앵커점(#2068 QA — 노드 높이 2/3 지점)', () {
-    test('가로는 노드 중앙 그대로, 세로는 노드 상단에서 높이의 2/3', () {
-      // 노드 중심 (100,200)·높이 12 → 상단 194, 2/3 지점 = 194 + 8 = 202.
+  group('팬 메뉴 꼬리 앵커점(#2068 QA — 노드 바닥에서 높이 2/3 위)', () {
+    test('가로는 노드 중앙 그대로, 세로는 노드 바닥에서 높이의 2/3 위', () {
+      // 노드 중심 (100,200)·높이 12 → 바닥 206, 2/3 위 지점 = 206 - 8 = 198.
       final anchor = fanMenuTailAnchorPoint(
         nodeCenter: const Offset(100, 200),
         nodeHeight: 12,
       );
       expect(anchor.dx, closeTo(100, 0.001));
-      expect(anchor.dy, closeTo(202, 0.001));
-      // 중심 기준으로는 항상 아래로 높이의 1/6.
-      expect(anchor.dy - 200, closeTo(12 / 6, 0.001));
+      expect(anchor.dy, closeTo(198, 0.001));
+      // 중심 기준으로는 항상 위로 높이의 1/6.
+      expect(200 - anchor.dy, closeTo(12 / 6, 0.001));
     });
 
     test('높이 0(노드 크기 미상)이면 중심 그대로 — 회귀 안전', () {
@@ -346,7 +346,7 @@ void main() {
       }
     });
 
-    test('앵커점은 노드 중심보다 아래(꼬리 팁이 노드 하단쪽 2/3에 닿는다)', () {
+    test('앵커점은 노드 중심보다 위(꼬리 팁이 노드 바닥에서 2/3 위에 닿는다)', () {
       const center = Offset(120, 340);
       final height = fanMenuAnchorNodeHeight(
         memberPositions: const [],
@@ -357,8 +357,8 @@ void main() {
         nodeHeight: height,
       );
       expect(anchor.dx, closeTo(center.dx, 0.001));
-      expect(anchor.dy, greaterThan(center.dy));
-      expect(anchor.dy, closeTo(center.dy + 1.5, 0.001));
+      expect(anchor.dy, lessThan(center.dy));
+      expect(anchor.dy, closeTo(center.dy - 1.5, 0.001));
     });
   });
 

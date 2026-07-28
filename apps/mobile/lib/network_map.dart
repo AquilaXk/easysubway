@@ -5143,8 +5143,9 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     };
   }
 
-  /// 팬 메뉴 꼬리 팁이 닿을 앵커의 source 좌표(#2068 QA). 노드 정중앙
-  /// ([_fanMenuAnchorSource])에서 노드 높이의 1/6만큼 내려온 "높이 2/3" 지점이다.
+  /// 팬 메뉴 꼬리 팁이 닿을 앵커의 source 좌표(#2068 QA). 노드 바닥에서
+  /// 노드 높이의 2/3만큼 위, 즉 ([_fanMenuAnchorSource])에서 높이의 1/6만큼
+  /// 위로 올라간 지점이다.
   /// build(렌더)와 [_panCameraToRevealFanMenu](카메라)가 같은 앵커를 소비하도록
   /// 단일 헬퍼로 둔다. **팬 메뉴 전용** — 드래프트 핀은 이동 없이
   /// [_fanMenuAnchorSource](정중앙)를 그대로 쓴다.
@@ -7487,7 +7488,7 @@ Offset fanMenuTransferAnchor({
 }
 
 /// 팬 메뉴 꼬리 팁이 닿을 앵커점(#2068 QA). 가로는 노드 정중앙 그대로, 세로는
-/// **노드 상단에서 높이의 2/3** 지점이다(= 노드 중심에서 아래로 높이의 1/6).
+/// **노드 바닥에서 높이의 2/3 위** 지점이다(= 노드 중심에서 위로 높이의 1/6).
 /// 정중앙 접촉(#2192 v3)은 메뉴가 노드보다 살짝 위에 떠 보인다는 실기기 QA
 /// 반려에 따라 이 지점으로 옮겼다.
 ///
@@ -7501,8 +7502,8 @@ Offset fanMenuTailAnchorPoint({
   required double nodeHeight,
 }) => Offset(
   nodeCenter.dx,
-  // 노드 상단(중심 − 높이/2)에서 높이의 2/3만큼 내려온 지점.
-  nodeCenter.dy - nodeHeight / 2 + nodeHeight * 2 / 3,
+  // 노드 바닥(중심 + 높이/2)에서 높이의 2/3만큼 위로 올라간 지점.
+  nodeCenter.dy + nodeHeight / 2 - nodeHeight * 2 / 3,
 );
 
 /// [fanMenuTailAnchorPoint]가 쓰는 "노드"의 세로 크기(source 단위, #2068 QA).
