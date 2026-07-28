@@ -2962,6 +2962,7 @@ test("누락된 재기술은 emit fixture를 남기지 않고 거부된다", asy
         resolutionsInput: { path: RESOLUTIONS_PATH, sha256: "e".repeat(64) },
         workDir: workspace,
         emitFixturePath,
+        verifyDeployedArtifact: async () => ({}),
       }),
       /line-scope redescriptions must exactly match the actual required set/,
     );
