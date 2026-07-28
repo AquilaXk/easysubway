@@ -648,7 +648,7 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
     materializeCapitalTopologySource(pack, topology, capitalAdmissions);
     applyCapitalNetworkEdgeEvidence(pack, topology, capitalTopology.pinned.snapshotId, capitalAdmissions);
     applyItxNetworkEdgeEvidence(pack, itxAdmission);
-    for (const edge of pack.networkEdges ?? []) {
+    for (const edge of [...(pack.networkEdges ?? []), ...(pack.outOfStationTransferLinks ?? [])]) {
       if (edge.verificationStatus !== "VERIFIED") {
         edge.accessibilityStatus = "UNKNOWN";
         edge.stairAccessState = "UNKNOWN";

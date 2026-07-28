@@ -8660,6 +8660,10 @@ test("데이터팩 도구는 앱 manifest 계약과 SQLite 검증 계약을 고�
   assert.match(builder, /--build-spec/);
   assert.match(builder, /datapack-candidate-build-spec/);
   assert.match(builder, /candidateBuild/);
+  assert.match(
+    builder,
+    /for \(const edge of \[\.\.\.\(pack\.networkEdges \?\? \[\]\), \.\.\.\(pack\.outOfStationTransferLinks \?\? \[\]\)\]\)/,
+  );
   assert.match(builder, /"transit_stop_times"/);
   assert.match(builder, /"station_pathway_edges"/);
   assert.match(builder, /"station_car_door_hints"/);
