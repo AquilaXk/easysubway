@@ -1287,9 +1287,9 @@
 		padding: 36px 18px;
 	}
 
-	.login-brand-panel {
+	.admin-login-page .login-brand-panel {
 		justify-content: center;
-		margin-bottom: 16px;
+		margin-bottom: 12px;
 	}
 
 	.login-brand-lockup {
@@ -1304,7 +1304,7 @@
 		border-radius: 8px;
 	}
 
-	.login-brand-lockup strong {
+	.admin-login-page .login-brand-lockup strong {
 		font-size: 20px;
 		letter-spacing: -0.02em;
 	}
@@ -1326,18 +1326,11 @@
 		text-align: center;
 	}
 
-	.admin-login-page .login-brand-panel {
-		margin-bottom: 12px;
-	}
-
 	.admin-login-page .login-brand-lockup img {
 		width: 40px;
 		height: 40px;
 	}
 
-	.admin-login-page .login-brand-lockup strong {
-		font-size: 18px;
-	}
 }
 
 .sr-only {
@@ -2107,7 +2100,7 @@
 }
 
 @media (max-width: 720px) {
-	.admin-alert-center .admin-alert-panel {
+	.admin-v3 .admin-alert-center .admin-alert-panel {
 		position: fixed;
 		top: 60px;
 		left: 10px;

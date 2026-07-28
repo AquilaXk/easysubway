@@ -859,7 +859,7 @@ class AdminDesignGuardTest {
 			.contains("width: 40px;")
 			.contains("height: 40px;");
 		assertThat(rule(components, "\\.admin-login-page \\.login-brand-lockup strong"))
-			.contains("font-size: 18px;");
+			.contains("font-size: 20px;");
 	}
 
 	@Test
@@ -876,8 +876,9 @@ class AdminDesignGuardTest {
 		assertThat(rule(components, "\\.login-brand-panel"))
 			.contains("background: transparent;")
 			.contains("color: var(--admin-ink);");
-		assertThat(components)
-			.contains("justify-content: center;")
+		assertThat(rule(components, "\\.admin-login-page \\.login-brand-panel"))
+			.contains("justify-content: center;");
+		assertThat(rule(components, "\\.admin-login-page \\.login-brand-lockup strong"))
 			.contains("font-size: 20px;");
 	}
 
@@ -894,10 +895,15 @@ class AdminDesignGuardTest {
 			.contains("width: 44px;")
 			.contains("padding: 0;")
 			.contains("border: 0;");
-		assertThat(components)
-			.contains("position: fixed;\n\t\ttop: 60px;\n\t\tleft: 10px;\n\t\tright: 10px;")
+		assertThat(rule(components, "\\.admin-v3 \\.admin-alert-center \\.admin-alert-panel"))
+			.contains("position: fixed;")
+			.contains("top: 60px;")
+			.contains("left: 10px;")
+			.contains("right: 10px;")
 			.contains("width: auto;");
-		assertThat(components.lastIndexOf(".admin-alert-center .admin-alert-panel"))
+		assertThat(count(Pattern.compile("\\.admin-alert-center \\.admin-alert-panel"), components))
+			.isEqualTo(2);
+		assertThat(components.indexOf(".admin-v3 .admin-alert-center .admin-alert-panel"))
 			.as("모바일 알림 override는 기본 패널 규칙 뒤에 온다")
 			.isGreaterThan(components.indexOf(".admin-alert-center .admin-alert-panel"));
 	}
