@@ -1,6 +1,7 @@
 import 'dart:math' as math;
 
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
+import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_svg_viewport.dart';
 import 'package:easysubway_mobile/features/network_map/presentation/route_map_basemap_view.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/network_map.dart';
@@ -216,6 +217,8 @@ Future<MapCameraState> _mountAndReadCamera(
 }
 
 void main() {
+  setUp(() => debugRouteMapSvgViewportPresentImmediately = true);
+  tearDown(() => debugRouteMapSvgViewportPresentImmediately = false);
   tearDown(resetNetworkMapOwnerLabelsCacheForTest);
 
   group('(1) 하한 조회값이 오너 지정 리터럴과 같다', () {

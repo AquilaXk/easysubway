@@ -32,6 +32,7 @@ import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_schedule_
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_subscription.dart';
 import 'package:easysubway_mobile/features/network_map/domain/map_camera.dart';
+import 'package:easysubway_mobile/features/network_map/infrastructure/route_map_svg_viewport.dart';
 import 'package:easysubway_mobile/features/realtime/realtime_repository.dart';
 import 'package:easysubway_mobile/features/route_draft/application/route_draft_controller.dart';
 import 'package:easysubway_mobile/features/stations/presentation/station_detail_body.dart';
@@ -566,6 +567,9 @@ Future<void> _tapFirstRouteResultListItem(WidgetTester tester) async {
 }
 
 void main() {
+  setUp(() => debugRouteMapSvgViewportPresentImmediately = true);
+  tearDown(() => debugRouteMapSvgViewportPresentImmediately = false);
+
   testWidgets('앱 Theme는 시그니처 ColorScheme 역할색을 사용한다', (tester) async {
     await tester.pumpWidget(
       buildEasySubwayTestApp(

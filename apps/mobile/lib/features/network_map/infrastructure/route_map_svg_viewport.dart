@@ -10,6 +10,9 @@ const _viewType = 'com.easysubway.easysubway_mobile/route_map_viewport_webview';
 const _channelPrefix =
     'com.easysubway.easysubway_mobile/route_map_viewport_webview/';
 
+@visibleForTesting
+bool debugRouteMapSvgViewportPresentImmediately = false;
+
 typedef RouteMapSvgFramePresentedCallback =
     void Function(int revision, int frameToken);
 
@@ -174,6 +177,7 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
   bool _failed = false;
   int _frameToken = 0;
   Widget? _presentedOverlay;
+  int? _debugPresentedRevision;
   ({
     int revision,
     int token,
@@ -223,9 +227,10 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
         }
       },
     );
-    if (!_isSupported ||
-        routeMapSvgAssetForRegion(widget.region) == null ||
-        !_hasValidViewBox(widget.camera, widget.sourceOrigin)) {
+    if (!debugRouteMapSvgViewportPresentImmediately &&
+        (!_isSupported ||
+            routeMapSvgAssetForRegion(widget.region) == null ||
+            !_hasValidViewBox(widget.camera, widget.sourceOrigin))) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _fail());
     }
   }
@@ -268,6 +273,20 @@ class _RouteMapSvgViewportState extends State<RouteMapSvgViewport> {
 
   @override
   Widget build(BuildContext context) {
+    if (debugRouteMapSvgViewportPresentImmediately) {
+      final revision = widget.camera.revision;
+      if (_debugPresentedRevision != revision) {
+        _debugPresentedRevision = revision;
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (mounted &&
+              debugRouteMapSvgViewportPresentImmediately &&
+              widget.camera.revision == revision) {
+            widget.onFramePresented?.call(revision);
+          }
+        });
+      }
+      return widget.overlay ?? const SizedBox.expand();
+    }
     final asset = routeMapSvgAssetForRegion(widget.region);
     if (_failed ||
         !_isSupported ||
