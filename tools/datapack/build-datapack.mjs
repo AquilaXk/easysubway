@@ -222,17 +222,22 @@ async function loadBuildInput(args, officialOdFareAdmissions, officialOdFareAdmi
   if (fixtureArg != null) {
     const fixture = JSON.parse(await readFile(path.resolve(root, fixtureArg), "utf8"));
     rejectTestOnlyBuildInput(fixture);
-    if (fixture.packs?.some(({ artifactKind }) => artifactKind === "production")) {
+    const hasProductionPack = fixture.packs?.some(({ artifactKind }) => artifactKind === "production");
+    if (hasProductionPack) {
       if (process.env.EASYSUBWAY_DATAPACK_PRODUCTION_FIXTURE_VALIDATION_ONLY !== "true") {
         throw new Error("production fixture builds are validation-only; release builds require --build-spec");
       }
+    }
+    if (hasProductionPack || fixture.manifest?.channel === "production") {
       fixture.manifest = {
         ...fixture.manifest,
         manifestVersion: 2,
         channel: fixture.manifest.channel === "candidate" ? "candidate" : "dev",
         releaseSequence: 1,
         publishedAt: fixture.manifest.publishedAt ?? buildPublishedAt(),
-        keyId: process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID?.trim() || "production-v1",
+        ...(hasProductionPack
+          ? { keyId: process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID?.trim() || "production-v1" }
+          : {}),
       };
     }
     if (args["test-only-itx-admission"] != null) {

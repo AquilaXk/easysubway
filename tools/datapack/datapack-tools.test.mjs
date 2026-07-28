@@ -1999,6 +1999,31 @@ test("데이터팩 생성기는 일반 fixture 입력으로 production channel�
       "--root", path.join(workspace, "validation-output"),
       "--require-production",
     ], { cwd: root, env: productionEnv });
+    const fixturePack = JSON.parse(await readFile("tools/datapack/fixtures/catalog-fixture.json", "utf8"));
+    fixturePack.manifest = {
+      ...fixturePack.manifest,
+      manifestVersion: 2,
+      channel: "production",
+      keyId: "production-v1",
+    };
+    const fixturePackPath = path.join(workspace, "fixture-pack.json");
+    await writeFile(fixturePackPath, `${JSON.stringify(fixturePack)}\n`);
+    await execFileAsync(process.execPath, [
+      "tools/datapack/build-datapack.mjs",
+      "--fixture", fixturePackPath,
+      "--output", path.join(workspace, "fixture-pack-output"),
+    ], {
+      cwd: root,
+      env: {
+        ...productionEnv,
+        EASYSUBWAY_DATAPACK_PRODUCTION_FIXTURE_VALIDATION_ONLY: "false",
+      },
+    });
+    const fixturePackManifest = JSON.parse(await readFile(
+      path.join(workspace, "fixture-pack-output/current.json"),
+      "utf8",
+    ));
+    assert.equal(fixturePackManifest.channel, "dev");
     fixture.manifest.channel = "candidate";
     await writeFile(fixturePath, `${JSON.stringify(fixture)}\n`);
     await execFileAsync(process.execPath, [
