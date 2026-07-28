@@ -96,13 +96,60 @@ test("fresh KRIC codes와 Seoul status만 production source input으로 material
     input: {
       ...input,
       facilityRows: [
-        { sourceId: "kric-station-convenience-standard", id: "facility-collision", providerRecordHash: "a".repeat(64) },
-        { sourceId: "kric-station-convenience-standard", id: "facility-collision", providerRecordHash: "b".repeat(64) },
+        {
+          sourceId: "kric-station-convenience-standard", id: "facility-collision",
+          providerRecordHash: "a".repeat(64), providerFacilityRef: `S1:1:1:EV:${"a".repeat(64)}`,
+        },
+        {
+          sourceId: "kric-station-convenience-standard", id: "facility-collision",
+          providerRecordHash: "b".repeat(64), providerFacilityRef: `S1:1:2:EV:${"b".repeat(64)}`,
+        },
       ],
     },
     kricSnapshot,
     seoulSnapshot,
   }), /facility identity collision/);
+  const twoStationInput = {
+    ...input,
+    stationMappings: [
+      ...input.stationMappings,
+      { sourceId: "molit-urban-rail-full-route", sourceStationCode: "MOLIT-L-2", lineId: "line-2", stationId: "station-b" },
+    ],
+    stationLineRows: [
+      ...input.stationLineRows,
+      {
+        sourceId: "molit-urban-rail-full-route", sourceStationCode: "MOLIT-L-2",
+        stationCode: "2", lineId: "line-2", stationNameKo: "나",
+      },
+    ],
+    minimumProductionCoverage: { facilities: 2 },
+  };
+  const sameProviderRow = { gubun: "EV", stinFlor: 1, dtlLoc: "동일 payload" };
+  const twoStationSnapshot = {
+    ...kricSnapshot,
+    queries: [
+      { ...kricSnapshot.queries[0], rows: [sameProviderRow] },
+      {
+        stationId: "station-b", lineId: "line-2", railOprIsttCd: "S1", lnCd: "2",
+        stinCd: "2", providerRecordHash: "b".repeat(64), rows: [sameProviderRow],
+      },
+    ],
+  };
+  const twoStations = materializeAccessibilitySourceInput({
+    input: twoStationInput, kricSnapshot: twoStationSnapshot, seoulSnapshot,
+  });
+  assert.equal(new Set(twoStations.facilityRows.map(({ id }) => id)).size, 2);
+  const stationBId = twoStations.facilityRows
+    .find(({ station }) => station.sourceStationCode === "MOLIT-L-2").id;
+  const stationBOnly = materializeAccessibilitySourceInput({
+    input: {
+      ...twoStationInput, facilityRows: twoStations.facilityRows,
+      minimumProductionCoverage: { facilities: 1 },
+    },
+    kricSnapshot: { ...twoStationSnapshot, queries: [twoStationSnapshot.queries[1]] },
+    seoulSnapshot,
+  });
+  assert.equal(stationBOnly.facilityRows[0].id, stationBId);
   const duplicated = materializeAccessibilitySourceInput({
     input,
     kricSnapshot: { ...kricSnapshot, queries: [{ ...kricSnapshot.queries[0], rows: [sameTypeRows[0], sameTypeRows[0]] }] },

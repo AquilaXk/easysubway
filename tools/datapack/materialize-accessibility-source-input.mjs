@@ -18,19 +18,21 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
   const mappings = new Map((input.stationMappings ?? [])
     .filter(({ sourceId }) => sourceId === "molit-urban-rail-full-route")
     .map((mapping) => [mapping.stationId, mapping]));
-  const facilityIdsByRecordHash = new Map();
-  const recordHashesByFacilityId = new Map();
+  const facilityIdsByProviderRef = new Map();
+  const providerRefsByFacilityId = new Map();
   for (const row of (input.facilityRows ?? []).filter(({ sourceId }) => sourceId === KRIC_SOURCE_ID)) {
     if (!/^[0-9a-f]{64}$/.test(row.providerRecordHash ?? "")
+      || typeof row.providerFacilityRef !== "string"
+      || !row.providerFacilityRef.endsWith(`:${row.providerRecordHash}`)
       || typeof row.id !== "string" || row.id === "" || row.id.length > 120
-      || (facilityIdsByRecordHash.has(row.providerRecordHash)
-        && facilityIdsByRecordHash.get(row.providerRecordHash) !== row.id)
-      || (recordHashesByFacilityId.has(row.id)
-        && recordHashesByFacilityId.get(row.id) !== row.providerRecordHash)) {
+      || (facilityIdsByProviderRef.has(row.providerFacilityRef)
+        && facilityIdsByProviderRef.get(row.providerFacilityRef) !== row.id)
+      || (providerRefsByFacilityId.has(row.id)
+        && providerRefsByFacilityId.get(row.id) !== row.providerFacilityRef)) {
       throw new Error("facility identity collision");
     }
-    facilityIdsByRecordHash.set(row.providerRecordHash, row.id);
-    recordHashesByFacilityId.set(row.id, row.providerRecordHash);
+    facilityIdsByProviderRef.set(row.providerFacilityRef, row.id);
+    providerRefsByFacilityId.set(row.id, row.providerFacilityRef);
   }
   const facilityRows = [];
   const absenceRows = [];
@@ -56,15 +58,16 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
       .sort((left, right) => codepointCompare(left.providerRecordHash, right.providerRecordHash))) {
       const number = (counts.get(type) ?? 0) + 1;
       counts.set(type, number);
-      const facilityId = facilityIdsByRecordHash.get(providerRecordHash)
+      const providerFacilityRef = `${query.railOprIsttCd}:${query.lnCd}:${query.stinCd}:${row.gubun}:${providerRecordHash}`;
+      const facilityId = facilityIdsByProviderRef.get(providerFacilityRef)
         ?? `facility-${query.stationId}-${type.toLowerCase()}-kric-standard-${providerRecordHash.slice(0, 16)}`;
       if (facilityId.length > 120
-        || (recordHashesByFacilityId.has(facilityId)
-          && recordHashesByFacilityId.get(facilityId) !== providerRecordHash)) {
+        || (providerRefsByFacilityId.has(facilityId)
+          && providerRefsByFacilityId.get(facilityId) !== providerFacilityRef)) {
         throw new Error("facility identity collision");
       }
-      facilityIdsByRecordHash.set(providerRecordHash, facilityId);
-      recordHashesByFacilityId.set(facilityId, providerRecordHash);
+      facilityIdsByProviderRef.set(providerFacilityRef, facilityId);
+      providerRefsByFacilityId.set(facilityId, providerFacilityRef);
       facilityRows.push({
         sourceId: KRIC_SOURCE_ID,
         id: facilityId,
@@ -75,7 +78,7 @@ export function materializeAccessibilitySourceInput({ input, kricSnapshot, seoul
         statusMeaning: "STATIC_LOCATION",
         operationalStatus: "UNKNOWN",
         installationStatus: "INSTALLED",
-        providerFacilityRef: `${query.railOprIsttCd}:${query.lnCd}:${query.stinCd}:${row.gubun}:${providerRecordHash}`,
+        providerFacilityRef,
         provenanceKind: "OFFICIAL_SOURCE",
         floorFrom: String(row.stinFlor ?? ""),
         floorTo: String(row.stinFlor ?? ""),
