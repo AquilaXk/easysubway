@@ -2632,9 +2632,7 @@ void main() {
     expect(routeDraftController.draft.origin, isNull);
   });
 
-  testWidgets('#2068 팬 메뉴 꼬리 팁은 노드 바닥에서 높이 2/3 위에 닿는다', (
-    tester,
-  ) async {
+  testWidgets('#2068 팬 메뉴 꼬리 팁은 노드 바닥에서 높이 2/3 위에 닿는다', (tester) async {
     // 배선 가드: network_map.dart의 팬 메뉴 호출부를 _fanMenuTailAnchorSource에서
     // _fanMenuAnchorSource(정중앙)로 되돌리면 이 delta가 0이 되어 red가 된다.
     // 기준점은 같은 역의 draft pin이다 — pin은 정중앙 앵커를 그대로 쓰고
