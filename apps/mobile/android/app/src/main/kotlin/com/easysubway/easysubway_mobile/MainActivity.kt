@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.Intent
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.content.res.Configuration
 import android.location.Location
 import android.location.LocationListener
 import android.location.LocationManager
@@ -50,10 +51,21 @@ class MainActivity : FlutterActivity() {
     private enum class LocationRequestOutcome { STARTED, PERMISSION_DENIED, FAILED }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        if (resources.configuration.smallestScreenWidthDp < 600) {
-            requestedOrientation = ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
-        }
+        applyScreenOrientationPolicy(resources.configuration)
         super.onCreate(savedInstanceState)
+    }
+
+    override fun onConfigurationChanged(newConfig: Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyScreenOrientationPolicy(newConfig)
+    }
+
+    private fun applyScreenOrientationPolicy(configuration: Configuration) {
+        requestedOrientation = if (configuration.smallestScreenWidthDp < 600) {
+            ActivityInfo.SCREEN_ORIENTATION_PORTRAIT
+        } else {
+            ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        }
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {

@@ -18319,6 +18319,8 @@ test("전화 앱은 세로 모드, 대화면은 자유 회전을 지원한다", 
     const activity = read(path);
     assert.match(activity, /smallestScreenWidthDp < 600/);
     assert.match(activity, /ActivityInfo\.SCREEN_ORIENTATION_PORTRAIT/);
+    assert.match(activity, /override fun onConfigurationChanged/);
+    assert.match(activity, /ActivityInfo\.SCREEN_ORIENTATION_UNSPECIFIED/);
   }
 
   const infoPlist = read("apps/mobile/ios/Runner/Info.plist");
@@ -18338,6 +18340,13 @@ test("전화 앱은 세로 모드, 대화면은 자유 회전을 지원한다", 
     "UIInterfaceOrientationLandscapeLeft",
     "UIInterfaceOrientationLandscapeRight",
   ]);
+});
+
+test("노선도 권역 전환 evidence는 동일 지역 측정을 거부한다", () => {
+  const script = read("tools/mobile/run-route-map-launch-region-evidence.sh");
+
+  assert.match(script, /grep -Fq .*지역: \$REGION_TARGET, 지역 변경/);
+  assert.match(script, /현재 지역과 REGION_TARGET이 같아 권역 전환 시간을 측정할 수 없다/);
 });
 
 test("iOS 릴리즈는 푸시 알림 entitlement를 출시 범위에서 제외한다", () => {

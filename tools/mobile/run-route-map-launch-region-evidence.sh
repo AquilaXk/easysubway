@@ -257,6 +257,11 @@ if [[ ! -s "$UI_XML" ]]; then
 fi
 require_non_empty "$UI_XML"
 
+if grep -Fq "content-desc=\"지역: $REGION_TARGET, 지역 변경\"" "$UI_XML"; then
+  echo "현재 지역과 REGION_TARGET이 같아 권역 전환 시간을 측정할 수 없다: $REGION_TARGET" >&2
+  exit 1
+fi
+
 # '지역 변경' 을 포함한 노드의 bounds 를 파싱해 중심 좌표를 얻는다.
 region_bounds="$(grep -o 'content-desc="[^"]*지역 변경[^"]*"[^>]*bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' "$UI_XML" | head -1 | grep -o 'bounds="\[[0-9]*,[0-9]*\]\[[0-9]*,[0-9]*\]"' | head -1 || true)"
 if [[ -z "$region_bounds" ]]; then
