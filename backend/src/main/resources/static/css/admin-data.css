@@ -285,10 +285,6 @@
 	font-weight: var(--admin-w-title);
 }
 
-.dashboard-week-day.is-weekend:not(.is-today) span {
-	color: color-mix(in srgb, var(--admin-ink-3) 65%, transparent);
-}
-
 .dashboard-weekly-total {
 	color: var(--admin-accent);
 	font-size: 12px;

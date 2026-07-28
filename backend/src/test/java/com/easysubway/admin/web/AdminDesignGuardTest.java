@@ -910,6 +910,7 @@ class AdminDesignGuardTest {
 		assertThat(data)
 			.contains(".dashboard-operations-details")
 			.contains("@media (max-width: 1200px) {\n\t.dashboard-overview-grid {\n\t\tgrid-template-columns: 1fr;")
+			.doesNotContain(".dashboard-week-day.is-weekend:not(.is-today)")
 			.doesNotContain(".admin-dashboard-page .dashboard-urgent,");
 		assertThat(rule(shell, "\\.admin-topbar-search:focus-within"))
 			.contains("outline: 3px solid var(--admin-focus);");
