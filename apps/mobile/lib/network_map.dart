@@ -4460,6 +4460,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   MapCameraState? _presentedRendererCamera;
   final _requestedRendererCamerasByRevision = <int, MapCameraState>{};
   bool _routeMapRendererActive = false;
+  bool _routeMapBasemapFailed = false;
   DateTime? _lastRendererCameraRequestAt;
   bool _cameraFrameCallbackScheduled = false;
   bool _forceRendererCameraCommit = false;
@@ -4486,8 +4487,8 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
   // basemap 6차(#2068): asset id(seoul/busan/...) → station명 → 오너 라벨 앵커.
   // 소비처는 (1) geometry bounds 확장(networkMapOwnerLabelSourceRects — 라벨까지
   // 담아 탭 히트·팬 한계를 맞춘다)과 (2) 초기 카메라 가독 배율뿐이다. 라벨 렌더는
-  // .vec 바탕층이 담당한다(#2068 SVG 충실도). 로드 전·실패 시 null → 두 소비처
-  // 모두 기존(라벨 미반영) 동작으로 안전 폴백한다.
+  // canonical SVG 바탕층이 담당한다(#2068 SVG 충실도). 로드 전·실패 시 null →
+  // 두 소비처 모두 기존(라벨 미반영) 동작으로 안전 폴백한다.
   Map<String, Map<String, List<RouteMapOwnerLabelEntry>>>? _ownerLabelsByRegion;
   // 초기 카메라 가독 배율(#2068 트랙 QA 후속) 캐시 — _readableInitialMapScaleFor.
   double? _readableInitialMapScaleCache;
@@ -4648,7 +4649,11 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                 previousCamera != null;
             _layoutKey = layoutKey;
             _layoutRegion = widget.data.selectedRegion;
+            _routeMapBasemapFailed = false;
             _pendingCamera = null;
+            _requestedRendererCamera = null;
+            _presentedRendererCamera = null;
+            _requestedRendererCamerasByRevision.clear();
             _routeMapRendererActive = widget.data.stations.isNotEmpty;
             _gestureActive = false;
             _cameraFocusedStationKey = null;
@@ -4730,68 +4735,84 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
             _cameraFocusedStationKey = focusedStationKey;
             _pendingCamera = null;
             _camera = focusedCamera;
+            _requestedRendererCamera = focusedCamera;
+            _requestedRendererCamerasByRevision
+              ..clear()
+              ..[focusedCamera.revision] = focusedCamera;
             camera = focusedCamera;
             widget.onViewportChanged(focusedCamera.visibleSourceRect);
           } else if (focusedStation == null) {
             _cameraFocusedStationKey = null;
           }
+          if (_routeMapBasemapFailed || !_routeMapRendererActive) {
+            return const _OriginalRouteMapUnavailable();
+          }
+          final presentedRendererCamera = _presentedRendererCamera;
+          final interactionCamera = presentedRendererCamera == null
+              ? null
+              : networkMapRendererTransformVisualCamera(
+                  rendererCamera: presentedRendererCamera,
+                  visualCamera: camera,
+                );
+          final gestureCamera = interactionCamera;
           return Stack(
             children: [
               Positioned.fill(
-                child: !_routeMapRendererActive
-                    ? const _OriginalRouteMapUnavailable()
-                    : _buildStructuredRouteMapCanvas(camera, geometry.origin),
+                child: _buildStructuredRouteMapCanvas(camera, geometry.origin),
               ),
-              Positioned.fill(
-                child: Semantics(
-                  label: '노선도',
-                  hint: '역을 누르면 출발, 도착, 역 정보 action을 볼 수 있어요',
-                  child: Listener(
-                    onPointerCancel: (_) => _endScaleGesture(),
-                    child: GestureDetector(
-                      behavior: HitTestBehavior.translucent,
-                      onScaleStart: (details) {
-                        if (!_gestureActive) {
-                          setState(() {
-                            _gestureActive = true;
-                            _clearSelectionAndNotify();
-                          });
-                        }
-                        _gestureStartCamera = camera;
-                        _gestureStartFocalPoint = details.localFocalPoint;
-                      },
-                      onScaleUpdate: (details) {
-                        _updateCameraForGesture(details);
-                      },
-                      onScaleEnd: (_) {
-                        _endScaleGesture();
-                      },
-                      onTapUp: (details) {
-                        _openNearestStation(
-                          details.localPosition,
-                          _stationLinesByIdCached(widget.data),
-                          geometry,
-                          camera,
-                        );
-                      },
+              if (gestureCamera != null)
+                Positioned.fill(
+                  child: Semantics(
+                    label: '노선도',
+                    hint: '역을 누르면 출발, 도착, 역 정보 action을 볼 수 있어요',
+                    child: Listener(
+                      onPointerCancel: (_) => _endScaleGesture(),
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.translucent,
+                        onScaleStart: (details) {
+                          if (!_gestureActive) {
+                            setState(() {
+                              _gestureActive = true;
+                              _clearSelectionAndNotify();
+                            });
+                          }
+                          _gestureStartCamera = gestureCamera;
+                          _gestureStartFocalPoint = details.localFocalPoint;
+                        },
+                        onScaleUpdate: (details) {
+                          _updateCameraForGesture(details);
+                        },
+                        onScaleEnd: (_) {
+                          _endScaleGesture();
+                        },
+                        onTapUp: interactionCamera == null
+                            ? null
+                            : (details) {
+                                _openNearestStation(
+                                  details.localPosition,
+                                  _stationLinesByIdCached(widget.data),
+                                  geometry,
+                                  interactionCamera,
+                                );
+                              },
+                      ),
                     ),
                   ),
                 ),
-              ),
-              if (!_gestureActive)
+              if (interactionCamera != null && !_gestureActive)
                 for (final station in _visibleCanonicalStations(
                   geometry: geometry,
-                  camera: camera,
+                  camera: interactionCamera,
                 ))
                   Positioned.fromRect(
                     rect: _sourceRectToViewport(
                       _stationHitRect(
                         station,
                         geometry,
-                        nodeRadius: 24 / camera.scale,
-                        labelHeight: 40 / camera.scale,
+                        nodeRadius: 24 / interactionCamera.scale,
+                        labelHeight: 40 / interactionCamera.scale,
                       ),
-                      camera,
+                      interactionCamera,
                     ),
                     child: _StationHitTarget(
                       key: Key(
@@ -4804,13 +4825,13 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
               // 드래프트 핀은 줌/팬 중에도 유지한다(역 hit·팬 메뉴와 달리 상태
               // 표시). Positioned는 Stack 직접 자식이어야 하므로, 제스처 중
               // 포인터 통과는 핀 위젯 내부 IgnorePointer로 처리한다.
-              if (originStation != null)
+              if (interactionCamera != null && originStation != null)
                 _NetworkMapDraftPin(
                   key: const Key('networkMapDraftPin-origin'),
                   station: originStation,
                   // 환승역은 캡슐 중심, 일반역은 노드 중심(팬 메뉴와 동일 앵커).
                   anchorSource: _fanMenuAnchorSource(originStation, geometry),
-                  camera: camera,
+                  camera: interactionCamera,
                   label: '출발',
                   surfaceColor: EasySubwayFanMenuColors.departure,
                   semanticSuffix: '출발 지정됨',
@@ -4818,12 +4839,12 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   ignorePointers: _gestureActive,
                   onClear: widget.onClearOrigin,
                 ),
-              if (waypointStation != null)
+              if (interactionCamera != null && waypointStation != null)
                 _NetworkMapDraftPin(
                   key: const Key('networkMapDraftPin-waypoint'),
                   station: waypointStation,
                   anchorSource: _fanMenuAnchorSource(waypointStation, geometry),
-                  camera: camera,
+                  camera: interactionCamera,
                   label: '경유',
                   surfaceColor: EasySubwayFanMenuColors.waypoint,
                   semanticSuffix: '경유 지정됨',
@@ -4831,7 +4852,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   ignorePointers: _gestureActive,
                   onClear: widget.onClearWaypoint,
                 ),
-              if (destinationStation != null)
+              if (interactionCamera != null && destinationStation != null)
                 _NetworkMapDraftPin(
                   key: const Key('networkMapDraftPin-destination'),
                   station: destinationStation,
@@ -4839,7 +4860,7 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                     destinationStation,
                     geometry,
                   ),
-                  camera: camera,
+                  camera: interactionCamera,
                   label: '도착',
                   surfaceColor: EasySubwayFanMenuColors.arrival,
                   semanticSuffix: '도착 지정됨',
@@ -4849,12 +4870,15 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
                   ignorePointers: _gestureActive,
                   onClear: widget.onClearDestination,
                 ),
-              if (!_gestureActive && selectedStation != null)
+              if (interactionCamera != null &&
+                  !_gestureActive &&
+                  selectedStation != null)
                 Builder(
                   builder: (context) {
-                    final stationPoint = camera.sourceToViewportPoint(
-                      _fanMenuTailAnchorSource(selectedStation, geometry),
-                    );
+                    final stationPoint = interactionCamera
+                        .sourceToViewportPoint(
+                          _fanMenuTailAnchorSource(selectedStation, geometry),
+                        );
                     // #2109: 배치 규칙은 fanMenuPlacement 단일 함수가 소유한다
                     // (카메라 최소 패닝 _panCameraToRevealFanMenu와 동일 규칙 소비).
                     final placement = fanMenuPlacement(
@@ -5248,32 +5272,44 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
     );
   }
 
-  // 하이브리드 바탕층(#2068)을 visual camera로 마운트한다. 바탕은 region에 매핑된
-  // 컴파일 .vec를 런타임 디코드해 그리며(RouteMapBasemapView), 인터랙션 좌표계와
-  // 1:1 정렬된다. WebView와 달리 명령형 controller 없이 camera prop 변경(setState)
-  // 으로 갱신된다. sourceOrigin은 오버레이·카메라의 origin-뺀 공간과 맞춘다.
+  // Native SVG viewport와 Flutter overlay는 source 좌표계를 공유한다.
   Widget _buildStructuredRouteMapCanvas(
-    MapCameraState camera,
+    MapCameraState visualCamera,
     Offset sourceOrigin,
   ) {
+    final rendererCamera = _requestedRendererCamera ?? visualCamera;
+    if (!identical(_presentedRendererCamera, rendererCamera)) {
+      _requestedRendererCamerasByRevision[rendererCamera.revision] =
+          rendererCamera;
+    }
+    final displayedRendererCamera = _presentedRendererCamera ?? rendererCamera;
+    final transformedVisualCamera = networkMapRendererTransformVisualCamera(
+      rendererCamera: displayedRendererCamera,
+      visualCamera: visualCamera,
+    );
     final attribution = _attributionTextByRegion?[widget.data.selectedRegion];
     _ensureStructuredRouteMap();
     final map = _structuredRouteMapCache!;
     final lineColors = _structuredLineColorsCache!;
     final labelTextByStationId = _structuredLabelTextCache!;
     final lineBadgeLabelByLineId = _structuredLineBadgeLabelCache!;
-    return Stack(
-      fit: StackFit.expand,
-      children: [
-        RouteMapBasemapView(
-          region: _displayRegionName(widget.data.selectedRegion),
-          camera: camera,
-          sourceOrigin: sourceOrigin,
-          attributionText: attribution,
-        ),
-        StructuredRouteMapView(
+    return Transform(
+      alignment: Alignment.topLeft,
+      transform: networkMapRendererFrameTransform(
+        rendererCamera: displayedRendererCamera,
+        visualCamera: transformedVisualCamera,
+      ),
+      child: RouteMapBasemapView(
+        key: ValueKey(_layoutKey),
+        region: _displayRegionName(widget.data.selectedRegion),
+        camera: rendererCamera,
+        sourceOrigin: sourceOrigin,
+        attributionText: attribution,
+        onUnavailable: _markRouteMapBasemapUnavailable,
+        onFramePresented: _acceptRouteMapFrame,
+        overlay: StructuredRouteMapView(
           map: map,
-          camera: camera,
+          camera: rendererCamera,
           lineColors: lineColors,
           labelTextByStationId: labelTextByStationId,
           lineBadgeLabelByLineId: lineBadgeLabelByLineId,
@@ -5281,8 +5317,24 @@ class _NetworkMapCanvasState extends State<_NetworkMapCanvas>
           drawStationSymbols: false,
           sourceOrigin: sourceOrigin,
         ),
-      ],
+      ),
     );
+  }
+
+  void _acceptRouteMapFrame(int revision) {
+    final camera = _requestedRendererCamerasByRevision[revision];
+    if (!mounted || camera == null) return;
+    setState(() {
+      _presentedRendererCamera = camera;
+      _requestedRendererCamerasByRevision.removeWhere(
+        (candidateRevision, _) => candidateRevision <= revision,
+      );
+    });
+  }
+
+  void _markRouteMapBasemapUnavailable() {
+    if (!mounted || _routeMapBasemapFailed) return;
+    setState(() => _routeMapBasemapFailed = true);
   }
 
   void _ensureStructuredRouteMap() {
@@ -6443,8 +6495,8 @@ Rect _ownerLabelLineSourceRect(
 }
 
 /// basemap 오너 라벨 1건의 실제 렌더 rect를 source 좌표로 산출한다(#2068,
-/// 다줄 라벨 렌더 갱신). 라벨 자체는 .vec 바탕층이 그리므로(#2068 SVG 충실도)
-/// 이 rect는 렌더가 아니라 **geometry bounds 확장**(팬 한계·탭 히트 소스 경계)에
+/// 다줄 라벨 렌더 갱신). 라벨 자체는 canonical SVG 바탕층이 그리므로
+/// (#2068 SVG 충실도) 이 rect는 렌더가 아니라 **geometry bounds 확장**에
 /// 쓰인다 — entry.fontSizePx는 이미 source(viewBox) 단위 로컬 font-size라 design
 /// 변환·클램프 없이 그대로 쓴다(클램프가 있으면 bounds가 실제 렌더보다 좁게
 /// 잡혀 라벨이 잘릴 수 있다).
