@@ -53,6 +53,11 @@ function applyEvidence(sqlitePath, pack) {
       row.provenanceKind, epoch(row.verifiedAt), epoch(row.retrievedAt), row.evidenceHash, row.statusMeaning,
       row.operationalStatus, row.installationStatus, row.confidence,
     );
+    database.prepare(`
+      DELETE FROM data_quality_records
+      WHERE target_type = 'facility'
+        AND NOT EXISTS (SELECT 1 FROM facilities WHERE facilities.id = data_quality_records.target_id)
+    `).run();
 
     database.prepare(`DELETE FROM station_facility_evidence WHERE station_id IN (${placeholders}) AND facility_type IN (${facilityTypes.map(() => "?").join(",")})`).run(...stationIds, ...facilityTypes);
     const insertEvidence = database.prepare(`
@@ -166,6 +171,15 @@ function assertEvidence(sqlitePath, pack) {
     if (stale !== 0) throw new StaleAccessibilityEvidenceError("bundled accessibility source snapshot is stale");
     const staleFacility = database.prepare(`SELECT count(*) AS count FROM facilities WHERE station_id IN (?,?) AND source_id IN (${[...replacedSourceIds].map(() => "?").join(",")})`).get(...stationIds, ...replacedSourceIds).count;
     if (staleFacility !== 0) throw new StaleAccessibilityEvidenceError("bundled accessibility facility source is stale");
+    const danglingQuality = database.prepare(`
+      SELECT count(*) AS count
+      FROM data_quality_records
+      WHERE target_type = 'facility'
+        AND NOT EXISTS (SELECT 1 FROM facilities WHERE facilities.id = data_quality_records.target_id)
+    `).get().count;
+    if (danglingQuality !== 0) {
+      throw new StaleAccessibilityEvidenceError("bundled facility quality record is stale");
+    }
     assertAccessibilityEdges(database, pack);
   } finally {
     database.close();
@@ -184,12 +198,14 @@ export function applyEvidenceIfStale(sqlitePath, pack) {
 export function syncCanonicalFixture(canonical, reviewedPack) {
   const pack = canonical.packs?.find(({ id }) => id === "capital");
   if (!pack) throw new Error("canonical capital pack is missing");
-  pack.facilities = (pack.facilities ?? [])
-    .filter(({ stationId, type, sourceId }) => !stationIds.includes(stationId)
+  const retainedFacilities = (pack.facilities ?? []).filter(({ stationId, type, sourceId }) => !stationIds.includes(stationId)
       || (!facilityTypes.includes(type)
         && !replacedSourceIds.has(sourceId)
-        && sourceId !== "kric-station-convenience-standard"))
-    .concat(reviewedPack.facilities);
+        && sourceId !== "kric-station-convenience-standard"));
+  pack.facilities = retainedFacilities.concat(reviewedPack.facilities);
+  const facilityIds = new Set(pack.facilities.map(({ id }) => id));
+  pack.dataQualityRecords = (pack.dataQualityRecords ?? []).filter(({ targetType, targetId }) =>
+    targetType !== "facility" || facilityIds.has(targetId));
   pack.stationFacilityEvidence = (pack.stationFacilityEvidence ?? [])
     .filter(({ stationId, facilityType }) => !stationIds.includes(stationId) || !facilityTypes.includes(facilityType))
     .concat(reviewedPack.stationFacilityEvidence);

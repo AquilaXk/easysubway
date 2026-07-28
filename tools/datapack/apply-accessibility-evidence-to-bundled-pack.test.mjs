@@ -59,6 +59,15 @@ test("canonical and SQLite refresh the reviewed ENTRY/EXIT identity together", (
   const routeServiceArtifactEvidence = [{ serviceClass: "ITX_CHEONGCHUN", admissionStatus: "MISSING" }];
   const canonical = { packs: [{
     id: "capital",
+    facilities: [
+      { id: "legacy-elevator", stationId: "station-sadang", type: "ELEVATOR", sourceId: "kric-station-elevator" },
+      { id: "surviving-toilet", stationId: "station-sadang", type: "ACCESSIBLE_TOILET", sourceId: "other" },
+    ],
+    dataQualityRecords: [
+      { targetType: "facility", targetId: "legacy-elevator", qualityLevel: "FIELD_VERIFIED" },
+      { targetType: "facility", targetId: "surviving-toilet", qualityLevel: "FIELD_STALE" },
+      { targetType: "station_exit", targetId: "exit-sadang-1", qualityLevel: "FIELD_VERIFIED" },
+    ],
     networkEdges: [{ ...reviewedEdge, sourceSnapshotId: "stale" }],
     sourceInventory: [{ id: "seoul-metro-official-od-fares" }],
     officialOdFareQuotes,
@@ -76,6 +85,10 @@ test("canonical and SQLite refresh the reviewed ENTRY/EXIT identity together", (
   assert.deepEqual(synced.packs[0].officialOdFareQuotes, officialOdFareQuotes);
   assert.deepEqual(synced.packs[0].routeServiceArtifactEvidence, routeServiceArtifactEvidence);
   assert.deepEqual(synced.packs[0].sourceInventory, [{ id: "seoul-metro-official-od-fares" }]);
+  assert.deepEqual(synced.packs[0].dataQualityRecords, [
+    { targetType: "facility", targetId: "surviving-toilet", qualityLevel: "FIELD_STALE" },
+    { targetType: "station_exit", targetId: "exit-sadang-1", qualityLevel: "FIELD_VERIFIED" },
+  ]);
   assert.equal(synced.packs[0].metadata.productionCoverageEvidence, "reviewed-accessibility-sources");
 
   const database = new DatabaseSync(":memory:");
