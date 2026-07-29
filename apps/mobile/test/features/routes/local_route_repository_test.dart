@@ -896,6 +896,7 @@ void main() {
 
     expect(result.status, 'BLOCKED');
     expect(result.isBlocked, isTrue);
+    expect(result.candidateIdentity, isNull);
     expect(result.blockedReasons, ['BLOCKED_ACCESSIBILITY']);
   });
 
@@ -1140,6 +1141,13 @@ void main() {
     expect(result.candidateIdentity, isNotNull);
     expect(result.providerRouteSearchId, isEmpty);
     expect(result.providerItineraryId, isEmpty);
+    final relabeled = result.withDisplayLabels(
+      originStationName: '표시 출발역',
+      destinationStationName: '표시 도착역',
+      lineName: '표시 노선',
+      etaSource: 'PLANNED',
+    );
+    expect(relabeled.candidateIdentity?.value, result.candidateIdentity?.value);
     expect(result.score, inInclusiveRange(0, 100));
     expect(result.burdenCost, greaterThan(result.score));
     // WHEELCHAIR는 STEP_FREE 프리셋이라 총 소요시간은 스텝 표시분 합에 경로당

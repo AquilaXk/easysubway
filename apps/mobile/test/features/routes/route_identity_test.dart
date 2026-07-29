@@ -27,6 +27,18 @@ void main() {
       'rq:v1:44fc6a858ca383205a430f5726c55067f70fed47f42b654bb334a636690e48bc',
     );
     expect(RouteQueryIdentity.fromSnapshot(identity.toSnapshot()), identity);
+    final untrustedSnapshot = {
+      ...identity.toSnapshot(),
+      'rawSearchText': '상록수 검색어',
+      'latitude': '37.123',
+      'providerToken': 'secret-token',
+    };
+    final restored = RouteQueryIdentity.fromSnapshot(untrustedSnapshot);
+    expect(restored, identity);
+    final restoredCanonicalText = utf8.decode(restored.canonicalBytes);
+    expect(restoredCanonicalText, isNot(contains('상록수 검색어')));
+    expect(restoredCanonicalText, isNot(contains('37.123')));
+    expect(restoredCanonicalText, isNot(contains('secret-token')));
   });
 
   test('query identity changes for each route query input but excludes raw search data', () {
