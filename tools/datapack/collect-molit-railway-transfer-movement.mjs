@@ -120,7 +120,7 @@ export async function runMolitRailwayTransferMovementCollector(argv, fixture = {
   const { gzipBytes, rows, ...metadata } = snapshot;
   await writeFile(output, gzipBytes);
   await writeFile(metadataPath, `${JSON.stringify({ ...metadata, gzipPath: path.basename(output) }, null, 2)}\n`);
-  return metadata;
+  return { ...metadata, gzipPath: path.basename(output) };
 }
 
 function parseCsv(text) {

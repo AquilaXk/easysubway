@@ -68,12 +68,13 @@ test("MOLIT transfer movement collector CLI는 output gzip과 metadata hash 변�
     await assert.rejects(() => runMolitRailwayTransferMovementCollector([
       "--input", input, "--output", path.join(directory, "snapshot.csv.gz"), "--captured-at", "2026-07-29T00:00:00.000Z",
     ], fixture), /canonical snapshot filename/);
-    await runMolitRailwayTransferMovementCollector([
+    const generated = await runMolitRailwayTransferMovementCollector([
       "--input", input,
       "--output", output,
       "--captured-at", "2026-07-29T00:00:00.000Z",
     ], fixture);
     const metadata = JSON.parse(await readFile(`${output}.json`, "utf8"));
+    assert.deepEqual(generated, metadata);
     assert.equal(metadata.gzipPath, path.basename(output));
     await rm(input);
     await assert.rejects(() => runMolitRailwayTransferMovementCollector([

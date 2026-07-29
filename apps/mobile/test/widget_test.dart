@@ -9004,7 +9004,10 @@ void main() {
       sourceScrollState.position.maxScrollExtent,
     );
     await tester.pumpAndSettle();
-    expect(find.text('국토교통부_철도역 환승 이동경로 정보'), findsNothing);
+    expect(
+      find.text('국토교통부_철도역 환승 이동경로 정보', skipOffstage: false),
+      findsNothing,
+    );
   });
 
   testWidgets('설정 화면 보기 옵션은 변경값을 저장하고 다시 실행해도 유지한다', (tester) async {
