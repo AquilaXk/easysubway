@@ -244,7 +244,59 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
                   '' AS evidence_hash
            FROM internal_route_edges WHERE accessibility_status <> 'UNKNOWN' ORDER BY id`).all().map(routeEdgeClaim)
       : [];
-    const claims = [...evidenceClaims, ...facilityClaims, ...edgeClaims, ...internalEdgeClaims].map((claim) => {
+    const pathwayEdgeClaims = tableExists(database, "station_pathway_edges")
+      && tableExists(database, "station_pathway_nodes")
+      ? database.prepare(`
+          SELECT edge.id, node.station_id, COALESCE(node.line_id, other.line_id, '') AS line_id,
+                 edge.edge_type, edge.accessibility_status,
+                 ${provenanceColumns(database, "station_pathway_edges", "edge")}
+          FROM station_pathway_edges edge
+          JOIN station_pathway_nodes node ON node.id = edge.from_node_id
+          JOIN station_pathway_nodes other ON other.id = edge.to_node_id
+          WHERE edge.accessibility_status <> 'UNKNOWN'
+          ORDER BY edge.id
+        `).all().map((row) => ({
+          claimId: row.id,
+          stationId: row.station_id,
+          lineId: row.line_id,
+          facilityType: row.edge_type,
+          domain: "NETWORK_EDGE",
+          evidenceKind: row.accessibility_status === "NO_OFFICIAL_FEED" ? "NOT_EXISTS" : "EXISTS",
+          sourceId: row.source_id,
+          sourceSnapshotId: row.source_snapshot_id,
+          providerRecordHash: row.provider_record_hash,
+          evidenceHash: row.evidence_hash,
+        }))
+      : [];
+    const outsideTransferClaims = tableExists(database, "out_of_station_transfer_links")
+      ? database.prepare(`
+          SELECT link.id, link.from_station_id AS station_id, link.from_line_id AS line_id,
+                 link.accessibility_status,
+                 ${provenanceColumns(database, "out_of_station_transfer_links", "link")}
+          FROM out_of_station_transfer_links link
+          WHERE link.accessibility_status <> 'UNKNOWN'
+          ORDER BY link.id
+        `).all().map((row) => ({
+          claimId: row.id,
+          stationId: row.station_id,
+          lineId: row.line_id,
+          facilityType: "OUT_OF_STATION_TRANSFER",
+          domain: "NETWORK_EDGE",
+          evidenceKind: row.accessibility_status === "NO_OFFICIAL_FEED" ? "NOT_EXISTS" : "EXISTS",
+          sourceId: row.source_id,
+          sourceSnapshotId: row.source_snapshot_id,
+          providerRecordHash: row.provider_record_hash,
+          evidenceHash: row.evidence_hash,
+        }))
+      : [];
+    const claims = [
+      ...evidenceClaims,
+      ...facilityClaims,
+      ...edgeClaims,
+      ...internalEdgeClaims,
+      ...pathwayEdgeClaims,
+      ...outsideTransferClaims,
+    ].map((claim) => {
       const stationName = stationNames.get(claim.stationId);
       return stationName ? { ...claim, stationName } : claim;
     });
@@ -278,6 +330,15 @@ function tableExists(database, table) {
 function tableHasColumns(database, table, columns) {
   const available = new Set(database.prepare(`PRAGMA table_info(${table})`).all().map(({ name }) => name));
   return columns.every((column) => available.has(column));
+}
+
+function provenanceColumns(database, table, alias) {
+  return tableHasColumns(database, table, [
+    "source_id", "source_snapshot_id", "provider_record_hash", "evidence_hash",
+  ])
+    ? `${alias}.source_id, ${alias}.source_snapshot_id,
+       ${alias}.provider_record_hash, ${alias}.evidence_hash`
+    : "'' AS source_id, '' AS source_snapshot_id, '' AS provider_record_hash, '' AS evidence_hash";
 }
 
 function resolvePackPath(root, pack) {
@@ -336,6 +397,7 @@ function validateSource(source, snapshotsByIdentity, policiesByIdentity, evaluat
     "contentSha256",
     "schemaFingerprint",
     "snapshotFileSha256",
+    "absenceEvidenceMode",
   ].some((key) => snapshot[key] !== evidence[key])
     || !sha256(evidence.rawSha256)
     || !sha256(evidence.contentSha256)) {

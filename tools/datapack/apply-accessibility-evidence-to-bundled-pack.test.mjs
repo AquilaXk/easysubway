@@ -58,15 +58,37 @@ test("unproven internal route availability fails check and normalizes to unknown
   legacy.close();
 });
 
-test("core-only strips facility quality targets and check rejects leftovers", () => {
+test("core-only strips facility quality targets and dependent pathway claims", () => {
   const database = new DatabaseSync(":memory:");
   database.exec(`
+    PRAGMA foreign_keys = ON;
     CREATE TABLE facilities (id TEXT PRIMARY KEY);
     CREATE TABLE data_quality_records (id TEXT PRIMARY KEY, target_type TEXT, target_id TEXT);
+    CREATE TABLE station_pathway_edges (
+      id TEXT PRIMARY KEY,
+      requires_facility_id TEXT REFERENCES facilities(id),
+      accessibility_status TEXT,
+      source_id TEXT,
+      source_snapshot_id TEXT,
+      provider_record_hash TEXT,
+      evidence_hash TEXT
+    );
+    CREATE TABLE out_of_station_transfer_links (
+      id TEXT PRIMARY KEY,
+      accessibility_status TEXT,
+      source_id TEXT,
+      source_snapshot_id TEXT,
+      provider_record_hash TEXT,
+      evidence_hash TEXT
+    );
     INSERT INTO facilities VALUES ('legacy-facility');
     INSERT INTO data_quality_records VALUES
       ('facility-quality', 'facility', 'legacy-facility'),
       ('exit-quality', 'station_exit', 'exit-1');
+    INSERT INTO station_pathway_edges VALUES
+      ('legacy-pathway', 'legacy-facility', 'AVAILABLE', '', '', '', '');
+    INSERT INTO out_of_station_transfer_links VALUES
+      ('legacy-outside-transfer', 'LIMITED', '', '', '', '');
   `);
 
   assert.throws(() => stripLegacyCoreClaims(database, { check: true }), /legacy core accessibility claims are stale/);
@@ -75,6 +97,18 @@ test("core-only strips facility quality targets and check rejects leftovers", ()
     database.prepare("SELECT target_type AS targetType FROM data_quality_records").all()
       .map((row) => ({ ...row })),
     [{ targetType: "station_exit" }],
+  );
+  assert.deepEqual(
+    database.prepare(`
+      SELECT requires_facility_id AS requiresFacilityId, accessibility_status AS accessibilityStatus
+      FROM station_pathway_edges
+    `).all().map((row) => ({ ...row })),
+    [{ requiresFacilityId: null, accessibilityStatus: "UNKNOWN" }],
+  );
+  assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
+  assert.equal(
+    database.prepare("SELECT accessibility_status AS status FROM out_of_station_transfer_links").get().status,
+    "UNKNOWN",
   );
   assert.doesNotThrow(() => stripLegacyCoreClaims(database, { check: true }));
 

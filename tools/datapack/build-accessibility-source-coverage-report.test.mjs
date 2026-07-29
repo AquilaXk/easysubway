@@ -104,6 +104,17 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
       accessibility_status TEXT, source_id TEXT, source_snapshot_id TEXT,
       provider_record_hash TEXT, evidence_hash TEXT
     );
+    CREATE TABLE station_pathway_nodes (id TEXT, station_id TEXT, line_id TEXT);
+    CREATE TABLE station_pathway_edges (
+      id TEXT, from_node_id TEXT, to_node_id TEXT, edge_type TEXT,
+      accessibility_status TEXT, source_id TEXT, source_snapshot_id TEXT,
+      provider_record_hash TEXT, evidence_hash TEXT
+    );
+    CREATE TABLE out_of_station_transfer_links (
+      id TEXT, from_station_id TEXT, from_line_id TEXT, to_station_id TEXT, to_line_id TEXT,
+      accessibility_status TEXT, source_id TEXT, source_snapshot_id TEXT,
+      provider_record_hash TEXT, evidence_hash TEXT
+    );
   `);
   database.prepare("INSERT INTO stations VALUES (?)").run("station-a");
   database.prepare("INSERT INTO station_lines VALUES (?, ?)").run("station-a", "line-a");
@@ -133,6 +144,18 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
   database.prepare("INSERT INTO internal_route_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
     "internal-edge-unknown", "station-a", "station-a:line-a", "WALK", "UNKNOWN",
     "", "", "", "",
+  );
+  database.prepare("INSERT INTO station_pathway_nodes VALUES (?, ?, ?)").run(
+    "path-node-a", "station-a", "line-a",
+  );
+  database.prepare("INSERT INTO station_pathway_nodes VALUES (?, ?, ?)").run(
+    "path-node-b", "station-a", "line-a",
+  );
+  database.prepare("INSERT INTO station_pathway_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    "path-edge-a", "path-node-a", "path-node-b", "ELEVATOR", "AVAILABLE", "", "", "", "",
+  );
+  database.prepare("INSERT INTO out_of_station_transfer_links VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    "outside-transfer-a", "station-a", "line-a", "station-a", "line-a", "LIMITED", "", "", "", "",
   );
   database.close();
   const sqliteBytes = await readFile(sqlitePath);
@@ -222,6 +245,28 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
       stationId: "station-a",
       lineId: "line-a",
       facilityType: "WALK",
+      domain: "NETWORK_EDGE",
+      evidenceKind: "EXISTS",
+      sourceId: "",
+      sourceSnapshotId: "",
+      providerRecordHash: "",
+      evidenceHash: "",
+    }, {
+      claimId: "path-edge-a",
+      stationId: "station-a",
+      lineId: "line-a",
+      facilityType: "ELEVATOR",
+      domain: "NETWORK_EDGE",
+      evidenceKind: "EXISTS",
+      sourceId: "",
+      sourceSnapshotId: "",
+      providerRecordHash: "",
+      evidenceHash: "",
+    }, {
+      claimId: "outside-transfer-a",
+      stationId: "station-a",
+      lineId: "line-a",
+      facilityType: "OUT_OF_STATION_TRANSFER",
       domain: "NETWORK_EDGE",
       evidenceKind: "EXISTS",
       sourceId: "",
@@ -342,6 +387,12 @@ for (const { name, mutate, partition, expected } of [
   {
     name: "snapshot file digest mismatch",
     mutate: (input) => { input.snapshots[0].snapshotFileSha256 = hash("different-file"); },
+    partition: "snapshot",
+    expected: "official-accessibility:SNAPSHOT_IDENTITY_MISMATCH",
+  },
+  {
+    name: "snapshot absence evidence mode mismatch",
+    mutate: (input) => { delete input.snapshots[0].absenceEvidenceMode; },
     partition: "snapshot",
     expected: "official-accessibility:SNAPSHOT_IDENTITY_MISMATCH",
   },
@@ -473,6 +524,7 @@ function validInput() {
       contentSha256,
       schemaFingerprint,
       snapshotFileSha256,
+      absenceEvidenceMode: "EXPLICIT_ZERO",
       claimBindings: ["station-a", "station-b"].map((stationId) => ({
         stationId,
         lineId: "line-a",

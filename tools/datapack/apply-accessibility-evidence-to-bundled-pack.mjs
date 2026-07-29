@@ -314,16 +314,63 @@ export function stripLegacyCoreClaims(database, { check }) {
     FROM data_quality_records
     WHERE target_type = 'facility'
   `).get().count;
-  const stale = facilityCount !== 0 || qualityCount !== 0;
+  const pathwayColumns = new Set(
+    database.prepare("PRAGMA table_info(station_pathway_edges)").all().map(({ name }) => name),
+  );
+  const outsideTransferColumns = new Set(
+    database.prepare("PRAGMA table_info(out_of_station_transfer_links)").all().map(({ name }) => name),
+  );
+  const pathwayIncomplete = incompleteRouteProvenanceSql(pathwayColumns);
+  const outsideTransferIncomplete = incompleteRouteProvenanceSql(outsideTransferColumns);
+  const stalePathwayCount = pathwayColumns.has("requires_facility_id")
+    ? database.prepare(`
+        SELECT count(*) AS count FROM station_pathway_edges
+        WHERE requires_facility_id IS NOT NULL
+          OR (accessibility_status <> 'UNKNOWN' AND (${pathwayIncomplete}))
+      `).get().count
+    : 0;
+  const staleOutsideTransferCount = outsideTransferColumns.has("accessibility_status")
+    ? database.prepare(`
+        SELECT count(*) AS count FROM out_of_station_transfer_links
+        WHERE accessibility_status <> 'UNKNOWN' AND (${outsideTransferIncomplete})
+      `).get().count
+    : 0;
+  const stale = facilityCount !== 0
+    || qualityCount !== 0
+    || stalePathwayCount !== 0
+    || staleOutsideTransferCount !== 0;
   if (check && stale) throw new Error("legacy core accessibility claims are stale");
   if (!check && stale) {
+    const pathwayCleanup = pathwayColumns.has("requires_facility_id") ? `
+      UPDATE station_pathway_edges
+      SET accessibility_status = CASE
+            WHEN requires_facility_id IS NOT NULL OR (${pathwayIncomplete}) THEN 'UNKNOWN'
+            ELSE accessibility_status
+          END,
+          requires_facility_id = NULL;
+    ` : "";
+    const outsideTransferCleanup = outsideTransferColumns.has("accessibility_status") ? `
+      UPDATE out_of_station_transfer_links
+      SET accessibility_status = 'UNKNOWN'
+      WHERE accessibility_status <> 'UNKNOWN' AND (${outsideTransferIncomplete});
+    ` : "";
     database.exec(`
+      ${pathwayCleanup}
+      ${outsideTransferCleanup}
       DELETE FROM data_quality_records WHERE target_type = 'facility';
       DELETE FROM facilities;
       VACUUM;
     `);
   }
   return stale;
+}
+
+function incompleteRouteProvenanceSql(columns) {
+  if (!["source_id", "source_snapshot_id", "provider_record_hash", "evidence_hash"]
+    .every((name) => columns.has(name))) return "1";
+  return `source_id = '' OR source_snapshot_id = ''
+    OR length(provider_record_hash) <> 64 OR provider_record_hash GLOB '*[^0-9a-f]*'
+    OR length(evidence_hash) <> 64 OR evidence_hash GLOB '*[^0-9a-f]*'`;
 }
 
 export function normalizeUnprovenInternalRouteEdges(database, { check }) {
