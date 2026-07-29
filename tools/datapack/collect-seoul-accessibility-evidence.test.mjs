@@ -23,6 +23,22 @@ test("collector rejects non-HTTPS endpoints", async () => {
   );
 });
 
+test("collector rejects unknown sources before fetching", async () => {
+  let fetched = false;
+  await assert.rejects(
+    collectSeoulAccessibility({
+      endpoint: "https://apis.data.go.kr/example",
+      serviceKey: "secret",
+      source: "other",
+      fetchImpl: async () => {
+        fetched = true;
+      },
+    }),
+    /Seoul accessibility API response invalid: source/,
+  );
+  assert.equal(fetched, false);
+});
+
 test("collector redacts request details from network failures", async () => {
   await assert.rejects(
     collectSeoulAccessibility({
@@ -497,6 +513,16 @@ test("snapshot content identity is stable when provider facility order changes",
 
   assert.deepEqual(first.stations, reversed.stations);
   assert.equal(first.contentSha256, reversed.contentSha256);
+});
+
+test("accessibility snapshot ignores facility-only provider codes in station identity", () => {
+  const snapshot = buildAccessibilitySnapshot([
+    { stationName: "사당", lineName: "4호선", providerStationCode: "A", operational: true, situationCode: "M", situation: "사용가능", pathDescription: "1번" },
+    { stationName: "사당", lineName: "4호선", providerStationCode: "B", operational: true, situationCode: "M", situation: "사용가능", pathDescription: "2번" },
+  ], "2026-07-29T00:00:00.000Z", { rawRowCount: 2, rawSha256: "a".repeat(64) });
+
+  assert.equal(snapshot.stations.length, 1);
+  assert.equal(snapshot.stations[0].facilities.length, 2);
 });
 
 test("snapshot rejects facilities without a verified or provider-missing status tuple", () => {

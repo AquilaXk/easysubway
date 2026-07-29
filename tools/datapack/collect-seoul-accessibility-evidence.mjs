@@ -145,8 +145,11 @@ export function buildAccessibilitySnapshot(
     previousSnapshotId = previousSnapshot.snapshotId;
   }
   const stationsByIdentity = new Map();
+  const stationIdentity = (station) => `${station.lineName}\0${station.stationName}${
+    source === "facility-location" ? `\0${station.providerStationCode}` : ""
+  }`;
   for (const row of rows) {
-    const key = `${row.lineName}\0${row.stationName}\0${row.providerStationCode ?? ""}`;
+    const key = stationIdentity(row);
     const station = stationsByIdentity.get(key) ?? {
       stationName: row.stationName,
       lineName: row.lineName,
@@ -162,10 +165,7 @@ export function buildAccessibilitySnapshot(
     stationsByIdentity.set(key, station);
   }
   const stations = [...stationsByIdentity.values()].sort((left, right) => (
-    compare(
-      `${left.lineName}\0${left.stationName}\0${left.providerStationCode ?? ""}`,
-      `${right.lineName}\0${right.stationName}\0${right.providerStationCode ?? ""}`,
-    )
+    compare(stationIdentity(left), stationIdentity(right))
   ));
   for (const station of stations) {
     station.facilities.sort((left, right) => compare(JSON.stringify(left), JSON.stringify(right)));
@@ -199,6 +199,7 @@ export async function collectSeoulAccessibility({
   fetchImpl = fetch,
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 }) {
+  if (!SOURCES[source]) throw new Error(`${INVALID_RESPONSE}: source`);
   const endpointUrl = new URL(endpoint);
   if (endpointUrl.protocol !== "https:") {
     throw new Error("HTTPS endpoint is required");
