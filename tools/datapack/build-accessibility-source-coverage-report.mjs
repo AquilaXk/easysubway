@@ -120,6 +120,9 @@ export function buildAccessibilitySourceCoverageReport({
     }))
     .sort((left, right) => compareStrings(left.artifactId, right.artifactId));
 
+  if (Boolean(molitTransferSnapshot) !== Boolean(providerCodeCatalog)) {
+    throw new TypeError("station domain gate inputs must be provided together");
+  }
   const stationDomainSourceGate = molitTransferSnapshot && providerCodeCatalog
     ? buildStationDomainSourceGate({
         artifacts,
@@ -166,10 +169,18 @@ export function buildStationDomainSourceGate({
     + transferTuplePartition.summary.unmatchedRowCount
     + transferTuplePartition.summary.ambiguousRowCount === molitTransferSnapshot.rowCount;
   if (!partitionIsComplete) throw new Error("MOLIT transfer tuple row partition mismatch");
-  transferTuplePartition.identity = Object.fromEntries([
+  const identity = Object.fromEntries([
     "sourceId", "snapshotId", "rawSha256", "gzipSha256", "metadataFileSha256",
     "sourceInventoryFileSha256", "sourceInventorySha256", "candidateBuildSpecSourceInventorySha256", "rowCount",
   ].map((key) => [key, molitTransferSnapshot[key]]));
+  if (typeof identity.sourceId !== "string" || identity.sourceId === ""
+    || typeof identity.snapshotId !== "string" || identity.snapshotId === ""
+    || !Number.isInteger(identity.rowCount) || identity.rowCount < 0
+    || ["rawSha256", "gzipSha256", "metadataFileSha256", "sourceInventoryFileSha256",
+      "sourceInventorySha256", "candidateBuildSpecSourceInventorySha256"].some((key) => !sha256(identity[key]))) {
+    throw new Error("MOLIT transfer snapshot identity is invalid");
+  }
+  transferTuplePartition.identity = identity;
   const decision = matrix.every(({ status }) => status === "ADMITTED")
     && transferTuplePartition.unmatched.length === 0
     && transferTuplePartition.ambiguous.length === 0 ? "GO" : "NO_GO";
@@ -201,17 +212,27 @@ function collectEvaluatedStationDomains(artifacts, validClaims) {
 
 function buildStationDomainMatrix(artifacts, stationLines, evaluated) {
   const operators = new Map();
+  const stationLineCountsByOperator = new Map();
+  const artifactStationLineCounts = new Map();
   for (const { operatorId, operatorName } of stationLines) {
     if (operators.has(operatorId) && operators.get(operatorId) !== operatorName) {
       throw new Error(`operator identity mismatch: ${operatorId}`);
     }
     operators.set(operatorId, operatorName);
+    stationLineCountsByOperator.set(operatorId, (stationLineCountsByOperator.get(operatorId) ?? 0) + 1);
+  }
+  for (const artifact of artifacts) {
+    for (const { operatorId } of artifact.stationLines ?? []) {
+      const key = `${artifact.artifactId}\0${operatorId}`;
+      artifactStationLineCounts.set(key, (artifactStationLineCounts.get(key) ?? 0) + 1);
+    }
   }
   return [...operators].flatMap(([operatorId, operatorName]) =>
     ["FACILITY", "EXIT", "TRANSFER"].map((domain) => buildStationDomainCell({
       artifacts,
-      stationLines,
       evaluated,
+      stationLineCountsByOperator,
+      artifactStationLineCounts,
       operatorId,
       operatorName,
       domain,
@@ -219,15 +240,17 @@ function buildStationDomainMatrix(artifacts, stationLines, evaluated) {
     .sort((left, right) => compareStrings(`${left.operatorId}\0${left.domain}`, `${right.operatorId}\0${right.domain}`));
 }
 
-function buildStationDomainCell({ artifacts, stationLines, evaluated, operatorId, operatorName, domain }) {
-  const scopedLines = stationLines.filter((row) => row.operatorId === operatorId);
+function buildStationDomainCell({
+  artifacts, evaluated, stationLineCountsByOperator, artifactStationLineCounts,
+  operatorId, operatorName, domain,
+}) {
+  const stationLineCount = stationLineCountsByOperator.get(operatorId) ?? 0;
   const evaluatedKeys = new Set();
   const sourceIds = new Set();
   const artifactScopes = [];
   for (const artifact of artifacts) {
     const entry = evaluated.get(`${artifact.artifactId}\0${operatorId}\0${domain}`);
-    const artifactStationLineCount = (artifact.stationLines ?? [])
-      .filter((row) => row.operatorId === operatorId).length;
+    const artifactStationLineCount = artifactStationLineCounts.get(`${artifact.artifactId}\0${operatorId}`) ?? 0;
     if (artifactStationLineCount === 0) continue;
     for (const stationLine of entry?.stationLines ?? []) {
       evaluatedKeys.add(`${artifact.artifactId}\0${stationLine}`);
@@ -241,7 +264,7 @@ function buildStationDomainCell({ artifacts, stationLines, evaluated, operatorId
     });
   }
   artifactScopes.sort((left, right) => compareStrings(left.artifactId, right.artifactId));
-  const missingStationLineCount = scopedLines.length - evaluatedKeys.size;
+  const missingStationLineCount = stationLineCount - evaluatedKeys.size;
   const blockingReasons = [];
   if (sourceIds.size === 0) blockingReasons.push("NO_ADMITTED_SOURCE");
   if (missingStationLineCount > 0) blockingReasons.push("STATION_LINE_COVERAGE_INCOMPLETE");
@@ -249,7 +272,7 @@ function buildStationDomainCell({ artifacts, stationLines, evaluated, operatorId
     operatorId,
     operatorName,
     domain,
-    stationLineCount: scopedLines.length,
+    stationLineCount,
     evaluatedStationLineCount: evaluatedKeys.size,
     missingStationLineCount,
     artifacts: artifactScopes,
@@ -478,7 +501,7 @@ export async function loadAccessibilityAdmissionSnapshots({ sources, referencedS
 }
 
 export async function loadMolitTransferSnapshot({
-  metadataPath, inventory, inventoryBytes, candidateBuildSpec, repositoryRoot,
+  metadataPath, inventory, inventoryBytes, candidateBuildSpec, repositoryRoot, evaluatedAt,
 }) {
   const source = inventory?.sources?.find(({ id }) => id === MOLIT_RAILWAY_TRANSFER_MOVEMENT_SOURCE_ID);
   const admission = source?.rawSnapshotAdmission;
@@ -506,6 +529,12 @@ export async function loadMolitTransferSnapshot({
     || candidateBuildSpec?.sourceInventorySha256 !== sourceInventorySha256) {
     throw new Error("MOLIT transfer snapshot binding mismatch");
   }
+  const evaluatedMillis = Date.parse(evaluatedAt);
+  const freshUntilMillis = Date.parse(metadata.freshUntil);
+  if (!Number.isFinite(evaluatedMillis) || !Number.isFinite(freshUntilMillis)) {
+    throw new TypeError("MOLIT transfer snapshot freshness is invalid");
+  }
+  if (freshUntilMillis <= evaluatedMillis) throw new Error("MOLIT transfer snapshot is stale");
   const rebuilt = buildMolitRailwayTransferMovementSnapshot({
     bytes: gunzipSync(gzipBytes),
     capturedAt: metadata.capturedAt,
@@ -517,7 +546,7 @@ export async function loadMolitTransferSnapshot({
   delete rebuiltMetadata.gzipSha256;
   const logicalMetadata = { ...metadata };
   delete logicalMetadata.gzipSha256;
-  if (JSON.stringify({ ...rebuiltMetadata, gzipPath: metadata.gzipPath }) !== JSON.stringify(logicalMetadata)) {
+  if (canonicalJson({ ...rebuiltMetadata, gzipPath: metadata.gzipPath }) !== canonicalJson(logicalMetadata)) {
     throw new Error("MOLIT transfer logical metadata mismatch");
   }
   return {
@@ -550,6 +579,10 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
         }, new Map())
       : new Map();
     const stationLines = ["operators", "lines", "station_lines", "stations"].every((table) => tableExists(database, table))
+      && tableHasColumns(database, "operators", ["id", "name_ko"])
+      && tableHasColumns(database, "lines", ["id", "operator_id", "name_ko"])
+      && tableHasColumns(database, "station_lines", ["station_id", "line_id"])
+      && tableHasColumns(database, "stations", ["id", "name_ko"])
       ? database.prepare(`
           SELECT station_lines.station_id AS station_id, stations.name_ko AS station_name,
                  station_lines.line_id AS line_id, lines.name_ko AS line_name,
@@ -955,6 +988,12 @@ function compareStrings(left, right) {
   return left < right ? -1 : left > right ? 1 : 0;
 }
 
+function canonicalJson(value) {
+  return JSON.stringify(value, (_key, inner) => inner && typeof inner === "object" && !Array.isArray(inner)
+    ? Object.fromEntries(Object.entries(inner).sort(([left], [right]) => compareStrings(left, right)))
+    : inner);
+}
+
 async function main(argv) {
   const args = parseArgs(argv);
   for (const name of ["manifest", "bundled-index", "inventory", "source-snapshots", "evaluation-at", "output"]) {
@@ -1004,6 +1043,7 @@ async function main(argv) {
         inventoryBytes,
         candidateBuildSpec: await readJson(args["candidate-build-spec"]),
         repositoryRoot: path.resolve(path.dirname(args.inventory), "../.."),
+        evaluatedAt: args["evaluation-at"],
       }),
     ]);
     validateKricProviderCodeCatalogIdentity(providerCodeCatalog);

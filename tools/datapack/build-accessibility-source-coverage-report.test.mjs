@@ -66,6 +66,9 @@ test("station domain source matrix는 실제 station-line 분모의 미평가 ce
     rawSha256: hash("transfer-raw"),
     gzipSha256: hash("transfer-gzip"),
     metadataFileSha256: hash("transfer-metadata"),
+    sourceInventoryFileSha256: hash("inventory-file"),
+    sourceInventorySha256: hash("inventory-canonical"),
+    candidateBuildSpecSourceInventorySha256: hash("inventory-canonical"),
     rowCount: 1,
     rows: [{
       RAIL_OPR_ISTT_CD: "S1(서울교통공사)",
@@ -135,6 +138,27 @@ test("station domain source matrix는 실제 station-line 분모의 미평가 ce
   assert.equal(report.stationDomainSourceGate.transferTuplePartition.joined.length, 1);
   assert.equal(report.stationDomainSourceGate.transferTuplePartition.unmatched.length, 0);
   assert.equal(report.stationDomainSourceGate.transferTuplePartition.ambiguous.length, 0);
+  assert.deepEqual(report.stationDomainSourceGate.transferTuplePartition.identity, {
+    sourceId: "molit-railway-transfer-movement",
+    snapshotId: "molit-railway-transfer-movement-20250811",
+    rawSha256: hash("transfer-raw"),
+    gzipSha256: hash("transfer-gzip"),
+    metadataFileSha256: hash("transfer-metadata"),
+    sourceInventoryFileSha256: hash("inventory-file"),
+    sourceInventorySha256: hash("inventory-canonical"),
+    candidateBuildSpecSourceInventorySha256: hash("inventory-canonical"),
+    rowCount: 1,
+  });
+
+  input.molitTransferSnapshot.rawSha256 = "invalid";
+  assert.throws(() => buildAccessibilitySourceCoverageReport(input), /identity is invalid/);
+});
+
+test("station domain gate 입력은 둘 중 하나만 있으면 fail-closed다", () => {
+  const input = validInput();
+  input.molitTransferSnapshot = {};
+
+  assert.throws(() => buildAccessibilitySourceCoverageReport(input), /inputs must be provided together/);
 });
 
 test("MOLIT transfer tuple partition은 unmatched와 ambiguous를 추정 없이 보존한다", () => {
@@ -178,6 +202,45 @@ test("MOLIT transfer tuple partition은 unmatched와 ambiguous를 추정 없이 
   assert.equal(partition.ambiguous[0].reason, "CANONICAL_STATION_AMBIGUOUS");
 });
 
+for (const { name, artifacts, providerLines, expectedKind, expectedReason } of [
+  {
+    name: "provider line 미등록",
+    artifacts: [],
+    providerLines: [],
+    expectedKind: "unmatched",
+    expectedReason: "PROVIDER_LINE_SCOPE_UNMAPPED",
+  },
+  {
+    name: "provider line 중복",
+    artifacts: [],
+    providerLines: [
+      { railOprIsttCd: "S1", lineName: "4호선" },
+      { railOprIsttCd: "S1", lineName: "4호선" },
+    ],
+    expectedKind: "ambiguous",
+    expectedReason: "PROVIDER_LINE_SCOPE_AMBIGUOUS",
+  },
+  {
+    name: "canonical line 미등록",
+    artifacts: [],
+    providerLines: [{ railOprIsttCd: "S1", lineName: "4호선" }],
+    expectedKind: "unmatched",
+    expectedReason: "CANONICAL_LINE_SCOPE_UNMATCHED",
+  },
+]) {
+  test(`MOLIT transfer tuple partition은 ${name} 사유를 보존한다`, () => {
+    const partition = partitionMolitTransferTuples({
+      artifacts,
+      rows: [{ RAIL_OPR_ISTT_CD: "S1(서울교통공사)", LN_NM: "4호선", STIN_NM: "사당" }],
+      providerCodeCatalog: { providerLines },
+    });
+
+    assert.equal(partition[expectedKind][0].reason, expectedReason);
+    assert.equal(partition.summary[`${expectedKind}TupleCount`], 1);
+    assert.equal(partition.summary[`${expectedKind}RowCount`], 1);
+  });
+}
+
 test("MOLIT transfer tuple partition snapshot binding은 inventory와 build spec hash를 강제한다", async () => {
   const repositoryRoot = path.resolve(import.meta.dirname, "../..");
   const inventoryPath = path.join(import.meta.dirname, "source-inventory.json");
@@ -197,6 +260,7 @@ test("MOLIT transfer tuple partition snapshot binding은 inventory와 build spec
     inventoryBytes,
     candidateBuildSpec,
     repositoryRoot,
+    evaluatedAt: EVALUATED_AT,
   });
 
   assert.equal(snapshot.rowCount, 8054);
@@ -213,7 +277,16 @@ test("MOLIT transfer tuple partition snapshot binding은 inventory와 build spec
     inventoryBytes,
     candidateBuildSpec,
     repositoryRoot,
+    evaluatedAt: EVALUATED_AT,
   }), /snapshot binding mismatch/);
+  await assert.rejects(loadMolitTransferSnapshot({
+    metadataPath,
+    inventory,
+    inventoryBytes,
+    candidateBuildSpec,
+    repositoryRoot,
+    evaluatedAt: "2026-08-11T00:00:00.000Z",
+  }), /snapshot is stale/);
 });
 
 test("inventory에 없는 source는 provider-domain matrix에서도 BLOCKED다", () => {
@@ -279,6 +352,8 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
   const database = new DatabaseSync(sqlitePath);
   database.exec(`
     CREATE TABLE stations (id TEXT PRIMARY KEY);
+    CREATE TABLE operators (id TEXT PRIMARY KEY);
+    CREATE TABLE lines (id TEXT PRIMARY KEY);
     CREATE TABLE station_lines (station_id TEXT, line_id TEXT);
     CREATE TABLE station_facility_evidence (
       station_id TEXT, line_id TEXT, facility_type TEXT, evidence_kind TEXT,
