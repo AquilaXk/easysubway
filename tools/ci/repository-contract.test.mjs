@@ -19655,6 +19655,7 @@ test("KRIC nationwide accessibility snapshot workflow는 default branch와 sanit
   assert.match(workflow, /collect-kric-nationwide-route-rosters\.mjs/);
   assert.match(workflow, /collect-kric-accessibility-snapshots\.mjs/);
   assert.match(workflow, /--targets tools\/datapack\/nationwide-coverage-targets\.json/);
+  assert.match(workflow, /--request-interval-ms 250/);
   assert.match(workflow, /uses: actions\/upload-artifact@[0-9a-f]{40}/);
   assert.match(workflow, /kric-station-convenience-standard-\*\.json/);
   assert.doesNotMatch(workflow, /\.env|github\.event\.inputs|\braw\b|response/i);
