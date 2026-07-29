@@ -8,6 +8,7 @@ import '../../../core/database/user/user_database.dart' as user_db;
 import '../../../favorite_facility.dart';
 import '../../../route_search.dart';
 import '../../../station_search.dart';
+import '../../routes/domain/route_identity.dart';
 
 const _localUserId = 'local-user';
 const _routeSnapshotPrefix = 'favorite_route_snapshot:';
@@ -507,22 +508,68 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         .get();
 
     final favorites = <FavoriteRoute>[];
+    final listedRouteIds = <String>{};
     for (final row in rows) {
-      final routeId = row.read<String>('route_id');
-      final snapshot = await _readRouteSnapshot(routeId);
-      if (snapshot != null) {
-        favorites.add(
-          _favoriteRouteFromSnapshot(
-            routeId: routeId,
+      var routeId = row.read<String>('route_id');
+      var snapshot = await _readRouteSnapshot(routeId);
+      var addedAt = _isoFromEpoch(row.read<int?>('added_at_value'));
+      var originStationId = row.read<String>('origin_station_id');
+      var destinationStationId = row.read<String>('destination_station_id');
+      var mobilityType = row.read<String>('mobility_profile');
+      var needsResearch = false;
+      if (routeId.startsWith('local-') && snapshot != null) {
+        final candidate = _legacyCandidate(snapshot);
+        if (candidate != null &&
+            candidate.query.originStationId == originStationId &&
+            candidate.query.destinationStationId == destinationStationId &&
+            candidate.query.mobilityType == mobilityType) {
+          final migrated = await _migrateLegacyRoute(
+            legacyRouteId: routeId,
+            row: row,
             snapshot: snapshot,
-            addedAt: _isoFromEpoch(row.read<int?>('added_at_value')),
-          ),
-        );
-        continue;
+            candidate: candidate,
+          );
+          if (migrated == null) continue;
+          routeId = migrated.routeId;
+          snapshot = migrated.snapshot;
+          addedAt = migrated.addedAt;
+          originStationId = migrated.originStationId;
+          destinationStationId = migrated.destinationStationId;
+          mobilityType = migrated.mobilityType;
+          needsResearch = migrated.needsResearch;
+        } else {
+          needsResearch = true;
+        }
       }
-
-      throw const FavoriteRouteException('즐겨찾기 경로를 불러오지 못했어요.');
+      if (!listedRouteIds.add(routeId)) continue;
+      try {
+        if (!needsResearch && snapshot != null) {
+          favorites.add(
+            _favoriteRouteFromSnapshot(
+              routeId: routeId,
+              snapshot: snapshot,
+              addedAt: addedAt,
+            ),
+          );
+          continue;
+        }
+      } on FormatException {
+        // A malformed old snapshot remains in place and is rendered below.
+      } on FavoriteRouteException {
+        // A partial old snapshot remains in place and is rendered below.
+      }
+      favorites.add(
+        await _researchRequiredFavorite(
+          routeId: routeId,
+          originStationId: originStationId,
+          destinationStationId: destinationStationId,
+          mobilityType: mobilityType,
+          addedAt: addedAt,
+          snapshot: snapshot,
+        ),
+      );
     }
+    favorites.sort((left, right) => right.addedAt.compareTo(left.addedAt));
     return favorites;
   }
 
@@ -588,8 +635,277 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     if (row == null) {
       return null;
     }
-    final decoded = jsonDecode(row.read<String>('value'));
-    return decoded is Map<String, Object?> ? decoded : null;
+    try {
+      final decoded = jsonDecode(row.read<String>('value'));
+      return decoded is Map<String, Object?> ? decoded : null;
+    } on FormatException {
+      return null;
+    }
+  }
+
+  RouteCandidateIdentity? _legacyCandidate(Map<String, Object?> snapshot) {
+    try {
+      final querySnapshot = snapshot['querySnapshot'];
+      final hasQuerySnapshot = snapshot.containsKey('querySnapshot');
+      final hasWaypointEvidence =
+          _snapshotOptionalString(snapshot, 'waypointStationId') != null ||
+          _hasWaypointStep(snapshot['steps']);
+      final mobilityType = _snapshotString(snapshot, 'mobilityType');
+      final query = querySnapshot is Map<String, Object?>
+          ? RouteQueryIdentity.fromSnapshot(querySnapshot)
+          : hasQuerySnapshot
+          ? throw const FormatException()
+          : hasWaypointEvidence
+          ? throw const FormatException()
+          : RouteQueryIdentity(
+              originStationId: _snapshotString(snapshot, 'originStationId'),
+              destinationStationId: _snapshotString(
+                snapshot,
+                'destinationStationId',
+              ),
+              mobilityType: mobilityType,
+              constraintMode:
+                  _snapshotOptionalString(snapshot, 'constraintMode') ??
+                  _legacyConstraintMode(mobilityType),
+              mobilityPreset:
+                  _snapshotOptionalString(snapshot, 'mobilityPreset') ??
+                  _legacyMobilityPreset(mobilityType),
+              transportScope:
+                  _snapshotOptionalString(snapshot, 'transportScope') ??
+                  'SUBWAY',
+              objective: _snapshotString(snapshot, 'objective'),
+            );
+      if (_snapshotString(snapshot, 'originStationId') !=
+              query.originStationId ||
+          _snapshotString(snapshot, 'destinationStationId') !=
+              query.destinationStationId ||
+          _snapshotString(snapshot, 'mobilityType') != query.mobilityType) {
+        throw const FormatException();
+      }
+      _snapshotString(snapshot, 'originStationName');
+      _snapshotString(snapshot, 'destinationStationName');
+      _snapshotString(snapshot, 'status');
+      _snapshotString(snapshot, 'createdAt');
+      if (snapshot['score'] is! int) throw const FormatException();
+      final steps = snapshot['steps'];
+      if (steps is! List<Object?> || steps.isEmpty) {
+        throw const FormatException();
+      }
+      return RouteCandidateIdentity(
+        query: query,
+        legs: [for (final step in steps) _legacyLeg(step)],
+      );
+    } on ArgumentError {
+      return null;
+    } on FormatException {
+      return null;
+    } on TypeError {
+      return null;
+    }
+  }
+
+  Future<
+    ({
+      String routeId,
+      Map<String, Object?>? snapshot,
+      String addedAt,
+      String originStationId,
+      String destinationStationId,
+      String mobilityType,
+      bool needsResearch,
+    })?
+  >
+  _migrateLegacyRoute({
+    required String legacyRouteId,
+    required QueryRow row,
+    required Map<String, Object?> snapshot,
+    required RouteCandidateIdentity candidate,
+  }) async {
+    final targetRouteId = candidate.value;
+    final migratedSnapshot = <String, Object?>{
+      ...snapshot,
+      'querySnapshot': candidate.query.toSnapshot(),
+      'queryIdentity': candidate.query.value,
+      'candidateIdentity': targetRouteId,
+    };
+    var resolvedAddedAt = _isoFromEpoch(row.read<int?>('added_at_value'));
+    var resolvedOriginStationId = row.read<String>('origin_station_id');
+    var resolvedDestinationStationId = row.read<String>(
+      'destination_station_id',
+    );
+    var resolvedMobilityType = row.read<String>('mobility_profile');
+    var targetAlreadyExisted = false;
+    var blockedByOrphanSnapshot = false;
+    final sourceStillExists = await userDatabase.transaction(() async {
+      final source = await userDatabase
+          .customSelect(
+            'SELECT route_id FROM favorite_routes WHERE route_id = ?',
+            variables: [Variable.withString(legacyRouteId)],
+          )
+          .getSingleOrNull();
+      if (source == null) return false;
+      final target = await userDatabase
+          .customSelect(
+            'SELECT route_id, origin_station_id, destination_station_id, mobility_profile, CAST(added_at AS INTEGER) AS added_at_value FROM favorite_routes WHERE route_id = ?',
+            variables: [Variable.withString(targetRouteId)],
+          )
+          .getSingleOrNull();
+      if (target == null) {
+        final orphanSnapshot = await userDatabase
+            .customSelect(
+              'SELECT key FROM app_preferences WHERE key = ?',
+              variables: [
+                Variable.withString('$_routeSnapshotPrefix$targetRouteId'),
+              ],
+            )
+            .getSingleOrNull();
+        if (orphanSnapshot != null) {
+          blockedByOrphanSnapshot = true;
+          return true;
+        }
+        await userDatabase
+            .into(userDatabase.favoriteRoutes)
+            .insert(
+              user_db.FavoriteRoutesCompanion.insert(
+                routeId: targetRouteId,
+                originStationId: row.read<String>('origin_station_id'),
+                destinationStationId: row.read<String>(
+                  'destination_station_id',
+                ),
+                mobilityProfile: row.read<String>('mobility_profile'),
+                addedAt: _dateTimeFromEpoch(
+                  row.read<int?>('added_at_value') ?? 0,
+                ),
+              ),
+            );
+        await userDatabase
+            .into(userDatabase.appPreferences)
+            .insert(
+              user_db.AppPreferencesCompanion.insert(
+                key: '$_routeSnapshotPrefix$targetRouteId',
+                value: jsonEncode(migratedSnapshot),
+                updatedAt: DateTime.now().toUtc(),
+              ),
+            );
+      } else {
+        targetAlreadyExisted = true;
+        resolvedAddedAt = _isoFromEpoch(target.read<int?>('added_at_value'));
+        resolvedOriginStationId = target.read<String>('origin_station_id');
+        resolvedDestinationStationId = target.read<String>(
+          'destination_station_id',
+        );
+        resolvedMobilityType = target.read<String>('mobility_profile');
+      }
+      await userDatabase.customStatement(
+        'DELETE FROM favorite_routes WHERE route_id = ?',
+        [legacyRouteId],
+      );
+      await userDatabase.customStatement(
+        'DELETE FROM app_preferences WHERE key = ?',
+        ['$_routeSnapshotPrefix$legacyRouteId'],
+      );
+      return true;
+    });
+    if (!sourceStillExists) return null;
+    if (blockedByOrphanSnapshot) {
+      return (
+        routeId: legacyRouteId,
+        snapshot: snapshot,
+        addedAt: resolvedAddedAt,
+        originStationId: resolvedOriginStationId,
+        destinationStationId: resolvedDestinationStationId,
+        mobilityType: resolvedMobilityType,
+        needsResearch: true,
+      );
+    }
+    if (targetRouteId == legacyRouteId) {
+      return (
+        routeId: legacyRouteId,
+        snapshot: snapshot,
+        addedAt: resolvedAddedAt,
+        originStationId: resolvedOriginStationId,
+        destinationStationId: resolvedDestinationStationId,
+        mobilityType: resolvedMobilityType,
+        needsResearch: false,
+      );
+    }
+    final targetSnapshot = await _readRouteSnapshot(targetRouteId);
+    return (
+      routeId: targetRouteId,
+      snapshot: targetAlreadyExisted
+          ? targetSnapshot
+          : targetSnapshot ?? migratedSnapshot,
+      addedAt: resolvedAddedAt,
+      originStationId: resolvedOriginStationId,
+      destinationStationId: resolvedDestinationStationId,
+      mobilityType: resolvedMobilityType,
+      needsResearch: false,
+    );
+  }
+
+  Future<FavoriteRoute> _researchRequiredFavorite({
+    required String routeId,
+    required String originStationId,
+    required String destinationStationId,
+    required String mobilityType,
+    required String addedAt,
+    required Map<String, Object?>? snapshot,
+  }) async {
+    return FavoriteRoute(
+      userId: _localUserId,
+      favoriteRouteId: routeId,
+      routeSearchId: routeId,
+      originStationId: originStationId,
+      originStationName: await _fallbackStationName(
+        snapshot,
+        'originStationName',
+        'originStationId',
+        originStationId,
+      ),
+      destinationStationId: destinationStationId,
+      destinationStationName: await _fallbackStationName(
+        snapshot,
+        'destinationStationName',
+        'destinationStationId',
+        destinationStationId,
+      ),
+      mobilityType: mobilityType,
+      status: 'RESEARCH_REQUIRED',
+      lineId: '',
+      lineName: '',
+      score: 0,
+      routeCreatedAt: addedAt,
+      addedAt: addedAt,
+      transportScope: _routeTransportScopeFromSnapshot(
+        snapshot?['transportScope'],
+      ),
+      needsResearch: true,
+    );
+  }
+
+  Future<String> _fallbackStationName(
+    Map<String, Object?>? snapshot,
+    String nameKey,
+    String idKey,
+    String stationId,
+  ) async {
+    final snapshotName = snapshot?[nameKey];
+    final snapshotStationId = snapshot?[idKey];
+    if ((snapshotStationId == null ||
+            snapshotStationId is String &&
+                snapshotStationId.trim() == stationId) &&
+        snapshotName is String &&
+        snapshotName.trim().isNotEmpty) {
+      return snapshotName.trim();
+    }
+    final row = await catalogDatabase
+        .customSelect(
+          'SELECT name_ko FROM stations WHERE id = ?',
+          variables: [Variable.withString(stationId)],
+        )
+        .getSingleOrNull();
+    final catalogName = row?.read<String?>('name_ko')?.trim() ?? '';
+    return catalogName.isEmpty ? stationId : catalogName;
   }
 
   Future<void> _writeRouteSnapshot(
@@ -746,6 +1062,10 @@ String _favoriteRouteStorageId({
   required String routeSearchId,
   required RouteSearchResult result,
 }) {
+  final candidateIdentity = result.candidateIdentity;
+  if (candidateIdentity != null) {
+    return candidateIdentity.value;
+  }
   final baseId = routeSearchId.trim().isNotEmpty
       ? routeSearchId.trim()
       : result.routeSearchId.trim();
@@ -762,6 +1082,14 @@ String _favoriteRouteStorageId({
 Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
   return {
     'routeSearchId': result.routeSearchId,
+    'providerRouteSearchId': result.providerRouteSearchId,
+    'providerItineraryId': result.providerItineraryId,
+    if (result.queryIdentity != null)
+      'querySnapshot': result.queryIdentity!.toSnapshot(),
+    if (result.queryIdentity != null)
+      'queryIdentity': result.queryIdentity!.value,
+    if (result.candidateIdentity != null)
+      'candidateIdentity': result.candidateIdentity!.value,
     'originStationId': result.originStationId,
     'originStationName': result.originStationName,
     'destinationStationId': result.destinationStationId,
@@ -817,12 +1145,104 @@ Map<String, Object?> _routeStepToJson(RouteSearchStep step) {
     'timeSource': step.timeSource,
     'distanceSource': step.distanceSource,
     'confidenceLabel': step.confidenceLabel,
+    'serviceClass': step.serviceClass,
+    'servicePattern': step.servicePattern,
   };
 }
 
 Map<String, Object?> _routeWarningToJson(RouteSearchWarning warning) {
   return {'code': warning.code};
 }
+
+RouteCandidateLegSignature _legacyLeg(Object? value) {
+  if (value is! Map<String, Object?>) throw const FormatException();
+  final stepType = _snapshotString(value, 'stepType');
+  final normalizedStepType = stepType.toLowerCase();
+  if (!_legacyStepTypes.contains(normalizedStepType)) {
+    throw const FormatException();
+  }
+  final serviceClass = _snapshotOptionalString(value, 'serviceClass');
+  final servicePattern = _snapshotOptionalString(value, 'servicePattern');
+  final isRide = normalizedStepType == 'ride' || normalizedStepType == 'train';
+  if (isRide &&
+      (!_legacyServiceClasses.contains(serviceClass) ||
+          !_legacyServicePatterns.contains(servicePattern))) {
+    throw const FormatException();
+  }
+  if (!isRide && (serviceClass != null || servicePattern != null)) {
+    throw const FormatException();
+  }
+  return RouteCandidateLegSignature(
+    stepType: stepType,
+    fromStationId: _snapshotString(value, 'fromStationId'),
+    toStationId: _snapshotString(value, 'toStationId'),
+    lineId: _snapshotOptionalString(value, 'lineId') ?? '',
+    serviceClass: serviceClass ?? '',
+    servicePattern: servicePattern ?? '',
+  );
+}
+
+const _legacyStepTypes = {
+  'ride',
+  'train',
+  'walk',
+  'transfer',
+  'legacytransfer',
+  'legacy_transfer',
+  'instationtransfer',
+  'in_station_transfer',
+  'outofstationtransfer',
+  'out_of_station_transfer',
+  'entry',
+  'exit',
+  'access',
+  'egress',
+  'walkway',
+  'elevator',
+  'ramp',
+  'stair',
+  'escalator',
+  'facilityconnector',
+  'facility_connector',
+  'internal',
+  'waypoint',
+};
+const _legacyServiceClasses = {'SUBWAY', 'ITX_CHEONGCHUN'};
+const _legacyServicePatterns = {'LOCAL', 'EXPRESS'};
+
+bool _hasWaypointStep(Object? value) {
+  if (value is! List<Object?>) return false;
+  return value.any(
+    (step) =>
+        step is Map<String, Object?> &&
+        _snapshotOptionalString(step, 'stepType')?.toLowerCase() == 'waypoint',
+  );
+}
+
+String _snapshotString(Map<String, Object?> snapshot, String key) {
+  final value = _snapshotOptionalString(snapshot, key);
+  if (value == null) throw const FormatException();
+  return value;
+}
+
+String? _snapshotOptionalString(Map<String, Object?> snapshot, String key) {
+  final value = snapshot[key];
+  if (value == null) return null;
+  if (value is! String) throw const FormatException();
+  final normalized = value.trim();
+  return normalized.isEmpty ? null : normalized;
+}
+
+String _legacyConstraintMode(String mobilityType) =>
+    mobilityType == 'WHEELCHAIR' ? 'STRICT_STEP_FREE' : 'PREFER_STEP_FREE';
+
+String _legacyMobilityPreset(String mobilityType) => switch (mobilityType) {
+  'STANDARD' => 'STANDARD',
+  'SENIOR' => 'SLOW',
+  'LUGGAGE' => 'NO_STAIRS',
+  'WHEELCHAIR' => 'STEP_FREE',
+  _ => throw const FormatException(),
+};
 
 String _isoFromSql(DateTime value) => value.toUtc().toIso8601String();
 
