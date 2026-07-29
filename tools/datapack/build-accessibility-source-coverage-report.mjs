@@ -91,7 +91,7 @@ export function buildAccessibilitySourceCoverageReport({
       domain: entry.domain,
       artifactIds: [...entry.artifactIds].sort(compareStrings),
       claimCount: entry.claimCount,
-      status: blockedSources.has(entry.sourceId) ? "BLOCKED" : "ADMITTED",
+      status: !sources.has(entry.sourceId) || blockedSources.has(entry.sourceId) ? "BLOCKED" : "ADMITTED",
     }))
     .sort((left, right) => compareStrings(`${left.sourceId}\0${left.domain}`, `${right.sourceId}\0${right.domain}`));
   const artifactSummaries = artifacts

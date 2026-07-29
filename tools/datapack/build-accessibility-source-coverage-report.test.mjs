@@ -46,6 +46,19 @@ test("미승인 source는 provider-domain matrix에서도 BLOCKED다", () => {
   assert.equal(report.providerDomainMatrix[0].status, "BLOCKED");
 });
 
+test("inventory에 없는 source는 provider-domain matrix에서도 BLOCKED다", () => {
+  const input = validInput();
+  input.artifacts[0].claims[0].sourceId = "unknown-source";
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(report.decision, "NO_GO");
+  assert.equal(
+    report.providerDomainMatrix.find(({ sourceId }) => sourceId === "unknown-source").status,
+    "BLOCKED",
+  );
+});
+
 test("accessibility 승인 license hash는 source governance 검토 hash와 일치해야 한다", () => {
   const input = validInput();
   input.inventory.sources[0].accessibilityAdmissionEvidence.licenseEvidenceHash = hash("stale-license");
