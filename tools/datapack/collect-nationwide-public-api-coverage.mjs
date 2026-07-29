@@ -406,6 +406,7 @@ function indexKnownProviderCandidates(sourceCandidates) {
   const indexed = new Map();
   for (const [index, candidate] of (sourceCandidates?.candidates ?? []).entries()) {
     if (!candidate || typeof candidate !== "object" || Array.isArray(candidate)) continue;
+    if (candidate.rawSnapshotAdmission !== undefined) continue;
     const id = typeof candidate.id === "string" ? candidate.id.trim() : "";
     const domain = typeof candidate.domain === "string" ? candidate.domain.trim() : "";
     const endpointValue = candidate.operation?.endpoint ?? candidate.requestUrl;
