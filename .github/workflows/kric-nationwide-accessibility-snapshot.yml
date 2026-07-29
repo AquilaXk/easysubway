@@ -1,0 +1,65 @@
+name: KRIC Nationwide Accessibility Snapshot
+
+on:
+  workflow_dispatch:
+
+jobs:
+  collect:
+    name: KRIC Nationwide Accessibility Snapshot
+    if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+
+    steps:
+      - name: KRIC Nationwide Accessibility Snapshot / Checkout default branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: KRIC Nationwide Accessibility Snapshot / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: KRIC Nationwide Accessibility Snapshot / Collect sanitized snapshot
+        env:
+          KRIC_SERVICE_KEY: ${{ secrets.KRIC_SERVICE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "${KRIC_SERVICE_KEY}"
+          node tools/datapack/build-molit-nationwide-fixture.mjs \
+            --csv tools/datapack/sources/molit-urban-rail-full-route-20251211.csv \
+            --svg-csv tools/datapack/sources/molit-rail-station-svg-route-20250811.csv \
+            --kric-code-catalog tools/datapack/sources/kric-provider-code-catalog-20260228.json \
+            --seoulmetro-js tools/datapack/sources/seoulmetro-cyberstation-line-data-20260623.js \
+            --humetro-html tools/datapack/sources/humetro-cyberstation-map-20260623.html \
+            --humetro-css tools/datapack/sources/humetro-cyber-station-20250310c.css \
+            --grtc-html tools/datapack/sources/grtc-cyber-simple-20260623.html \
+            --dtro-html tools/datapack/sources/dtro-cyberstation-20260623.html \
+            --djtc-html tools/datapack/sources/djtc-cyberstation-20260623.html \
+            --djtc-css tools/datapack/sources/djtc-content-20260623.css \
+            --output "${RUNNER_TEMP}/kric-nationwide-fixture.json"
+          node tools/datapack/collect-kric-nationwide-route-rosters.mjs \
+            --targets tools/datapack/nationwide-coverage-targets.json \
+            --fixture "${RUNNER_TEMP}/kric-nationwide-fixture.json" \
+            --output "${RUNNER_TEMP}/kric-nationwide-route-rosters.json"
+          node tools/datapack/collect-kric-accessibility-snapshots.mjs \
+            --bundled-index apps/mobile/assets/datapacks/index.json \
+            --targets tools/datapack/nationwide-coverage-targets.json \
+            --fixture "${RUNNER_TEMP}/kric-nationwide-fixture.json" \
+            --route-rosters "${RUNNER_TEMP}/kric-nationwide-route-rosters.json" \
+            --request-interval-ms 250 \
+            --output-root "${RUNNER_TEMP}/kric-nationwide-accessibility-snapshot"
+
+      - name: KRIC Nationwide Accessibility Snapshot / Upload sanitized snapshot
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: kric-nationwide-accessibility-snapshot
+          path: ${{ runner.temp }}/kric-nationwide-accessibility-snapshot/kric-station-convenience-standard-*.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 14
