@@ -161,6 +161,9 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
   database.prepare("INSERT INTO station_pathway_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
     "path-edge-a", "path-node-a", "path-node-b", "ELEVATOR", "AVAILABLE", "", "", "", "",
   );
+  database.prepare("INSERT INTO station_pathway_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
+    "broken-path-edge", "missing-node", "path-node-b", "WALK", "AVAILABLE", "", "", "", "",
+  );
   database.prepare("INSERT INTO out_of_station_transfer_links VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
     "outside-transfer-a", "station-a", "line-a", "station-a", "line-a", "LIMITED", "", "", "", "",
   );
@@ -260,6 +263,17 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
       evidenceHash: "",
     }, {
       claimId: "internal-edge-without-provenance",
+      stationId: "station-a",
+      lineId: "line-a",
+      facilityType: "WALK",
+      domain: "NETWORK_EDGE",
+      evidenceKind: "EXISTS",
+      sourceId: "",
+      sourceSnapshotId: "",
+      providerRecordHash: "",
+      evidenceHash: "",
+    }, {
+      claimId: "broken-path-edge",
       stationId: "station-a",
       lineId: "line-a",
       facilityType: "WALK",

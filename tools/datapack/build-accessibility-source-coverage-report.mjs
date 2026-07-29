@@ -271,12 +271,13 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
     const pathwayEdgeClaims = tableExists(database, "station_pathway_edges")
       && tableExists(database, "station_pathway_nodes")
       ? database.prepare(`
-          SELECT edge.id, node.station_id, COALESCE(node.line_id, other.line_id, '') AS line_id,
+          SELECT edge.id, COALESCE(node.station_id, other.station_id, '') AS station_id,
+                 COALESCE(node.line_id, other.line_id, '') AS line_id,
                  edge.edge_type, edge.accessibility_status,
                  ${provenanceColumns(database, "station_pathway_edges", "edge")}
           FROM station_pathway_edges edge
-          JOIN station_pathway_nodes node ON node.id = edge.from_node_id
-          JOIN station_pathway_nodes other ON other.id = edge.to_node_id
+          LEFT JOIN station_pathway_nodes node ON node.id = edge.from_node_id
+          LEFT JOIN station_pathway_nodes other ON other.id = edge.to_node_id
           WHERE edge.accessibility_status <> 'UNKNOWN'
           ORDER BY edge.id
         `).all().map((row) => ({

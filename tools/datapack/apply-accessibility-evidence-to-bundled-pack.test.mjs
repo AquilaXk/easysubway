@@ -25,7 +25,8 @@ test("unproven internal route availability fails check and normalizes to unknown
     INSERT INTO internal_route_edges VALUES
       ('stale', 'AVAILABLE', '', '', '', ''),
       ('unknown', 'UNKNOWN', '', '', '', ''),
-      ('proven', 'AVAILABLE', 'source', 'snapshot', '${"a".repeat(64)}', '${"b".repeat(64)}');
+      ('proven', 'AVAILABLE', 'kric-station-elevator-movement', 'snapshot', '${"a".repeat(64)}', '${"b".repeat(64)}'),
+      ('static-facility', 'AVAILABLE', 'kric-station-convenience-standard', 'snapshot', '${"c".repeat(64)}', '${"d".repeat(64)}');
   `);
 
   assert.throws(
@@ -39,6 +40,7 @@ test("unproven internal route availability fails check and normalizes to unknown
     [
       { id: "proven", status: "AVAILABLE" },
       { id: "stale", status: "UNKNOWN" },
+      { id: "static-facility", status: "UNKNOWN" },
       { id: "unknown", status: "UNKNOWN" },
     ],
   );
@@ -94,7 +96,9 @@ test("core-only strips facility quality targets and dependent pathway claims", (
     INSERT INTO station_exits VALUES
       ('exit-1', 1, 'fixture-capital-catalog', 'fixture-capital-catalog-20260619');
     INSERT INTO station_pathway_edges VALUES
-      ('legacy-pathway', 'legacy-facility', 'AVAILABLE', '', '', '', '');
+      ('legacy-pathway', 'legacy-facility', 'AVAILABLE', '', '', '', ''),
+      ('static-facility-pathway', NULL, 'AVAILABLE', 'kric-station-convenience-standard',
+       'snapshot', '${"a".repeat(64)}', '${"b".repeat(64)}');
     INSERT INTO out_of_station_transfer_links VALUES
       ('legacy-outside-transfer', 'LIMITED', '', '', '', '');
   `);
@@ -111,10 +115,13 @@ test("core-only strips facility quality targets and dependent pathway claims", (
   );
   assert.deepEqual(
     database.prepare(`
-      SELECT requires_facility_id AS requiresFacilityId, accessibility_status AS accessibilityStatus
-      FROM station_pathway_edges
+      SELECT id, requires_facility_id AS requiresFacilityId, accessibility_status AS accessibilityStatus
+      FROM station_pathway_edges ORDER BY id
     `).all().map((row) => ({ ...row })),
-    [{ requiresFacilityId: null, accessibilityStatus: "UNKNOWN" }],
+    [
+      { id: "legacy-pathway", requiresFacilityId: null, accessibilityStatus: "UNKNOWN" },
+      { id: "static-facility-pathway", requiresFacilityId: null, accessibilityStatus: "UNKNOWN" },
+    ],
   );
   assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
   assert.equal(

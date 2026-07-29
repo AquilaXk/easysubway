@@ -16,6 +16,10 @@ const root = path.resolve(import.meta.dirname, "../..");
 const stationIds = ["station-sadang", "station-sangnoksu"];
 const facilityTypes = ["ELEVATOR", "ESCALATOR", "WHEELCHAIR_LIFT", "ACCESSIBILITY_STATUS_PROBE"];
 const accessibilityRouteSourceId = "seoul-metro-accessibility";
+const directRouteEvidenceSourceIds = new Set([
+  "kric-station-elevator-movement",
+  "kric-wheelchair-lift-movement",
+]);
 const replacedSourceIds = new Set([
   "kric-station-elevator",
   "kric-station-escalator",
@@ -376,7 +380,7 @@ export function normalizeUnprovenStationExitElevatorClaims(database, { check }) 
     database.prepare("PRAGMA table_info(station_exits)").all().map(({ name }) => name),
   );
   if (!columns.has("has_elevator_connection")) return false;
-  const incomplete = incompleteRouteProvenanceSql(columns);
+  const incomplete = incompleteProvenanceSql(columns);
   const stale = database.prepare(`
     SELECT count(*) AS count FROM station_exits
     WHERE has_elevator_connection = 1 AND (${incomplete})
@@ -393,6 +397,13 @@ export function normalizeUnprovenStationExitElevatorClaims(database, { check }) 
 }
 
 function incompleteRouteProvenanceSql(columns) {
+  const incomplete = incompleteProvenanceSql(columns);
+  if (incomplete === "1") return incomplete;
+  const allowedSources = [...directRouteEvidenceSourceIds].map((sourceId) => `'${sourceId}'`).join(",");
+  return `(${incomplete}) OR source_id NOT IN (${allowedSources})`;
+}
+
+function incompleteProvenanceSql(columns) {
   if (!["source_id", "source_snapshot_id", "provider_record_hash", "evidence_hash"]
     .every((name) => columns.has(name))) return "1";
   return `source_id = '' OR source_snapshot_id = ''
@@ -425,7 +436,7 @@ export function normalizeUnprovenInternalRouteEdges(database, { check }) {
 }
 
 function completeInternalRouteEdgeProvenance(edge) {
-  return Boolean(edge.sourceId)
+  return directRouteEvidenceSourceIds.has(edge.sourceId)
     && Boolean(edge.sourceSnapshotId)
     && /^[0-9a-f]{64}$/.test(edge.providerRecordHash ?? "")
     && /^[0-9a-f]{64}$/.test(edge.evidenceHash ?? "");
