@@ -560,7 +560,7 @@ void main() {
     );
   });
 
-  test('기존 candidate 대상은 snapshot과 추가 시각을 보존하고 레거시 쌍만 제거한다', () async {
+  test('기존 candidate 대상은 보존하고 최종 추가 시각 순으로 정렬한다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(catalogDatabase.close);
@@ -600,7 +600,7 @@ void main() {
               originStationId: 'target-origin',
               destinationStationId: 'target-destination',
               mobilityProfile: 'WHEELCHAIR',
-              addedAt: DateTime.utc(2026, 7, 2),
+              addedAt: DateTime.utc(2026, 7, 1),
             ),
           );
       await userDatabase
@@ -609,6 +609,27 @@ void main() {
             user_db.AppPreferencesCompanion.insert(
               key: 'favorite_route_snapshot:${candidate.value}',
               value: targetSnapshot,
+              updatedAt: DateTime.utc(2026, 7, 1),
+            ),
+          );
+      await userDatabase
+          .into(userDatabase.favoriteRoutes)
+          .insert(
+            user_db.FavoriteRoutesCompanion.insert(
+              routeId: 'middle-route',
+              originStationId: 'middle-origin',
+              destinationStationId: 'middle-destination',
+              mobilityProfile: 'STANDARD',
+              addedAt: DateTime.utc(2026, 7, 2),
+            ),
+          );
+      await userDatabase
+          .into(userDatabase.appPreferences)
+          .insert(
+            user_db.AppPreferencesCompanion.insert(
+              key: 'favorite_route_snapshot:middle-route',
+              value:
+                  '{"routeSearchId":"middle-route","originStationId":"middle-origin","originStationName":"중간 출발","destinationStationId":"middle-destination","destinationStationName":"중간 도착","mobilityType":"STANDARD","status":"FOUND","score":50,"createdAt":"2026-07-02T00:00:00.000Z","steps":[]}',
               updatedAt: DateTime.utc(2026, 7, 2),
             ),
           );
@@ -620,7 +641,7 @@ void main() {
               originStationId: 'station-sangnoksu',
               destinationStationId: 'station-sadang',
               mobilityProfile: 'SENIOR',
-              addedAt: DateTime.utc(2026, 7, 1),
+              addedAt: DateTime.utc(2026, 7, 3),
             ),
           );
       await userDatabase
@@ -653,9 +674,12 @@ void main() {
 
     final favorites = await repository.listFavoriteRoutes();
 
-    expect(favorites.single.favoriteRouteId, candidate.value);
-    expect(favorites.single.addedAt, '2026-07-02T00:00:00.000Z');
-    expect(favorites.single.originStationName, '대상 출발');
+    expect(favorites.map((favorite) => favorite.favoriteRouteId), [
+      'middle-route',
+      candidate.value,
+    ]);
+    expect(favorites.last.addedAt, '2026-07-01T00:00:00.000Z');
+    expect(favorites.last.originStationName, '대상 출발');
     final target = await userDatabase
         .customSelect(
           'SELECT value, CAST(updated_at AS INTEGER) AS updated_at_value FROM app_preferences WHERE key = ?',

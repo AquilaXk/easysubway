@@ -567,6 +567,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         ),
       );
     }
+    favorites.sort((left, right) => right.addedAt.compareTo(left.addedAt));
     return favorites;
   }
 
