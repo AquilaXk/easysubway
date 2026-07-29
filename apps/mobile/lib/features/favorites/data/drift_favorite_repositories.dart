@@ -1108,8 +1108,12 @@ Map<String, Object?> _routeWarningToJson(RouteSearchWarning warning) {
 
 RouteCandidateLegSignature _legacyLeg(Object? value) {
   if (value is! Map<String, Object?>) throw const FormatException();
+  final stepType = _snapshotString(value, 'stepType');
+  if (!_legacyStepTypes.contains(stepType.toLowerCase())) {
+    throw const FormatException();
+  }
   return RouteCandidateLegSignature(
-    stepType: _snapshotString(value, 'stepType'),
+    stepType: stepType,
     fromStationId: _snapshotString(value, 'fromStationId'),
     toStationId: _snapshotString(value, 'toStationId'),
     fromNodeId: _snapshotOptionalString(value, 'fromNodeId') ?? '',
@@ -1120,6 +1124,32 @@ RouteCandidateLegSignature _legacyLeg(Object? value) {
     servicePattern: _snapshotOptionalString(value, 'servicePattern') ?? '',
   );
 }
+
+const _legacyStepTypes = {
+  'ride',
+  'train',
+  'walk',
+  'transfer',
+  'legacytransfer',
+  'legacy_transfer',
+  'instationtransfer',
+  'in_station_transfer',
+  'outofstationtransfer',
+  'out_of_station_transfer',
+  'entry',
+  'exit',
+  'access',
+  'egress',
+  'walkway',
+  'elevator',
+  'ramp',
+  'stair',
+  'escalator',
+  'facilityconnector',
+  'facility_connector',
+  'internal',
+  'waypoint',
+};
 
 bool _hasWaypointStep(Object? value) {
   if (value is! List<Object?>) return false;

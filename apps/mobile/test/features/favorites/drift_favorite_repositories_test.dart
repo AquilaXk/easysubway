@@ -988,6 +988,26 @@ void main() {
           ],
         }),
       ),
+      (
+        'local-invalid-step-type',
+        jsonEncode({
+          'originStationId': 'station-sangnoksu',
+          'originStationName': '상록수',
+          'destinationStationId': 'station-sadang',
+          'destinationStationName': '사당',
+          'mobilityType': 'WHEELCHAIR',
+          'status': 'FOUND',
+          'score': 1,
+          'createdAt': '2026-07-01T00:00:00.000Z',
+          'steps': [
+            {
+              'stepType': 'GARBAGE',
+              'fromStationId': 'station-sangnoksu',
+              'toStationId': 'station-sadang',
+            },
+          ],
+        }),
+      ),
     ]) {
       await userDatabase
           .into(userDatabase.favoriteRoutes)
@@ -1015,7 +1035,7 @@ void main() {
 
     final favorites = await repository.listFavoriteRoutes();
 
-    expect(favorites, hasLength(7));
+    expect(favorites, hasLength(8));
     expect(favorites.every((favorite) => favorite.needsResearch), isTrue);
     expect(favorites.map((favorite) => favorite.statusLabel).toSet(), {
       '다시 검색 필요',
@@ -1052,7 +1072,7 @@ void main() {
       await userDatabase
           .customSelect('SELECT route_id FROM favorite_routes')
           .get(),
-      hasLength(6),
+      hasLength(7),
     );
     expect(
       await userDatabase
