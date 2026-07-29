@@ -513,6 +513,10 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       var routeId = row.read<String>('route_id');
       var snapshot = await _readRouteSnapshot(routeId);
       var addedAt = _isoFromEpoch(row.read<int?>('added_at_value'));
+      var originStationId = row.read<String>('origin_station_id');
+      var destinationStationId = row.read<String>('destination_station_id');
+      var mobilityType = row.read<String>('mobility_profile');
+      var needsResearch = false;
       if (routeId.startsWith('local-') && snapshot != null) {
         final candidate = _legacyCandidate(snapshot);
         if (candidate != null) {
@@ -525,11 +529,16 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
           routeId = migrated.routeId;
           snapshot = migrated.snapshot;
           addedAt = migrated.addedAt;
+          originStationId = migrated.originStationId;
+          destinationStationId = migrated.destinationStationId;
+          mobilityType = migrated.mobilityType;
+        } else {
+          needsResearch = true;
         }
       }
       if (!listedRouteIds.add(routeId)) continue;
       try {
-        if (snapshot != null) {
+        if (!needsResearch && snapshot != null) {
           favorites.add(
             _favoriteRouteFromSnapshot(
               routeId: routeId,
@@ -544,7 +553,16 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       } on FavoriteRouteException {
         // A partial old snapshot remains in place and is rendered below.
       }
-      favorites.add(await _researchRequiredFavorite(row: row, snapshot: snapshot));
+      favorites.add(
+        await _researchRequiredFavorite(
+          routeId: routeId,
+          originStationId: originStationId,
+          destinationStationId: destinationStationId,
+          mobilityType: mobilityType,
+          addedAt: addedAt,
+          snapshot: snapshot,
+        ),
+      );
     }
     return favorites;
   }
@@ -622,10 +640,13 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
   RouteCandidateIdentity? _legacyCandidate(Map<String, Object?> snapshot) {
     try {
       final querySnapshot = snapshot['querySnapshot'];
+      final hasQuerySnapshot = snapshot.containsKey('querySnapshot');
       final hasWaypointEvidence = _nonBlank(snapshot['waypointStationId']) ||
           _hasWaypointStep(snapshot['steps']);
       final query = querySnapshot is Map<String, Object?>
           ? RouteQueryIdentity.fromSnapshot(querySnapshot)
+          : hasQuerySnapshot
+          ? throw const FormatException()
           : hasWaypointEvidence
           ? throw const FormatException()
           : RouteQueryIdentity(
@@ -661,7 +682,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     }
   }
 
-  Future<({String routeId, Map<String, Object?> snapshot, String addedAt})> _migrateLegacyRoute({
+  Future<({String routeId, Map<String, Object?> snapshot, String addedAt, String originStationId, String destinationStationId, String mobilityType})> _migrateLegacyRoute({
     required String legacyRouteId,
     required QueryRow row,
     required Map<String, Object?> snapshot,
@@ -675,10 +696,13 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       'candidateIdentity': targetRouteId,
     };
     var resolvedAddedAt = _isoFromEpoch(row.read<int?>('added_at_value'));
+    var resolvedOriginStationId = row.read<String>('origin_station_id');
+    var resolvedDestinationStationId = row.read<String>('destination_station_id');
+    var resolvedMobilityType = row.read<String>('mobility_profile');
     await userDatabase.transaction(() async {
       final target = await userDatabase
           .customSelect(
-            'SELECT route_id, CAST(added_at AS INTEGER) AS added_at_value FROM favorite_routes WHERE route_id = ?',
+            'SELECT route_id, origin_station_id, destination_station_id, mobility_profile, CAST(added_at AS INTEGER) AS added_at_value FROM favorite_routes WHERE route_id = ?',
             variables: [Variable.withString(targetRouteId)],
           )
           .getSingleOrNull();
@@ -701,6 +725,9 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         );
       } else {
         resolvedAddedAt = _isoFromEpoch(target.read<int?>('added_at_value'));
+        resolvedOriginStationId = target.read<String>('origin_station_id');
+        resolvedDestinationStationId = target.read<String>('destination_station_id');
+        resolvedMobilityType = target.read<String>('mobility_profile');
       }
       await userDatabase.customStatement(
         'DELETE FROM favorite_routes WHERE route_id = ?',
@@ -716,6 +743,9 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         routeId: legacyRouteId,
         snapshot: snapshot,
         addedAt: resolvedAddedAt,
+        originStationId: resolvedOriginStationId,
+        destinationStationId: resolvedDestinationStationId,
+        mobilityType: resolvedMobilityType,
       );
     }
     final targetSnapshot = await _readRouteSnapshot(targetRouteId);
@@ -723,25 +753,29 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       routeId: targetRouteId,
       snapshot: targetSnapshot ?? migratedSnapshot,
       addedAt: resolvedAddedAt,
+      originStationId: resolvedOriginStationId,
+      destinationStationId: resolvedDestinationStationId,
+      mobilityType: resolvedMobilityType,
     );
   }
 
   Future<FavoriteRoute> _researchRequiredFavorite({
-    required QueryRow row,
+    required String routeId,
+    required String originStationId,
+    required String destinationStationId,
+    required String mobilityType,
+    required String addedAt,
     required Map<String, Object?>? snapshot,
   }) async {
-    final originStationId = row.read<String>('origin_station_id');
-    final destinationStationId = row.read<String>('destination_station_id');
-    final addedAt = _isoFromEpoch(row.read<int?>('added_at_value'));
     return FavoriteRoute(
       userId: _localUserId,
-      favoriteRouteId: row.read<String>('route_id'),
-      routeSearchId: row.read<String>('route_id'),
+      favoriteRouteId: routeId,
+      routeSearchId: routeId,
       originStationId: originStationId,
       originStationName: await _fallbackStationName(snapshot, 'originStationName', originStationId),
       destinationStationId: destinationStationId,
       destinationStationName: await _fallbackStationName(snapshot, 'destinationStationName', destinationStationId),
-      mobilityType: row.read<String>('mobility_profile'),
+      mobilityType: mobilityType,
       status: 'RESEARCH_REQUIRED',
       lineId: '',
       lineName: '',
