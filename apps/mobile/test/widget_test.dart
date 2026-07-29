@@ -919,6 +919,40 @@ void main() {
     expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
   });
 
+  testWidgets('저장 탭은 복원 불가 경로에 다시 검색 필요를 표시한다', (tester) async {
+    final favoriteRouteRepository = FakeFavoriteRouteRepository(
+      favorites: [_favoriteRoute(needsResearch: true)],
+    );
+    await tester.pumpWidget(
+      buildEasySubwayTestApp(
+        repository: FakeStationSearchRepository(),
+        reportRepository: FakeFacilityReportRepository(),
+        routeRepository: FakeRouteSearchRepository(),
+        favoriteRepository: FakeFavoriteStationRepository(),
+        favoriteFacilityRepository: FakeFavoriteFacilityRepository(),
+        favoriteRouteRepository: favoriteRouteRepository,
+        notificationRepository: FakeNotificationSettingsRepository(),
+        initialOnboardingState: _completedOnboardingState(),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await _openFavoriteList(tester);
+
+    expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
+    expect(find.text('상록수역 → 사당역'), findsOneWidget);
+    expect(
+      find.text('수도권 4호선 · 천천히 · 다시 검색 필요'),
+      findsOneWidget,
+    );
+    expect(
+      find.bySemanticsLabel(
+        '즐겨찾기 경로, 상록수역에서 사당역까지, 수도권 4호선, 천천히, 다시 검색 필요',
+      ),
+      findsOneWidget,
+    );
+  });
+
   testWidgets('노선도 첫 화면은 하단 광고 위에 지도 조작을 유지한다', (tester) async {
     tester.view.viewPadding = const FakeViewPadding(bottom: 34);
     addTearDown(tester.view.resetViewPadding);
@@ -20775,6 +20809,7 @@ FavoriteFacility _favoriteFacility({
 FavoriteRoute _favoriteRoute({
   String mobilityType = 'SENIOR',
   RouteTransportScope transportScope = RouteTransportScope.subway,
+  bool needsResearch = false,
 }) {
   return FavoriteRoute(
     userId: 'anonymous-user-1',
@@ -20792,6 +20827,7 @@ FavoriteRoute _favoriteRoute({
     routeCreatedAt: '2026-06-13T04:20:00',
     addedAt: '2026-06-14T10:00:00',
     transportScope: transportScope,
+    needsResearch: needsResearch,
   );
 }
 

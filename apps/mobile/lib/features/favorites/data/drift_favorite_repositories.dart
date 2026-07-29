@@ -508,9 +508,11 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         .get();
 
     final favorites = <FavoriteRoute>[];
+    final listedRouteIds = <String>{};
     for (final row in rows) {
       var routeId = row.read<String>('route_id');
       var snapshot = await _readRouteSnapshot(routeId);
+      var addedAt = _isoFromEpoch(row.read<int?>('added_at_value'));
       if (routeId.startsWith('local-') && snapshot != null) {
         final candidate = _legacyCandidate(snapshot);
         if (candidate != null) {
@@ -522,9 +524,10 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
           );
           routeId = migrated.routeId;
           snapshot = migrated.snapshot;
+          addedAt = migrated.addedAt;
         }
       }
-      final addedAt = _isoFromEpoch(row.read<int?>('added_at_value'));
+      if (!listedRouteIds.add(routeId)) continue;
       try {
         if (snapshot != null) {
           favorites.add(
@@ -658,7 +661,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     }
   }
 
-  Future<({String routeId, Map<String, Object?> snapshot})> _migrateLegacyRoute({
+  Future<({String routeId, Map<String, Object?> snapshot, String addedAt})> _migrateLegacyRoute({
     required String legacyRouteId,
     required QueryRow row,
     required Map<String, Object?> snapshot,
@@ -671,10 +674,11 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       'queryIdentity': candidate.query.value,
       'candidateIdentity': targetRouteId,
     };
+    var resolvedAddedAt = _isoFromEpoch(row.read<int?>('added_at_value'));
     await userDatabase.transaction(() async {
       final target = await userDatabase
           .customSelect(
-            'SELECT route_id FROM favorite_routes WHERE route_id = ?',
+            'SELECT route_id, CAST(added_at AS INTEGER) AS added_at_value FROM favorite_routes WHERE route_id = ?',
             variables: [Variable.withString(targetRouteId)],
           )
           .getSingleOrNull();
@@ -695,6 +699,8 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
             updatedAt: DateTime.now().toUtc(),
           ),
         );
+      } else {
+        resolvedAddedAt = _isoFromEpoch(target.read<int?>('added_at_value'));
       }
       await userDatabase.customStatement(
         'DELETE FROM favorite_routes WHERE route_id = ?',
@@ -705,9 +711,19 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         ['$_routeSnapshotPrefix$legacyRouteId'],
       );
     });
-    if (targetRouteId == legacyRouteId) return (routeId: legacyRouteId, snapshot: snapshot);
+    if (targetRouteId == legacyRouteId) {
+      return (
+        routeId: legacyRouteId,
+        snapshot: snapshot,
+        addedAt: resolvedAddedAt,
+      );
+    }
     final targetSnapshot = await _readRouteSnapshot(targetRouteId);
-    return (routeId: targetRouteId, snapshot: targetSnapshot ?? migratedSnapshot);
+    return (
+      routeId: targetRouteId,
+      snapshot: targetSnapshot ?? migratedSnapshot,
+      addedAt: resolvedAddedAt,
+    );
   }
 
   Future<FavoriteRoute> _researchRequiredFavorite({
