@@ -433,6 +433,30 @@ test("facility-location snapshot identity is stable for duplicate station names 
   assert.equal(build(rows).contentSha256, build([...rows].reverse()).contentSha256);
 });
 
+test("facility-location writer rejects endpoint overrides before fetching", async () => {
+  const outputRoot = await mkdtemp(join(tmpdir(), "easysubway-facility-location-endpoint-"));
+  let fetched = false;
+  try {
+    await assert.rejects(
+      writeSeoulAccessibilityEvidence({
+        endpoint: "https://apis.data.go.kr/example",
+        serviceKey: "secret",
+        source: "facility-location",
+        output: "unused.json",
+        outputRoot,
+        fetchImpl: async () => {
+          fetched = true;
+          throw new Error("must not fetch");
+        },
+      }),
+      /endpoint/,
+    );
+    assert.equal(fetched, false);
+  } finally {
+    await rm(outputRoot, { recursive: true, force: true });
+  }
+});
+
 test("same-day captures keep distinct timestamped files and explicit lineage", async (t) => {
   const outputRoot = await mkdtemp(join(tmpdir(), "easysubway-seoul-snapshots-"));
   t.after(() => rm(outputRoot, { recursive: true, force: true }));

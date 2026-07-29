@@ -283,6 +283,9 @@ export async function writeSeoulAccessibilityEvidence({
   const { outputPath: requestedOutputPath } = await validatedOutputPath(output, outputRoot);
   const sourceConfig = SOURCES[source];
   if (!sourceConfig) throw new Error(`${INVALID_RESPONSE}: source`);
+  if (source === "facility-location" && endpoint !== undefined && endpoint !== sourceConfig.endpoint) {
+    throw new Error(`${INVALID_RESPONSE}: endpoint`);
+  }
   const collected = await collectSeoulAccessibility({
     endpoint: endpoint ?? sourceConfig.endpoint,
     serviceKey,
