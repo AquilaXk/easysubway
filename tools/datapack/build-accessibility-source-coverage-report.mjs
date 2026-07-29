@@ -482,7 +482,7 @@ function claimMatchesSnapshot(snapshot, claim) {
       && (!claim.lineId || query.lineId === claim.lineId)).some((query) => {
       const tuple = { railOprIsttCd: query.railOprIsttCd, lnCd: query.lnCd, stinCd: query.stinCd };
       const rows = (query.rows ?? []).filter(({ gubun }) => gubun === code);
-      if (rows.length > 0) return rows.some((row) => {
+      if (rows.length > 0) return claim.evidenceKind === "EXISTS" && rows.some((row) => {
         const providerRecordHash = digest(JSON.stringify(row));
         return providerRecordHash === claim.providerRecordHash
           && digest(JSON.stringify({ snapshotId: snapshot.snapshotId, query: tuple, providerRecordHash })) === claim.evidenceHash;
@@ -558,7 +558,7 @@ async function main(argv) {
   ]);
   const artifacts = await loadSelectableAccessibilityArtifacts({
     manifest,
-    manifestRoot: args["manifest-root"] ?? packAssetRoot(args.manifest),
+    manifestRoot: args["manifest-root"] ?? manifestAssetRoot(args.manifest),
     bundledIndex,
     bundledRoot: args["bundled-root"] ?? packAssetRoot(args["bundled-index"]),
   });
@@ -598,6 +598,10 @@ async function readJson(file) {
 
 function packAssetRoot(indexPath) {
   return path.resolve(path.dirname(indexPath), "../..");
+}
+
+export function manifestAssetRoot(manifestPath) {
+  return path.dirname(manifestPath);
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {

@@ -11,6 +11,7 @@ import {
   buildAccessibilitySourceCoverageReport,
   loadAccessibilityAdmissionSnapshots,
   loadSelectableAccessibilityArtifacts,
+  manifestAssetRoot,
 } from "./build-accessibility-source-coverage-report.mjs";
 
 const EVALUATED_AT = "2026-07-28T00:00:00.000Z";
@@ -395,6 +396,37 @@ test("Seoul snapshot에 존재하는 역·노선은 NOT_EXISTS로 위조할 수 
   assert.deepEqual(report.violations.provenance, [
     "bundled-capital:station-sadang|seoul-4|ELEVATOR|STATION_FACILITY_EVIDENCE:CLAIM_SNAPSHOT_BINDING_MISMATCH",
   ]);
+});
+
+test("KRIC snapshot에 matching row가 있으면 NOT_EXISTS로 위조할 수 없다", () => {
+  const input = validInput();
+  input.artifacts = [input.artifacts[0]];
+  const claim = input.artifacts[0].claims[0];
+  const row = { gubun: "EV", dtlLoc: "승강장" };
+  const query = { railOprIsttCd: "KR", lnCd: "4", stinCd: "448" };
+  claim.evidenceKind = "NOT_EXISTS";
+  claim.providerRecordHash = hash(JSON.stringify(row));
+  claim.evidenceHash = hash(JSON.stringify({
+    snapshotId: claim.sourceSnapshotId,
+    query,
+    providerRecordHash: claim.providerRecordHash,
+  }));
+  Object.assign(input.snapshots[0], {
+    artifactKind: "kric-accessibility-snapshot",
+    queries: [{ ...query, stationId: claim.stationId, lineId: claim.lineId, rows: [row] }],
+  });
+  delete input.snapshots[0].claimBindings;
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(report.decision, "NO_GO");
+  assert.deepEqual(report.violations.provenance, [
+    "bundled-capital:station-a|line-a|ELEVATOR|STATION_FACILITY_EVIDENCE:CLAIM_SNAPSHOT_BINDING_MISMATCH",
+  ]);
+});
+
+test("manifest root 기본값은 manifest 파일의 디렉터리다", () => {
+  assert.equal(manifestAssetRoot("/tmp/output/current.json"), "/tmp/output");
 });
 
 for (const { name, mutate, partition, expected } of [
