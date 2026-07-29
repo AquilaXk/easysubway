@@ -95,6 +95,7 @@ export async function runMolitRailwayTransferMovementCollector(argv, fixture = {
   if (path.basename(output) !== `${MOLIT_RAILWAY_TRANSFER_MOVEMENT_SNAPSHOT_ID}.csv.gz`) {
     throw new Error("--output must use the canonical snapshot filename");
   }
+  if (args["verify-existing"] !== undefined && args["verify-existing"] !== "true") throw new Error("--verify-existing must be true");
   const metadataPath = `${output}.json`;
   if (args["verify-existing"] === "true") {
     const [metadataBytes, gzipBytes] = await Promise.all([readFile(metadataPath), readFile(output)]);
