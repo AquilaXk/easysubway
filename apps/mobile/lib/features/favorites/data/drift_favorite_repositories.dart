@@ -671,6 +671,13 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
               objective:
                   _snapshotOptionalString(snapshot, 'objective') ?? 'FASTEST',
             );
+      if (_snapshotString(snapshot, 'originStationId') !=
+              query.originStationId ||
+          _snapshotString(snapshot, 'destinationStationId') !=
+              query.destinationStationId ||
+          _snapshotString(snapshot, 'mobilityType') != query.mobilityType) {
+        throw const FormatException();
+      }
       _snapshotString(snapshot, 'originStationName');
       _snapshotString(snapshot, 'destinationStationName');
       _snapshotString(snapshot, 'status');
