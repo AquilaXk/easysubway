@@ -41,7 +41,8 @@ void main() {
       RouteQueryIdentity(originStationId: 'a', destinationStationId: 'b', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', waypointStationId: 'w', transportScope: 'SUBWAY', objective: 'FASTEST'),
       RouteQueryIdentity(originStationId: 'a', destinationStationId: 'b', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', mobilityPreset: 'STEP_FREE', transportScope: 'SUBWAY', objective: 'FASTEST'),
       RouteQueryIdentity(originStationId: 'a', destinationStationId: 'b', mobilityType: 'STANDARD', constraintMode: 'STRICT_STEP_FREE', transportScope: 'SUBWAY', objective: 'FASTEST'),
-      RouteQueryIdentity(originStationId: 'a', destinationStationId: 'b', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', transportScope: 'SUBWAY_AND_ITX_CHEONGCHUN', objective: 'FEWEST_TRANSFERS'),
+      RouteQueryIdentity(originStationId: 'a', destinationStationId: 'b', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', transportScope: 'SUBWAY_AND_ITX_CHEONGCHUN', objective: 'FASTEST'),
+      RouteQueryIdentity(originStationId: 'a', destinationStationId: 'b', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', transportScope: 'SUBWAY', objective: 'FEWEST_TRANSFERS'),
     ];
     for (final variant in variants) {
       expect(variant, isNot(base));
@@ -51,22 +52,32 @@ void main() {
     expect(canonicalText, isNot(contains('상록수 검색어')));
     expect(canonicalText, isNot(contains('37.123')));
     expect(canonicalText, isNot(contains('secret-token')));
+    final ambiguousLeft = RouteQueryIdentity(originStationId: 'ab', destinationStationId: 'c', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', transportScope: 'SUBWAY', objective: 'FASTEST');
+    final ambiguousRight = RouteQueryIdentity(originStationId: 'a', destinationStationId: 'bc', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', transportScope: 'SUBWAY', objective: 'FASTEST');
+    expect(ambiguousLeft.value, isNot(ambiguousRight.value));
+    expect(base.value, isNot(RouteQueryIdentity(originStationId: 'local-a', destinationStationId: 'online-b', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', transportScope: 'SUBWAY', objective: 'FASTEST').value));
   });
 
   test('candidate identity is ordered and ignores display-only provider data', () {
     final query = RouteQueryIdentity(originStationId: 'a', destinationStationId: 'b', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', transportScope: 'SUBWAY', objective: 'FASTEST');
     final first = RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l1', serviceClass: 'SUBWAY', servicePattern: 'LOCAL')]);
     final variants = [
+      RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'WALK', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l1', serviceClass: 'SUBWAY', servicePattern: 'LOCAL')]),
       RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'x', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l1', serviceClass: 'SUBWAY', servicePattern: 'LOCAL')]),
       RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'x', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l1', serviceClass: 'SUBWAY', servicePattern: 'LOCAL')]),
       RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n2', toNodeId: 'n1', edgeId: 'e1', lineId: 'l1', serviceClass: 'SUBWAY', servicePattern: 'LOCAL')]),
+      RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l1', serviceClass: 'ITX_CHEONGCHUN', servicePattern: 'LOCAL')]),
+      RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l1', serviceClass: 'SUBWAY', servicePattern: 'EXPRESS')]),
       RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e2', lineId: 'l1', serviceClass: 'SUBWAY', servicePattern: 'LOCAL')]),
       RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l2', serviceClass: 'SUBWAY', servicePattern: 'LOCAL')]),
       RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l1', serviceClass: 'ITX_CHEONGCHUN', servicePattern: 'EXPRESS')]),
     ];
     for (final variant in variants) { expect(first.value, isNot(variant.value)); }
+    final twoLegs = RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'b'), RouteCandidateLegSignature(stepType: 'WALK', fromStationId: 'b', toStationId: 'c')]);
+    final reversed = RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'WALK', fromStationId: 'b', toStationId: 'c'), RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'b')]);
+    expect(twoLegs.value, isNot(reversed.value));
     expect(() => RouteCandidateIdentity(query: query, legs: const []), throwsArgumentError);
   });
 }
 
-List<int> utf8Bytes(String value) => value.codeUnits;
+List<int> utf8Bytes(String value) => utf8.encode(value);

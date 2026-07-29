@@ -1366,7 +1366,7 @@ class RouteSearchResult {
     this.candidateIdentity,
     String? providerRouteSearchId,
     String? providerItineraryId,
-  }) : providerRouteSearchId = providerRouteSearchId ?? routeSearchId,
+  }) : providerRouteSearchId = providerRouteSearchId ?? '',
        providerItineraryId = providerItineraryId ?? '',
        // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
@@ -1407,6 +1407,7 @@ class RouteSearchResult {
 
     return RouteSearchResult(
       routeSearchId: _requiredRouteString(json, 'routeSearchId'),
+      providerRouteSearchId: _requiredRouteString(json, 'routeSearchId'),
       originStationId: _requiredRouteString(json, 'originStationId'),
       originStationName: _requiredRouteString(json, 'originStationName'),
       destinationStationId: _requiredRouteString(json, 'destinationStationId'),
@@ -2045,7 +2046,7 @@ RouteSearchResult _routeSearchResultFromV2Itinerary({
   return RouteSearchResult(
     routeSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
     queryIdentity: queryIdentity,
-    candidateIdentity: queryIdentity == null
+    candidateIdentity: queryIdentity == null || itinerary.legs.isEmpty
         ? null
         : RouteCandidateIdentity(
             query: queryIdentity,

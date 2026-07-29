@@ -276,6 +276,8 @@ void main() {
       warnings: const [],
       blockedReasons: const [],
       createdAt: '2026-06-19T09:00:00.000Z',
+      providerRouteSearchId: 'provider-search-opaque',
+      providerItineraryId: 'provider-itinerary-full-opaque',
       queryIdentity: RouteQueryIdentity(
         originStationId: 'station-sangnoksu',
         destinationStationId: 'station-sadang',
@@ -340,6 +342,9 @@ void main() {
     ]);
     expect(snapshot['queryIdentity'], result.queryIdentity!.value);
     expect(snapshot['candidateIdentity'], result.candidateIdentity!.value);
+    expect(snapshot['querySnapshot'], result.queryIdentity!.toSnapshot());
+    expect(snapshot['providerRouteSearchId'], 'provider-search-opaque');
+    expect(snapshot['providerItineraryId'], 'provider-itinerary-full-opaque');
 
     await repository.removeFavoriteRoute(saved.favoriteRouteId);
 
