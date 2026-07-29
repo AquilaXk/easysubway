@@ -584,9 +584,9 @@ void main() {
       await userDatabase.into(userDatabase.favoriteRoutes).insert(
         user_db.FavoriteRoutesCompanion.insert(
           routeId: candidate.value,
-          originStationId: 'station-sangnoksu',
-          destinationStationId: 'station-sadang',
-          mobilityProfile: 'SENIOR',
+          originStationId: 'target-origin',
+          destinationStationId: 'target-destination',
+          mobilityProfile: 'WHEELCHAIR',
           addedAt: DateTime.utc(2026, 7, 2),
         ),
       );
@@ -747,8 +747,8 @@ void main() {
       await userDatabase.into(userDatabase.favoriteRoutes).insert(
         user_db.FavoriteRoutesCompanion.insert(
           routeId: 'local-newer-duplicate',
-          originStationId: 'legacy-origin',
-          destinationStationId: 'legacy-destination',
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
           mobilityProfile: 'SENIOR',
           addedAt: DateTime.utc(2026, 7, 2),
         ),
@@ -837,6 +837,29 @@ void main() {
         'waypointStationId': 'station-seonjeongneung',
         'transportScope': 'SUBWAY_AND_ITX_CHEONGCHUN',
       })),
+      ('local-query-mismatch', jsonEncode({
+        'originStationId': 'station-other',
+        'originStationName': '다른 출발',
+        'destinationStationId': 'station-sadang',
+        'destinationStationName': '사당',
+        'mobilityType': 'WHEELCHAIR',
+        'status': 'FOUND',
+        'score': 1,
+        'createdAt': '2026-07-01T00:00:00.000Z',
+        'steps': [{'stepType': 'RIDE', 'fromStationId': 'station-other', 'toStationId': 'station-sadang'}],
+      })),
+      ('local-waypoint-number', jsonEncode({
+        'originStationId': 'station-sangnoksu',
+        'originStationName': '상록수',
+        'destinationStationId': 'station-sadang',
+        'destinationStationName': '사당',
+        'mobilityType': 'WHEELCHAIR',
+        'waypointStationId': 1,
+        'status': 'FOUND',
+        'score': 1,
+        'createdAt': '2026-07-01T00:00:00.000Z',
+        'steps': [{'stepType': 'RIDE', 'fromStationId': 'station-sangnoksu', 'toStationId': 'station-sadang'}],
+      })),
     ]) {
       await userDatabase.into(userDatabase.favoriteRoutes).insert(
         user_db.FavoriteRoutesCompanion.insert(
@@ -860,7 +883,7 @@ void main() {
 
     final favorites = await repository.listFavoriteRoutes();
 
-    expect(favorites, hasLength(4));
+    expect(favorites, hasLength(6));
     expect(favorites.every((favorite) => favorite.needsResearch), isTrue);
     expect(favorites.map((favorite) => favorite.statusLabel).toSet(), {'다시 검색 필요'});
     for (final favorite in favorites) {
@@ -889,7 +912,7 @@ void main() {
 
     expect(
       await userDatabase.customSelect('SELECT route_id FROM favorite_routes').get(),
-      hasLength(3),
+      hasLength(5),
     );
     expect(
       await userDatabase
@@ -908,6 +931,12 @@ void main() {
           .customSelect('SELECT key FROM app_preferences WHERE key = ?', variables: [Variable.withString('favorite_route_snapshot:local-waypoint')])
           .get(),
       hasLength(1),
+    );
+    expect(
+      await userDatabase
+          .customSelect('SELECT route_id FROM favorite_routes WHERE route_id IN (?, ?)', variables: [Variable.withString('local-query-mismatch'), Variable.withString('local-waypoint-number')])
+          .get(),
+      hasLength(2),
     );
   });
 

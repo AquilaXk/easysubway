@@ -882,7 +882,7 @@ class RouteSearchRequest {
     return RouteSearchRequest(
       originStationId: originStationId.trim(),
       destinationStationId: destinationStationId.trim(),
-      mobilityType: mobilityType,
+      mobilityType: mobilityType.trim(),
       constraintMode: constraintMode?.trim(),
       waypointStationId: waypointStationId?.trim(),
       mobilityPreset: mobilityPreset?.trim(),

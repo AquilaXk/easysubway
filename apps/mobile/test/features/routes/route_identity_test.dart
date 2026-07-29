@@ -5,6 +5,22 @@ import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('trimmed wheelchair mobility keeps the strict query identity', () {
+    final padded = RouteSearchRequest(
+      originStationId: 'station-a',
+      destinationStationId: 'station-b',
+      mobilityType: ' WHEELCHAIR ',
+    );
+    final normalized = RouteSearchRequest(
+      originStationId: 'station-a',
+      destinationStationId: 'station-b',
+      mobilityType: 'WHEELCHAIR',
+    );
+
+    expect(padded.trimmed().effectiveConstraintMode, 'STRICT_STEP_FREE');
+    expect(padded.queryIdentity, normalized.queryIdentity);
+  });
+
   test('query identity uses fixed UTF-8 JSON bytes and a stable hash', () {
     final identity = RouteQueryIdentity(
       originStationId: ' station-a ',

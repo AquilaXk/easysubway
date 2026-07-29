@@ -519,7 +519,10 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       var needsResearch = false;
       if (routeId.startsWith('local-') && snapshot != null) {
         final candidate = _legacyCandidate(snapshot);
-        if (candidate != null) {
+        if (candidate != null &&
+            candidate.query.originStationId == originStationId &&
+            candidate.query.destinationStationId == destinationStationId &&
+            candidate.query.mobilityType == mobilityType) {
           final migrated = await _migrateLegacyRoute(
             legacyRouteId: routeId,
             row: row,
@@ -641,7 +644,8 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     try {
       final querySnapshot = snapshot['querySnapshot'];
       final hasQuerySnapshot = snapshot.containsKey('querySnapshot');
-      final hasWaypointEvidence = _nonBlank(snapshot['waypointStationId']) ||
+      final hasWaypointEvidence =
+          _snapshotOptionalString(snapshot, 'waypointStationId') != null ||
           _hasWaypointStep(snapshot['steps']);
       final query = querySnapshot is Map<String, Object?>
           ? RouteQueryIdentity.fromSnapshot(querySnapshot)
@@ -1072,8 +1076,6 @@ bool _hasWaypointStep(Object? value) {
         _snapshotOptionalString(step, 'stepType')?.toLowerCase() == 'waypoint',
   );
 }
-
-bool _nonBlank(Object? value) => value is String && value.trim().isNotEmpty;
 
 String _snapshotString(Map<String, Object?> snapshot, String key) {
   final value = _snapshotOptionalString(snapshot, key);
