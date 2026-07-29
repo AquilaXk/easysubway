@@ -7313,7 +7313,7 @@
         "responseFields": ["RAIL_OPR_ISTT_CD", "LN_NM", "STIN_NM", "CHTN_MV_TP_ORDR", "MV_CONT_DTL", "CHTN_MV_CONT"],
         "runner": {
           "command": "node tools/datapack/collect-molit-railway-transfer-movement.mjs",
-          "arguments": ["--input", "[downloaded-cp949-csv]", "--output", "[absolute-output.csv.gz]", "--captured-at", "[ISO-8601-capture-instant]"],
+          "arguments": ["--input", "[downloaded-cp949-csv]", "--output", "[absolute-output-directory]/molit-railway-transfer-movement-20250811.csv.gz", "--captured-at", "[ISO-8601-capture-instant]"],
           "requiredEnv": []
         },
         "secretPolicy": "credential-free-output"

@@ -25,7 +25,11 @@ export function buildMolitRailwayTransferMovementSnapshot({
   expectedRawSha256 = MOLIT_RAILWAY_TRANSFER_MOVEMENT_RAW_SHA256,
 }) {
   if (!Buffer.isBuffer(bytes) || bytes.length === 0) throw new Error("CSV input is required");
-  requiredUtcInstant(capturedAt, "capturedAt");
+  const capturedMillis = requiredUtcInstant(capturedAt, "capturedAt");
+  const observedAt = "2025-08-11T00:00:00.000Z";
+  if (capturedMillis < Date.parse(observedAt) || capturedMillis > Date.now()) {
+    throw new Error("capturedAt must be between observedAt and now");
+  }
   if (!Number.isSafeInteger(expectedRowCount) || expectedRowCount < 1) throw new Error("expected row count is invalid");
   const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
   const text = utf8.startsWith(PROVIDER_COLUMNS[0]) ? utf8 : new TextDecoder("euc-kr").decode(bytes);
@@ -50,7 +54,6 @@ export function buildMolitRailwayTransferMovementSnapshot({
     return row;
   });
   const gzipBytes = gzipSync(bytes, { mtime: 0 });
-  const observedAt = "2025-08-11T00:00:00.000Z";
   const freshUntil = "2026-08-11T00:00:00.000Z";
   return {
     schemaVersion: 1,
@@ -86,6 +89,9 @@ export async function runMolitRailwayTransferMovementCollector(argv, fixture = {
   const output = path.resolve(required(args.output, "--output"));
   if (!path.isAbsolute(args.output)) throw new Error("--output must be absolute");
   if (!output.endsWith(".csv.gz")) throw new Error("--output must end with .csv.gz");
+  if (path.basename(output) !== `${MOLIT_RAILWAY_TRANSFER_MOVEMENT_SNAPSHOT_ID}.csv.gz`) {
+    throw new Error("--output must use the canonical snapshot filename");
+  }
   const metadataPath = `${output}.json`;
   if (args["verify-existing"] === "true") {
     const [metadataBytes, gzipBytes] = await Promise.all([readFile(metadataPath), readFile(output)]);

@@ -52,6 +52,8 @@ test("MOLIT transfer movement collector는 exact schema·순서와 공란을 보
 test("MOLIT transfer movement collector는 provider step 순서를 verbatim 보존하고 양의 정수 형식만 검증한다", () => {
   const fixtureOptions = options();
   assert.throws(() => buildMolitRailwayTransferMovementSnapshot({ ...fixtureOptions, bytes: csv(), capturedAt: "2026-07-29" }), /RFC 3339 UTC timestamp/);
+  assert.throws(() => buildMolitRailwayTransferMovementSnapshot({ ...fixtureOptions, bytes: csv(), capturedAt: "2025-08-10T23:59:59.999Z" }), /between observedAt and now/);
+  assert.throws(() => buildMolitRailwayTransferMovementSnapshot({ ...fixtureOptions, bytes: csv(), capturedAt: "9999-01-01T00:00:00.000Z" }), /between observedAt and now/);
   for (const [bytes, pattern] of [[csv(ROWS, "a,b,c"), /header mismatch/], [csv([ROWS[0]]), /row count mismatch/], [csv([",1호선,가,1,계단,이동", ROWS[1]]), /identity blank/], [csv([ROWS[0], "S1,1호선,가,0,,"]), /invalid step/], [csv([ROWS[0], "S1,1호선,가,one,,"]), /invalid step/]]) assert.throws(() => buildMolitRailwayTransferMovementSnapshot({ ...fixtureOptions, bytes, expectedRawSha256: createHash("sha256").update(bytes).digest("hex") }), pattern);
 });
 
@@ -59,9 +61,12 @@ test("MOLIT transfer movement collector CLI는 output gzip과 metadata hash 변�
   const directory = await mkdtemp(path.join(tmpdir(), "easysubway-molit-transfer-"));
   try {
     const input = path.join(directory, "official.csv");
-    const output = path.join(directory, "snapshot.csv.gz");
+    const output = path.join(directory, "molit-railway-transfer-movement-20250811.csv.gz");
     await writeFile(input, csv());
     const fixture = { expectedRowCount: 2, expectedRawSha256: createHash("sha256").update(csv()).digest("hex") };
+    await assert.rejects(() => runMolitRailwayTransferMovementCollector([
+      "--input", input, "--output", path.join(directory, "snapshot.csv.gz"), "--captured-at", "2026-07-29T00:00:00.000Z",
+    ], fixture), /canonical snapshot filename/);
     await runMolitRailwayTransferMovementCollector([
       "--input", input,
       "--output", output,
