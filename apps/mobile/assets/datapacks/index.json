@@ -1,24 +1,24 @@
 {
   "schemaVersion": 1,
-  "builtAt": "2026-07-12T00:00:00.000Z",
-  "qualityAsOf": "2026-07-12T00:00:00.000Z",
+  "builtAt": "2026-07-29T00:47:36.105Z",
+  "qualityAsOf": "2026-07-28T18:45:03.338Z",
   "freshnessExpiresAt": "2026-08-02T15:00:00.000Z",
-  "sourceSnapshotSetHash": "845b5a8f54f5c09277c2e7e6468fd8baab4da74210512f3b83be12d3bdcad75e",
+  "sourceSnapshotSetHash": "cd85827d6f90e7084f76ac63e376758eb72dd76f3247f46d5b9c77ec267f498e",
   "schemaIdentity": "catalog-schema-v1",
   "packs": [
     {
       "id": "core",
       "asset": "assets/datapacks/core.sqlite.gz",
-      "sha256": "6d722492f91dc0be5edebe3921f131275d7997ab76916706e05e3fa10a33dd2a",
-      "sqliteSha256": "45e0b9eba5f570f1d63afefc87e83f74c14a65355b94cf417928beea6f042b6b",
-      "byteSize": 183894
+      "sha256": "858474f6b3340c69aff2ca287179164ec307bb848c28ea69e94d8dc213125f06",
+      "sqliteSha256": "da8f967abf6333c3156c15212bc8f65317a6abfe722f01d9167a119408913221",
+      "byteSize": 183594
     },
     {
       "id": "capital",
       "asset": "assets/datapacks/capital.sqlite.gz",
-      "sha256": "0fc9103e3b27e867d90513d1c8ffb6e01ac9b8026e4a6311fda9ee6f18c4779c",
-      "sqliteSha256": "91fd8a98895fd55f1305c1cfe6b554fd4bb71d07bdb1c3a284a93f8ad31651cd",
-      "byteSize": 1463673
+      "sha256": "f328fbedff014be18a0e8341e0bdbfe9b0dd774fa7e9ae7692aa869e831707b3",
+      "sqliteSha256": "a581c5d2a78f765b859e7e7b7d62d3bf0d9b573bcebd246ab4c6f0cd62fddfc5",
+      "byteSize": 1463745
     }
   ]
 }

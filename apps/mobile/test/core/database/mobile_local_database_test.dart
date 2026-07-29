@@ -350,6 +350,11 @@ void main() {
           )
           ORDER BY target_id
           ''').get();
+    final facilityQualityCount = await database.customSelect('''
+          SELECT COUNT(*) AS count
+          FROM data_quality_records
+          WHERE target_type = 'facility'
+          ''').getSingle();
     final networkEdges = await database.customSelect('''
           SELECT id, from_node_id, to_node_id, edge_type, service_pattern,
                  includes_stairs, accessibility_status, reliability_score,
@@ -402,41 +407,32 @@ void main() {
     expect(exits.single.read<String>('exit_number'), '1');
     expect(exits.single.read<double>('latitude'), closeTo(37.3021, 0.0001));
     expect(exits.single.read<double>('longitude'), closeTo(126.8661, 0.0001));
-    expect(exits.single.read<int>('has_elevator_connection'), 1);
+    expect(exits.single.read<int>('has_elevator_connection'), 0);
     expect(exits.single.read<String>('data_source_type'), 'OFFICIAL_FILE');
     expect(exits.single.read<int>('last_verified_at'), 1781827200);
     expect(facilities.map((row) => row.read<String>('type')).toSet(), {
-      'ACCESSIBLE_TOILET',
       'ELEVATOR',
-      'ESCALATOR',
-      'WHEELCHAIR_LIFT',
     });
     expect(
       facilities.map((row) => row.read<String>('name')),
-      containsAll([
-        '대합실 장애인 화장실',
-        '상록수역 엘리베이터 설치 정보',
-        '상록수역 에스컬레이터 설치 정보',
-        '상록수역 휠체어리프트 설치 정보',
-      ]),
+      containsAll(['상록수역 ELEVATOR 1', '상록수역 ELEVATOR 2']),
     );
+    expect(facilities, hasLength(2));
+    expect(facilityQualityCount.read<int>('count'), 0);
     expect(
       fieldValidationRecords
           .map((row) => row.read<String>('target_type'))
           .toSet(),
-      {'facility', 'internal_route_edge', 'station_exit'},
+      {'internal_route_edge', 'station_exit'},
     );
     expect(
       fieldValidationRecords
           .map((row) => row.read<String>('quality_level'))
           .toSet(),
-      {'FIELD_STALE', 'FIELD_UNKNOWN', 'FIELD_VERIFIED'},
+      {'FIELD_VERIFIED'},
     );
     final expectedFieldValidationRecords = {
       'exit-sangnoksu-1': ('station_exit', 'FIELD_VERIFIED'),
-      'facility-sangnoksu-elevator-1': ('facility', 'FIELD_VERIFIED'),
-      'facility-sangnoksu-escalator-1': ('facility', 'FIELD_UNKNOWN'),
-      'facility-sangnoksu-accessible-toilet-1': ('facility', 'FIELD_STALE'),
       'edge-sangnoksu-concourse-exit-1': (
         'internal_route_edge',
         'FIELD_VERIFIED',
@@ -512,7 +508,7 @@ void main() {
       internalRouteEdges
           .map((row) => row.read<String>('accessibility_status'))
           .toSet(),
-      {'AVAILABLE'},
+      {'UNKNOWN'},
     );
     // [2026-07-11 #1950] 정본이 오너 자작 도식으로 교체되어 좌표가 바뀐다. 정확한
     // 폴리곤 대신 구조(닫힌 4점 사각형)를 검증한다(좌표 회귀는 route-map 게이트가 강제).
