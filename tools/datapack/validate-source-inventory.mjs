@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
+import path from "node:path";
+import { gunzipSync } from "node:zlib";
 import { validateQuotaEvidence } from "./lib/quota-evidence.mjs";
 import { officialOdFareAdmissionsBySource } from "./lib/official-od-fare-evidence.mjs";
 import { validateSourceGovernancePolicy } from "./source-governance-policy.mjs";
@@ -42,7 +44,7 @@ try {
   const officialOdFareAdmissionBytes = inventory.sources.some(
     (source) => source.officialOdFareAdmissionHash != null || source.fareStationLineMappingLedgerHash != null,
   ) ? await readFile(officialOdFareAdmissionPath) : null;
-  validateAdmittedCandidateEvidence(inventory, candidates, officialOdFareAdmissionBytes);
+  await validateAdmittedCandidateEvidence(inventory, candidates, officialOdFareAdmissionBytes);
   if (scope) {
     validateProductionScope(inventory, scope);
   }
@@ -263,7 +265,7 @@ function validateProductionScope(inventory, scope) {
   }
 }
 
-function validateAdmittedCandidateEvidence(inventory, candidates, officialOdFareAdmissionBytes) {
+async function validateAdmittedCandidateEvidence(inventory, candidates, officialOdFareAdmissionBytes) {
   if (!candidates || typeof candidates !== "object" || Array.isArray(candidates)) {
     throw new Error("source candidates must be an object");
   }
@@ -277,7 +279,55 @@ function validateAdmittedCandidateEvidence(inventory, candidates, officialOdFare
   const unmatchedFareSourceIds = new Set(inventory.sources
     .filter((source) => source.officialOdFareAdmissionHash != null || source.fareStationLineMappingLedgerHash != null)
     .map((source) => source.id));
+  const unmatchedSnapshotSourceIds = new Set(inventory.sources
+    .filter((source) => source.rawSnapshotAdmission != null)
+    .map((source) => source.id));
   for (const candidate of candidates.candidates) {
+    if (candidate?.rawSnapshotAdmission != null && candidate.admissionStatus !== "official_snapshot_admitted") {
+      throw new Error(`${candidate.id} official snapshot admissionStatus invalid`);
+    }
+    if (candidate?.admissionStatus === "official_snapshot_admitted") {
+      const source = sources.get(candidate.id);
+      if (!source) throw new Error(`${candidate.id} official snapshot missing inventory source`);
+      if (!unmatchedSnapshotSourceIds.delete(candidate.id)) {
+        throw new Error(`${candidate.id} official snapshot requires exactly one inventory binding`);
+      }
+      if (source.requiredForProductionPack || source.capabilities.facility.productionUseAllowed
+        || source.capabilities.schedule.productionUseAllowed || source.capabilities.realtime.productionUseAllowed) {
+        throw new Error(`${candidate.id} official snapshot must remain non-production`);
+      }
+      const candidateBinding = candidate.rawSnapshotAdmission;
+      const inventoryBinding = source.rawSnapshotAdmission;
+      if (!candidateBinding || !inventoryBinding || JSON.stringify(candidateBinding) !== JSON.stringify(inventoryBinding)) {
+        throw new Error(`${candidate.id} official snapshot binding mismatch`);
+      }
+      for (const field of ["snapshotId", "metadataPath", "metadataFileSha256", "rawSha256", "gzipSha256", "rowCount", "status"]) {
+        if (candidateBinding[field] == null) throw new Error(`${candidate.id} official snapshot ${field} missing`);
+      }
+      if (!/^[0-9a-f]{64}$/.test(candidateBinding.metadataFileSha256)
+        || !/^[0-9a-f]{64}$/.test(candidateBinding.rawSha256)
+        || !/^[0-9a-f]{64}$/.test(candidateBinding.gzipSha256)
+        || candidateBinding.rowCount !== 8054 || candidateBinding.status !== "LOCKED") {
+        throw new Error(`${candidate.id} official snapshot binding invalid`);
+      }
+      const metadataBytes = await readFile(candidateBinding.metadataPath);
+      if (sha256(metadataBytes) !== candidateBinding.metadataFileSha256) {
+        throw new Error(`${candidate.id} official snapshot metadata hash mismatch`);
+      }
+      const metadata = JSON.parse(metadataBytes);
+      for (const field of ["snapshotId", "rawSha256", "gzipSha256", "rowCount"]) {
+        if (metadata[field] !== candidateBinding[field]) throw new Error(`${candidate.id} official snapshot metadata ${field} mismatch`);
+      }
+      if (metadata.sourceId !== candidate.id || metadata.artifactKind !== "molit-railway-transfer-movement-snapshot-metadata") {
+        throw new Error(`${candidate.id} official snapshot metadata identity mismatch`);
+      }
+      const gzipBytes = await readFile(path.resolve(path.dirname(candidateBinding.metadataPath), metadata.gzipPath));
+      if (sha256(gzipBytes) !== candidateBinding.gzipSha256) throw new Error(`${candidate.id} official snapshot gzip hash mismatch`);
+      if (sha256(gunzipSync(gzipBytes)) !== candidateBinding.rawSha256) {
+        throw new Error(`${candidate.id} official snapshot raw hash mismatch`);
+      }
+      continue;
+    }
     if (candidate?.admissionStatus === "official_od_fare_admitted_to_production_inventory") {
       validateOfficialOdFareCandidate(candidate, sources, officialOdFareAdmissionBytes);
       const sourceId = candidate.productionInventoryReferenceId ?? candidate.id;
@@ -301,6 +351,9 @@ function validateAdmittedCandidateEvidence(inventory, candidates, officialOdFare
   }
   if (unmatchedFareSourceIds.size !== 0) {
     throw new Error(`${[...unmatchedFareSourceIds][0]} official OD fare source requires an admitted candidate`);
+  }
+  if (unmatchedSnapshotSourceIds.size !== 0) {
+    throw new Error(`${[...unmatchedSnapshotSourceIds][0]} official snapshot requires an admitted candidate`);
   }
 }
 

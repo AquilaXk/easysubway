@@ -9385,6 +9385,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-uijeongbu-route-map-positions",
     "kric-wheelchair-lift-location",
     "kric-wheelchair-lift-movement",
+    "molit-railway-transfer-movement",
     "molit-tago-subway-info",
     "molit-urban-rail-full-route",
     "molit-urban-rail-full-route-daegu-line1-membership",
