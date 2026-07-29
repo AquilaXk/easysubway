@@ -529,6 +529,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
             snapshot: snapshot,
             candidate: candidate,
           );
+          if (migrated == null) continue;
           routeId = migrated.routeId;
           snapshot = migrated.snapshot;
           addedAt = migrated.addedAt;
@@ -712,7 +713,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       String destinationStationId,
       String mobilityType,
       bool needsResearch,
-    })
+    })?
   >
   _migrateLegacyRoute({
     required String legacyRouteId,
@@ -735,7 +736,14 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     var resolvedMobilityType = row.read<String>('mobility_profile');
     var targetAlreadyExisted = false;
     var blockedByOrphanSnapshot = false;
-    await userDatabase.transaction(() async {
+    final sourceStillExists = await userDatabase.transaction(() async {
+      final source = await userDatabase
+          .customSelect(
+            'SELECT route_id FROM favorite_routes WHERE route_id = ?',
+            variables: [Variable.withString(legacyRouteId)],
+          )
+          .getSingleOrNull();
+      if (source == null) return false;
       final target = await userDatabase
           .customSelect(
             'SELECT route_id, origin_station_id, destination_station_id, mobility_profile, CAST(added_at AS INTEGER) AS added_at_value FROM favorite_routes WHERE route_id = ?',
@@ -753,7 +761,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
             .getSingleOrNull();
         if (orphanSnapshot != null) {
           blockedByOrphanSnapshot = true;
-          return;
+          return true;
         }
         await userDatabase
             .into(userDatabase.favoriteRoutes)
@@ -796,7 +804,9 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         'DELETE FROM app_preferences WHERE key = ?',
         ['$_routeSnapshotPrefix$legacyRouteId'],
       );
+      return true;
     });
+    if (!sourceStillExists) return null;
     if (blockedByOrphanSnapshot) {
       return (
         routeId: legacyRouteId,

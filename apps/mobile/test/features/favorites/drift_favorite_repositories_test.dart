@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:drift/drift.dart';
+import 'package:drift/native.dart';
 import 'package:easysubway_mobile/app/app_dependencies.dart';
 import 'package:easysubway_mobile/core/database/catalog/catalog_database.dart';
 import 'package:easysubway_mobile/core/database/user/user_database.dart'
@@ -516,6 +517,84 @@ void main() {
           )
           .get(),
       hasLength(1),
+    );
+  });
+
+  test('목록 조회 뒤 삭제된 레거시 경로는 candidate identity로 되살리지 않는다', () async {
+    const legacyRouteId = 'local-concurrently-deleted';
+    final interceptor = _DeleteLegacyBeforeMigrationTransaction(legacyRouteId);
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase(
+      NativeDatabase.memory().interceptWith(interceptor),
+    );
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    final repository = DriftFavoriteRouteRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+    await userDatabase.transaction(() async {
+      await userDatabase
+          .into(userDatabase.favoriteRoutes)
+          .insert(
+            user_db.FavoriteRoutesCompanion.insert(
+              routeId: legacyRouteId,
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityProfile: 'WHEELCHAIR',
+              addedAt: DateTime.utc(2026, 7),
+            ),
+          );
+      await userDatabase
+          .into(userDatabase.appPreferences)
+          .insert(
+            user_db.AppPreferencesCompanion.insert(
+              key: 'favorite_route_snapshot:$legacyRouteId',
+              value: jsonEncode({
+                'routeSearchId': legacyRouteId,
+                'originStationId': 'station-sangnoksu',
+                'originStationName': '상록수',
+                'destinationStationId': 'station-sadang',
+                'destinationStationName': '사당',
+                'mobilityType': 'WHEELCHAIR',
+                'status': 'FOUND',
+                'score': 71,
+                'createdAt': '2026-07-01T00:00:00.000Z',
+                'objective': 'FASTEST',
+                'steps': [
+                  {
+                    'stepType': 'RIDE',
+                    'fromStationId': 'station-sangnoksu',
+                    'toStationId': 'station-sadang',
+                    'lineId': 'seoul-4',
+                    'serviceClass': 'SUBWAY',
+                    'servicePattern': 'LOCAL',
+                  },
+                ],
+              }),
+              updatedAt: DateTime.utc(2026, 7),
+            ),
+          );
+    });
+    interceptor.arm();
+
+    final favorites = await repository.listFavoriteRoutes();
+
+    expect(favorites, isEmpty);
+    expect(
+      await userDatabase
+          .customSelect('SELECT route_id FROM favorite_routes')
+          .get(),
+      isEmpty,
+    );
+    expect(
+      await userDatabase
+          .customSelect(
+            "SELECT key FROM app_preferences WHERE key LIKE 'favorite_route_snapshot:%'",
+          )
+          .get(),
+      isEmpty,
     );
   });
 
@@ -1577,4 +1656,32 @@ void main() {
       isA<UserDataDeletionLocalRepository>(),
     );
   });
+}
+
+final class _DeleteLegacyBeforeMigrationTransaction extends QueryInterceptor {
+  _DeleteLegacyBeforeMigrationTransaction(this.legacyRouteId);
+
+  final String legacyRouteId;
+  bool _armed = false;
+
+  void arm() => _armed = true;
+
+  @override
+  Future<List<Map<String, Object?>>> runSelect(
+    QueryExecutor executor,
+    String statement,
+    List<Object?> args,
+  ) async {
+    if (_armed && executor is TransactionExecutor) {
+      _armed = false;
+      await executor.runDelete(
+        'DELETE FROM favorite_routes WHERE route_id = ?',
+        [legacyRouteId],
+      );
+      await executor.runDelete('DELETE FROM app_preferences WHERE key = ?', [
+        'favorite_route_snapshot:$legacyRouteId',
+      ]);
+    }
+    return executor.runSelect(statement, args);
+  }
 }
