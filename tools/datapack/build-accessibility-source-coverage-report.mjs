@@ -24,6 +24,13 @@ const VIOLATION_KEYS = Object.freeze([
   "artifactIdentity",
 ]);
 const ABSENCE_EVIDENCE_MODES = new Set(["EXPLICIT_ZERO", "EXHAUSTIVE_LIST"]);
+const COVERAGE_REGION_IDS = Object.freeze({
+  "수도권": "capital",
+  "부산권": "busan",
+  "대구권": "daegu",
+  "광주권": "gwangju",
+  "대전권": "daejeon",
+});
 
 export function buildAccessibilitySourceCoverageReport({
   artifacts,
@@ -205,7 +212,7 @@ function collectEvaluatedStationDomains(artifacts, validClaims, sources) {
         : undefined;
       const source = sources.get(claim.sourceId);
       if (!stationLine || !validClaims.has(claim)
-        || !sourceCoversStationDomain(source, stationLine.operatorId, domain)) continue;
+        || !sourceCoversStationDomain(source, stationLine, domain)) continue;
       const key = `${artifact.artifactId}\0${stationLine.operatorId}\0${domain}`;
       const entry = evaluated.get(key) ?? { stationLines: new Set(), sourceIds: new Set() };
       entry.stationLines.add(`${claim.stationId}\0${claim.lineId}`);
@@ -216,15 +223,18 @@ function collectEvaluatedStationDomains(artifacts, validClaims, sources) {
   return evaluated;
 }
 
-function sourceCoversStationDomain(source, operatorId, domain) {
+function sourceCoversStationDomain(source, stationLine, domain) {
   const sourceDomain = {
     FACILITY: "accessibility_facilities",
     EXIT: "indoor_movement_paths",
     TRANSFER: "indoor_movement_paths",
   }[domain];
+  const scope = source?.coverageScope;
   return ABSENCE_EVIDENCE_MODES.has(source?.accessibilityAdmissionEvidence?.absenceEvidenceMode)
-    && source?.coverageScope?.operatorIds?.includes(operatorId)
-    && source?.coverageScope?.sourceDomains?.includes(sourceDomain);
+    && scope?.regionIds?.includes(stationLine.regionId)
+    && scope?.operatorIds?.includes(stationLine.operatorId)
+    && (!scope.lineIds || scope.lineIds.includes(stationLine.lineId))
+    && scope?.sourceDomains?.includes(sourceDomain);
 }
 
 function buildStationDomainMatrix(artifacts, stationLines, evaluated) {
@@ -615,9 +625,10 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
       && tableHasColumns(database, "operators", ["id", "name_ko"])
       && tableHasColumns(database, "lines", ["id", "operator_id", "name_ko"])
       && tableHasColumns(database, "station_lines", ["station_id", "line_id"])
-      && tableHasColumns(database, "stations", ["id", "name_ko"])
+      && tableHasColumns(database, "stations", ["id", "name_ko", "region"])
       ? database.prepare(`
           SELECT station_lines.station_id AS station_id, stations.name_ko AS station_name,
+                 stations.region AS region_id,
                  station_lines.line_id AS line_id, lines.name_ko AS line_name,
                  operators.id AS operator_id, operators.name_ko AS operator_name
           FROM station_lines
@@ -629,6 +640,7 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
           stationId: row.station_id,
           stationName: row.station_name,
           stationAliases: stationAliases.get(row.station_id) ?? [],
+          regionId: COVERAGE_REGION_IDS[row.region_id],
           lineId: row.line_id,
           lineName: row.line_name,
           operatorId: row.operator_id,

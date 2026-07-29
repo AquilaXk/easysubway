@@ -55,6 +55,7 @@ test("station domain source matrix는 실제 station-line 분모의 미평가 ce
     stationId: "station-a",
     stationName: "사당",
     stationAliases: [],
+    regionId: "capital",
     lineId: "line-a",
     lineName: "수도권 4호선",
     operatorId: "seoul-metro",
@@ -80,7 +81,9 @@ test("station domain source matrix는 실제 station-line 분모의 미평가 ce
     providerLines: [{ railOprIsttCd: "S1", operatorName: "서울교통공사", lnCd: "4", lineName: "4호선" }],
   };
   input.inventory.sources[0].coverageScope = {
+    regionIds: ["capital"],
     operatorIds: ["seoul-metro"],
+    lineIds: ["line-a"],
     sourceDomains: ["accessibility_facilities"],
   };
 
@@ -169,6 +172,16 @@ test("station domain source matrix는 실제 station-line 분모의 미평가 ce
     .stationDomainSourceGate.matrix.find(({ domain }) => domain === "FACILITY").status, "BLOCKED");
 
   input.inventory.sources[0].coverageScope.sourceDomains = ["accessibility_facilities"];
+  input.inventory.sources[0].coverageScope.regionIds = ["busan"];
+  assert.equal(buildAccessibilitySourceCoverageReport(input)
+    .stationDomainSourceGate.matrix.find(({ domain }) => domain === "FACILITY").status, "BLOCKED");
+
+  input.inventory.sources[0].coverageScope.regionIds = ["capital"];
+  input.inventory.sources[0].coverageScope.lineIds = ["line-b"];
+  assert.equal(buildAccessibilitySourceCoverageReport(input)
+    .stationDomainSourceGate.matrix.find(({ domain }) => domain === "FACILITY").status, "BLOCKED");
+
+  input.inventory.sources[0].coverageScope.lineIds = ["line-a"];
   input.molitTransferSnapshot.rawSha256 = "invalid";
   assert.throws(() => buildAccessibilitySourceCoverageReport(input), /identity is invalid/);
 
