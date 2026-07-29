@@ -19637,6 +19637,29 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   }
 });
 
+test("KRIC nationwide accessibility snapshot workflow는 default branch와 sanitized artifact 경계를 유지한다", () => {
+  const workflowPath = ".github/workflows/kric-nationwide-accessibility-snapshot.yml";
+  assert.ok(existsSync(path.join(root, workflowPath)), "KRIC nationwide accessibility workflow must exist");
+  const workflow = read(workflowPath);
+
+  assert.match(workflow, /^on:\s*\n  workflow_dispatch: *$/m);
+  assert.match(
+    workflow,
+    /if: \$\{\{ github\.ref == format\('refs\/heads\/\{0\}', github\.event\.repository\.default_branch\) \}\}/,
+  );
+  assert.deepEqual(
+    [...new Set([...workflow.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1]))],
+    ["KRIC_SERVICE_KEY"],
+  );
+  assert.match(workflow, /build-molit-nationwide-fixture\.mjs/);
+  assert.match(workflow, /collect-kric-nationwide-route-rosters\.mjs/);
+  assert.match(workflow, /collect-kric-accessibility-snapshots\.mjs/);
+  assert.match(workflow, /--targets tools\/datapack\/nationwide-coverage-targets\.json/);
+  assert.match(workflow, /uses: actions\/upload-artifact@[0-9a-f]{40}/);
+  assert.match(workflow, /kric-station-convenience-standard-\*\.json/);
+  assert.doesNotMatch(workflow, /\.env|github\.event\.inputs|\braw\b|response/i);
+});
+
 test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized artifact 경계를 유지한다", () => {
   const workflowPath = ".github/workflows/kric-source-candidate-evidence.yml";
   assert.ok(existsSync(path.join(root, workflowPath)), "KRIC evidence workflow must exist");
