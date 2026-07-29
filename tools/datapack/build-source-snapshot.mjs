@@ -16,6 +16,9 @@ const DEFAULT_FRESHNESS_POLICY = "apps/mobile/release/datapack-freshness-sla.jso
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  if (args["remove-source-ids"] != null && args["snapshot-set"] == null) {
+    throw new Error("--remove-source-ids requires --snapshot-set");
+  }
   const raw = await readRaw(args);
   assertNoCredential(raw);
   const canonicalRaw = canonicalizeRaw(raw);

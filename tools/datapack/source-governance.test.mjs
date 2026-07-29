@@ -341,6 +341,14 @@ test("snapshot set explicit removal은 다른 known source만 허용한다", asy
   ];
 
   try {
+    await assert.rejects(
+      buildSnapshot([
+        ...buildArgs.slice(0, -2),
+        "--snapshot-id", "snapshot-a-0",
+        "--remove-source-ids", "other",
+      ]),
+      /--remove-source-ids requires --snapshot-set/,
+    );
     await writeFile(snapshotSet, `${JSON.stringify([{ snapshotId: "other-1", sourceId: "other" }])}\n`);
     await buildSnapshot([...buildArgs, "--snapshot-id", "snapshot-a-1", "--remove-source-ids", " other "]);
     assert.deepEqual(
