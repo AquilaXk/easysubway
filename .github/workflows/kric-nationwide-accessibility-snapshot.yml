@@ -52,6 +52,7 @@ jobs:
             --targets tools/datapack/nationwide-coverage-targets.json \
             --fixture "${RUNNER_TEMP}/kric-nationwide-fixture.json" \
             --route-rosters "${RUNNER_TEMP}/kric-nationwide-route-rosters.json" \
+            --request-interval-ms 250 \
             --output-root "${RUNNER_TEMP}/kric-nationwide-accessibility-snapshot"
 
       - name: KRIC Nationwide Accessibility Snapshot / Upload sanitized snapshot

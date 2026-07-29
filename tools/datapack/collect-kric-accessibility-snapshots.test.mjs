@@ -193,11 +193,14 @@ test("전체 station-line을 다음 snapshot roster 입력으로 읽는다", asy
 
 test("KRIC accessibility snapshot은 tuple을 정렬하고 present/explicit-zero를 보존한다", async () => {
   const seen = [];
+  const delays = [];
   const snapshots = await collectKricAccessibilitySnapshots({
     roster: [...roster, { ...roster[0], stationId: "station-c" }],
     operations: [operation],
     serviceKey: "super-secret",
     now: new Date("2026-07-28T00:00:00.000Z"),
+    requestIntervalMs: 250,
+    delayImpl: async (milliseconds) => { delays.push(milliseconds); },
     fetchImpl: async (url) => {
       seen.push(url.searchParams.get("stinCd"));
       const tuple = Object.fromEntries(url.searchParams);
@@ -206,6 +209,7 @@ test("KRIC accessibility snapshot은 tuple을 정렬하고 present/explicit-zero
   });
 
   assert.deepEqual(seen, ["101", "202"]);
+  assert.deepEqual(delays, [250]);
   assert.deepEqual(snapshots[0].queries.map(({ status }) => status), [
     "PRESENT", "ABSENT_EXPLICIT_ZERO", "ABSENT_EXPLICIT_ZERO",
   ]);
@@ -367,7 +371,7 @@ test("두 번째 transport 실패 뒤에는 fail closed다", async () => {
     operations: [operation],
     serviceKey: "key",
     fetchImpl: async () => { calls += 1; throw new Error("timeout"); },
-  }), /KRIC accessibility request failed/);
+  }), /KRIC accessibility request failed: kric-station-elevator\/S1\/2\/202/);
   assert.equal(calls, 2);
 });
 
