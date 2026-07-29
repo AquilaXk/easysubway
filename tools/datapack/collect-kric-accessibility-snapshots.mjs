@@ -44,6 +44,11 @@ export async function collectKricAccessibilitySnapshots({
   const capturedAt = now.toISOString();
   const freshUntil = new Date(now.getTime() + 86_400_000).toISOString();
   const snapshots = [];
+  let requestCount = 0;
+  const paceRequest = async () => {
+    if (requestCount > 0 && requestIntervalMs > 0) await delayImpl(requestIntervalMs);
+    requestCount += 1;
+  };
   for (const operation of operations) {
     validateOperation(operation);
     const queries = [];
@@ -51,9 +56,8 @@ export async function collectKricAccessibilitySnapshots({
     for (const tuple of tuples) {
       const providerKey = [tuple.railOprIsttCd, tuple.lnCd, tuple.stinCd].join("\0");
       if (!responsesByProviderTuple.has(providerKey)) {
-        if (responsesByProviderTuple.size > 0 && requestIntervalMs > 0) await delayImpl(requestIntervalMs);
         responsesByProviderTuple.set(providerKey, await requestRows({
-          operation, tuple, serviceKey, fetchImpl, requestTimeoutMs,
+          operation, tuple, serviceKey, fetchImpl, requestTimeoutMs, paceRequest,
         }));
       }
       const { rows, rawResponseSha256 } = responsesByProviderTuple.get(providerKey);
@@ -288,13 +292,14 @@ function validateOperation(operation) {
   }
 }
 
-async function requestRows({ operation, tuple, serviceKey, fetchImpl, requestTimeoutMs }) {
+async function requestRows({ operation, tuple, serviceKey, fetchImpl, requestTimeoutMs, paceRequest }) {
   const url = new URL(operation.endpoint);
   url.searchParams.set("serviceKey", serviceKey);
   url.searchParams.set("format", "json");
   for (const field of ["railOprIsttCd", "lnCd", "stinCd"]) url.searchParams.set(field, tuple[field]);
   let response;
   for (let attempt = 0; attempt < 2; attempt += 1) {
+    await paceRequest();
     try {
       response = await fetchImpl(url, { signal: AbortSignal.timeout(requestTimeoutMs) });
     } catch {

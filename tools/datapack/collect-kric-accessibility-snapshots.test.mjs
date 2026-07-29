@@ -346,10 +346,13 @@ test("provider resultCode 00 body array envelope는 표준 rows로 검증한다"
 test("transport와 5xx는 정확히 한 번만 retry한다", async () => {
   for (const firstFailure of [new Error("timeout"), response(503, [])]) {
     let calls = 0;
+    const delays = [];
     const snapshots = await collectKricAccessibilitySnapshots({
       roster: roster.slice(0, 1),
       operations: [operation],
       serviceKey: "key",
+      requestIntervalMs: 250,
+      delayImpl: async (milliseconds) => { delays.push(milliseconds); },
       fetchImpl: async () => {
         calls += 1;
         if (calls === 1) {
@@ -360,6 +363,7 @@ test("transport와 5xx는 정확히 한 번만 retry한다", async () => {
       },
     });
     assert.equal(calls, 2);
+    assert.deepEqual(delays, [250]);
     assert.equal(snapshots[0].queries[0].status, "ABSENT_EXPLICIT_ZERO");
   }
 });
