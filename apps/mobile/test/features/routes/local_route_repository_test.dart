@@ -10,6 +10,7 @@ import 'package:easysubway_mobile/facility_report.dart';
 import 'package:easysubway_mobile/features/routes/application/network_graph.dart'
     as graph;
 import 'package:easysubway_mobile/features/routes/data/local_route_repository.dart';
+import 'package:easysubway_mobile/features/routes/domain/route_identity.dart';
 import 'package:easysubway_mobile/features/fare/official_od_fare_quote.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_route_mapping.dart';
 import 'package:easysubway_mobile/features/get_off_alarm/get_off_alarm_scheduler.dart';
@@ -1551,6 +1552,42 @@ void main() {
     expect(alarmStops, hasLength(1));
     expect(alarmStops.single.stationId, 'station-c');
     expect(alarmStops.single.kind, GetOffAlarmKind.destination);
+  });
+
+  test('로컬 candidate identity는 저장되는 collapse·정규화 leg와 일치한다', () async {
+    final database = CatalogDatabase.memory();
+    addTearDown(database.close);
+    await _seedConsecutiveRideRoute(database, servicePattern: 'local ');
+    await _seedConsecutiveRideTimetable(database);
+    final result =
+        await LocalRouteRepository(
+          catalogDatabase: database,
+          now: () => DateTime.parse('2026-07-10T07:58:00+09:00'),
+        ).searchRoute(
+          const RouteSearchRequest(
+            originStationId: 'station-a',
+            destinationStationId: 'station-c',
+            mobilityType: 'WHEELCHAIR',
+          ),
+        );
+    final expected = RouteCandidateIdentity(
+      query: result.queryIdentity!,
+      legs: [
+        for (final step in result.steps)
+          RouteCandidateLegSignature(
+            stepType: step.stepType,
+            fromStationId: step.fromStationId,
+            toStationId: step.toStationId,
+            lineId: step.lineId,
+            serviceClass: step.serviceClass ?? '',
+            servicePattern: step.servicePattern ?? '',
+          ),
+      ],
+    );
+
+    final ride = result.steps.singleWhere((step) => step.stepType == 'ride');
+    expect(ride.servicePattern, 'LOCAL');
+    expect(result.candidateIdentity?.value, expected.value);
   });
 
   test('출발 초보다 500ms 늦은 cursor는 이미 출발한 trip을 건너뛴다', () async {
@@ -6626,7 +6663,10 @@ Future<void> _seedTwoLegRoute(CatalogDatabase database) async {
   );
 }
 
-Future<void> _seedConsecutiveRideRoute(CatalogDatabase database) async {
+Future<void> _seedConsecutiveRideRoute(
+  CatalogDatabase database, {
+  String servicePattern = 'LOCAL',
+}) async {
   await _seedLineWithoutNetworkEdges(database);
   await _insertVerifiedNetworkEdge(
     database,
@@ -6635,7 +6675,7 @@ Future<void> _seedConsecutiveRideRoute(CatalogDatabase database) async {
     toNodeId: 'station-b:line-test:LOCAL',
     edgeType: 'RIDE',
     durationSeconds: 300,
-    servicePattern: 'LOCAL',
+    servicePattern: servicePattern,
   );
   await _insertVerifiedNetworkEdge(
     database,
@@ -6644,7 +6684,7 @@ Future<void> _seedConsecutiveRideRoute(CatalogDatabase database) async {
     toNodeId: 'station-c:line-test:LOCAL',
     edgeType: 'RIDE',
     durationSeconds: 300,
-    servicePattern: 'LOCAL',
+    servicePattern: servicePattern,
   );
 }
 

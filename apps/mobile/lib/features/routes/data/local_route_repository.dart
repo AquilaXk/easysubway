@@ -594,17 +594,14 @@ class LocalRouteRepository implements RouteSearchRepository {
           : RouteCandidateIdentity(
               query: request.queryIdentity,
               legs: [
-                for (final step in result.steps)
+                for (final step in steps)
                   RouteCandidateLegSignature(
-                    stepType: step.type.name,
-                    fromStationId: catalog.stationIdForNode(step.fromNodeId),
-                    toStationId: catalog.stationIdForNode(step.toNodeId),
-                    fromNodeId: step.fromNodeId,
-                    toNodeId: step.toNodeId,
-                    edgeId: step.edgeId,
+                    stepType: step.stepType,
+                    fromStationId: step.fromStationId,
+                    toStationId: step.toStationId,
                     lineId: step.lineId,
-                    serviceClass: step.type.name == 'ride' ? 'SUBWAY' : '',
-                    servicePattern: step.servicePattern,
+                    serviceClass: step.serviceClass ?? '',
+                    servicePattern: step.servicePattern ?? '',
                   ),
               ],
             ),
