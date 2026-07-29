@@ -108,6 +108,7 @@ export async function runMolitRailwayTransferMovementCollector(argv, fixture = {
     if (JSON.stringify({ ...rebuiltMetadata, gzipPath: path.basename(output) }) !== JSON.stringify(metadata)) {
       throw new Error("metadata mismatch");
     }
+    return metadata;
   }
   const snapshot = buildMolitRailwayTransferMovementSnapshot({
     bytes: await readFile(input),
