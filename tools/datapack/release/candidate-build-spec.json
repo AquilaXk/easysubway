@@ -9,7 +9,7 @@
   "networkEdgeEvidence": {
     "sourceInventory": {
       "path": "tools/datapack/source-inventory.json",
-      "sha256": "4590cb3c8eeaa831a09c1d7a6d4af042783782b4f82d53ebb07dc6912bd89f20"
+      "sha256": "ceec72e2bee1f7060820076068926214150239df701fe38aa148b1a804354192"
     },
     "capitalTopology": {
       "path": "tools/datapack/sources/capital-route-topology-20260724.json",
@@ -185,7 +185,7 @@
   "facilityEvidenceLedgerHash": "b3ffc88b4a9ce3515340366885beaace718c70058608567513f378e198935981",
   "routeEvidenceLedgerHash": "da884d0ff0138e009587753ec541997c29da57370e056dd8d3f6ad2687ad9fa9",
   "approvedOverrideSetHash": "ee5364319442d0bb4590d83e149631635c65ab59f1f3254fdbf196e04ec0f3cd",
-  "sourceInventorySha256": "e58215364a8affe5ea8ddc23e12ff645fc6943344680b63a92751a7a220aa671",
+  "sourceInventorySha256": "7c7373097a5a8078061d516ba68bd86c02387adb4861ee41c620d7fa8c00330a",
   "builderGitSha": "6492e35ba435925a219b0de232f977395344afe6",
   "builderVersion": "build-datapack.mjs@23",
   "officialOdFareEvidence": {

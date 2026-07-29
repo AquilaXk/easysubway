@@ -29,10 +29,23 @@ test("official snapshot admission validates exact non-production raw binding", a
     const source = inventory.sources.find(({ id }) => id === "molit-railway-transfer-movement");
     const candidate = candidates.candidates.find(({ id }) => id === "molit-railway-transfer-movement");
     const binding = structuredClone(candidate.rawSnapshotAdmission);
+    assert.equal(source.coverageScope.mappingStatus, "UNMAPPED_RAW_SNAPSHOT");
+    assert.deepEqual(source.coverageScope.regionIds, []);
+    assert.deepEqual(source.coverageScope.operatorIds, []);
     await writeFile(inventoryPath, JSON.stringify(inventory));
     await writeFile(candidatesPath, JSON.stringify(candidates));
     await execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root });
     const metadata = JSON.parse(await readFile(binding.metadataPath, "utf8"));
+    assert.equal(metadata.observedRailOperatorCodes.length, 18);
+    const mappedSource = inventory.sources.find(({ id }) => id !== source.id);
+    const mappedRegionIds = mappedSource.coverageScope.regionIds;
+    mappedSource.coverageScope.regionIds = [];
+    await writeFile(inventoryPath, JSON.stringify(inventory));
+    await assert.rejects(
+      execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root }),
+      /coverageScope.regionIds must be a non-empty array/,
+    );
+    mappedSource.coverageScope.regionIds = mappedRegionIds;
     const metadataOnlyMutation = { ...metadata, freshUntil: "2027-08-11T00:00:00.000Z" };
     const metadataOnlyMutationBytes = Buffer.from(JSON.stringify(metadataOnlyMutation));
     const metadataOnlyMutationPath = path.join(directory, `${binding.snapshotId}.csv.gz.json`);

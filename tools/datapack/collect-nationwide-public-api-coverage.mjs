@@ -166,7 +166,7 @@ function admittedRequirementKeys(targets, launchDomains, inventory) {
     throw new Error("source inventory sources must be a non-empty array");
   }
   const targetIndex = coverageTargetIndex(targets);
-  const sources = inventory.sources.map((source, index) => {
+  const sources = inventory.sources.filter((source) => source.rawSnapshotAdmission == null).map((source, index) => {
     const label = `source inventory sources[${index}]`;
     const coverage = source?.coverageScope;
     if (!coverage || typeof coverage !== "object" || Array.isArray(coverage)) {

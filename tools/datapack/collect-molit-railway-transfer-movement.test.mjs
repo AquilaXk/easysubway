@@ -31,6 +31,7 @@ test("MOLIT transfer movement collector는 exact schema·순서와 공란을 보
   assert.equal(snapshot.sourceId, "molit-railway-transfer-movement");
   assert.equal(snapshot.snapshotId, "molit-railway-transfer-movement-20250811");
   assert.equal(snapshot.rowCount, 2);
+  assert.deepEqual(snapshot.observedRailOperatorCodes, ["S1"]);
   assert.deepEqual(snapshot.columns, HEADER.split(",").map((value) => ({
     철도운영기관코드: "RAIL_OPR_ISTT_CD",
     선명: "LN_NM",

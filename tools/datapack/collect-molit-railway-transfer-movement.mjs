@@ -77,6 +77,9 @@ export function buildMolitRailwayTransferMovementSnapshot({
     }))),
     rowCount: rows.length,
     credentialRedacted: true,
+    observedRailOperatorCodes: [...new Set(rows.map((row) => row.RAIL_OPR_ISTT_CD))].sort((left, right) => (
+      left < right ? -1 : left > right ? 1 : 0
+    )),
     columns: COLUMNS,
     rows,
     gzipBytes,

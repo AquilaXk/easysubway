@@ -127,7 +127,7 @@ function validateSource(source, label) {
   }
   assertDate(source.observedDataUpdatedAt, `${id}.observedDataUpdatedAt`);
   validateLicense(source.license, id);
-  validateCoverageScope(source.coverageScope, id);
+  validateCoverageScope(source.coverageScope, source, id);
   validateCapabilities(source.capabilities, source, id);
 
   if (!Array.isArray(source.fieldsProvided) || source.fieldsProvided.length === 0) {
@@ -507,12 +507,31 @@ function assertDisjoint(left, right, leftLabel, rightLabel) {
   }
 }
 
-function validateCoverageScope(coverageScope, sourceId) {
+function validateCoverageScope(coverageScope, source, sourceId) {
   if (!coverageScope || typeof coverageScope !== "object" || Array.isArray(coverageScope)) {
     throw new Error(`${sourceId}.coverageScope must be an object`);
   }
-  assertStringArray(coverageScope.regionIds, `${sourceId}.coverageScope.regionIds`);
-  assertStringArray(coverageScope.operatorIds, `${sourceId}.coverageScope.operatorIds`);
+  const unmappedRawSnapshot = coverageScope.mappingStatus === "UNMAPPED_RAW_SNAPSHOT"
+    && source.rawSnapshotAdmission != null
+    && source.requiredForProductionPack === false
+    && ["facility", "schedule", "realtime"].every(
+      (capability) => source.capabilities?.[capability]?.productionUseAllowed === false,
+    );
+  if (coverageScope.mappingStatus !== undefined && !unmappedRawSnapshot) {
+    throw new Error(`${sourceId}.coverageScope.mappingStatus requires a non-production raw snapshot`);
+  }
+  if (source.rawSnapshotAdmission != null && coverageScope.mappingStatus !== "UNMAPPED_RAW_SNAPSHOT") {
+    throw new Error(`${sourceId}.rawSnapshotAdmission requires UNMAPPED_RAW_SNAPSHOT coverage`);
+  }
+  const regionIds = assertStringArray(
+    coverageScope.regionIds, `${sourceId}.coverageScope.regionIds`, { allowEmpty: unmappedRawSnapshot },
+  );
+  const operatorIds = assertStringArray(
+    coverageScope.operatorIds, `${sourceId}.coverageScope.operatorIds`, { allowEmpty: unmappedRawSnapshot },
+  );
+  if (unmappedRawSnapshot && (regionIds.length !== 0 || operatorIds.length !== 0)) {
+    throw new Error(`${sourceId}.rawSnapshotAdmission requires an explicit mapping ledger before internal coverage scope`);
+  }
   assertStringArray(coverageScope.sourceDomains, `${sourceId}.coverageScope.sourceDomains`);
   if (coverageScope.lineIds !== undefined) {
     const lineIds = assertStringArray(coverageScope.lineIds, `${sourceId}.coverageScope.lineIds`);
@@ -554,8 +573,8 @@ function assertString(value, label) {
   return value;
 }
 
-function assertStringArray(value, label) {
-  if (!Array.isArray(value) || value.length === 0) {
+function assertStringArray(value, label, { allowEmpty = false } = {}) {
+  if (!Array.isArray(value) || (!allowEmpty && value.length === 0)) {
     throw new Error(`${label} must be a non-empty array`);
   }
   for (const entry of value) {
