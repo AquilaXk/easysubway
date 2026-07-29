@@ -77,6 +77,7 @@ function applyEvidence(sqlitePath, pack) {
     );
     syncAccessibilityEdges(database, pack);
     normalizeUnprovenInternalRouteEdges(database, { check: false });
+    normalizeUnprovenStationExitElevatorClaims(database, { check: false });
 
     database.exec("COMMIT");
   } catch (error) {
@@ -183,6 +184,7 @@ function assertEvidence(sqlitePath, pack) {
     }
     assertAccessibilityEdges(database, pack);
     normalizeUnprovenInternalRouteEdges(database, { check: true });
+    normalizeUnprovenStationExitElevatorClaims(database, { check: true });
   } finally {
     database.close();
   }
@@ -218,6 +220,8 @@ export function syncCanonicalFixture(canonical, reviewedPack) {
     edge.accessibilityStatus !== "UNKNOWN" && !completeInternalRouteEdgeProvenance(edge)
       ? { ...edge, accessibilityStatus: "UNKNOWN" }
       : edge);
+  pack.stationExits = (pack.stationExits ?? []).map((exit) =>
+    exit.hasElevatorConnection ? { ...exit, hasElevatorConnection: false } : exit);
   const freshSources = reviewedPack.sourceInventory.filter(({ id }) =>
     ["kric-station-convenience-standard", "seoul-metro-accessibility"].includes(id));
   pack.sourceInventory = pack.sourceInventory
@@ -335,10 +339,12 @@ export function stripLegacyCoreClaims(database, { check }) {
         WHERE accessibility_status <> 'UNKNOWN' AND (${outsideTransferIncomplete})
       `).get().count
     : 0;
+  const staleExit = normalizeUnprovenStationExitElevatorClaims(database, { check });
   const stale = facilityCount !== 0
     || qualityCount !== 0
     || stalePathwayCount !== 0
-    || staleOutsideTransferCount !== 0;
+    || staleOutsideTransferCount !== 0
+    || staleExit;
   if (check && stale) throw new Error("legacy core accessibility claims are stale");
   if (!check && stale) {
     const pathwayCleanup = pathwayColumns.has("requires_facility_id") ? `
@@ -362,6 +368,27 @@ export function stripLegacyCoreClaims(database, { check }) {
       VACUUM;
     `);
   }
+  return stale;
+}
+
+export function normalizeUnprovenStationExitElevatorClaims(database, { check }) {
+  const columns = new Set(
+    database.prepare("PRAGMA table_info(station_exits)").all().map(({ name }) => name),
+  );
+  if (!columns.has("has_elevator_connection")) return false;
+  const incomplete = incompleteRouteProvenanceSql(columns);
+  const stale = database.prepare(`
+    SELECT count(*) AS count FROM station_exits
+    WHERE has_elevator_connection = 1 AND (${incomplete})
+  `).get().count !== 0;
+  if (check && stale) {
+    throw new StaleAccessibilityEvidenceError("bundled station exit elevator claim is stale");
+  }
+  if (stale) database.exec(`
+    UPDATE station_exits
+    SET has_elevator_connection = 0
+    WHERE has_elevator_connection = 1 AND (${incomplete});
+  `);
   return stale;
 }
 

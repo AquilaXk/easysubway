@@ -407,7 +407,7 @@ void main() {
     expect(exits.single.read<String>('exit_number'), '1');
     expect(exits.single.read<double>('latitude'), closeTo(37.3021, 0.0001));
     expect(exits.single.read<double>('longitude'), closeTo(126.8661, 0.0001));
-    expect(exits.single.read<int>('has_elevator_connection'), 1);
+    expect(exits.single.read<int>('has_elevator_connection'), 0);
     expect(exits.single.read<String>('data_source_type'), 'OFFICIAL_FILE');
     expect(exits.single.read<int>('last_verified_at'), 1781827200);
     expect(facilities.map((row) => row.read<String>('type')).toSet(), {

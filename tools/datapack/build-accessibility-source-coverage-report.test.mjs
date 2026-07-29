@@ -94,6 +94,10 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
       id TEXT, station_id TEXT, type TEXT, source_id TEXT, source_snapshot_id TEXT,
       provider_record_hash TEXT, evidence_hash TEXT
     );
+    CREATE TABLE station_exits (
+      id TEXT, station_id TEXT, has_elevator_connection INTEGER,
+      source_id TEXT, source_snapshot_id TEXT
+    );
     CREATE TABLE network_edges (
       id TEXT, from_node_id TEXT, to_node_id TEXT, edge_type TEXT,
       accessibility_status TEXT, stair_access_state TEXT, source_id TEXT,
@@ -128,6 +132,9 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
   );
   database.prepare("INSERT INTO facilities VALUES (?, ?, ?, ?, ?, ?, ?)").run(
     "facility-without-provenance", "station-a", "ESCALATOR", "", "", "", "",
+  );
+  database.prepare("INSERT INTO station_exits VALUES (?, ?, ?, ?, ?)").run(
+    "exit-a", "station-a", 1, "fixture-capital-catalog", "fixture-capital-catalog-20260619",
   );
   database.prepare("INSERT INTO network_edges VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)").run(
     "edge-entry-a", "station-a", "station-a:line-a", "ENTRY", "UNKNOWN", "UNKNOWN",
@@ -216,6 +223,17 @@ test("remote manifest URL과 bundled index가 같은 gzip SQLite를 가리키면
       evidenceKind: "EXISTS",
       sourceId: "",
       sourceSnapshotId: "",
+      providerRecordHash: "",
+      evidenceHash: "",
+    }, {
+      claimId: "exit-a",
+      stationId: "station-a",
+      lineId: "",
+      facilityType: "ELEVATOR_CONNECTION",
+      domain: "STATION_EXIT",
+      evidenceKind: "EXISTS",
+      sourceId: "fixture-capital-catalog",
+      sourceSnapshotId: "fixture-capital-catalog-20260619",
       providerRecordHash: "",
       evidenceHash: "",
     }, {

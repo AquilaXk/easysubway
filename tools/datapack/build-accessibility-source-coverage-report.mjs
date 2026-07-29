@@ -216,6 +216,30 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
           evidenceHash: row.evidence_hash,
         }))
       : [];
+    const exitClaims = tableExists(database, "station_exits")
+      ? database.prepare(tableHasColumns(database, "station_exits", ["source_id", "source_snapshot_id"])
+        ? `
+          SELECT id, station_id, source_id, source_snapshot_id,
+                 '' AS provider_record_hash, '' AS evidence_hash
+          FROM station_exits
+          WHERE has_elevator_connection = 1
+          ORDER BY station_id, id
+        `
+        : `SELECT id, station_id, '' AS source_id, '' AS source_snapshot_id,
+                  '' AS provider_record_hash, '' AS evidence_hash
+           FROM station_exits WHERE has_elevator_connection = 1 ORDER BY station_id, id`).all().map((row) => ({
+          claimId: row.id,
+          stationId: row.station_id,
+          lineId: "",
+          facilityType: "ELEVATOR_CONNECTION",
+          domain: "STATION_EXIT",
+          evidenceKind: "EXISTS",
+          sourceId: row.source_id,
+          sourceSnapshotId: row.source_snapshot_id,
+          providerRecordHash: row.provider_record_hash,
+          evidenceHash: row.evidence_hash,
+        }))
+      : [];
     const edgeClaims = tableExists(database, "network_edges")
       ? database.prepare(tableHasColumns(database, "network_edges", ["source_id", "source_snapshot_id", "provider_record_hash", "evidence_hash"])
         ? `
@@ -292,6 +316,7 @@ function readAccessibilityArtifact(sqlitePath, artifactId, sqliteSha256) {
     const claims = [
       ...evidenceClaims,
       ...facilityClaims,
+      ...exitClaims,
       ...edgeClaims,
       ...internalEdgeClaims,
       ...pathwayEdgeClaims,

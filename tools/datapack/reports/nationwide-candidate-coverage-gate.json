@@ -37,7 +37,7 @@
   },
   "deployedArtifact": {
     "byteSize": 1463745,
-    "gzipSha256": "67a6b1ac33cc317c93b374bc7b1a1e4932c1717fe79bdc62a61b6d65efabc275",
+    "gzipSha256": "f328fbedff014be18a0e8341e0bdbfe9b0dd774fa7e9ae7692aa869e831707b3",
     "networkEdgeCounts": {
       "provenanceComplete": 656,
       "strictEligible": 652,
@@ -83,7 +83,7 @@
       "transit_stop_times": 932,
       "transit_trips": 466
     },
-    "sqliteSha256": "0f57fc1ea5fb1d5bba7caafcf185b6993b956cb58a129a5067d54a61a19abfb1",
+    "sqliteSha256": "a581c5d2a78f765b859e7e7b7d62d3bf0d9b573bcebd246ab4c6f0cd62fddfc5",
     "verifierPath": "tools/datapack/verify-production-pack-artifact-identity.mjs"
   },
   "determinism": {

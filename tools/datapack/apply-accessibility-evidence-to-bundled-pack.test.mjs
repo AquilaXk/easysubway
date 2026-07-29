@@ -64,6 +64,12 @@ test("core-only strips facility quality targets and dependent pathway claims", (
     PRAGMA foreign_keys = ON;
     CREATE TABLE facilities (id TEXT PRIMARY KEY);
     CREATE TABLE data_quality_records (id TEXT PRIMARY KEY, target_type TEXT, target_id TEXT);
+    CREATE TABLE station_exits (
+      id TEXT PRIMARY KEY,
+      has_elevator_connection INTEGER,
+      source_id TEXT,
+      source_snapshot_id TEXT
+    );
     CREATE TABLE station_pathway_edges (
       id TEXT PRIMARY KEY,
       requires_facility_id TEXT REFERENCES facilities(id),
@@ -85,13 +91,18 @@ test("core-only strips facility quality targets and dependent pathway claims", (
     INSERT INTO data_quality_records VALUES
       ('facility-quality', 'facility', 'legacy-facility'),
       ('exit-quality', 'station_exit', 'exit-1');
+    INSERT INTO station_exits VALUES
+      ('exit-1', 1, 'fixture-capital-catalog', 'fixture-capital-catalog-20260619');
     INSERT INTO station_pathway_edges VALUES
       ('legacy-pathway', 'legacy-facility', 'AVAILABLE', '', '', '', '');
     INSERT INTO out_of_station_transfer_links VALUES
       ('legacy-outside-transfer', 'LIMITED', '', '', '', '');
   `);
 
-  assert.throws(() => stripLegacyCoreClaims(database, { check: true }), /legacy core accessibility claims are stale/);
+  assert.throws(
+    () => stripLegacyCoreClaims(database, { check: true }),
+    /bundled station exit elevator claim is stale/,
+  );
   assert.equal(stripLegacyCoreClaims(database, { check: false }), true);
   assert.deepEqual(
     database.prepare("SELECT target_type AS targetType FROM data_quality_records").all()
@@ -109,6 +120,11 @@ test("core-only strips facility quality targets and dependent pathway claims", (
   assert.equal(
     database.prepare("SELECT accessibility_status AS status FROM out_of_station_transfer_links").get().status,
     "UNKNOWN",
+  );
+  assert.equal(
+    database.prepare("SELECT has_elevator_connection AS hasElevatorConnection FROM station_exits").get()
+      .hasElevatorConnection,
+    0,
   );
   assert.doesNotThrow(() => stripLegacyCoreClaims(database, { check: true }));
 
@@ -181,6 +197,12 @@ test("canonical and SQLite refresh the reviewed ENTRY/EXIT identity together", (
       providerRecordHash: "",
       evidenceHash: "",
     }],
+    stationExits: [{
+      id: "exit-sadang-1",
+      hasElevatorConnection: true,
+      sourceId: "baseline-exit-source-capital",
+      sourceSnapshotId: "baseline-exit-source-capital-20260619",
+    }],
     sourceInventory: [{ id: "seoul-metro-official-od-fares" }],
     officialOdFareQuotes,
     routeServiceArtifactEvidence,
@@ -195,6 +217,7 @@ test("canonical and SQLite refresh the reviewed ENTRY/EXIT identity together", (
   });
   assert.deepEqual(synced.packs[0].networkEdges, [reviewedEdge]);
   assert.equal(synced.packs[0].internalRouteEdges[0].accessibilityStatus, "UNKNOWN");
+  assert.equal(synced.packs[0].stationExits[0].hasElevatorConnection, false);
   assert.deepEqual(synced.packs[0].officialOdFareQuotes, officialOdFareQuotes);
   assert.deepEqual(synced.packs[0].routeServiceArtifactEvidence, routeServiceArtifactEvidence);
   assert.deepEqual(synced.packs[0].sourceInventory, [{ id: "seoul-metro-official-od-fares" }]);

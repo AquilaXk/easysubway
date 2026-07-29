@@ -28,8 +28,8 @@
     "inputSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
     "inputSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
     "inputByteSize": 359319,
-    "outputSha256": "67a6b1ac33cc317c93b374bc7b1a1e4932c1717fe79bdc62a61b6d65efabc275",
-    "outputSqliteSha256": "0f57fc1ea5fb1d5bba7caafcf185b6993b956cb58a129a5067d54a61a19abfb1",
+    "outputSha256": "f328fbedff014be18a0e8341e0bdbfe9b0dd774fa7e9ae7692aa869e831707b3",
+    "outputSqliteSha256": "a581c5d2a78f765b859e7e7b7d62d3bf0d9b573bcebd246ab4c6f0cd62fddfc5",
     "byteSize": 1463745,
     "byteSizeDelta": 1104426
   },
@@ -4954,6 +4954,71 @@
                   "operational_status": "UNKNOWN",
                   "installation_status": "INSTALLED",
                   "confidence": 100
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "readmittedAt": "2026-07-29T00:47:28.284Z",
+      "provenance": "#2609 공식 접근성 exit claim fail-closed 정리; owner 승인",
+      "previousPack": {
+        "sha256": "67a6b1ac33cc317c93b374bc7b1a1e4932c1717fe79bdc62a61b6d65efabc275",
+        "sqliteSha256": "0f57fc1ea5fb1d5bba7caafcf185b6993b956cb58a129a5067d54a61a19abfb1",
+        "byteSize": 1463745
+      },
+      "newPack": {
+        "sha256": "f328fbedff014be18a0e8341e0bdbfe9b0dd774fa7e9ae7692aa869e831707b3",
+        "sqliteSha256": "a581c5d2a78f765b859e7e7b7d62d3bf0d9b573bcebd246ab4c6f0cd62fddfc5",
+        "byteSize": 1463745
+      },
+      "byteSizeDelta": 0,
+      "itxSubgraph": {
+        "unchanged": true,
+        "edgeCount": 48,
+        "edgesSha256": "e09f9ece35f261b0690753b9c88749d2e460c79e889bea045fb44a46bae78709",
+        "evidenceSha256": "a4834c3638dd45500292f67bd39e5a8ff9660162e1ffa2a78359c5d645b74996"
+      },
+      "rowDiff": [
+        {
+          "table": "station_exits",
+          "previousRowCount": 1,
+          "newRowCount": 1,
+          "rowsRemoved": 0,
+          "rowsAdded": 0,
+          "rowsChanged": 1,
+          "detail": {
+            "removed": [],
+            "added": [],
+            "changed": [
+              {
+                "previous": {
+                  "id": "exit-sangnoksu-1",
+                  "station_id": "station-sangnoksu",
+                  "exit_number": "1",
+                  "description": "상록수역 1번 출구",
+                  "latitude": 37.3021,
+                  "longitude": 126.8661,
+                  "has_elevator_connection": 1,
+                  "source_id": "baseline-exit-source-capital",
+                  "source_snapshot_id": "baseline-exit-source-capital-20260619",
+                  "data_source_type": "OFFICIAL_FILE",
+                  "last_verified_at": 1781827200
+                },
+                "new": {
+                  "id": "exit-sangnoksu-1",
+                  "station_id": "station-sangnoksu",
+                  "exit_number": "1",
+                  "description": "상록수역 1번 출구",
+                  "latitude": 37.3021,
+                  "longitude": 126.8661,
+                  "has_elevator_connection": 0,
+                  "source_id": "baseline-exit-source-capital",
+                  "source_snapshot_id": "baseline-exit-source-capital-20260619",
+                  "data_source_type": "OFFICIAL_FILE",
+                  "last_verified_at": 1781827200
                 }
               }
             ]
