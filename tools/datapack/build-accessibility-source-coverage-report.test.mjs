@@ -46,6 +46,16 @@ test("미승인 source는 provider-domain matrix에서도 BLOCKED다", () => {
   assert.equal(report.providerDomainMatrix[0].status, "BLOCKED");
 });
 
+test("accessibility 승인 license hash는 source governance 검토 hash와 일치해야 한다", () => {
+  const input = validInput();
+  input.inventory.sources[0].accessibilityAdmissionEvidence.licenseEvidenceHash = hash("stale-license");
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(report.decision, "NO_GO");
+  assert.deepEqual(report.violations.license, ["official-accessibility:LICENSE_EVIDENCE_MISMATCH"]);
+});
+
 test("tracked snapshot bytes와 inventory file SHA가 일치해야 한다", async (t) => {
   const repositoryRoot = await mkdtemp(path.join(tmpdir(), "easysubway-accessibility-snapshot-"));
   t.after(() => rm(repositoryRoot, { recursive: true, force: true }));
@@ -529,6 +539,7 @@ function validInput() {
   const snapshotFileSha256 = hash("snapshot-file");
   const snapshotId = "official-accessibility-20260728";
   const sourceId = "official-accessibility";
+  const licenseEvidenceHash = hash("license-evidence");
   const claim = (stationId) => ({
     stationId,
     lineId: "line-a",
@@ -561,9 +572,11 @@ function validInput() {
         id: sourceId,
         productionUseAllowed: true,
         license: { redistributionAllowed: true, attribution: "공식 제공기관" },
+        admissionEvidence: { licenseEvidenceHash },
         accessibilityAdmissionEvidence: {
           decision: "APPROVED",
           productionUseAllowed: true,
+          licenseEvidenceHash,
           snapshotId,
           snapshotPath: "tools/datapack/sources/official-accessibility-20260728.json",
           capturedAt: "2026-07-27T23:00:00.000Z",

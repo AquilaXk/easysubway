@@ -400,6 +400,10 @@ function validateSource(source, snapshotsByIdentity, policiesByIdentity, evaluat
     violations.snapshot.push(`${source.id}:SNAPSHOT_IDENTITY_MISSING`);
     return;
   }
+  if (!sha256(evidence.licenseEvidenceHash)
+    || evidence.licenseEvidenceHash !== source.admissionEvidence?.licenseEvidenceHash) {
+    violations.license.push(`${source.id}:LICENSE_EVIDENCE_MISMATCH`);
+  }
   if (evidence.decision !== "APPROVED" || evidence.productionUseAllowed !== true) {
     violations.provenance.push(`${source.id}:ACCESSIBILITY_ADMISSION_NOT_APPROVED`);
   }
