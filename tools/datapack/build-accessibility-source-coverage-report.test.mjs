@@ -9,7 +9,9 @@ import { gzipSync } from "node:zlib";
 
 import {
   buildAccessibilitySourceCoverageReport,
+  partitionMolitTransferTuples,
   loadAccessibilityAdmissionSnapshots,
+  loadMolitTransferSnapshot,
   loadSelectableAccessibilityArtifacts,
   manifestAssetRoot,
 } from "./build-accessibility-source-coverage-report.mjs";
@@ -44,6 +46,174 @@ test("미승인 source는 provider-domain matrix에서도 BLOCKED다", () => {
 
   assert.equal(report.decision, "NO_GO");
   assert.equal(report.providerDomainMatrix[0].status, "BLOCKED");
+});
+
+test("station domain source matrix는 실제 station-line 분모의 미평가 cell을 NO_GO로 남긴다", () => {
+  const input = validInput();
+  input.artifacts = [input.artifacts[0]];
+  input.artifacts[0].stationLines = [{
+    stationId: "station-a",
+    stationName: "사당",
+    stationAliases: [],
+    lineId: "line-a",
+    lineName: "수도권 4호선",
+    operatorId: "seoul-metro",
+    operatorName: "서울교통공사",
+  }];
+  input.molitTransferSnapshot = {
+    sourceId: "molit-railway-transfer-movement",
+    snapshotId: "molit-railway-transfer-movement-20250811",
+    rawSha256: hash("transfer-raw"),
+    gzipSha256: hash("transfer-gzip"),
+    metadataFileSha256: hash("transfer-metadata"),
+    rowCount: 1,
+    rows: [{
+      RAIL_OPR_ISTT_CD: "S1(서울교통공사)",
+      LN_NM: "4호선",
+      STIN_NM: "사당",
+    }],
+  };
+  input.providerCodeCatalog = {
+    providerLines: [{ railOprIsttCd: "S1", operatorName: "서울교통공사", lnCd: "4", lineName: "4호선" }],
+  };
+
+  const report = buildAccessibilitySourceCoverageReport(input);
+
+  assert.equal(report.decision, "NO_GO");
+  assert.deepEqual(report.stationDomainSourceGate.matrix, [{
+    operatorId: "seoul-metro",
+    operatorName: "서울교통공사",
+    domain: "EXIT",
+    stationLineCount: 1,
+    evaluatedStationLineCount: 0,
+    missingStationLineCount: 1,
+    artifacts: [{
+      artifactId: "bundled-capital",
+      stationLineCount: 1,
+      evaluatedStationLineCount: 0,
+      missingStationLineCount: 1,
+    }],
+    sourceIds: [],
+    blockingReasons: ["NO_ADMITTED_SOURCE", "STATION_LINE_COVERAGE_INCOMPLETE"],
+    requiredEvidence: "OFFICIAL_EXHAUSTIVE_EXIT_PATH_SNAPSHOT_OR_EXPLICIT_ZERO",
+    status: "BLOCKED",
+  }, {
+    operatorId: "seoul-metro",
+    operatorName: "서울교통공사",
+    domain: "FACILITY",
+    stationLineCount: 1,
+    evaluatedStationLineCount: 1,
+    missingStationLineCount: 0,
+    artifacts: [{
+      artifactId: "bundled-capital",
+      stationLineCount: 1,
+      evaluatedStationLineCount: 1,
+      missingStationLineCount: 0,
+    }],
+    sourceIds: ["official-accessibility"],
+    blockingReasons: [],
+    requiredEvidence: "OFFICIAL_EXHAUSTIVE_FACILITY_SNAPSHOT_OR_EXPLICIT_ZERO",
+    status: "ADMITTED",
+  }, {
+    operatorId: "seoul-metro",
+    operatorName: "서울교통공사",
+    domain: "TRANSFER",
+    stationLineCount: 1,
+    evaluatedStationLineCount: 0,
+    missingStationLineCount: 1,
+    artifacts: [{
+      artifactId: "bundled-capital",
+      stationLineCount: 1,
+      evaluatedStationLineCount: 0,
+      missingStationLineCount: 1,
+    }],
+    sourceIds: [],
+    blockingReasons: ["NO_ADMITTED_SOURCE", "STATION_LINE_COVERAGE_INCOMPLETE"],
+    requiredEvidence: "OFFICIAL_TRANSFER_TOPOLOGY_AND_ACCESSIBILITY_SNAPSHOT",
+    status: "BLOCKED",
+  }]);
+  assert.equal(report.stationDomainSourceGate.transferTuplePartition.joined.length, 1);
+  assert.equal(report.stationDomainSourceGate.transferTuplePartition.unmatched.length, 0);
+  assert.equal(report.stationDomainSourceGate.transferTuplePartition.ambiguous.length, 0);
+});
+
+test("MOLIT transfer tuple partition은 unmatched와 ambiguous를 추정 없이 보존한다", () => {
+  const row = (stationName) => ({
+    RAIL_OPR_ISTT_CD: "S1(서울교통공사)",
+    LN_NM: "4호선",
+    STIN_NM: stationName,
+  });
+  const artifacts = [{
+    artifactId: "capital",
+    stationLines: ["station-a", "station-b"].map((stationId) => ({
+      stationId,
+      stationName: "중앙",
+      stationAliases: [],
+      lineId: "line-a",
+      lineName: "수도권 4호선",
+      operatorId: "seoul-metro",
+      operatorName: "서울교통공사",
+    })),
+  }];
+
+  const partition = partitionMolitTransferTuples({
+    artifacts,
+    rows: [row("중앙"), row("중앙"), row("없는역")],
+    providerCodeCatalog: {
+      providerLines: [{ railOprIsttCd: "S1", operatorName: "서울교통공사", lnCd: "4", lineName: "4호선" }],
+    },
+  });
+
+  assert.deepEqual(partition.summary, {
+    rowCount: 3,
+    tupleCount: 2,
+    joinedTupleCount: 0,
+    joinedRowCount: 0,
+    unmatchedTupleCount: 1,
+    unmatchedRowCount: 1,
+    ambiguousTupleCount: 1,
+    ambiguousRowCount: 2,
+  });
+  assert.equal(partition.unmatched[0].reason, "CANONICAL_STATION_UNMATCHED");
+  assert.equal(partition.ambiguous[0].reason, "CANONICAL_STATION_AMBIGUOUS");
+});
+
+test("MOLIT transfer tuple partition snapshot binding은 inventory와 build spec hash를 강제한다", async () => {
+  const repositoryRoot = path.resolve(import.meta.dirname, "../..");
+  const inventoryPath = path.join(import.meta.dirname, "source-inventory.json");
+  const inventoryBytes = await readFile(inventoryPath);
+  const inventory = JSON.parse(inventoryBytes);
+  const candidateBuildSpec = JSON.parse(await readFile(
+    path.join(import.meta.dirname, "release/candidate-build-spec.json"),
+  ));
+  const metadataPath = path.join(
+    repositoryRoot,
+    inventory.sources.find(({ id }) => id === "molit-railway-transfer-movement").rawSnapshotAdmission.metadataPath,
+  );
+
+  const snapshot = await loadMolitTransferSnapshot({
+    metadataPath,
+    inventory,
+    inventoryBytes,
+    candidateBuildSpec,
+    repositoryRoot,
+  });
+
+  assert.equal(snapshot.rowCount, 8054);
+  assert.equal(snapshot.rows.length, 8054);
+  assert.equal(snapshot.sourceInventorySha256, candidateBuildSpec.sourceInventorySha256);
+  await assert.rejects(loadMolitTransferSnapshot({
+    metadataPath,
+    inventory: {
+      ...inventory,
+      sources: inventory.sources.map((source) => source.id === "molit-railway-transfer-movement"
+        ? { ...source, rawSnapshotAdmission: { ...source.rawSnapshotAdmission, rawSha256: hash("tampered") } }
+        : source),
+    },
+    inventoryBytes,
+    candidateBuildSpec,
+    repositoryRoot,
+  }), /snapshot binding mismatch/);
 });
 
 test("inventory에 없는 source는 provider-domain matrix에서도 BLOCKED다", () => {
