@@ -148,6 +148,9 @@ export function buildAccessibilitySourceCoverageReport({
 export function buildStationDomainSourceGate({
   artifacts, validClaims, molitTransferSnapshot, providerCodeCatalog,
 }) {
+  if (artifacts.some((artifact) => !Array.isArray(artifact.stationLines) || artifact.stationLines.length === 0)) {
+    throw new Error("station domain gate requires station-lines for every artifact");
+  }
   const stationLines = artifacts.flatMap((artifact) => (artifact.stationLines ?? []).map((row) => ({
     ...row,
     artifactId: artifact.artifactId,
@@ -372,7 +375,18 @@ function classifyMolitTransferTuple({
   if (providerLines.length > 1) {
     return { kind: "ambiguous", entry: { ...base, reason: "PROVIDER_LINE_SCOPE_AMBIGUOUS" } };
   }
-  const providerLineKey = `${provider.name}\0${lineName}`;
+  const [providerLine] = providerLines;
+  if (provider.name !== providerLine.operatorName) {
+    return {
+      kind: "unmatched",
+      entry: {
+        ...base,
+        reason: "PROVIDER_OPERATOR_IDENTITY_MISMATCH",
+        catalogOperatorName: providerLine.operatorName,
+      },
+    };
+  }
+  const providerLineKey = `${providerLine.operatorName}\0${lineName}`;
   const artifactIds = [...(artifactsByProviderLine.get(providerLineKey) ?? [])].sort(compareStrings);
   if (artifactIds.length === 0) {
     return { kind: "unmatched", entry: { ...base, reason: "CANONICAL_LINE_SCOPE_UNMATCHED" } };

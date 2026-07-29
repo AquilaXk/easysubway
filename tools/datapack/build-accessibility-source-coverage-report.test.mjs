@@ -152,6 +152,15 @@ test("station domain source matrix는 실제 station-line 분모의 미평가 ce
 
   input.molitTransferSnapshot.rawSha256 = "invalid";
   assert.throws(() => buildAccessibilitySourceCoverageReport(input), /identity is invalid/);
+
+  input.molitTransferSnapshot.rawSha256 = hash("transfer-raw");
+  input.artifacts.push({
+    artifactId: "remote-core",
+    sqliteSha256: hash("sqlite-core"),
+    searchableStationIds: ["station-a"],
+    claims: [],
+  });
+  assert.throws(() => buildAccessibilitySourceCoverageReport(input), /station-lines for every artifact/);
 });
 
 test("station domain gate 입력은 둘 중 하나만 있으면 fail-closed다", () => {
@@ -214,8 +223,8 @@ for (const { name, artifacts, providerLines, expectedKind, expectedReason } of [
     name: "provider line 중복",
     artifacts: [],
     providerLines: [
-      { railOprIsttCd: "S1", lineName: "4호선" },
-      { railOprIsttCd: "S1", lineName: "4호선" },
+      { railOprIsttCd: "S1", operatorName: "서울교통공사", lineName: "4호선" },
+      { railOprIsttCd: "S1", operatorName: "서울교통공사", lineName: "4호선" },
     ],
     expectedKind: "ambiguous",
     expectedReason: "PROVIDER_LINE_SCOPE_AMBIGUOUS",
@@ -223,7 +232,7 @@ for (const { name, artifacts, providerLines, expectedKind, expectedReason } of [
   {
     name: "canonical line 미등록",
     artifacts: [],
-    providerLines: [{ railOprIsttCd: "S1", lineName: "4호선" }],
+    providerLines: [{ railOprIsttCd: "S1", operatorName: "서울교통공사", lineName: "4호선" }],
     expectedKind: "unmatched",
     expectedReason: "CANONICAL_LINE_SCOPE_UNMATCHED",
   },
@@ -240,6 +249,30 @@ for (const { name, artifacts, providerLines, expectedKind, expectedReason } of [
     assert.equal(partition.summary[`${expectedKind}RowCount`], 1);
   });
 }
+
+test("MOLIT transfer tuple partition은 raw 운영사명 대신 검증된 catalog scope를 사용한다", () => {
+  const partition = partitionMolitTransferTuples({
+    artifacts: [{
+      artifactId: "capital",
+      stationLines: [{
+        stationId: "station-a",
+        stationName: "사당",
+        lineId: "line-a",
+        lineName: "4호선",
+        operatorId: "operator-a",
+        operatorName: "위조운영사",
+      }],
+    }],
+    rows: [{ RAIL_OPR_ISTT_CD: "S1(위조운영사)", LN_NM: "4호선", STIN_NM: "사당" }],
+    providerCodeCatalog: {
+      providerLines: [{ railOprIsttCd: "S1", operatorName: "서울교통공사", lineName: "4호선" }],
+    },
+  });
+
+  assert.equal(partition.unmatched[0].reason, "PROVIDER_OPERATOR_IDENTITY_MISMATCH");
+  assert.equal(partition.unmatched[0].catalogOperatorName, "서울교통공사");
+  assert.equal(partition.joined.length, 0);
+});
 
 test("MOLIT transfer tuple partition snapshot binding은 inventory와 build spec hash를 강제한다", async () => {
   const repositoryRoot = path.resolve(import.meta.dirname, "../..");
