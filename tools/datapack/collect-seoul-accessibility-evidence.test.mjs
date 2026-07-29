@@ -385,6 +385,23 @@ test("snapshot contains sorted full-scope evidence and hashes", () => {
   assert.doesNotMatch(JSON.stringify(snapshot), /serviceKey|https?:\/\//);
 });
 
+test("facility-location snapshot preserves the provider station code under a distinct source identity", () => {
+  const rows = normalizeAccessibilityRows(
+    [{ lineNm: "2호선", stnNm: "신정네거리", stnCd: "0249", oprtngSitu: "M", dtlPstn: "대합실-승강장" }],
+    { source: "facility-location" },
+  );
+  const snapshot = buildAccessibilitySnapshot(
+    rows,
+    "2026-07-29T00:00:00.000Z",
+    { source: "facility-location", rawRowCount: 1, rawSha256: "a".repeat(64) },
+  );
+
+  assert.equal(snapshot.sourceId, "seoul-metro-facility-location");
+  assert.equal(snapshot.artifactKind, "seoul-facility-location-snapshot");
+  assert.equal(snapshot.snapshotId, "seoul-metro-facility-location-20260729T000000000Z");
+  assert.equal(snapshot.stations[0].providerStationCode, "0249");
+});
+
 test("same-day captures keep distinct timestamped files and explicit lineage", async (t) => {
   const outputRoot = await mkdtemp(join(tmpdir(), "easysubway-seoul-snapshots-"));
   t.after(() => rm(outputRoot, { recursive: true, force: true }));
@@ -642,6 +659,22 @@ test("CLI requires the service key before collection", async () => {
       { env: {} },
     ),
     /DATA_GO_KR_SERVICE_KEY env is required/,
+  );
+});
+
+test("CLI rejects unknown facility-location source modes before collection", async () => {
+  await assert.rejects(
+    execFileAsync(
+      process.execPath,
+      [
+        collectorPath,
+        "--output", "unused.json",
+        "--output-root", tmpdir(),
+        "--source", "other",
+      ],
+      { env: { DATA_GO_KR_SERVICE_KEY: "secret" } },
+    ),
+    /Seoul accessibility API response invalid: source/,
   );
 });
 
