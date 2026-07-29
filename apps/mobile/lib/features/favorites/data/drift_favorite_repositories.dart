@@ -535,6 +535,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
           originStationId = migrated.originStationId;
           destinationStationId = migrated.destinationStationId;
           mobilityType = migrated.mobilityType;
+          needsResearch = migrated.needsResearch;
         } else {
           needsResearch = true;
         }
@@ -709,6 +710,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       String originStationId,
       String destinationStationId,
       String mobilityType,
+      bool needsResearch,
     })
   >
   _migrateLegacyRoute({
@@ -731,6 +733,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     );
     var resolvedMobilityType = row.read<String>('mobility_profile');
     var targetAlreadyExisted = false;
+    var blockedByOrphanSnapshot = false;
     await userDatabase.transaction(() async {
       final target = await userDatabase
           .customSelect(
@@ -739,6 +742,18 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
           )
           .getSingleOrNull();
       if (target == null) {
+        final orphanSnapshot = await userDatabase
+            .customSelect(
+              'SELECT key FROM app_preferences WHERE key = ?',
+              variables: [
+                Variable.withString('$_routeSnapshotPrefix$targetRouteId'),
+              ],
+            )
+            .getSingleOrNull();
+        if (orphanSnapshot != null) {
+          blockedByOrphanSnapshot = true;
+          return;
+        }
         await userDatabase
             .into(userDatabase.favoriteRoutes)
             .insert(
@@ -781,6 +796,17 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         ['$_routeSnapshotPrefix$legacyRouteId'],
       );
     });
+    if (blockedByOrphanSnapshot) {
+      return (
+        routeId: legacyRouteId,
+        snapshot: snapshot,
+        addedAt: resolvedAddedAt,
+        originStationId: resolvedOriginStationId,
+        destinationStationId: resolvedDestinationStationId,
+        mobilityType: resolvedMobilityType,
+        needsResearch: true,
+      );
+    }
     if (targetRouteId == legacyRouteId) {
       return (
         routeId: legacyRouteId,
@@ -789,6 +815,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
         originStationId: resolvedOriginStationId,
         destinationStationId: resolvedDestinationStationId,
         mobilityType: resolvedMobilityType,
+        needsResearch: false,
       );
     }
     final targetSnapshot = await _readRouteSnapshot(targetRouteId);
@@ -801,6 +828,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       originStationId: resolvedOriginStationId,
       destinationStationId: resolvedDestinationStationId,
       mobilityType: resolvedMobilityType,
+      needsResearch: false,
     );
   }
 

@@ -496,6 +496,98 @@ void main() {
     );
   });
 
+  test('orphan target snapshot이 있으면 legacy 행을 보존하고 다시 검색 필요로 표시한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    final repository = DriftFavoriteRouteRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+    final query = RouteQueryIdentity(
+      originStationId: 'station-sangnoksu',
+      destinationStationId: 'station-sadang',
+      mobilityType: 'WHEELCHAIR',
+      constraintMode: 'STRICT_STEP_FREE',
+      transportScope: 'SUBWAY',
+      objective: 'FASTEST',
+    );
+    final candidate = RouteCandidateIdentity(
+      query: query,
+      legs: [
+        RouteCandidateLegSignature(
+          stepType: 'RIDE',
+          fromStationId: 'station-sangnoksu',
+          toStationId: 'station-sadang',
+          lineId: 'seoul-4',
+        ),
+      ],
+    );
+    final legacySnapshot = jsonEncode({
+      'routeSearchId': 'local-orphan-target',
+      'originStationId': 'station-sangnoksu',
+      'originStationName': '상록수',
+      'destinationStationId': 'station-sadang',
+      'destinationStationName': '사당',
+      'mobilityType': 'WHEELCHAIR',
+      'status': 'FOUND',
+      'score': 71,
+      'createdAt': '2026-07-01T00:00:00.000Z',
+      'steps': [
+        {
+          'stepType': 'RIDE',
+          'fromStationId': 'station-sangnoksu',
+          'toStationId': 'station-sadang',
+          'lineId': 'seoul-4',
+        },
+      ],
+    });
+    await userDatabase.transaction(() async {
+      await userDatabase
+          .into(userDatabase.favoriteRoutes)
+          .insert(
+            user_db.FavoriteRoutesCompanion.insert(
+              routeId: 'local-orphan-target',
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityProfile: 'WHEELCHAIR',
+              addedAt: DateTime.utc(2026, 7),
+            ),
+          );
+      for (final entry in {
+        'favorite_route_snapshot:local-orphan-target': legacySnapshot,
+        'favorite_route_snapshot:${candidate.value}': 'orphan',
+      }.entries) {
+        await userDatabase
+            .into(userDatabase.appPreferences)
+            .insert(
+              user_db.AppPreferencesCompanion.insert(
+                key: entry.key,
+                value: entry.value,
+                updatedAt: DateTime.utc(2026, 7),
+              ),
+            );
+      }
+    });
+
+    final favorite = (await repository.listFavoriteRoutes()).single;
+
+    expect(favorite.favoriteRouteId, 'local-orphan-target');
+    expect(favorite.needsResearch, isTrue);
+    expect(
+      await userDatabase
+          .customSelect('SELECT route_id FROM favorite_routes')
+          .get(),
+      hasLength(1),
+    );
+    expect(
+      await userDatabase.customSelect('SELECT key FROM app_preferences').get(),
+      hasLength(2),
+    );
+  });
+
   test('같은 출발지와 도착지의 레거시 경로도 identity 입력이 다르면 분리 이관한다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();
