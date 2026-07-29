@@ -9,6 +9,7 @@ import { officialOdFareAdmissionsBySource } from "./lib/official-od-fare-evidenc
 import { validateSourceGovernancePolicy } from "./source-governance-policy.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import {
+  buildMolitRailwayTransferMovementSnapshot,
   MOLIT_RAILWAY_TRANSFER_MOVEMENT_RAW_SHA256,
   MOLIT_RAILWAY_TRANSFER_MOVEMENT_SOURCE_ID,
 } from "./collect-molit-railway-transfer-movement.mjs";
@@ -331,10 +332,19 @@ async function validateAdmittedCandidateEvidence(inventory, candidates, official
         throw new Error(`${candidate.id} official snapshot metadata identity mismatch`);
       }
       requiredUtcInstant(metadata.capturedAt, `${candidate.id} official snapshot capturedAt`);
+      if (metadata.gzipPath !== `${candidateBinding.snapshotId}.csv.gz`) {
+        throw new Error(`${candidate.id} official snapshot metadata mismatch`);
+      }
       const gzipBytes = await readFile(path.resolve(path.dirname(candidateBinding.metadataPath), metadata.gzipPath));
       if (sha256(gzipBytes) !== candidateBinding.gzipSha256) throw new Error(`${candidate.id} official snapshot gzip hash mismatch`);
-      if (sha256(gunzipSync(gzipBytes)) !== candidateBinding.rawSha256) {
+      const rawBytes = gunzipSync(gzipBytes);
+      if (sha256(rawBytes) !== candidateBinding.rawSha256) {
         throw new Error(`${candidate.id} official snapshot raw hash mismatch`);
+      }
+      const rebuilt = buildMolitRailwayTransferMovementSnapshot({ bytes: rawBytes, capturedAt: metadata.capturedAt });
+      const { gzipBytes: ignoredGzipBytes, rows: ignoredRows, ...rebuiltMetadata } = rebuilt;
+      if (JSON.stringify({ ...rebuiltMetadata, gzipPath: metadata.gzipPath }) !== JSON.stringify(metadata)) {
+        throw new Error(`${candidate.id} official snapshot metadata mismatch`);
       }
       continue;
     }

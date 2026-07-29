@@ -3,7 +3,7 @@
   "artifactKind": "production-source-candidates",
   "source": "tools/datapack/source-candidates.json",
   "retrievedAt": "2026-06-22",
-  "updatedAt": "2026-07-25",
+  "updatedAt": "2026-07-29",
   "candidates": [
     {
       "id": "busan-transportation-accessibility",
