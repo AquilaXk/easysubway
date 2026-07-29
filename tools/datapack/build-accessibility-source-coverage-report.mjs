@@ -155,75 +155,8 @@ export function buildStationDomainSourceGate({
     throw new Error("MOLIT transfer snapshot row count mismatch");
   }
 
-  const evaluated = new Map();
-  for (const artifact of artifacts) {
-    const stationLineByKey = new Map((artifact.stationLines ?? []).map((row) => [
-      `${row.stationId}\0${row.lineId}`,
-      row,
-    ]));
-    for (const claim of artifact.claims ?? []) {
-      const domain = stationDomainForClaim(claim);
-      const stationLine = domain && claim.lineId
-        ? stationLineByKey.get(`${claim.stationId}\0${claim.lineId}`)
-        : undefined;
-      if (!stationLine || !validClaims.has(claim)) continue;
-      const key = `${artifact.artifactId}\0${stationLine.operatorId}\0${domain}`;
-      const entry = evaluated.get(key) ?? { stationLines: new Set(), sourceIds: new Set() };
-      entry.stationLines.add(`${claim.stationId}\0${claim.lineId}`);
-      entry.sourceIds.add(claim.sourceId);
-      evaluated.set(key, entry);
-    }
-  }
-
-  const operators = new Map();
-  for (const { operatorId, operatorName } of stationLines) {
-    if (operators.has(operatorId) && operators.get(operatorId) !== operatorName) {
-      throw new Error(`operator identity mismatch: ${operatorId}`);
-    }
-    operators.set(operatorId, operatorName);
-  }
-  const matrix = [...operators].flatMap(([operatorId, operatorName]) =>
-    ["FACILITY", "EXIT", "TRANSFER"].map((domain) => {
-      const scopedLines = stationLines.filter((row) => row.operatorId === operatorId);
-      const evaluatedKeys = new Set();
-      const sourceIds = new Set();
-      const artifactScopes = [];
-      for (const artifact of artifacts) {
-        const entry = evaluated.get(`${artifact.artifactId}\0${operatorId}\0${domain}`);
-        const artifactStationLineCount = (artifact.stationLines ?? [])
-          .filter((row) => row.operatorId === operatorId).length;
-        if (artifactStationLineCount === 0) continue;
-        for (const stationLine of entry?.stationLines ?? []) {
-          evaluatedKeys.add(`${artifact.artifactId}\0${stationLine}`);
-        }
-        for (const sourceId of entry?.sourceIds ?? []) sourceIds.add(sourceId);
-        artifactScopes.push({
-          artifactId: artifact.artifactId,
-          stationLineCount: artifactStationLineCount,
-          evaluatedStationLineCount: entry?.stationLines.size ?? 0,
-          missingStationLineCount: artifactStationLineCount - (entry?.stationLines.size ?? 0),
-        });
-      }
-      artifactScopes.sort((left, right) => compareStrings(left.artifactId, right.artifactId));
-      const missingStationLineCount = scopedLines.length - evaluatedKeys.size;
-      const blockingReasons = [];
-      if (sourceIds.size === 0) blockingReasons.push("NO_ADMITTED_SOURCE");
-      if (missingStationLineCount > 0) blockingReasons.push("STATION_LINE_COVERAGE_INCOMPLETE");
-      return {
-        operatorId,
-        operatorName,
-        domain,
-        stationLineCount: scopedLines.length,
-        evaluatedStationLineCount: evaluatedKeys.size,
-        missingStationLineCount,
-        artifacts: artifactScopes,
-        sourceIds: [...sourceIds].sort(compareStrings),
-        blockingReasons,
-        requiredEvidence: requiredEvidenceFor(domain),
-        status: blockingReasons.length === 0 ? "ADMITTED" : "BLOCKED",
-      };
-    }))
-    .sort((left, right) => compareStrings(`${left.operatorId}\0${left.domain}`, `${right.operatorId}\0${right.domain}`));
+  const evaluated = collectEvaluatedStationDomains(artifacts, validClaims);
+  const matrix = buildStationDomainMatrix(artifacts, stationLines, evaluated);
   const transferTuplePartition = partitionMolitTransferTuples({
     artifacts,
     rows: molitTransferSnapshot.rows,
@@ -243,10 +176,123 @@ export function buildStationDomainSourceGate({
   return { matrix, transferTuplePartition, decision };
 }
 
+function collectEvaluatedStationDomains(artifacts, validClaims) {
+  const evaluated = new Map();
+  for (const artifact of artifacts) {
+    const stationLineByKey = new Map((artifact.stationLines ?? []).map((row) => [
+      `${row.stationId}\0${row.lineId}`,
+      row,
+    ]));
+    for (const claim of artifact.claims ?? []) {
+      const domain = stationDomainForClaim(claim);
+      const stationLine = domain && claim.lineId
+        ? stationLineByKey.get(`${claim.stationId}\0${claim.lineId}`)
+        : undefined;
+      if (!stationLine || !validClaims.has(claim)) continue;
+      const key = `${artifact.artifactId}\0${stationLine.operatorId}\0${domain}`;
+      const entry = evaluated.get(key) ?? { stationLines: new Set(), sourceIds: new Set() };
+      entry.stationLines.add(`${claim.stationId}\0${claim.lineId}`);
+      entry.sourceIds.add(claim.sourceId);
+      evaluated.set(key, entry);
+    }
+  }
+  return evaluated;
+}
+
+function buildStationDomainMatrix(artifacts, stationLines, evaluated) {
+  const operators = new Map();
+  for (const { operatorId, operatorName } of stationLines) {
+    if (operators.has(operatorId) && operators.get(operatorId) !== operatorName) {
+      throw new Error(`operator identity mismatch: ${operatorId}`);
+    }
+    operators.set(operatorId, operatorName);
+  }
+  return [...operators].flatMap(([operatorId, operatorName]) =>
+    ["FACILITY", "EXIT", "TRANSFER"].map((domain) => buildStationDomainCell({
+      artifacts,
+      stationLines,
+      evaluated,
+      operatorId,
+      operatorName,
+      domain,
+    })))
+    .sort((left, right) => compareStrings(`${left.operatorId}\0${left.domain}`, `${right.operatorId}\0${right.domain}`));
+}
+
+function buildStationDomainCell({ artifacts, stationLines, evaluated, operatorId, operatorName, domain }) {
+  const scopedLines = stationLines.filter((row) => row.operatorId === operatorId);
+  const evaluatedKeys = new Set();
+  const sourceIds = new Set();
+  const artifactScopes = [];
+  for (const artifact of artifacts) {
+    const entry = evaluated.get(`${artifact.artifactId}\0${operatorId}\0${domain}`);
+    const artifactStationLineCount = (artifact.stationLines ?? [])
+      .filter((row) => row.operatorId === operatorId).length;
+    if (artifactStationLineCount === 0) continue;
+    for (const stationLine of entry?.stationLines ?? []) {
+      evaluatedKeys.add(`${artifact.artifactId}\0${stationLine}`);
+    }
+    for (const sourceId of entry?.sourceIds ?? []) sourceIds.add(sourceId);
+    artifactScopes.push({
+      artifactId: artifact.artifactId,
+      stationLineCount: artifactStationLineCount,
+      evaluatedStationLineCount: entry?.stationLines.size ?? 0,
+      missingStationLineCount: artifactStationLineCount - (entry?.stationLines.size ?? 0),
+    });
+  }
+  artifactScopes.sort((left, right) => compareStrings(left.artifactId, right.artifactId));
+  const missingStationLineCount = scopedLines.length - evaluatedKeys.size;
+  const blockingReasons = [];
+  if (sourceIds.size === 0) blockingReasons.push("NO_ADMITTED_SOURCE");
+  if (missingStationLineCount > 0) blockingReasons.push("STATION_LINE_COVERAGE_INCOMPLETE");
+  return {
+    operatorId,
+    operatorName,
+    domain,
+    stationLineCount: scopedLines.length,
+    evaluatedStationLineCount: evaluatedKeys.size,
+    missingStationLineCount,
+    artifacts: artifactScopes,
+    sourceIds: [...sourceIds].sort(compareStrings),
+    blockingReasons,
+    requiredEvidence: requiredEvidenceFor(domain),
+    status: blockingReasons.length === 0 ? "ADMITTED" : "BLOCKED",
+  };
+}
+
 export function partitionMolitTransferTuples({ artifacts, rows, providerCodeCatalog }) {
   if (!Array.isArray(rows) || !Array.isArray(providerCodeCatalog?.providerLines)) {
     throw new TypeError("MOLIT rows and provider code catalog are required");
   }
+  const { canonical, artifactsByProviderLine } = indexCanonicalStationLines(artifacts);
+  const tuples = groupMolitTransferTuples(rows);
+  const partition = { joined: [], unmatched: [], ambiguous: [] };
+  for (const [, tuple] of [...tuples].sort(([left], [right]) => compareStrings(left, right))) {
+    const classified = classifyMolitTransferTuple({
+      ...tuple,
+      providerCodeCatalog,
+      canonical,
+      artifactsByProviderLine,
+    });
+    partition[classified.kind].push(classified.entry);
+  }
+  const sumRows = (entries) => entries.reduce((total, entry) => total + entry.rowCount, 0);
+  return {
+    summary: {
+      rowCount: rows.length,
+      tupleCount: tuples.size,
+      joinedTupleCount: partition.joined.length,
+      joinedRowCount: sumRows(partition.joined),
+      unmatchedTupleCount: partition.unmatched.length,
+      unmatchedRowCount: sumRows(partition.unmatched),
+      ambiguousTupleCount: partition.ambiguous.length,
+      ambiguousRowCount: sumRows(partition.ambiguous),
+    },
+    ...partition,
+  };
+}
+
+function indexCanonicalStationLines(artifacts) {
   const canonical = new Map();
   const artifactsByProviderLine = new Map();
   for (const artifact of artifacts) {
@@ -265,7 +311,10 @@ export function partitionMolitTransferTuples({ artifacts, rows, providerCodeCata
       }
     }
   }
+  return { canonical, artifactsByProviderLine };
+}
 
+function groupMolitTransferTuples(rows) {
   const tuples = new Map();
   for (const row of rows) {
     const values = [row.RAIL_OPR_ISTT_CD, row.LN_NM, row.STIN_NM];
@@ -277,81 +326,85 @@ export function partitionMolitTransferTuples({ artifacts, rows, providerCodeCata
     tuple.rowCount += 1;
     tuples.set(key, tuple);
   }
+  return tuples;
+}
 
-  const partition = { joined: [], unmatched: [], ambiguous: [] };
-  for (const [, { row, rowCount }] of [...tuples].sort(([left], [right]) => compareStrings(left, right))) {
-    const provider = parseMolitOperator(row.RAIL_OPR_ISTT_CD);
-    const lineName = normalizeMolitProviderLineName(row.LN_NM);
-    const providerLines = providerCodeCatalog.providerLines.filter((line) =>
-      line.railOprIsttCd === provider.code && normalizeMolitProviderLineName(line.lineName) === lineName);
-    const base = {
-      providerOperatorCode: provider.code,
-      providerOperatorName: provider.name,
-      providerLineName: row.LN_NM,
-      providerStationName: row.STIN_NM,
-      rowCount,
-    };
-    if (providerLines.length === 0) {
-      partition.unmatched.push({ ...base, reason: "PROVIDER_LINE_SCOPE_UNMAPPED" });
-      continue;
-    }
-    if (providerLines.length > 1) {
-      partition.ambiguous.push({ ...base, reason: "PROVIDER_LINE_SCOPE_AMBIGUOUS" });
-      continue;
-    }
-    const providerLineKey = `${provider.name}\0${lineName}`;
-    const artifactIds = [...(artifactsByProviderLine.get(providerLineKey) ?? [])].sort(compareStrings);
-    if (artifactIds.length === 0) {
-      partition.unmatched.push({ ...base, reason: "CANONICAL_LINE_SCOPE_UNMATCHED" });
-      continue;
-    }
-    const matchesByArtifact = artifactIds.map((artifactId) => ({
-      artifactId,
-      matches: [...(canonical.get(
-        `${artifactId}\0${providerLineKey}\0${normalizeStationName(row.STIN_NM)}`,
-      )?.values() ?? [])].sort((left, right) => compareStrings(
-        `${left.operatorId}\0${left.lineId}\0${left.stationId}`,
-        `${right.operatorId}\0${right.lineId}\0${right.stationId}`,
-      )),
-    }));
-    const ambiguous = matchesByArtifact.filter(({ matches }) => matches.length > 1);
-    const unmatched = matchesByArtifact.filter(({ matches }) => matches.length === 0);
-    if (ambiguous.length > 0) {
-      partition.ambiguous.push({
+function classifyMolitTransferTuple({
+  row, rowCount, providerCodeCatalog, canonical, artifactsByProviderLine,
+}) {
+  const provider = parseMolitOperator(row.RAIL_OPR_ISTT_CD);
+  const lineName = normalizeMolitProviderLineName(row.LN_NM);
+  const providerLines = providerCodeCatalog.providerLines.filter((line) =>
+    line.railOprIsttCd === provider.code && normalizeMolitProviderLineName(line.lineName) === lineName);
+  const base = {
+    providerOperatorCode: provider.code,
+    providerOperatorName: provider.name,
+    providerLineName: row.LN_NM,
+    providerStationName: row.STIN_NM,
+    rowCount,
+  };
+  if (providerLines.length === 0) {
+    return { kind: "unmatched", entry: { ...base, reason: "PROVIDER_LINE_SCOPE_UNMAPPED" } };
+  }
+  if (providerLines.length > 1) {
+    return { kind: "ambiguous", entry: { ...base, reason: "PROVIDER_LINE_SCOPE_AMBIGUOUS" } };
+  }
+  const providerLineKey = `${provider.name}\0${lineName}`;
+  const artifactIds = [...(artifactsByProviderLine.get(providerLineKey) ?? [])].sort(compareStrings);
+  if (artifactIds.length === 0) {
+    return { kind: "unmatched", entry: { ...base, reason: "CANONICAL_LINE_SCOPE_UNMATCHED" } };
+  }
+  const matchesByArtifact = canonicalMatchesByArtifact({
+    artifactIds,
+    canonical,
+    providerLineKey,
+    stationName: row.STIN_NM,
+  });
+  const ambiguous = matchesByArtifact.filter(({ matches }) => matches.length > 1);
+  const unmatched = matchesByArtifact.filter(({ matches }) => matches.length === 0);
+  if (ambiguous.length > 0) {
+    return {
+      kind: "ambiguous",
+      entry: {
         ...base,
         reason: "CANONICAL_STATION_AMBIGUOUS",
         candidates: ambiguous.flatMap(({ matches }) => matches),
-      });
-    } else if (unmatched.length > 0) {
-      partition.unmatched.push({
+      },
+    };
+  }
+  if (unmatched.length > 0) {
+    return {
+      kind: "unmatched",
+      entry: {
         ...base,
         reason: "CANONICAL_STATION_UNMATCHED",
         unmatchedArtifactIds: unmatched.map(({ artifactId }) => artifactId),
-      });
-    } else {
-      partition.joined.push({
-        ...base,
-        mappings: matchesByArtifact.map(({ matches: [match] }) => {
-          const { stationAliases: ignoredAliases, ...mapping } = match;
-          return mapping;
-        }),
-      });
-    }
+      },
+    };
   }
-  const sumRows = (entries) => entries.reduce((total, entry) => total + entry.rowCount, 0);
   return {
-    summary: {
-      rowCount: rows.length,
-      tupleCount: tuples.size,
-      joinedTupleCount: partition.joined.length,
-      joinedRowCount: sumRows(partition.joined),
-      unmatchedTupleCount: partition.unmatched.length,
-      unmatchedRowCount: sumRows(partition.unmatched),
-      ambiguousTupleCount: partition.ambiguous.length,
-      ambiguousRowCount: sumRows(partition.ambiguous),
+    kind: "joined",
+    entry: {
+      ...base,
+      mappings: matchesByArtifact.map(({ matches: [match] }) => {
+        const mapping = { ...match };
+        delete mapping.stationAliases;
+        return mapping;
+      }),
     },
-    ...partition,
   };
+}
+
+function canonicalMatchesByArtifact({ artifactIds, canonical, providerLineKey, stationName }) {
+  return artifactIds.map((artifactId) => ({
+    artifactId,
+    matches: [...(canonical.get(
+      `${artifactId}\0${providerLineKey}\0${normalizeStationName(stationName)}`,
+    )?.values() ?? [])].sort((left, right) => compareStrings(
+      `${left.operatorId}\0${left.lineId}\0${left.stationId}`,
+      `${right.operatorId}\0${right.lineId}\0${right.stationId}`,
+    )),
+  }));
 }
 
 function stationDomainForClaim(claim) {
@@ -430,7 +483,7 @@ export async function loadMolitTransferSnapshot({
   const source = inventory?.sources?.find(({ id }) => id === MOLIT_RAILWAY_TRANSFER_MOVEMENT_SOURCE_ID);
   const admission = source?.rawSnapshotAdmission;
   const expectedMetadataPath = path.resolve(repositoryRoot, admission?.metadataPath ?? "");
-  if (!admission || admission.status !== "LOCKED"
+  if (admission?.status !== "LOCKED"
     || !expectedMetadataPath.endsWith(".csv.gz.json")
     || path.resolve(metadataPath) !== expectedMetadataPath) {
     throw new Error("MOLIT transfer metadata path is not inventory-bound");
@@ -457,8 +510,13 @@ export async function loadMolitTransferSnapshot({
     bytes: gunzipSync(gzipBytes),
     capturedAt: metadata.capturedAt,
   });
-  const { gzipBytes: ignored, rows, gzipSha256: ignoredPlatformGzipSha256, ...rebuiltMetadata } = rebuilt;
-  const { gzipSha256: ignoredStoredGzipSha256, ...logicalMetadata } = metadata;
+  const rows = rebuilt.rows;
+  const rebuiltMetadata = { ...rebuilt };
+  delete rebuiltMetadata.gzipBytes;
+  delete rebuiltMetadata.rows;
+  delete rebuiltMetadata.gzipSha256;
+  const logicalMetadata = { ...metadata };
+  delete logicalMetadata.gzipSha256;
   if (JSON.stringify({ ...rebuiltMetadata, gzipPath: metadata.gzipPath }) !== JSON.stringify(logicalMetadata)) {
     throw new Error("MOLIT transfer logical metadata mismatch");
   }
