@@ -4,6 +4,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 import { gzipSync, gunzipSync } from "node:zlib";
+import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
 export const MOLIT_RAILWAY_TRANSFER_MOVEMENT_SOURCE_ID = "molit-railway-transfer-movement";
 export const MOLIT_RAILWAY_TRANSFER_MOVEMENT_SNAPSHOT_ID = "molit-railway-transfer-movement-20250811";
@@ -17,14 +18,14 @@ const COLUMNS = Object.freeze([
 ]);
 const LICENSE_TEXT = "이용허락범위 제한 없음";
 const EXPECTED_ROW_COUNT = 8054;
-const EXPECTED_RAW_SHA256 = "3a45dc1d82f81666c48eeef81fdc35b0e4a0c59312e4b26907f644c45b518ce3";
+export const MOLIT_RAILWAY_TRANSFER_MOVEMENT_RAW_SHA256 = "3a45dc1d82f81666c48eeef81fdc35b0e4a0c59312e4b26907f644c45b518ce3";
 
 export function buildMolitRailwayTransferMovementSnapshot({
-  bytes, capturedAt, expectedRowCount = EXPECTED_ROW_COUNT, expectedRawSha256 = EXPECTED_RAW_SHA256,
+  bytes, capturedAt, expectedRowCount = EXPECTED_ROW_COUNT,
+  expectedRawSha256 = MOLIT_RAILWAY_TRANSFER_MOVEMENT_RAW_SHA256,
 }) {
   if (!Buffer.isBuffer(bytes) || bytes.length === 0) throw new Error("CSV input is required");
-  const capturedMillis = Date.parse(capturedAt);
-  if (!Number.isFinite(capturedMillis)) throw new Error("capturedAt must be an ISO instant");
+  requiredUtcInstant(capturedAt, "capturedAt");
   if (!Number.isSafeInteger(expectedRowCount) || expectedRowCount < 1) throw new Error("expected row count is invalid");
   const utf8 = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
   const text = utf8.startsWith(PROVIDER_COLUMNS[0]) ? utf8 : new TextDecoder("euc-kr").decode(bytes);

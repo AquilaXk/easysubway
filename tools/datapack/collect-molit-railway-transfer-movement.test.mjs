@@ -51,6 +51,7 @@ test("MOLIT transfer movement collector는 exact schema·순서와 공란을 보
 
 test("MOLIT transfer movement collector는 provider step 순서를 verbatim 보존하고 양의 정수 형식만 검증한다", () => {
   const fixtureOptions = options();
+  assert.throws(() => buildMolitRailwayTransferMovementSnapshot({ ...fixtureOptions, bytes: csv(), capturedAt: "2026-07-29" }), /RFC 3339 UTC timestamp/);
   for (const [bytes, pattern] of [[csv(ROWS, "a,b,c"), /header mismatch/], [csv([ROWS[0]]), /row count mismatch/], [csv([",1호선,가,1,계단,이동", ROWS[1]]), /identity blank/], [csv([ROWS[0], "S1,1호선,가,0,,"]), /invalid step/], [csv([ROWS[0], "S1,1호선,가,one,,"]), /invalid step/]]) assert.throws(() => buildMolitRailwayTransferMovementSnapshot({ ...fixtureOptions, bytes, expectedRawSha256: createHash("sha256").update(bytes).digest("hex") }), pattern);
 });
 

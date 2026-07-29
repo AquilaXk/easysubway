@@ -32,6 +32,18 @@ test("official snapshot admission validates exact non-production raw binding", a
     await writeFile(inventoryPath, JSON.stringify(inventory));
     await writeFile(candidatesPath, JSON.stringify(candidates));
     await execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root });
+    const metadata = JSON.parse(await readFile(binding.metadataPath, "utf8"));
+    const invalidTimestampMetadataBytes = Buffer.from(JSON.stringify({ ...metadata, capturedAt: "2026-07-29" }));
+    const invalidTimestampMetadataPath = path.join(directory, "invalid-timestamp.json");
+    await writeFile(invalidTimestampMetadataPath, invalidTimestampMetadataBytes);
+    source.rawSnapshotAdmission.metadataPath = invalidTimestampMetadataPath;
+    source.rawSnapshotAdmission.metadataFileSha256 = sha256(invalidTimestampMetadataBytes);
+    candidate.rawSnapshotAdmission = structuredClone(source.rawSnapshotAdmission);
+    await writeFile(inventoryPath, JSON.stringify(inventory));
+    await writeFile(candidatesPath, JSON.stringify(candidates));
+    await assert.rejects(execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root }), /RFC 3339 UTC timestamp/);
+    source.rawSnapshotAdmission = structuredClone(binding);
+    candidate.rawSnapshotAdmission = structuredClone(binding);
     candidate.admissionStatus = "PENDING";
     await writeFile(candidatesPath, JSON.stringify(candidates));
     await assert.rejects(
@@ -43,7 +55,7 @@ test("official snapshot admission validates exact non-production raw binding", a
     candidate.rawSnapshotAdmission.rawSha256 = "0".repeat(64);
     await writeFile(inventoryPath, JSON.stringify(inventory));
     await writeFile(candidatesPath, JSON.stringify(candidates));
-    await assert.rejects(execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root }), /metadata rawSha256 mismatch/);
+    await assert.rejects(execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root }), /raw hash is not the pinned provider artifact/);
     source.rawSnapshotAdmission = structuredClone(binding);
     candidate.rawSnapshotAdmission = structuredClone(binding);
     candidates.candidates = candidates.candidates.filter(({ id }) => id !== candidate.id);
@@ -51,12 +63,12 @@ test("official snapshot admission validates exact non-production raw binding", a
     await writeFile(candidatesPath, JSON.stringify(candidates));
     await assert.rejects(execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root }), /official snapshot requires an admitted candidate/);
     candidates.candidates.push(candidate);
-    const metadata = JSON.parse(await readFile(binding.metadataPath, "utf8"));
     const rawBytes = gunzipSync(await readFile(path.join(path.dirname(binding.metadataPath), metadata.gzipPath)));
     const mutatedRawBytes = Buffer.from(rawBytes);
     mutatedRawBytes[mutatedRawBytes.length - 1] ^= 1;
     const mutatedGzipBytes = gzipSync(mutatedRawBytes, { mtime: 0 });
-    const mutatedMetadata = { ...metadata, gzipSha256: sha256(mutatedGzipBytes) };
+    const mutatedRawSha256 = sha256(mutatedRawBytes);
+    const mutatedMetadata = { ...metadata, rawSha256: mutatedRawSha256, gzipSha256: sha256(mutatedGzipBytes) };
     const mutatedMetadataBytes = Buffer.from(JSON.stringify(mutatedMetadata));
     const mutatedMetadataPath = path.join(directory, "mutated-snapshot.json");
     await writeFile(path.join(directory, metadata.gzipPath), mutatedGzipBytes);
@@ -65,13 +77,14 @@ test("official snapshot admission validates exact non-production raw binding", a
       ...binding,
       metadataPath: mutatedMetadataPath,
       metadataFileSha256: sha256(mutatedMetadataBytes),
+      rawSha256: mutatedRawSha256,
       gzipSha256: sha256(mutatedGzipBytes),
     };
     source.rawSnapshotAdmission = structuredClone(mutatedBinding);
     candidate.rawSnapshotAdmission = structuredClone(mutatedBinding);
     await writeFile(inventoryPath, JSON.stringify(inventory));
     await writeFile(candidatesPath, JSON.stringify(candidates));
-    await assert.rejects(execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root }), /official snapshot raw hash mismatch/);
+    await assert.rejects(execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root }), /raw hash is not the pinned provider artifact/);
   } finally { await rm(directory, { recursive: true, force: true }); }
 });
 const testPrivateKeyPem = `-----BEGIN PRIVATE KEY-----
