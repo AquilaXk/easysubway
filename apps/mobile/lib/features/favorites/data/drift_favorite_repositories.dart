@@ -682,7 +682,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     }
   }
 
-  Future<({String routeId, Map<String, Object?> snapshot, String addedAt, String originStationId, String destinationStationId, String mobilityType})> _migrateLegacyRoute({
+  Future<({String routeId, Map<String, Object?>? snapshot, String addedAt, String originStationId, String destinationStationId, String mobilityType})> _migrateLegacyRoute({
     required String legacyRouteId,
     required QueryRow row,
     required Map<String, Object?> snapshot,
@@ -699,6 +699,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     var resolvedOriginStationId = row.read<String>('origin_station_id');
     var resolvedDestinationStationId = row.read<String>('destination_station_id');
     var resolvedMobilityType = row.read<String>('mobility_profile');
+    var targetAlreadyExisted = false;
     await userDatabase.transaction(() async {
       final target = await userDatabase
           .customSelect(
@@ -724,6 +725,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
           ),
         );
       } else {
+        targetAlreadyExisted = true;
         resolvedAddedAt = _isoFromEpoch(target.read<int?>('added_at_value'));
         resolvedOriginStationId = target.read<String>('origin_station_id');
         resolvedDestinationStationId = target.read<String>('destination_station_id');
@@ -751,7 +753,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     final targetSnapshot = await _readRouteSnapshot(targetRouteId);
     return (
       routeId: targetRouteId,
-      snapshot: targetSnapshot ?? migratedSnapshot,
+      snapshot: targetAlreadyExisted ? targetSnapshot : targetSnapshot ?? migratedSnapshot,
       addedAt: resolvedAddedAt,
       originStationId: resolvedOriginStationId,
       destinationStationId: resolvedDestinationStationId,

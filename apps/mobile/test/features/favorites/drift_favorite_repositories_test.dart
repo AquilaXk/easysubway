@@ -734,7 +734,6 @@ void main() {
         ),
       ],
     );
-    const targetSnapshot = '{"originStationName":"대상"}';
     await userDatabase.transaction(() async {
       await userDatabase.into(userDatabase.favoriteRoutes).insert(
         user_db.FavoriteRoutesCompanion.insert(
@@ -743,13 +742,6 @@ void main() {
           destinationStationId: 'target-destination',
           mobilityProfile: 'WHEELCHAIR',
           addedAt: DateTime.utc(2026, 7, 1),
-        ),
-      );
-      await userDatabase.into(userDatabase.appPreferences).insert(
-        user_db.AppPreferencesCompanion.insert(
-          key: 'favorite_route_snapshot:${candidate.value}',
-          value: targetSnapshot,
-          updatedAt: DateTime.utc(2026, 7, 1),
         ),
       );
       await userDatabase.into(userDatabase.favoriteRoutes).insert(
@@ -802,14 +794,25 @@ void main() {
       isEmpty,
     );
     expect(
-      (await userDatabase
-              .customSelect('SELECT value FROM app_preferences WHERE key = ?', variables: [Variable.withString('favorite_route_snapshot:${candidate.value}')])
-              .getSingle())
-          .read<String>('value'),
-      targetSnapshot,
+      await userDatabase
+          .customSelect('SELECT key FROM app_preferences WHERE key = ?', variables: [Variable.withString('favorite_route_snapshot:${candidate.value}')])
+          .get(),
+      isEmpty,
     );
 
-    await repository.removeFavoriteRoute(favorite.favoriteRouteId);
+    final restarted = DriftFavoriteRouteRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+    final reloaded = (await restarted.listFavoriteRoutes()).single;
+    expect(reloaded.favoriteRouteId, candidate.value);
+    expect(reloaded.originStationId, 'target-origin');
+    expect(reloaded.destinationStationId, 'target-destination');
+    expect(reloaded.mobilityType, 'WHEELCHAIR');
+    expect(reloaded.addedAt, '2026-07-01T00:00:00.000Z');
+    expect(reloaded.needsResearch, isTrue);
+
+    await restarted.removeFavoriteRoute(reloaded.favoriteRouteId);
 
     expect(await repository.listFavoriteRoutes(), isEmpty);
   });
