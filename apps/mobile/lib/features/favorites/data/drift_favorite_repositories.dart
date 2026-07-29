@@ -886,9 +886,8 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
           variables: [Variable.withString(stationId)],
         )
         .getSingleOrNull();
-    return row?.read<String?>('name_ko')?.trim().isNotEmpty == true
-        ? row!.read<String>('name_ko')
-        : stationId;
+    final catalogName = row?.read<String?>('name_ko')?.trim() ?? '';
+    return catalogName.isEmpty ? stationId : catalogName;
   }
 
   Future<void> _writeRouteSnapshot(

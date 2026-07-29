@@ -601,8 +601,13 @@ class _FavoriteHomeRouteRow extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
     return Semantics(
       button: true,
-      label:
-          '즐겨찾기 경로, $originName에서 $destinationName까지, ${route.lineLabel}, ${route.mobilityLabel}${route.needsResearch ? ', ${route.statusLabel}' : ''}',
+      label: [
+        '즐겨찾기 경로',
+        '$originName에서 $destinationName까지',
+        if (route.lineLabel.trim().isNotEmpty) route.lineLabel.trim(),
+        if (route.mobilityLabel.trim().isNotEmpty) route.mobilityLabel.trim(),
+        if (route.needsResearch) route.statusLabel,
+      ].join(', '),
       onTap: onTap,
       child: ExcludeSemantics(
         child: InkWell(

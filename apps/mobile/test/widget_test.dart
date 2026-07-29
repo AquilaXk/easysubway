@@ -921,7 +921,7 @@ void main() {
 
   testWidgets('저장 탭은 복원 불가 경로에 다시 검색 필요를 표시한다', (tester) async {
     final favoriteRouteRepository = FakeFavoriteRouteRepository(
-      favorites: [_favoriteRoute(needsResearch: true)],
+      favorites: [_favoriteRoute(needsResearch: true, lineName: '')],
     );
     await tester.pumpWidget(
       buildEasySubwayTestApp(
@@ -941,9 +941,9 @@ void main() {
 
     expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
     expect(find.text('상록수역 → 사당역'), findsOneWidget);
-    expect(find.text('수도권 4호선 · 천천히 · 다시 검색 필요'), findsOneWidget);
+    expect(find.text('천천히 · 다시 검색 필요'), findsOneWidget);
     expect(
-      find.bySemanticsLabel('즐겨찾기 경로, 상록수역에서 사당역까지, 수도권 4호선, 천천히, 다시 검색 필요'),
+      find.bySemanticsLabel('즐겨찾기 경로, 상록수역에서 사당역까지, 천천히, 다시 검색 필요'),
       findsOneWidget,
     );
   });
@@ -20805,6 +20805,7 @@ FavoriteRoute _favoriteRoute({
   String mobilityType = 'SENIOR',
   RouteTransportScope transportScope = RouteTransportScope.subway,
   bool needsResearch = false,
+  String lineName = '수도권 4호선',
 }) {
   return FavoriteRoute(
     userId: 'anonymous-user-1',
@@ -20817,7 +20818,7 @@ FavoriteRoute _favoriteRoute({
     mobilityType: mobilityType,
     status: 'FOUND',
     lineId: 'seoul-4',
-    lineName: '수도권 4호선',
+    lineName: lineName,
     score: 92,
     routeCreatedAt: '2026-06-13T04:20:00',
     addedAt: '2026-06-14T10:00:00',

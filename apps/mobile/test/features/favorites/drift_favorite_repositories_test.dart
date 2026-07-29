@@ -1045,6 +1045,9 @@ void main() {
     addTearDown(catalogDatabase.close);
     addTearDown(userDatabase.close);
     await catalogDatabase.seedBaselineIfEmpty();
+    await catalogDatabase.customStatement(
+      "UPDATE stations SET name_ko = ' 상록수 ' WHERE id = 'station-sangnoksu'",
+    );
     final repository = DriftFavoriteRouteRepository(
       catalogDatabase: catalogDatabase,
       userDatabase: userDatabase,
