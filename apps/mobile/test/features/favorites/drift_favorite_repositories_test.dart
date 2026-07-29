@@ -452,12 +452,15 @@ void main() {
                 'status': 'FOUND',
                 'score': 71,
                 'createdAt': '2026-07-01T00:00:00.000Z',
+                'objective': 'FASTEST',
                 'steps': [
                   {
                     'stepType': 'RIDE',
                     'fromStationId': 'station-sangnoksu',
                     'toStationId': 'station-sadang',
                     'lineId': 'seoul-4',
+                    'serviceClass': 'SUBWAY',
+                    'servicePattern': 'LOCAL',
                   },
                 ],
               }),
@@ -475,6 +478,26 @@ void main() {
 
     expect(first.single.favoriteRouteId, startsWith('rc:v1:'));
     expect(second.single.favoriteRouteId, first.single.favoriteRouteId);
+    final migratedSnapshot =
+        jsonDecode(
+              (await userDatabase
+                      .customSelect(
+                        'SELECT value FROM app_preferences WHERE key = ?',
+                        variables: [
+                          Variable.withString(
+                            'favorite_route_snapshot:${first.single.favoriteRouteId}',
+                          ),
+                        ],
+                      )
+                      .getSingle())
+                  .read<String>('value'),
+            )
+            as Map<String, Object?>;
+    expect(
+      (migratedSnapshot['querySnapshot']
+          as Map<String, Object?>)['mobilityPreset'],
+      'STEP_FREE',
+    );
     expect(
       await userDatabase
           .customSelect('SELECT route_id FROM favorite_routes')
@@ -510,6 +533,7 @@ void main() {
       originStationId: 'station-sangnoksu',
       destinationStationId: 'station-sadang',
       mobilityType: 'WHEELCHAIR',
+      mobilityPreset: 'STEP_FREE',
       constraintMode: 'STRICT_STEP_FREE',
       transportScope: 'SUBWAY',
       objective: 'FASTEST',
@@ -522,6 +546,8 @@ void main() {
           fromStationId: 'station-sangnoksu',
           toStationId: 'station-sadang',
           lineId: 'seoul-4',
+          serviceClass: 'SUBWAY',
+          servicePattern: 'LOCAL',
         ),
       ],
     );
@@ -535,12 +561,15 @@ void main() {
       'status': 'FOUND',
       'score': 71,
       'createdAt': '2026-07-01T00:00:00.000Z',
+      'objective': 'FASTEST',
       'steps': [
         {
           'stepType': 'RIDE',
           'fromStationId': 'station-sangnoksu',
           'toStationId': 'station-sadang',
           'lineId': 'seoul-4',
+          'serviceClass': 'SUBWAY',
+          'servicePattern': 'LOCAL',
         },
       ],
     });
@@ -634,6 +663,10 @@ void main() {
                       'stepType': fixture.$3,
                       'fromStationId': 'station-sangnoksu',
                       'toStationId': 'station-sadang',
+                      if (fixture.$3 == 'RIDE') ...{
+                        'serviceClass': 'SUBWAY',
+                        'servicePattern': 'LOCAL',
+                      },
                     },
                   ],
                 }),
@@ -646,6 +679,12 @@ void main() {
     final favorites = await repository.listFavoriteRoutes();
 
     expect(favorites, hasLength(2));
+    expect(
+      favorites.every(
+        (favorite) => favorite.favoriteRouteId.startsWith('rc:v1:'),
+      ),
+      isTrue,
+    );
     expect(
       favorites.map((favorite) => favorite.favoriteRouteId).toSet(),
       hasLength(2),
@@ -666,6 +705,7 @@ void main() {
       originStationId: 'station-sangnoksu',
       destinationStationId: 'station-sadang',
       mobilityType: 'SENIOR',
+      mobilityPreset: 'SLOW',
       constraintMode: 'PREFER_STEP_FREE',
       transportScope: 'SUBWAY',
       objective: 'FASTEST',
@@ -678,6 +718,8 @@ void main() {
           fromStationId: 'station-sangnoksu',
           toStationId: 'station-sadang',
           lineId: 'seoul-4',
+          serviceClass: 'SUBWAY',
+          servicePattern: 'LOCAL',
         ),
       ],
     );
@@ -750,12 +792,15 @@ void main() {
                 'status': 'FOUND',
                 'score': 1,
                 'createdAt': '2026-07-01T00:00:00.000Z',
+                'objective': 'FASTEST',
                 'steps': [
                   {
                     'stepType': 'RIDE',
                     'fromStationId': 'station-sangnoksu',
                     'toStationId': 'station-sadang',
                     'lineId': 'seoul-4',
+                    'serviceClass': 'SUBWAY',
+                    'servicePattern': 'LOCAL',
                   },
                 ],
               }),
@@ -879,6 +924,7 @@ void main() {
         originStationId: 'station-sangnoksu',
         destinationStationId: 'station-sadang',
         mobilityType: 'SENIOR',
+        mobilityPreset: 'SLOW',
         constraintMode: 'PREFER_STEP_FREE',
         transportScope: 'SUBWAY',
         objective: 'FASTEST',
@@ -888,6 +934,8 @@ void main() {
           stepType: 'RIDE',
           fromStationId: 'station-sangnoksu',
           toStationId: 'station-sadang',
+          serviceClass: 'SUBWAY',
+          servicePattern: 'LOCAL',
         ),
       ],
     );
@@ -928,11 +976,14 @@ void main() {
                 'status': 'FOUND',
                 'score': 1,
                 'createdAt': '2026-07-02T00:00:00.000Z',
+                'objective': 'FASTEST',
                 'steps': [
                   {
                     'stepType': 'RIDE',
                     'fromStationId': 'station-sangnoksu',
                     'toStationId': 'station-sadang',
+                    'serviceClass': 'SUBWAY',
+                    'servicePattern': 'LOCAL',
                   },
                 ],
               }),
@@ -1002,6 +1053,32 @@ void main() {
       ('local-missing', null),
       ('local-invalid-json', '{'),
       ('local-invalid-shape', '[]'),
+      (
+        'local-missing-objective',
+        jsonEncode({
+          'originStationId': 'station-sangnoksu',
+          'originStationName': '상록수',
+          'destinationStationId': 'station-sadang',
+          'destinationStationName': '사당',
+          'mobilityType': 'WHEELCHAIR',
+          'mobilityPreset': 'STEP_FREE',
+          'constraintMode': 'STRICT_STEP_FREE',
+          'transportScope': 'SUBWAY',
+          'status': 'FOUND',
+          'score': 1,
+          'createdAt': '2026-07-01T00:00:00.000Z',
+          'steps': [
+            {
+              'stepType': 'RIDE',
+              'fromStationId': 'station-sangnoksu',
+              'toStationId': 'station-sadang',
+              'lineId': 'seoul-4',
+              'serviceClass': 'SUBWAY',
+              'servicePattern': 'LOCAL',
+            },
+          ],
+        }),
+      ),
       (
         'local-waypoint',
         jsonEncode({
@@ -1127,7 +1204,7 @@ void main() {
 
     final favorites = await repository.listFavoriteRoutes();
 
-    expect(favorites, hasLength(8));
+    expect(favorites, hasLength(9));
     expect(favorites.every((favorite) => favorite.needsResearch), isTrue);
     expect(favorites.map((favorite) => favorite.statusLabel).toSet(), {
       '다시 검색 필요',
@@ -1164,7 +1241,7 @@ void main() {
       await userDatabase
           .customSelect('SELECT route_id FROM favorite_routes')
           .get(),
-      hasLength(7),
+      hasLength(8),
     );
     expect(
       await userDatabase

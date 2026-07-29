@@ -649,6 +649,7 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       final hasWaypointEvidence =
           _snapshotOptionalString(snapshot, 'waypointStationId') != null ||
           _hasWaypointStep(snapshot['steps']);
+      final mobilityType = _snapshotString(snapshot, 'mobilityType');
       final query = querySnapshot is Map<String, Object?>
           ? RouteQueryIdentity.fromSnapshot(querySnapshot)
           : hasQuerySnapshot
@@ -661,17 +662,17 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
                 snapshot,
                 'destinationStationId',
               ),
-              mobilityType: _snapshotString(snapshot, 'mobilityType'),
+              mobilityType: mobilityType,
               constraintMode:
                   _snapshotOptionalString(snapshot, 'constraintMode') ??
-                  _legacyConstraintMode(
-                    _snapshotString(snapshot, 'mobilityType'),
-                  ),
+                  _legacyConstraintMode(mobilityType),
+              mobilityPreset:
+                  _snapshotOptionalString(snapshot, 'mobilityPreset') ??
+                  _legacyMobilityPreset(mobilityType),
               transportScope:
                   _snapshotOptionalString(snapshot, 'transportScope') ??
                   'SUBWAY',
-              objective:
-                  _snapshotOptionalString(snapshot, 'objective') ?? 'FASTEST',
+              objective: _snapshotString(snapshot, 'objective'),
             );
       if (_snapshotString(snapshot, 'originStationId') !=
               query.originStationId ||
@@ -1127,6 +1128,8 @@ Map<String, Object?> _routeStepToJson(RouteSearchStep step) {
     'timeSource': step.timeSource,
     'distanceSource': step.distanceSource,
     'confidenceLabel': step.confidenceLabel,
+    'serviceClass': step.serviceClass,
+    'servicePattern': step.servicePattern,
   };
 }
 
@@ -1137,7 +1140,14 @@ Map<String, Object?> _routeWarningToJson(RouteSearchWarning warning) {
 RouteCandidateLegSignature _legacyLeg(Object? value) {
   if (value is! Map<String, Object?>) throw const FormatException();
   final stepType = _snapshotString(value, 'stepType');
-  if (!_legacyStepTypes.contains(stepType.toLowerCase())) {
+  final normalizedStepType = stepType.toLowerCase();
+  if (!_legacyStepTypes.contains(normalizedStepType)) {
+    throw const FormatException();
+  }
+  final serviceClass = _snapshotOptionalString(value, 'serviceClass');
+  final servicePattern = _snapshotOptionalString(value, 'servicePattern');
+  if ((normalizedStepType == 'ride' || normalizedStepType == 'train') &&
+      (serviceClass == null || servicePattern == null)) {
     throw const FormatException();
   }
   return RouteCandidateLegSignature(
@@ -1145,6 +1155,8 @@ RouteCandidateLegSignature _legacyLeg(Object? value) {
     fromStationId: _snapshotString(value, 'fromStationId'),
     toStationId: _snapshotString(value, 'toStationId'),
     lineId: _snapshotOptionalString(value, 'lineId') ?? '',
+    serviceClass: serviceClass ?? '',
+    servicePattern: servicePattern ?? '',
   );
 }
 
@@ -1199,6 +1211,14 @@ String? _snapshotOptionalString(Map<String, Object?> snapshot, String key) {
 
 String _legacyConstraintMode(String mobilityType) =>
     mobilityType == 'WHEELCHAIR' ? 'STRICT_STEP_FREE' : 'PREFER_STEP_FREE';
+
+String _legacyMobilityPreset(String mobilityType) => switch (mobilityType) {
+  'STANDARD' => 'STANDARD',
+  'SENIOR' => 'SLOW',
+  'LUGGAGE' => 'NO_STAIRS',
+  'WHEELCHAIR' => 'STEP_FREE',
+  _ => throw const FormatException(),
+};
 
 String _isoFromSql(DateTime value) => value.toUtc().toIso8601String();
 
