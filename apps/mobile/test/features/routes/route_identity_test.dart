@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:easysubway_mobile/features/routes/domain/route_identity.dart';
+import 'package:easysubway_mobile/route_search.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
@@ -92,6 +93,27 @@ void main() {
     expect(twoLegs.value, isNot(reversed.value));
     expect(() => RouteCandidateIdentity(query: query, legs: const []), throwsArgumentError);
   });
+
+  test('V2 candidate identity excludes provider, time, objective tags, and labels', () {
+    final query = RouteQueryIdentity(originStationId: 'a', destinationStationId: 'b', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', transportScope: 'SUBWAY', objective: 'FASTEST');
+    final first = RouteSearchResult.fromV2(_v2Result('2026-07-01T09:00:00Z', 'provider-itinerary-a', const ['FASTEST']), queryIdentity: query);
+    final second = RouteSearchResult.fromV2(_v2Result('2026-08-01T09:00:00Z', 'provider-itinerary-b', const ['FASTEST', 'FEWEST_TRANSFERS']), queryIdentity: query);
+    expect(first.candidateIdentity!.canonicalBytes, second.candidateIdentity!.canonicalBytes);
+    expect(first.candidateIdentity!.value, second.candidateIdentity!.value);
+    expect(first.withDisplayLabels(originStationName: '표시 A', destinationStationName: '표시 B', lineName: '표시 노선', etaSource: 'PLANNED').candidateIdentity!.value, first.candidateIdentity!.value);
+  });
+
+  test('V2 blocked itinerary with raw empty legs keeps no candidate identity', () {
+    final query = RouteQueryIdentity(originStationId: 'a', destinationStationId: 'b', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', transportScope: 'SUBWAY', objective: 'FASTEST');
+    final result = RouteSearchResult.fromV2(_v2Result('2026-07-01T09:00:00Z', 'blocked-provider-id', const ['FASTEST'], status: 'BLOCKED', legs: const []), queryIdentity: query);
+    expect(result.status, 'BLOCKED');
+    expect(result.candidateIdentity, isNull);
+  });
 }
 
 List<int> utf8Bytes(String value) => utf8.encode(value);
+
+RouteSearchV2Result _v2Result(String departureTime, String itineraryId, List<String> tags, {String status = 'FOUND', List<RouteSearchV2Leg>? legs}) => RouteSearchV2Result(contractVersion: 'v2', originStationId: 'a', destinationStationId: 'b', departureTime: departureTime, mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', useRealtime: true, maxTransfers: 3, alternativeCount: 3, statuses: const ['BLOCKED'], itineraries: [RouteSearchV2Itinerary(itineraryId: itineraryId, status: status, plannedArrivalTime: '2026-07-01T09:10:00Z', realtimeArrivalTime: null, etaSource: 'PLANNED', etaConfidence: 'HIGH', durationSeconds: 600, transferCount: 0, walkingDistanceMeters: 0, accessibilityRisk: _risk, legs: legs ?? [_leg], commercialEtaEligible: false, objectiveTags: tags)]);
+
+const _risk = RouteSearchV2AccessibilityRisk(stairCount: 0, unknownAccessibilityCount: 0, generatedConnectorCount: 0, staleDataCount: 0, lowConfidenceCount: 0, unavailableFacilityCount: 0, riskLevel: 'LOW', reasonCodes: [], level: 'LOW', reasons: []);
+const _leg = RouteSearchV2Leg(legType: 'RIDE', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', lineId: 'l1', tripId: 'trip', trainNo: 'train', plannedDepartureTime: '2026-07-01T09:00:00Z', realtimeDepartureTime: null, plannedArrivalTime: '2026-07-01T09:10:00Z', realtimeArrivalTime: null, waitTimeSeconds: 0, slackSeconds: 0, durationSeconds: 600, distanceMeters: 0, etaSource: 'PLANNED', confidence: 'HIGH', accessibilityRisk: _risk, serviceClass: 'SUBWAY', servicePattern: 'LOCAL');
