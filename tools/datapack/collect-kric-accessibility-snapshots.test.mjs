@@ -375,7 +375,10 @@ test("두 번째 transport 실패 뒤에는 fail closed다", async () => {
     operations: [operation],
     serviceKey: "key",
     fetchImpl: async () => { calls += 1; throw new Error("timeout"); },
-  }), /KRIC accessibility request failed: kric-station-elevator\/S1\/2\/202/);
+  }), {
+    name: "Error",
+    message: "KRIC accessibility request failed: kric-station-elevator/S1/2/202",
+  });
   assert.equal(calls, 2);
 });
 
