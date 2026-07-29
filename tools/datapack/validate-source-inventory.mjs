@@ -342,8 +342,9 @@ async function validateAdmittedCandidateEvidence(inventory, candidates, official
         throw new Error(`${candidate.id} official snapshot raw hash mismatch`);
       }
       const rebuilt = buildMolitRailwayTransferMovementSnapshot({ bytes: rawBytes, capturedAt: metadata.capturedAt });
-      const { gzipBytes: ignoredGzipBytes, rows: ignoredRows, ...rebuiltMetadata } = rebuilt;
-      if (JSON.stringify({ ...rebuiltMetadata, gzipPath: metadata.gzipPath }) !== JSON.stringify(metadata)) {
+      const { gzipBytes: ignoredGzipBytes, gzipSha256: ignoredRebuiltGzipSha256, rows: ignoredRows, ...rebuiltMetadata } = rebuilt;
+      const { gzipSha256: ignoredMetadataGzipSha256, ...logicalMetadata } = metadata;
+      if (JSON.stringify({ ...rebuiltMetadata, gzipPath: metadata.gzipPath }) !== JSON.stringify(logicalMetadata)) {
         throw new Error(`${candidate.id} official snapshot metadata mismatch`);
       }
       continue;

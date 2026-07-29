@@ -37,6 +37,28 @@ test("official snapshot admission validates exact non-production raw binding", a
     await execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root });
     const metadata = JSON.parse(await readFile(binding.metadataPath, "utf8"));
     assert.equal(metadata.observedRailOperatorCodes.length, 18);
+    const rawBytes = gunzipSync(await readFile(path.join(path.dirname(binding.metadataPath), metadata.gzipPath)));
+    const alternateGzipBytes = gzipSync(rawBytes, { level: 1, mtime: 0 });
+    const alternateGzipSha256 = sha256(alternateGzipBytes);
+    assert.notEqual(alternateGzipSha256, metadata.gzipSha256);
+    const alternateMetadata = { ...metadata, gzipSha256: alternateGzipSha256 };
+    const alternateMetadataBytes = Buffer.from(JSON.stringify(alternateMetadata));
+    const alternateMetadataPath = path.join(directory, "alternate-compression.json");
+    await writeFile(path.join(directory, metadata.gzipPath), alternateGzipBytes);
+    await writeFile(alternateMetadataPath, alternateMetadataBytes);
+    const alternateBinding = {
+      ...binding,
+      metadataPath: alternateMetadataPath,
+      metadataFileSha256: sha256(alternateMetadataBytes),
+      gzipSha256: alternateGzipSha256,
+    };
+    source.rawSnapshotAdmission = structuredClone(alternateBinding);
+    candidate.rawSnapshotAdmission = structuredClone(alternateBinding);
+    await writeFile(inventoryPath, JSON.stringify(inventory));
+    await writeFile(candidatesPath, JSON.stringify(candidates));
+    await execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root });
+    source.rawSnapshotAdmission = structuredClone(binding);
+    candidate.rawSnapshotAdmission = structuredClone(binding);
     const mappedSource = inventory.sources.find(({ id }) => id !== source.id);
     const mappedRegionIds = mappedSource.coverageScope.regionIds;
     mappedSource.coverageScope.regionIds = [];
@@ -89,7 +111,6 @@ test("official snapshot admission validates exact non-production raw binding", a
     await writeFile(candidatesPath, JSON.stringify(candidates));
     await assert.rejects(execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root }), /official snapshot requires an admitted candidate/);
     candidates.candidates.push(candidate);
-    const rawBytes = gunzipSync(await readFile(path.join(path.dirname(binding.metadataPath), metadata.gzipPath)));
     const mutatedRawBytes = Buffer.from(rawBytes);
     mutatedRawBytes[mutatedRawBytes.length - 1] ^= 1;
     const mutatedGzipBytes = gzipSync(mutatedRawBytes, { mtime: 0 });
