@@ -479,7 +479,21 @@
             }
           },
           "officialOdFareAdmissionHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-          "fareStationLineMappingLedgerHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+          "fareStationLineMappingLedgerHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "rawSnapshotAdmission": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["snapshotId", "metadataPath", "metadataFileSha256", "rawSha256", "gzipSha256", "rowCount", "status"],
+            "properties": {
+              "snapshotId": { "type": "string", "minLength": 1 },
+              "metadataPath": { "type": "string", "minLength": 1 },
+              "metadataFileSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "rawSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "gzipSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "rowCount": { "type": "integer", "minimum": 1 },
+              "status": { "type": "string", "enum": ["LOCKED"] }
+            }
+          }
         }
       }
     }

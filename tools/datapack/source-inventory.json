@@ -7903,6 +7903,7 @@
       "displayName": "국토교통부_철도역 환승 이동경로 정보",
       "owner": "국토교통부",
       "provider": "국토교통부",
+      "providerDepartment": "철도정책과",
       "sourceSystem": "공공데이터포털",
       "datasetUrl": "https://www.data.go.kr/data/15130556/fileData.do",
       "datasetKind": "file-data",
