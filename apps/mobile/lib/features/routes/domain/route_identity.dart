@@ -55,24 +55,87 @@ class RouteQueryIdentity {
   ];
   List<int> get canonicalBytes => utf8.encode(jsonEncode(_canonical));
   String get value => 'rq:v1:${sha256.convert(canonicalBytes)}';
-  Map<String, Object?> toSnapshot() => {'originStationId': originStationId, 'destinationStationId': destinationStationId, 'mobilityType': mobilityType, 'constraintMode': constraintMode, 'waypointStationId': waypointStationId, 'mobilityPreset': mobilityPreset, 'transportScope': transportScope, 'objective': objective};
-  @override bool operator ==(Object other) => other is RouteQueryIdentity && value == other.value;
-  @override int get hashCode => value.hashCode;
+  Map<String, Object?> toSnapshot() => {
+    'originStationId': originStationId,
+    'destinationStationId': destinationStationId,
+    'mobilityType': mobilityType,
+    'constraintMode': constraintMode,
+    'waypointStationId': waypointStationId,
+    'mobilityPreset': mobilityPreset,
+    'transportScope': transportScope,
+    'objective': objective,
+  };
+  @override
+  bool operator ==(Object other) =>
+      other is RouteQueryIdentity && value == other.value;
+  @override
+  int get hashCode => value.hashCode;
 }
 
 class RouteCandidateLegSignature {
-  RouteCandidateLegSignature({required this.stepType, required this.fromStationId, required this.toStationId, this.fromNodeId = '', this.toNodeId = '', this.edgeId = '', this.lineId = '', this.serviceClass = '', this.servicePattern = ''});
-  final String stepType, fromStationId, toStationId, fromNodeId, toNodeId, edgeId, lineId, serviceClass, servicePattern;
-  List<String> get canonical => [stepType, fromStationId, toStationId, fromNodeId, toNodeId, edgeId, lineId, serviceClass, servicePattern].map((value) => value.trim()).toList(growable: false);
+  RouteCandidateLegSignature({
+    required this.stepType,
+    required this.fromStationId,
+    required this.toStationId,
+    this.fromNodeId = '',
+    this.toNodeId = '',
+    this.edgeId = '',
+    this.lineId = '',
+    this.serviceClass = '',
+    this.servicePattern = '',
+  });
+  final String stepType,
+      fromStationId,
+      toStationId,
+      fromNodeId,
+      toNodeId,
+      edgeId,
+      lineId,
+      serviceClass,
+      servicePattern;
+  List<String> get canonical => [
+    stepType,
+    fromStationId,
+    toStationId,
+    fromNodeId,
+    toNodeId,
+    edgeId,
+    lineId,
+    serviceClass,
+    servicePattern,
+  ].map((value) => value.trim()).toList(growable: false);
 }
 
 class RouteCandidateIdentity {
-  RouteCandidateIdentity({required this.query, required List<RouteCandidateLegSignature> legs}) : legs = List.unmodifiable(legs) { if (legs.isEmpty) throw ArgumentError.value(legs, 'legs', 'must not be empty'); }
+  RouteCandidateIdentity({
+    required this.query,
+    required List<RouteCandidateLegSignature> legs,
+  }) : legs = List.unmodifiable(legs) {
+    if (legs.isEmpty) {
+      throw ArgumentError.value(legs, 'legs', 'must not be empty');
+    }
+  }
   final RouteQueryIdentity query;
   final List<RouteCandidateLegSignature> legs;
-  List<int> get canonicalBytes => utf8.encode(jsonEncode(['route-candidate-v1', query._canonical, [for (final leg in legs) leg.canonical]]));
+  List<int> get canonicalBytes => utf8.encode(
+    jsonEncode([
+      'route-candidate-v1',
+      query._canonical,
+      [for (final leg in legs) leg.canonical],
+    ]),
+  );
   String get value => 'rc:v1:${sha256.convert(canonicalBytes)}';
 }
 
-String _required(String value) { final normalized = value.trim(); if (normalized.isEmpty) throw ArgumentError.value(value, 'value', 'must not be blank'); return normalized; }
-String? _optional(String? value) { final normalized = value?.trim() ?? ''; return normalized.isEmpty ? null : normalized; }
+String _required(String value) {
+  final normalized = value.trim();
+  if (normalized.isEmpty) {
+    throw ArgumentError.value(value, 'value', 'must not be blank');
+  }
+  return normalized;
+}
+
+String? _optional(String? value) {
+  final normalized = value?.trim() ?? '';
+  return normalized.isEmpty ? null : normalized;
+}

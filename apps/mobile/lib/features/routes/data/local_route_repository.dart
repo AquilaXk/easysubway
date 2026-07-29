@@ -604,7 +604,7 @@ class LocalRouteRepository implements RouteSearchRepository {
                     edgeId: step.edgeId,
                     lineId: step.lineId,
                     serviceClass: step.type.name == 'ride' ? 'SUBWAY' : '',
-                    servicePattern: step.servicePattern ?? '',
+                    servicePattern: step.servicePattern,
                   ),
               ],
             ),

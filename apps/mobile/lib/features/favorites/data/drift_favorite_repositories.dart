@@ -660,11 +660,16 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
                 'destinationStationId',
               ),
               mobilityType: _snapshotString(snapshot, 'mobilityType'),
-              constraintMode: _snapshotOptionalString(snapshot, 'constraintMode') ??
-                  _legacyConstraintMode(_snapshotString(snapshot, 'mobilityType')),
+              constraintMode:
+                  _snapshotOptionalString(snapshot, 'constraintMode') ??
+                  _legacyConstraintMode(
+                    _snapshotString(snapshot, 'mobilityType'),
+                  ),
               transportScope:
-                  _snapshotOptionalString(snapshot, 'transportScope') ?? 'SUBWAY',
-              objective: _snapshotOptionalString(snapshot, 'objective') ?? 'FASTEST',
+                  _snapshotOptionalString(snapshot, 'transportScope') ??
+                  'SUBWAY',
+              objective:
+                  _snapshotOptionalString(snapshot, 'objective') ?? 'FASTEST',
             );
       _snapshotString(snapshot, 'originStationName');
       _snapshotString(snapshot, 'destinationStationName');
@@ -672,7 +677,9 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       _snapshotString(snapshot, 'createdAt');
       if (snapshot['score'] is! int) throw const FormatException();
       final steps = snapshot['steps'];
-      if (steps is! List<Object?> || steps.isEmpty) throw const FormatException();
+      if (steps is! List<Object?> || steps.isEmpty) {
+        throw const FormatException();
+      }
       return RouteCandidateIdentity(
         query: query,
         legs: [for (final step in steps) _legacyLeg(step)],
@@ -686,7 +693,17 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     }
   }
 
-  Future<({String routeId, Map<String, Object?>? snapshot, String addedAt, String originStationId, String destinationStationId, String mobilityType})> _migrateLegacyRoute({
+  Future<
+    ({
+      String routeId,
+      Map<String, Object?>? snapshot,
+      String addedAt,
+      String originStationId,
+      String destinationStationId,
+      String mobilityType,
+    })
+  >
+  _migrateLegacyRoute({
     required String legacyRouteId,
     required QueryRow row,
     required Map<String, Object?> snapshot,
@@ -701,7 +718,9 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     };
     var resolvedAddedAt = _isoFromEpoch(row.read<int?>('added_at_value'));
     var resolvedOriginStationId = row.read<String>('origin_station_id');
-    var resolvedDestinationStationId = row.read<String>('destination_station_id');
+    var resolvedDestinationStationId = row.read<String>(
+      'destination_station_id',
+    );
     var resolvedMobilityType = row.read<String>('mobility_profile');
     var targetAlreadyExisted = false;
     await userDatabase.transaction(() async {
@@ -712,27 +731,37 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
           )
           .getSingleOrNull();
       if (target == null) {
-        await userDatabase.into(userDatabase.favoriteRoutes).insert(
-          user_db.FavoriteRoutesCompanion.insert(
-            routeId: targetRouteId,
-            originStationId: row.read<String>('origin_station_id'),
-            destinationStationId: row.read<String>('destination_station_id'),
-            mobilityProfile: row.read<String>('mobility_profile'),
-            addedAt: _dateTimeFromEpoch(row.read<int?>('added_at_value') ?? 0),
-          ),
-        );
-        await userDatabase.into(userDatabase.appPreferences).insert(
-          user_db.AppPreferencesCompanion.insert(
-            key: '$_routeSnapshotPrefix$targetRouteId',
-            value: jsonEncode(migratedSnapshot),
-            updatedAt: DateTime.now().toUtc(),
-          ),
-        );
+        await userDatabase
+            .into(userDatabase.favoriteRoutes)
+            .insert(
+              user_db.FavoriteRoutesCompanion.insert(
+                routeId: targetRouteId,
+                originStationId: row.read<String>('origin_station_id'),
+                destinationStationId: row.read<String>(
+                  'destination_station_id',
+                ),
+                mobilityProfile: row.read<String>('mobility_profile'),
+                addedAt: _dateTimeFromEpoch(
+                  row.read<int?>('added_at_value') ?? 0,
+                ),
+              ),
+            );
+        await userDatabase
+            .into(userDatabase.appPreferences)
+            .insert(
+              user_db.AppPreferencesCompanion.insert(
+                key: '$_routeSnapshotPrefix$targetRouteId',
+                value: jsonEncode(migratedSnapshot),
+                updatedAt: DateTime.now().toUtc(),
+              ),
+            );
       } else {
         targetAlreadyExisted = true;
         resolvedAddedAt = _isoFromEpoch(target.read<int?>('added_at_value'));
         resolvedOriginStationId = target.read<String>('origin_station_id');
-        resolvedDestinationStationId = target.read<String>('destination_station_id');
+        resolvedDestinationStationId = target.read<String>(
+          'destination_station_id',
+        );
         resolvedMobilityType = target.read<String>('mobility_profile');
       }
       await userDatabase.customStatement(
@@ -757,7 +786,9 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
     final targetSnapshot = await _readRouteSnapshot(targetRouteId);
     return (
       routeId: targetRouteId,
-      snapshot: targetAlreadyExisted ? targetSnapshot : targetSnapshot ?? migratedSnapshot,
+      snapshot: targetAlreadyExisted
+          ? targetSnapshot
+          : targetSnapshot ?? migratedSnapshot,
       addedAt: resolvedAddedAt,
       originStationId: resolvedOriginStationId,
       destinationStationId: resolvedDestinationStationId,
@@ -778,9 +809,17 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       favoriteRouteId: routeId,
       routeSearchId: routeId,
       originStationId: originStationId,
-      originStationName: await _fallbackStationName(snapshot, 'originStationName', originStationId),
+      originStationName: await _fallbackStationName(
+        snapshot,
+        'originStationName',
+        originStationId,
+      ),
       destinationStationId: destinationStationId,
-      destinationStationName: await _fallbackStationName(snapshot, 'destinationStationName', destinationStationId),
+      destinationStationName: await _fallbackStationName(
+        snapshot,
+        'destinationStationName',
+        destinationStationId,
+      ),
       mobilityType: mobilityType,
       status: 'RESEARCH_REQUIRED',
       lineId: '',
@@ -788,7 +827,9 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       score: 0,
       routeCreatedAt: addedAt,
       addedAt: addedAt,
-      transportScope: _routeTransportScopeFromSnapshot(snapshot?['transportScope']),
+      transportScope: _routeTransportScopeFromSnapshot(
+        snapshot?['transportScope'],
+      ),
       needsResearch: true,
     );
   }
@@ -989,9 +1030,12 @@ Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
     'routeSearchId': result.routeSearchId,
     'providerRouteSearchId': result.providerRouteSearchId,
     'providerItineraryId': result.providerItineraryId,
-    if (result.queryIdentity != null) 'querySnapshot': result.queryIdentity!.toSnapshot(),
-    if (result.queryIdentity != null) 'queryIdentity': result.queryIdentity!.value,
-    if (result.candidateIdentity != null) 'candidateIdentity': result.candidateIdentity!.value,
+    if (result.queryIdentity != null)
+      'querySnapshot': result.queryIdentity!.toSnapshot(),
+    if (result.queryIdentity != null)
+      'queryIdentity': result.queryIdentity!.value,
+    if (result.candidateIdentity != null)
+      'candidateIdentity': result.candidateIdentity!.value,
     'originStationId': result.originStationId,
     'originStationName': result.originStationName,
     'destinationStationId': result.destinationStationId,
@@ -1072,7 +1116,8 @@ RouteCandidateLegSignature _legacyLeg(Object? value) {
 bool _hasWaypointStep(Object? value) {
   if (value is! List<Object?>) return false;
   return value.any(
-    (step) => step is Map<String, Object?> &&
+    (step) =>
+        step is Map<String, Object?> &&
         _snapshotOptionalString(step, 'stepType')?.toLowerCase() == 'waypoint',
   );
 }

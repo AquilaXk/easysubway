@@ -941,14 +941,9 @@ void main() {
 
     expect(favoriteRouteRepository.listCount, greaterThanOrEqualTo(1));
     expect(find.text('상록수역 → 사당역'), findsOneWidget);
+    expect(find.text('수도권 4호선 · 천천히 · 다시 검색 필요'), findsOneWidget);
     expect(
-      find.text('수도권 4호선 · 천천히 · 다시 검색 필요'),
-      findsOneWidget,
-    );
-    expect(
-      find.bySemanticsLabel(
-        '즐겨찾기 경로, 상록수역에서 사당역까지, 수도권 4호선, 천천히, 다시 검색 필요',
-      ),
+      find.bySemanticsLabel('즐겨찾기 경로, 상록수역에서 사당역까지, 수도권 4호선, 천천히, 다시 검색 필요'),
       findsOneWidget,
     );
   });

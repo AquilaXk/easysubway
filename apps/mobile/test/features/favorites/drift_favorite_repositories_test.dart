@@ -425,9 +425,10 @@ void main() {
       catalogDatabase: catalogDatabase,
       userDatabase: userDatabase,
     );
-    await userDatabase
-        .transaction(() async {
-          await userDatabase.into(userDatabase.favoriteRoutes).insert(
+    await userDatabase.transaction(() async {
+      await userDatabase
+          .into(userDatabase.favoriteRoutes)
+          .insert(
             user_db.FavoriteRoutesCompanion.insert(
               routeId: 'local-legacy-route',
               originStationId: 'station-sangnoksu',
@@ -436,7 +437,9 @@ void main() {
               addedAt: DateTime.utc(2026, 7),
             ),
           );
-          await userDatabase.into(userDatabase.appPreferences).insert(
+      await userDatabase
+          .into(userDatabase.appPreferences)
+          .insert(
             user_db.AppPreferencesCompanion.insert(
               key: 'favorite_route_snapshot:local-legacy-route',
               value: jsonEncode({
@@ -461,7 +464,7 @@ void main() {
               updatedAt: DateTime.utc(2026, 7),
             ),
           );
-        });
+    });
 
     final first = await repository.listFavoriteRoutes();
     final restarted = DriftFavoriteRouteRepository(
@@ -508,46 +511,53 @@ void main() {
       ('local-legacy-transfer', 'FEWEST_TRANSFERS', 'WALK'),
     ]) {
       await userDatabase.transaction(() async {
-        await userDatabase.into(userDatabase.favoriteRoutes).insert(
-          user_db.FavoriteRoutesCompanion.insert(
-            routeId: fixture.$1,
-            originStationId: 'station-sangnoksu',
-            destinationStationId: 'station-sadang',
-            mobilityProfile: 'SENIOR',
-            addedAt: DateTime.utc(2026, 7),
-          ),
-        );
-        await userDatabase.into(userDatabase.appPreferences).insert(
-          user_db.AppPreferencesCompanion.insert(
-            key: 'favorite_route_snapshot:${fixture.$1}',
-            value: jsonEncode({
-              'originStationId': 'station-sangnoksu',
-              'originStationName': '상록수',
-              'destinationStationId': 'station-sadang',
-              'destinationStationName': '사당',
-              'mobilityType': 'SENIOR',
-              'status': 'FOUND',
-              'score': 70,
-              'createdAt': '2026-07-01T00:00:00.000Z',
-              'objective': fixture.$2,
-              'steps': [
-                {
-                  'stepType': fixture.$3,
-                  'fromStationId': 'station-sangnoksu',
-                  'toStationId': 'station-sadang',
-                },
-              ],
-            }),
-            updatedAt: DateTime.utc(2026, 7),
-          ),
-        );
+        await userDatabase
+            .into(userDatabase.favoriteRoutes)
+            .insert(
+              user_db.FavoriteRoutesCompanion.insert(
+                routeId: fixture.$1,
+                originStationId: 'station-sangnoksu',
+                destinationStationId: 'station-sadang',
+                mobilityProfile: 'SENIOR',
+                addedAt: DateTime.utc(2026, 7),
+              ),
+            );
+        await userDatabase
+            .into(userDatabase.appPreferences)
+            .insert(
+              user_db.AppPreferencesCompanion.insert(
+                key: 'favorite_route_snapshot:${fixture.$1}',
+                value: jsonEncode({
+                  'originStationId': 'station-sangnoksu',
+                  'originStationName': '상록수',
+                  'destinationStationId': 'station-sadang',
+                  'destinationStationName': '사당',
+                  'mobilityType': 'SENIOR',
+                  'status': 'FOUND',
+                  'score': 70,
+                  'createdAt': '2026-07-01T00:00:00.000Z',
+                  'objective': fixture.$2,
+                  'steps': [
+                    {
+                      'stepType': fixture.$3,
+                      'fromStationId': 'station-sangnoksu',
+                      'toStationId': 'station-sadang',
+                    },
+                  ],
+                }),
+                updatedAt: DateTime.utc(2026, 7),
+              ),
+            );
       });
     }
 
     final favorites = await repository.listFavoriteRoutes();
 
     expect(favorites, hasLength(2));
-    expect(favorites.map((favorite) => favorite.favoriteRouteId).toSet(), hasLength(2));
+    expect(
+      favorites.map((favorite) => favorite.favoriteRouteId).toSet(),
+      hasLength(2),
+    );
   });
 
   test('기존 candidate 대상은 snapshot과 추가 시각을 보존하고 레거시 쌍만 제거한다', () async {
@@ -579,57 +589,66 @@ void main() {
         ),
       ],
     );
-    const targetSnapshot = '{"routeSearchId":"target-route","originStationId":"station-sangnoksu","originStationName":"대상 출발","destinationStationId":"station-sadang","destinationStationName":"대상 도착","mobilityType":"SENIOR","status":"FOUND","score":99,"createdAt":"2026-07-02T00:00:00.000Z","steps":[]}';
+    const targetSnapshot =
+        '{"routeSearchId":"target-route","originStationId":"station-sangnoksu","originStationName":"대상 출발","destinationStationId":"station-sadang","destinationStationName":"대상 도착","mobilityType":"SENIOR","status":"FOUND","score":99,"createdAt":"2026-07-02T00:00:00.000Z","steps":[]}';
     await userDatabase.transaction(() async {
-      await userDatabase.into(userDatabase.favoriteRoutes).insert(
-        user_db.FavoriteRoutesCompanion.insert(
-          routeId: candidate.value,
-          originStationId: 'target-origin',
-          destinationStationId: 'target-destination',
-          mobilityProfile: 'WHEELCHAIR',
-          addedAt: DateTime.utc(2026, 7, 2),
-        ),
-      );
-      await userDatabase.into(userDatabase.appPreferences).insert(
-        user_db.AppPreferencesCompanion.insert(
-          key: 'favorite_route_snapshot:${candidate.value}',
-          value: targetSnapshot,
-          updatedAt: DateTime.utc(2026, 7, 2),
-        ),
-      );
-      await userDatabase.into(userDatabase.favoriteRoutes).insert(
-        user_db.FavoriteRoutesCompanion.insert(
-          routeId: 'local-duplicate',
-          originStationId: 'station-sangnoksu',
-          destinationStationId: 'station-sadang',
-          mobilityProfile: 'SENIOR',
-          addedAt: DateTime.utc(2026, 7, 1),
-        ),
-      );
-      await userDatabase.into(userDatabase.appPreferences).insert(
-        user_db.AppPreferencesCompanion.insert(
-          key: 'favorite_route_snapshot:local-duplicate',
-          value: jsonEncode({
-            'originStationId': 'station-sangnoksu',
-            'originStationName': '레거시 출발',
-            'destinationStationId': 'station-sadang',
-            'destinationStationName': '레거시 도착',
-            'mobilityType': 'SENIOR',
-            'status': 'FOUND',
-            'score': 1,
-            'createdAt': '2026-07-01T00:00:00.000Z',
-            'steps': [
-              {
-                'stepType': 'RIDE',
-                'fromStationId': 'station-sangnoksu',
-                'toStationId': 'station-sadang',
-                'lineId': 'seoul-4',
-              },
-            ],
-          }),
-          updatedAt: DateTime.utc(2026, 7, 1),
-        ),
-      );
+      await userDatabase
+          .into(userDatabase.favoriteRoutes)
+          .insert(
+            user_db.FavoriteRoutesCompanion.insert(
+              routeId: candidate.value,
+              originStationId: 'target-origin',
+              destinationStationId: 'target-destination',
+              mobilityProfile: 'WHEELCHAIR',
+              addedAt: DateTime.utc(2026, 7, 2),
+            ),
+          );
+      await userDatabase
+          .into(userDatabase.appPreferences)
+          .insert(
+            user_db.AppPreferencesCompanion.insert(
+              key: 'favorite_route_snapshot:${candidate.value}',
+              value: targetSnapshot,
+              updatedAt: DateTime.utc(2026, 7, 2),
+            ),
+          );
+      await userDatabase
+          .into(userDatabase.favoriteRoutes)
+          .insert(
+            user_db.FavoriteRoutesCompanion.insert(
+              routeId: 'local-duplicate',
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityProfile: 'SENIOR',
+              addedAt: DateTime.utc(2026, 7, 1),
+            ),
+          );
+      await userDatabase
+          .into(userDatabase.appPreferences)
+          .insert(
+            user_db.AppPreferencesCompanion.insert(
+              key: 'favorite_route_snapshot:local-duplicate',
+              value: jsonEncode({
+                'originStationId': 'station-sangnoksu',
+                'originStationName': '레거시 출발',
+                'destinationStationId': 'station-sadang',
+                'destinationStationName': '레거시 도착',
+                'mobilityType': 'SENIOR',
+                'status': 'FOUND',
+                'score': 1,
+                'createdAt': '2026-07-01T00:00:00.000Z',
+                'steps': [
+                  {
+                    'stepType': 'RIDE',
+                    'fromStationId': 'station-sangnoksu',
+                    'toStationId': 'station-sadang',
+                    'lineId': 'seoul-4',
+                  },
+                ],
+              }),
+              updatedAt: DateTime.utc(2026, 7, 1),
+            ),
+          );
     });
 
     final favorites = await repository.listFavoriteRoutes();
@@ -640,19 +659,29 @@ void main() {
     final target = await userDatabase
         .customSelect(
           'SELECT value, CAST(updated_at AS INTEGER) AS updated_at_value FROM app_preferences WHERE key = ?',
-          variables: [Variable.withString('favorite_route_snapshot:${candidate.value}')],
+          variables: [
+            Variable.withString('favorite_route_snapshot:${candidate.value}'),
+          ],
         )
         .getSingle();
     expect(target.read<String>('value'), targetSnapshot);
     expect(
       await userDatabase
-          .customSelect('SELECT route_id FROM favorite_routes WHERE route_id = ?', variables: [Variable.withString('local-duplicate')])
+          .customSelect(
+            'SELECT route_id FROM favorite_routes WHERE route_id = ?',
+            variables: [Variable.withString('local-duplicate')],
+          )
           .get(),
       isEmpty,
     );
     expect(
       await userDatabase
-          .customSelect('SELECT key FROM app_preferences WHERE key = ?', variables: [Variable.withString('favorite_route_snapshot:local-duplicate')])
+          .customSelect(
+            'SELECT key FROM app_preferences WHERE key = ?',
+            variables: [
+              Variable.withString('favorite_route_snapshot:local-duplicate'),
+            ],
+          )
           .get(),
       isEmpty,
     );
@@ -668,24 +697,29 @@ void main() {
       catalogDatabase: catalogDatabase,
       userDatabase: userDatabase,
     );
-    const snapshot = '{"querySnapshot":"not-a-map","originStationId":"station-sangnoksu","originStationName":"상록수","destinationStationId":"station-sadang","destinationStationName":"사당","mobilityType":"SENIOR","status":"FOUND","score":1,"createdAt":"2026-07-01T00:00:00.000Z","steps":[{"stepType":"RIDE","fromStationId":"station-sangnoksu","toStationId":"station-sadang"}]}';
+    const snapshot =
+        '{"querySnapshot":"not-a-map","originStationId":"station-sangnoksu","originStationName":"상록수","destinationStationId":"station-sadang","destinationStationName":"사당","mobilityType":"SENIOR","status":"FOUND","score":1,"createdAt":"2026-07-01T00:00:00.000Z","steps":[{"stepType":"RIDE","fromStationId":"station-sangnoksu","toStationId":"station-sadang"}]}';
     await userDatabase.transaction(() async {
-      await userDatabase.into(userDatabase.favoriteRoutes).insert(
-        user_db.FavoriteRoutesCompanion.insert(
-          routeId: 'local-corrupt-query-snapshot',
-          originStationId: 'station-sangnoksu',
-          destinationStationId: 'station-sadang',
-          mobilityProfile: 'SENIOR',
-          addedAt: DateTime.utc(2026, 7),
-        ),
-      );
-      await userDatabase.into(userDatabase.appPreferences).insert(
-        user_db.AppPreferencesCompanion.insert(
-          key: 'favorite_route_snapshot:local-corrupt-query-snapshot',
-          value: snapshot,
-          updatedAt: DateTime.utc(2026, 7),
-        ),
-      );
+      await userDatabase
+          .into(userDatabase.favoriteRoutes)
+          .insert(
+            user_db.FavoriteRoutesCompanion.insert(
+              routeId: 'local-corrupt-query-snapshot',
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityProfile: 'SENIOR',
+              addedAt: DateTime.utc(2026, 7),
+            ),
+          );
+      await userDatabase
+          .into(userDatabase.appPreferences)
+          .insert(
+            user_db.AppPreferencesCompanion.insert(
+              key: 'favorite_route_snapshot:local-corrupt-query-snapshot',
+              value: snapshot,
+              updatedAt: DateTime.utc(2026, 7),
+            ),
+          );
     });
 
     final favorite = (await repository.listFavoriteRoutes()).single;
@@ -700,7 +734,14 @@ void main() {
     );
     expect(
       (await userDatabase
-              .customSelect('SELECT value FROM app_preferences WHERE key = ?', variables: [Variable.withString('favorite_route_snapshot:local-corrupt-query-snapshot')])
+              .customSelect(
+                'SELECT value FROM app_preferences WHERE key = ?',
+                variables: [
+                  Variable.withString(
+                    'favorite_route_snapshot:local-corrupt-query-snapshot',
+                  ),
+                ],
+              )
               .getSingle())
           .read<String>('value'),
       snapshot,
@@ -735,47 +776,53 @@ void main() {
       ],
     );
     await userDatabase.transaction(() async {
-      await userDatabase.into(userDatabase.favoriteRoutes).insert(
-        user_db.FavoriteRoutesCompanion.insert(
-          routeId: candidate.value,
-          originStationId: 'target-origin',
-          destinationStationId: 'target-destination',
-          mobilityProfile: 'WHEELCHAIR',
-          addedAt: DateTime.utc(2026, 7, 1),
-        ),
-      );
-      await userDatabase.into(userDatabase.favoriteRoutes).insert(
-        user_db.FavoriteRoutesCompanion.insert(
-          routeId: 'local-newer-duplicate',
-          originStationId: 'station-sangnoksu',
-          destinationStationId: 'station-sadang',
-          mobilityProfile: 'SENIOR',
-          addedAt: DateTime.utc(2026, 7, 2),
-        ),
-      );
-      await userDatabase.into(userDatabase.appPreferences).insert(
-        user_db.AppPreferencesCompanion.insert(
-          key: 'favorite_route_snapshot:local-newer-duplicate',
-          value: jsonEncode({
-            'originStationId': 'station-sangnoksu',
-            'originStationName': '상록수',
-            'destinationStationId': 'station-sadang',
-            'destinationStationName': '사당',
-            'mobilityType': 'SENIOR',
-            'status': 'FOUND',
-            'score': 1,
-            'createdAt': '2026-07-02T00:00:00.000Z',
-            'steps': [
-              {
-                'stepType': 'RIDE',
-                'fromStationId': 'station-sangnoksu',
-                'toStationId': 'station-sadang',
-              },
-            ],
-          }),
-          updatedAt: DateTime.utc(2026, 7, 2),
-        ),
-      );
+      await userDatabase
+          .into(userDatabase.favoriteRoutes)
+          .insert(
+            user_db.FavoriteRoutesCompanion.insert(
+              routeId: candidate.value,
+              originStationId: 'target-origin',
+              destinationStationId: 'target-destination',
+              mobilityProfile: 'WHEELCHAIR',
+              addedAt: DateTime.utc(2026, 7, 1),
+            ),
+          );
+      await userDatabase
+          .into(userDatabase.favoriteRoutes)
+          .insert(
+            user_db.FavoriteRoutesCompanion.insert(
+              routeId: 'local-newer-duplicate',
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityProfile: 'SENIOR',
+              addedAt: DateTime.utc(2026, 7, 2),
+            ),
+          );
+      await userDatabase
+          .into(userDatabase.appPreferences)
+          .insert(
+            user_db.AppPreferencesCompanion.insert(
+              key: 'favorite_route_snapshot:local-newer-duplicate',
+              value: jsonEncode({
+                'originStationId': 'station-sangnoksu',
+                'originStationName': '상록수',
+                'destinationStationId': 'station-sadang',
+                'destinationStationName': '사당',
+                'mobilityType': 'SENIOR',
+                'status': 'FOUND',
+                'score': 1,
+                'createdAt': '2026-07-02T00:00:00.000Z',
+                'steps': [
+                  {
+                    'stepType': 'RIDE',
+                    'fromStationId': 'station-sangnoksu',
+                    'toStationId': 'station-sadang',
+                  },
+                ],
+              }),
+              updatedAt: DateTime.utc(2026, 7, 2),
+            ),
+          );
     });
 
     final favorite = (await repository.listFavoriteRoutes()).single;
@@ -789,13 +836,21 @@ void main() {
     expect(favorite.needsResearch, isTrue);
     expect(
       await userDatabase
-          .customSelect('SELECT route_id FROM favorite_routes WHERE route_id = ?', variables: [Variable.withString('local-newer-duplicate')])
+          .customSelect(
+            'SELECT route_id FROM favorite_routes WHERE route_id = ?',
+            variables: [Variable.withString('local-newer-duplicate')],
+          )
           .get(),
       isEmpty,
     );
     expect(
       await userDatabase
-          .customSelect('SELECT key FROM app_preferences WHERE key = ?', variables: [Variable.withString('favorite_route_snapshot:${candidate.value}')])
+          .customSelect(
+            'SELECT key FROM app_preferences WHERE key = ?',
+            variables: [
+              Variable.withString('favorite_route_snapshot:${candidate.value}'),
+            ],
+          )
           .get(),
       isEmpty,
     );
@@ -831,53 +886,78 @@ void main() {
       ('local-missing', null),
       ('local-invalid-json', '{'),
       ('local-invalid-shape', '[]'),
-      ('local-waypoint', jsonEncode({
-        'originStationName': '저장 출발',
-        'destinationStationName': '저장 도착',
-        'waypointStationId': 'station-seonjeongneung',
-        'transportScope': 'SUBWAY_AND_ITX_CHEONGCHUN',
-      })),
-      ('local-query-mismatch', jsonEncode({
-        'originStationId': 'station-other',
-        'originStationName': '다른 출발',
-        'destinationStationId': 'station-sadang',
-        'destinationStationName': '사당',
-        'mobilityType': 'WHEELCHAIR',
-        'status': 'FOUND',
-        'score': 1,
-        'createdAt': '2026-07-01T00:00:00.000Z',
-        'steps': [{'stepType': 'RIDE', 'fromStationId': 'station-other', 'toStationId': 'station-sadang'}],
-      })),
-      ('local-waypoint-number', jsonEncode({
-        'originStationId': 'station-sangnoksu',
-        'originStationName': '상록수',
-        'destinationStationId': 'station-sadang',
-        'destinationStationName': '사당',
-        'mobilityType': 'WHEELCHAIR',
-        'waypointStationId': 1,
-        'status': 'FOUND',
-        'score': 1,
-        'createdAt': '2026-07-01T00:00:00.000Z',
-        'steps': [{'stepType': 'RIDE', 'fromStationId': 'station-sangnoksu', 'toStationId': 'station-sadang'}],
-      })),
+      (
+        'local-waypoint',
+        jsonEncode({
+          'originStationName': '저장 출발',
+          'destinationStationName': '저장 도착',
+          'waypointStationId': 'station-seonjeongneung',
+          'transportScope': 'SUBWAY_AND_ITX_CHEONGCHUN',
+        }),
+      ),
+      (
+        'local-query-mismatch',
+        jsonEncode({
+          'originStationId': 'station-other',
+          'originStationName': '다른 출발',
+          'destinationStationId': 'station-sadang',
+          'destinationStationName': '사당',
+          'mobilityType': 'WHEELCHAIR',
+          'status': 'FOUND',
+          'score': 1,
+          'createdAt': '2026-07-01T00:00:00.000Z',
+          'steps': [
+            {
+              'stepType': 'RIDE',
+              'fromStationId': 'station-other',
+              'toStationId': 'station-sadang',
+            },
+          ],
+        }),
+      ),
+      (
+        'local-waypoint-number',
+        jsonEncode({
+          'originStationId': 'station-sangnoksu',
+          'originStationName': '상록수',
+          'destinationStationId': 'station-sadang',
+          'destinationStationName': '사당',
+          'mobilityType': 'WHEELCHAIR',
+          'waypointStationId': 1,
+          'status': 'FOUND',
+          'score': 1,
+          'createdAt': '2026-07-01T00:00:00.000Z',
+          'steps': [
+            {
+              'stepType': 'RIDE',
+              'fromStationId': 'station-sangnoksu',
+              'toStationId': 'station-sadang',
+            },
+          ],
+        }),
+      ),
     ]) {
-      await userDatabase.into(userDatabase.favoriteRoutes).insert(
-        user_db.FavoriteRoutesCompanion.insert(
-          routeId: fixture.$1,
-          originStationId: 'station-sangnoksu',
-          destinationStationId: 'station-sadang',
-          mobilityProfile: 'WHEELCHAIR',
-          addedAt: DateTime.utc(2026, 7),
-        ),
-      );
+      await userDatabase
+          .into(userDatabase.favoriteRoutes)
+          .insert(
+            user_db.FavoriteRoutesCompanion.insert(
+              routeId: fixture.$1,
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityProfile: 'WHEELCHAIR',
+              addedAt: DateTime.utc(2026, 7),
+            ),
+          );
       if (fixture.$2 case final String value) {
-        await userDatabase.into(userDatabase.appPreferences).insert(
-          user_db.AppPreferencesCompanion.insert(
-            key: 'favorite_route_snapshot:${fixture.$1}',
-            value: value,
-            updatedAt: DateTime.utc(2026, 7),
-          ),
-        );
+        await userDatabase
+            .into(userDatabase.appPreferences)
+            .insert(
+              user_db.AppPreferencesCompanion.insert(
+                key: 'favorite_route_snapshot:${fixture.$1}',
+                value: value,
+                updatedAt: DateTime.utc(2026, 7),
+              ),
+            );
       }
     }
 
@@ -885,7 +965,9 @@ void main() {
 
     expect(favorites, hasLength(6));
     expect(favorites.every((favorite) => favorite.needsResearch), isTrue);
-    expect(favorites.map((favorite) => favorite.statusLabel).toSet(), {'다시 검색 필요'});
+    expect(favorites.map((favorite) => favorite.statusLabel).toSet(), {
+      '다시 검색 필요',
+    });
     for (final favorite in favorites) {
       expect(favorite.routeSearchId, favorite.favoriteRouteId);
       expect(favorite.originStationId, 'station-sangnoksu');
@@ -899,11 +981,15 @@ void main() {
       expect(favorite.routeCreatedAt, '2026-07-01T00:00:00.000Z');
       expect(favorite.addedAt, '2026-07-01T00:00:00.000Z');
     }
-    final missing = favorites.singleWhere((favorite) => favorite.favoriteRouteId == 'local-missing');
+    final missing = favorites.singleWhere(
+      (favorite) => favorite.favoriteRouteId == 'local-missing',
+    );
     expect(missing.originStationName, '상록수');
     expect(missing.destinationStationName, '사당');
     expect(missing.transportScope, RouteTransportScope.subway);
-    final waypoint = favorites.singleWhere((favorite) => favorite.favoriteRouteId == 'local-waypoint');
+    final waypoint = favorites.singleWhere(
+      (favorite) => favorite.favoriteRouteId == 'local-waypoint',
+    );
     expect(waypoint.originStationName, '저장 출발');
     expect(waypoint.destinationStationName, '저장 도착');
     expect(waypoint.transportScope, RouteTransportScope.subwayAndItxCheongchun);
@@ -911,30 +997,54 @@ void main() {
     await repository.removeFavoriteRoute('local-invalid-json');
 
     expect(
-      await userDatabase.customSelect('SELECT route_id FROM favorite_routes').get(),
+      await userDatabase
+          .customSelect('SELECT route_id FROM favorite_routes')
+          .get(),
       hasLength(5),
     );
     expect(
       await userDatabase
-          .customSelect('SELECT key FROM app_preferences WHERE key = ?', variables: [Variable.withString('favorite_route_snapshot:local-invalid-json')])
+          .customSelect(
+            'SELECT key FROM app_preferences WHERE key = ?',
+            variables: [
+              Variable.withString('favorite_route_snapshot:local-invalid-json'),
+            ],
+          )
           .get(),
       isEmpty,
     );
     expect(
       await userDatabase
-          .customSelect('SELECT route_id FROM favorite_routes WHERE route_id IN (?, ?)', variables: [Variable.withString('local-missing'), Variable.withString('local-waypoint')])
+          .customSelect(
+            'SELECT route_id FROM favorite_routes WHERE route_id IN (?, ?)',
+            variables: [
+              Variable.withString('local-missing'),
+              Variable.withString('local-waypoint'),
+            ],
+          )
           .get(),
       hasLength(2),
     );
     expect(
       await userDatabase
-          .customSelect('SELECT key FROM app_preferences WHERE key = ?', variables: [Variable.withString('favorite_route_snapshot:local-waypoint')])
+          .customSelect(
+            'SELECT key FROM app_preferences WHERE key = ?',
+            variables: [
+              Variable.withString('favorite_route_snapshot:local-waypoint'),
+            ],
+          )
           .get(),
       hasLength(1),
     );
     expect(
       await userDatabase
-          .customSelect('SELECT route_id FROM favorite_routes WHERE route_id IN (?, ?)', variables: [Variable.withString('local-query-mismatch'), Variable.withString('local-waypoint-number')])
+          .customSelect(
+            'SELECT route_id FROM favorite_routes WHERE route_id IN (?, ?)',
+            variables: [
+              Variable.withString('local-query-mismatch'),
+              Variable.withString('local-waypoint-number'),
+            ],
+          )
           .get(),
       hasLength(2),
     );
@@ -950,22 +1060,26 @@ void main() {
       catalogDatabase: catalogDatabase,
       userDatabase: userDatabase,
     );
-    await userDatabase.into(userDatabase.favoriteRoutes).insert(
-      user_db.FavoriteRoutesCompanion.insert(
-        routeId: 'bad',
-        originStationId: 'station-sangnoksu',
-        destinationStationId: 'station-sadang',
-        mobilityProfile: 'SENIOR',
-        addedAt: DateTime.utc(2026, 7),
-      ),
-    );
-    await userDatabase.into(userDatabase.appPreferences).insert(
-      user_db.AppPreferencesCompanion.insert(
-        key: 'favorite_route_snapshot:bad',
-        value: '[]',
-        updatedAt: DateTime.utc(2026, 7),
-      ),
-    );
+    await userDatabase
+        .into(userDatabase.favoriteRoutes)
+        .insert(
+          user_db.FavoriteRoutesCompanion.insert(
+            routeId: 'bad',
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityProfile: 'SENIOR',
+            addedAt: DateTime.utc(2026, 7),
+          ),
+        );
+    await userDatabase
+        .into(userDatabase.appPreferences)
+        .insert(
+          user_db.AppPreferencesCompanion.insert(
+            key: 'favorite_route_snapshot:bad',
+            value: '[]',
+            updatedAt: DateTime.utc(2026, 7),
+          ),
+        );
     final saved = await repository.saveFavoriteRoute(
       'good',
       result: RouteSearchResult(
@@ -989,8 +1103,18 @@ void main() {
     final favorites = await repository.listFavoriteRoutes();
 
     expect(favorites, hasLength(2));
-    expect(favorites.any((favorite) => favorite.favoriteRouteId == saved.favoriteRouteId), isTrue);
-    expect(favorites.singleWhere((favorite) => favorite.favoriteRouteId == 'bad').needsResearch, isTrue);
+    expect(
+      favorites.any(
+        (favorite) => favorite.favoriteRouteId == saved.favoriteRouteId,
+      ),
+      isTrue,
+    );
+    expect(
+      favorites
+          .singleWhere((favorite) => favorite.favoriteRouteId == 'bad')
+          .needsResearch,
+      isTrue,
+    );
   });
 
   test('V2 경로 즐겨찾기는 ETA 출처와 step metadata를 snapshot에 보존한다', () async {
