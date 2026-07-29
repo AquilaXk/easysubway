@@ -7909,8 +7909,8 @@
       "datasetKind": "file-data",
       "coverage": "전국 철도역 환승 이동경로의 provider verbatim 단계와 이동내용",
       "coverageScope": {
-        "regionIds": ["nationwide"],
-        "operatorIds": ["official-rail-operators"],
+        "regionIds": ["capital", "busan", "daegu", "gwangju", "daejeon"],
+        "operatorIds": ["airport-railroad", "busan-transportation", "daegu-transportation", "daejeon-transportation", "gimpo-goldline", "gtx-a", "gwangju-metropolitan-rapid-transit", "incheon-transit", "korail", "seoul-metro", "shinbundang", "sillim-line", "ui-sinseol-light-rail", "uijeongbu-light-rail", "yongin-everline"],
         "sourceDomains": ["indoor_movement_paths"]
       },
       "requiredForProductionPack": false,
