@@ -402,6 +402,21 @@ test("facility-location snapshot preserves the provider station code under a dis
   assert.equal(snapshot.stations[0].providerStationCode, "0249");
 });
 
+test("facility-location snapshot identity is stable for duplicate station names with distinct codes", () => {
+  const rows = normalizeAccessibilityRows([
+    { lineNm: "2호선", stnNm: "환승역", stnCd: "0202", oprtngSitu: "M", dtlPstn: "2번" },
+    { lineNm: "2호선", stnNm: "환승역", stnCd: "0201", oprtngSitu: "M", dtlPstn: "1번" },
+  ], { source: "facility-location" });
+  const build = (input) => buildAccessibilitySnapshot(input, "2026-07-29T00:00:00.000Z", {
+    source: "facility-location",
+    rawRowCount: 2,
+    rawSha256: "a".repeat(64),
+  });
+
+  assert.deepEqual(build(rows).stations, build([...rows].reverse()).stations);
+  assert.equal(build(rows).contentSha256, build([...rows].reverse()).contentSha256);
+});
+
 test("same-day captures keep distinct timestamped files and explicit lineage", async (t) => {
   const outputRoot = await mkdtemp(join(tmpdir(), "easysubway-seoul-snapshots-"));
   t.after(() => rm(outputRoot, { recursive: true, force: true }));

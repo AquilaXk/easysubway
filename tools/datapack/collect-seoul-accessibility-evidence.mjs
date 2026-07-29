@@ -162,7 +162,10 @@ export function buildAccessibilitySnapshot(
     stationsByIdentity.set(key, station);
   }
   const stations = [...stationsByIdentity.values()].sort((left, right) => (
-    compare(`${left.lineName}\0${left.stationName}`, `${right.lineName}\0${right.stationName}`)
+    compare(
+      `${left.lineName}\0${left.stationName}\0${left.providerStationCode ?? ""}`,
+      `${right.lineName}\0${right.stationName}\0${right.providerStationCode ?? ""}`,
+    )
   ));
   for (const station of stations) {
     station.facilities.sort((left, right) => compare(JSON.stringify(left), JSON.stringify(right)));
