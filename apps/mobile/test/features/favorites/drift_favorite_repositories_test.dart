@@ -1362,6 +1362,10 @@ void main() {
     expect(waypoint.originStationName, '저장 출발');
     expect(waypoint.destinationStationName, '저장 도착');
     expect(waypoint.transportScope, RouteTransportScope.subwayAndItxCheongchun);
+    final queryMismatch = favorites.singleWhere(
+      (favorite) => favorite.favoriteRouteId == 'local-query-mismatch',
+    );
+    expect(queryMismatch.originStationName, '상록수');
 
     await repository.removeFavoriteRoute('local-invalid-json');
 

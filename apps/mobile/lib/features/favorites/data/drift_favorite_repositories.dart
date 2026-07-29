@@ -859,12 +859,14 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
       originStationName: await _fallbackStationName(
         snapshot,
         'originStationName',
+        'originStationId',
         originStationId,
       ),
       destinationStationId: destinationStationId,
       destinationStationName: await _fallbackStationName(
         snapshot,
         'destinationStationName',
+        'destinationStationId',
         destinationStationId,
       ),
       mobilityType: mobilityType,
@@ -883,11 +885,17 @@ class DriftFavoriteRouteRepository implements FavoriteRouteRepository {
 
   Future<String> _fallbackStationName(
     Map<String, Object?>? snapshot,
-    String key,
+    String nameKey,
+    String idKey,
     String stationId,
   ) async {
-    final snapshotName = snapshot?[key];
-    if (snapshotName is String && snapshotName.trim().isNotEmpty) {
+    final snapshotName = snapshot?[nameKey];
+    final snapshotStationId = snapshot?[idKey];
+    if ((snapshotStationId == null ||
+            snapshotStationId is String &&
+                snapshotStationId.trim() == stationId) &&
+        snapshotName is String &&
+        snapshotName.trim().isNotEmpty) {
       return snapshotName.trim();
     }
     final row = await catalogDatabase
