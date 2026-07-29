@@ -850,6 +850,10 @@ void main() {
       expect(requestedBodies.single, containsPair('mobilityType', 'SENIOR'));
       expect(requestedBodies.single['departureTime'], isA<String>());
       expect(result.routeSearchId, 'route-v2');
+      expect(result.queryIdentity, isNotNull);
+      expect(result.candidateIdentity, isNotNull);
+      expect(result.providerRouteSearchId, isEmpty);
+      expect(result.providerItineraryId, 'route-v2-primary');
       expect(result.originStationName, '상록수');
       expect(result.destinationStationName, '사당');
       expect(result.lineName, '수도권 4호선');
@@ -1132,6 +1136,10 @@ void main() {
     expect(result.lineId, 'seoul-4');
     expect(result.lineName, '수도권 4호선');
     expect(result.isLocalResult, isTrue);
+    expect(result.queryIdentity, isNotNull);
+    expect(result.candidateIdentity, isNotNull);
+    expect(result.providerRouteSearchId, isEmpty);
+    expect(result.providerItineraryId, isEmpty);
     expect(result.score, inInclusiveRange(0, 100));
     expect(result.burdenCost, greaterThan(result.score));
     // WHEELCHAIR는 STEP_FREE 프리셋이라 총 소요시간은 스텝 표시분 합에 경로당

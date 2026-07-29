@@ -61,6 +61,8 @@ void main() {
   test('candidate identity is ordered and ignores display-only provider data', () {
     final query = RouteQueryIdentity(originStationId: 'a', destinationStationId: 'b', mobilityType: 'STANDARD', constraintMode: 'PREFER_STEP_FREE', transportScope: 'SUBWAY', objective: 'FASTEST');
     final first = RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l1', serviceClass: 'SUBWAY', servicePattern: 'LOCAL')]);
+    expect(first.canonicalBytes, utf8.encode('["route-candidate-v1",["route-query-v1","a","b",null,"STANDARD",null,"PREFER_STEP_FREE","SUBWAY","FASTEST"],[["RIDE","a","b","n1","n2","e1","l1","SUBWAY","LOCAL"]]]'));
+    expect(first.value, 'rc:v1:aeb259ab45a445856f0277476cd61b04bf225036003f7a06e28faa4e4409e3aa');
     final variants = [
       RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'WALK', fromStationId: 'a', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l1', serviceClass: 'SUBWAY', servicePattern: 'LOCAL')]),
       RouteCandidateIdentity(query: query, legs: [RouteCandidateLegSignature(stepType: 'RIDE', fromStationId: 'x', toStationId: 'b', fromNodeId: 'n1', toNodeId: 'n2', edgeId: 'e1', lineId: 'l1', serviceClass: 'SUBWAY', servicePattern: 'LOCAL')]),

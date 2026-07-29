@@ -2064,7 +2064,7 @@ RouteSearchResult _routeSearchResultFromV2Itinerary({
                 ),
             ],
           ),
-    providerRouteSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
+    providerRouteSearchId: '',
     providerItineraryId: itinerary.itineraryId,
     originStationId: result.originStationId,
     originStationName: result.originStationId,
