@@ -1146,8 +1146,13 @@ RouteCandidateLegSignature _legacyLeg(Object? value) {
   }
   final serviceClass = _snapshotOptionalString(value, 'serviceClass');
   final servicePattern = _snapshotOptionalString(value, 'servicePattern');
-  if ((normalizedStepType == 'ride' || normalizedStepType == 'train') &&
-      (serviceClass == null || servicePattern == null)) {
+  final isRide = normalizedStepType == 'ride' || normalizedStepType == 'train';
+  if (isRide &&
+      (!_legacyServiceClasses.contains(serviceClass) ||
+          !_legacyServicePatterns.contains(servicePattern))) {
+    throw const FormatException();
+  }
+  if (!isRide && (serviceClass != null || servicePattern != null)) {
     throw const FormatException();
   }
   return RouteCandidateLegSignature(
@@ -1185,6 +1190,8 @@ const _legacyStepTypes = {
   'internal',
   'waypoint',
 };
+const _legacyServiceClasses = {'SUBWAY', 'ITX_CHEONGCHUN'};
+const _legacyServicePatterns = {'LOCAL', 'EXPRESS'};
 
 bool _hasWaypointStep(Object? value) {
   if (value is! List<Object?>) return false;

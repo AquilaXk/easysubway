@@ -1177,6 +1177,52 @@ void main() {
           ],
         }),
       ),
+      (
+        'local-invalid-ride-service',
+        jsonEncode({
+          'originStationId': 'station-sangnoksu',
+          'originStationName': '상록수',
+          'destinationStationId': 'station-sadang',
+          'destinationStationName': '사당',
+          'mobilityType': 'WHEELCHAIR',
+          'status': 'FOUND',
+          'score': 1,
+          'createdAt': '2026-07-01T00:00:00.000Z',
+          'objective': 'FASTEST',
+          'steps': [
+            {
+              'stepType': 'RIDE',
+              'fromStationId': 'station-sangnoksu',
+              'toStationId': 'station-sadang',
+              'serviceClass': 'BUS',
+              'servicePattern': 'RAPID',
+            },
+          ],
+        }),
+      ),
+      (
+        'local-non-ride-service',
+        jsonEncode({
+          'originStationId': 'station-sangnoksu',
+          'originStationName': '상록수',
+          'destinationStationId': 'station-sadang',
+          'destinationStationName': '사당',
+          'mobilityType': 'WHEELCHAIR',
+          'status': 'FOUND',
+          'score': 1,
+          'createdAt': '2026-07-01T00:00:00.000Z',
+          'objective': 'FASTEST',
+          'steps': [
+            {
+              'stepType': 'WALK',
+              'fromStationId': 'station-sangnoksu',
+              'toStationId': 'station-sadang',
+              'serviceClass': 'SUBWAY',
+              'servicePattern': 'LOCAL',
+            },
+          ],
+        }),
+      ),
     ]) {
       await userDatabase
           .into(userDatabase.favoriteRoutes)
@@ -1204,7 +1250,7 @@ void main() {
 
     final favorites = await repository.listFavoriteRoutes();
 
-    expect(favorites, hasLength(9));
+    expect(favorites, hasLength(11));
     expect(favorites.every((favorite) => favorite.needsResearch), isTrue);
     expect(favorites.map((favorite) => favorite.statusLabel).toSet(), {
       '다시 검색 필요',
@@ -1241,7 +1287,7 @@ void main() {
       await userDatabase
           .customSelect('SELECT route_id FROM favorite_routes')
           .get(),
-      hasLength(8),
+      hasLength(10),
     );
     expect(
       await userDatabase
