@@ -1116,12 +1116,7 @@ RouteCandidateLegSignature _legacyLeg(Object? value) {
     stepType: stepType,
     fromStationId: _snapshotString(value, 'fromStationId'),
     toStationId: _snapshotString(value, 'toStationId'),
-    fromNodeId: _snapshotOptionalString(value, 'fromNodeId') ?? '',
-    toNodeId: _snapshotOptionalString(value, 'toNodeId') ?? '',
-    edgeId: _snapshotOptionalString(value, 'edgeId') ?? '',
     lineId: _snapshotOptionalString(value, 'lineId') ?? '',
-    serviceClass: _snapshotOptionalString(value, 'serviceClass') ?? '',
-    servicePattern: _snapshotOptionalString(value, 'servicePattern') ?? '',
   );
 }
 

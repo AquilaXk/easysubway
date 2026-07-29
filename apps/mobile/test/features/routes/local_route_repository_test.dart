@@ -1579,8 +1579,6 @@ void main() {
             fromStationId: step.fromStationId,
             toStationId: step.toStationId,
             lineId: step.lineId,
-            serviceClass: step.serviceClass ?? '',
-            servicePattern: step.servicePattern ?? '',
           ),
       ],
     );
