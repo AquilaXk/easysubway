@@ -678,6 +678,7 @@ function isReviewedAccessibilityEdge(edge, pack) {
   return edge.sourceId === "seoul-metro-accessibility"
     && ["ENTRY", "EXIT"].includes(edge.edgeType)
     && ["UNKNOWN", "NO_OFFICIAL_FEED"].includes(edge.accessibilityStatus)
+    && (edge.accessibilityStatus !== "NO_OFFICIAL_FEED" || probe?.evidenceKind === "NOT_EXISTS")
     && edge.stairAccessState === "UNKNOWN"
     && edge.provenanceKind === "OFFICIAL_SOURCE"
     && edge.verificationStatus === "NOT_VERIFIED"
@@ -1522,7 +1523,8 @@ function packFieldProvenance(pack, { artifactKind, sqliteSha256 }) {
       addRecord(facility, "facility", facility.id, "verified_at", operatorIds, lineIds);
     }
   }
-  for (const evidence of pack.stationFacilityEvidence ?? []) {
+  for (const evidence of (pack.stationFacilityEvidence ?? [])
+    .filter(({ evidenceKind }) => evidenceKind === "NOT_EXISTS")) {
     const operatorIds = [lineOperatorIds.get(evidence.lineId)].filter(Boolean);
     const field = facilityField(evidence.facilityType);
     if (field) {

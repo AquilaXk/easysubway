@@ -10,6 +10,7 @@ import path from "node:path";
 import { promisify } from "node:util";
 import test from "node:test";
 import { sortJson } from "./run-source-admission-pipeline.mjs";
+import { normalizeUnverifiedNetworkEdgeStates } from "./build-datapack.mjs";
 // 정준 직렬화는 검증 대상 구현을 그대로 쓴다. 테스트가 규칙을 복제하면 3언어
 // 분열(이슈 #2528)을 구조적으로 검출할 수 없다.
 import { canonicalJson, validateManifest, withoutSignature } from "./lib/manifest-validation.mjs";
@@ -12739,6 +12740,43 @@ test("station status probe가 route evidence가 아니면 production edge covera
     ),
     /capital@1 verified ENTRY coverage gap: 2\/2/,
   );
+});
+
+test("NO_OFFICIAL_FEED edge는 EXISTS status probe와 결합되면 UNKNOWN으로 정규화된다 (#2609)", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-contradictory-feed-${Date.now()}`);
+  const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  const probe = fixture.packs[0].stationFacilityEvidence.find(
+    (row) => row.stationId === "station-sangnoksu" && row.facilityType === "ACCESSIBILITY_STATUS_PROBE",
+  );
+  assert.equal(probe.evidenceKind, "NOT_EXISTS");
+  probe.evidenceKind = "EXISTS";
+  normalizeUnverifiedNetworkEdgeStates(fixture.packs[0]);
+  assert.equal(
+    fixture.packs[0].networkEdges.find(({ id }) => id === "edge-entry-sangnoksu-seoul-4").accessibilityStatus,
+    "UNKNOWN",
+  );
+});
+
+test("field provenance는 materialized facility와 EXISTS evidence를 중복 집계하지 않는다 (#2609)", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-accessibility-provenance-dedup-${Date.now()}`);
+  const packOutputDir = path.join(outputDir, "pack");
+  const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  const fixturePath = path.join(outputDir, "fixture.json");
+  await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
+  await execFileAsync(
+    process.execPath,
+    ["tools/datapack/build-datapack.mjs", "--fixture", fixturePath, "--output", packOutputDir],
+    { cwd: root, env: productionEnv },
+  );
+
+  const absenceIds = new Set(fixture.packs[0].stationFacilityEvidence
+    .filter(({ evidenceKind }) => evidenceKind === "NOT_EXISTS")
+    .map(({ stationId, lineId, facilityType }) => `${stationId}:${lineId}:${facilityType}`));
+  const provenance = JSON.parse(await readFile(path.join(packOutputDir, "current.provenance.json"), "utf8"));
+  const evidenceRecords = provenance.packs[0].records
+    .filter(({ entityType }) => entityType === "station_facility_evidence");
+  assert.ok(evidenceRecords.length > 0);
+  assert.ok(evidenceRecords.every(({ entityId }) => absenceIds.has(entityId)));
 });
 
 test("데이터팩 검증기는 AVAILABLE accessibility edge의 승인된 이동 경로 누락을 거부한다", async () => {

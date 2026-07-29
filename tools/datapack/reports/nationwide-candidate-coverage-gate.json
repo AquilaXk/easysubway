@@ -5669,10 +5669,10 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 80,
-            "escalator": 80,
+            "elevator": 40,
+            "escalator": 59,
             "status": 120,
-            "verified_at": 240,
+            "verified_at": 179,
             "wheelchair_lift": 80
           }
         },
@@ -5882,10 +5882,10 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 34,
-            "escalator": 34,
+            "elevator": 18,
+            "escalator": 17,
             "status": 51,
-            "verified_at": 102,
+            "verified_at": 69,
             "wheelchair_lift": 34
           }
         },
@@ -6095,10 +6095,10 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 28,
-            "escalator": 28,
+            "elevator": 14,
+            "escalator": 14,
             "status": 42,
-            "verified_at": 84,
+            "verified_at": 56,
             "wheelchair_lift": 28
           }
         },
@@ -6308,11 +6308,11 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 86,
-            "escalator": 86,
+            "elevator": 43,
+            "escalator": 57,
             "status": 129,
-            "verified_at": 258,
-            "wheelchair_lift": 86
+            "verified_at": 183,
+            "wheelchair_lift": 83
           }
         },
         {
@@ -6521,10 +6521,10 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 22,
-            "escalator": 22,
+            "elevator": 11,
+            "escalator": 11,
             "status": 33,
-            "verified_at": 66,
+            "verified_at": 44,
             "wheelchair_lift": 22
           }
         },
@@ -6689,10 +6689,10 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 54,
-            "escalator": 54,
+            "elevator": 27,
+            "escalator": 27,
             "status": 81,
-            "verified_at": 162,
+            "verified_at": 108,
             "wheelchair_lift": 54
           }
         },
@@ -6902,11 +6902,11 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 66,
-            "escalator": 66,
+            "elevator": 33,
+            "escalator": 35,
             "status": 99,
-            "verified_at": 198,
-            "wheelchair_lift": 66
+            "verified_at": 132,
+            "wheelchair_lift": 64
           }
         },
         {
@@ -7913,10 +7913,10 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 60,
-            "escalator": 60,
+            "elevator": 30,
+            "escalator": 30,
             "status": 90,
-            "verified_at": 180,
+            "verified_at": 120,
             "wheelchair_lift": 60
           }
         },
@@ -8127,11 +8127,11 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 70,
-            "escalator": 70,
+            "elevator": 35,
+            "escalator": 39,
             "status": 105,
-            "verified_at": 210,
-            "wheelchair_lift": 70
+            "verified_at": 143,
+            "wheelchair_lift": 69
           }
         },
         {
@@ -8341,10 +8341,10 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 58,
-            "escalator": 58,
+            "elevator": 29,
+            "escalator": 29,
             "status": 87,
-            "verified_at": 174,
+            "verified_at": 116,
             "wheelchair_lift": 58
           }
         },
@@ -8555,10 +8555,10 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 44,
-            "escalator": 44,
+            "elevator": 22,
+            "escalator": 22,
             "status": 66,
-            "verified_at": 132,
+            "verified_at": 88,
             "wheelchair_lift": 44
           }
         },
@@ -8769,10 +8769,10 @@
           ],
           "status": "SUPPORTED",
           "supportingRecordCountByField": {
-            "elevator": 40,
-            "escalator": 40,
+            "elevator": 21,
+            "escalator": 23,
             "status": 60,
-            "verified_at": 120,
+            "verified_at": 84,
             "wheelchair_lift": 40
           }
         },
