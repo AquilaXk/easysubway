@@ -79,6 +79,10 @@ test("station domain source matrix는 실제 station-line 분모의 미평가 ce
   input.providerCodeCatalog = {
     providerLines: [{ railOprIsttCd: "S1", operatorName: "서울교통공사", lnCd: "4", lineName: "4호선" }],
   };
+  input.inventory.sources[0].coverageScope = {
+    operatorIds: ["seoul-metro"],
+    sourceDomains: ["accessibility_facilities"],
+  };
 
   const report = buildAccessibilitySourceCoverageReport(input);
 
@@ -150,6 +154,21 @@ test("station domain source matrix는 실제 station-line 분모의 미평가 ce
     rowCount: 1,
   });
 
+  delete input.inventory.sources[0].accessibilityAdmissionEvidence.absenceEvidenceMode;
+  assert.equal(buildAccessibilitySourceCoverageReport(input)
+    .stationDomainSourceGate.matrix.find(({ domain }) => domain === "FACILITY").status, "BLOCKED");
+
+  input.inventory.sources[0].accessibilityAdmissionEvidence.absenceEvidenceMode = "EXPLICIT_ZERO";
+  input.inventory.sources[0].coverageScope.operatorIds = ["korail"];
+  assert.equal(buildAccessibilitySourceCoverageReport(input)
+    .stationDomainSourceGate.matrix.find(({ domain }) => domain === "FACILITY").status, "BLOCKED");
+
+  input.inventory.sources[0].coverageScope.operatorIds = ["seoul-metro"];
+  input.inventory.sources[0].coverageScope.sourceDomains = ["indoor_movement_paths"];
+  assert.equal(buildAccessibilitySourceCoverageReport(input)
+    .stationDomainSourceGate.matrix.find(({ domain }) => domain === "FACILITY").status, "BLOCKED");
+
+  input.inventory.sources[0].coverageScope.sourceDomains = ["accessibility_facilities"];
   input.molitTransferSnapshot.rawSha256 = "invalid";
   assert.throws(() => buildAccessibilitySourceCoverageReport(input), /identity is invalid/);
 
@@ -293,12 +312,20 @@ test("MOLIT transfer tuple partition snapshot binding은 inventory와 build spec
     inventoryBytes,
     candidateBuildSpec,
     repositoryRoot,
-    evaluatedAt: EVALUATED_AT,
+    evaluatedAt: "2026-07-30T00:00:00.000Z",
   });
 
   assert.equal(snapshot.rowCount, 8054);
   assert.equal(snapshot.rows.length, 8054);
   assert.equal(snapshot.sourceInventorySha256, candidateBuildSpec.sourceInventorySha256);
+  await assert.rejects(loadMolitTransferSnapshot({
+    metadataPath,
+    inventory,
+    inventoryBytes,
+    candidateBuildSpec,
+    repositoryRoot,
+    evaluatedAt: EVALUATED_AT,
+  }), /snapshot is future-dated/);
   await assert.rejects(loadMolitTransferSnapshot({
     metadataPath,
     inventory: {
@@ -310,7 +337,7 @@ test("MOLIT transfer tuple partition snapshot binding은 inventory와 build spec
     inventoryBytes,
     candidateBuildSpec,
     repositoryRoot,
-    evaluatedAt: EVALUATED_AT,
+    evaluatedAt: "2026-07-30T00:00:00.000Z",
   }), /snapshot binding mismatch/);
   await assert.rejects(loadMolitTransferSnapshot({
     metadataPath,

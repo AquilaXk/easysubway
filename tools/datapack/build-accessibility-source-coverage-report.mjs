@@ -127,6 +127,7 @@ export function buildAccessibilitySourceCoverageReport({
     ? buildStationDomainSourceGate({
         artifacts,
         validClaims,
+        sources,
         molitTransferSnapshot,
         providerCodeCatalog,
       })
@@ -146,7 +147,7 @@ export function buildAccessibilitySourceCoverageReport({
 }
 
 export function buildStationDomainSourceGate({
-  artifacts, validClaims, molitTransferSnapshot, providerCodeCatalog,
+  artifacts, validClaims, sources, molitTransferSnapshot, providerCodeCatalog,
 }) {
   if (artifacts.some((artifact) => !Array.isArray(artifact.stationLines) || artifact.stationLines.length === 0)) {
     throw new Error("station domain gate requires station-lines for every artifact");
@@ -161,7 +162,7 @@ export function buildStationDomainSourceGate({
     throw new Error("MOLIT transfer snapshot row count mismatch");
   }
 
-  const evaluated = collectEvaluatedStationDomains(artifacts, validClaims);
+  const evaluated = collectEvaluatedStationDomains(artifacts, validClaims, sources);
   const matrix = buildStationDomainMatrix(artifacts, stationLines, evaluated);
   const transferTuplePartition = partitionMolitTransferTuples({
     artifacts,
@@ -190,7 +191,7 @@ export function buildStationDomainSourceGate({
   return { matrix, transferTuplePartition, decision };
 }
 
-function collectEvaluatedStationDomains(artifacts, validClaims) {
+function collectEvaluatedStationDomains(artifacts, validClaims, sources) {
   const evaluated = new Map();
   for (const artifact of artifacts) {
     const stationLineByKey = new Map((artifact.stationLines ?? []).map((row) => [
@@ -202,7 +203,9 @@ function collectEvaluatedStationDomains(artifacts, validClaims) {
       const stationLine = domain && claim.lineId
         ? stationLineByKey.get(`${claim.stationId}\0${claim.lineId}`)
         : undefined;
-      if (!stationLine || !validClaims.has(claim)) continue;
+      const source = sources.get(claim.sourceId);
+      if (!stationLine || !validClaims.has(claim)
+        || !sourceCoversStationDomain(source, stationLine.operatorId, domain)) continue;
       const key = `${artifact.artifactId}\0${stationLine.operatorId}\0${domain}`;
       const entry = evaluated.get(key) ?? { stationLines: new Set(), sourceIds: new Set() };
       entry.stationLines.add(`${claim.stationId}\0${claim.lineId}`);
@@ -211,6 +214,17 @@ function collectEvaluatedStationDomains(artifacts, validClaims) {
     }
   }
   return evaluated;
+}
+
+function sourceCoversStationDomain(source, operatorId, domain) {
+  const sourceDomain = {
+    FACILITY: "accessibility_facilities",
+    EXIT: "indoor_movement_paths",
+    TRANSFER: "indoor_movement_paths",
+  }[domain];
+  return ABSENCE_EVIDENCE_MODES.has(source?.accessibilityAdmissionEvidence?.absenceEvidenceMode)
+    && source?.coverageScope?.operatorIds?.includes(operatorId)
+    && source?.coverageScope?.sourceDomains?.includes(sourceDomain);
 }
 
 function buildStationDomainMatrix(artifacts, stationLines, evaluated) {
@@ -544,9 +558,14 @@ export async function loadMolitTransferSnapshot({
     throw new Error("MOLIT transfer snapshot binding mismatch");
   }
   const evaluatedMillis = Date.parse(evaluatedAt);
+  const capturedMillis = Date.parse(metadata.capturedAt);
+  const observedMillis = Date.parse(metadata.observedAt);
   const freshUntilMillis = Date.parse(metadata.freshUntil);
-  if (!Number.isFinite(evaluatedMillis) || !Number.isFinite(freshUntilMillis)) {
+  if (![evaluatedMillis, capturedMillis, observedMillis, freshUntilMillis].every(Number.isFinite)) {
     throw new TypeError("MOLIT transfer snapshot freshness is invalid");
+  }
+  if (capturedMillis > evaluatedMillis || observedMillis > evaluatedMillis) {
+    throw new Error("MOLIT transfer snapshot is future-dated");
   }
   if (freshUntilMillis <= evaluatedMillis) throw new Error("MOLIT transfer snapshot is stale");
   const rebuilt = buildMolitRailwayTransferMovementSnapshot({
