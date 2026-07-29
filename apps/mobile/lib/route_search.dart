@@ -17,6 +17,7 @@ import 'features/ads/active_ad_banner.dart';
 import 'features/ads/ad_repository.dart';
 import 'features/fare/official_od_fare_quote.dart';
 import 'features/route_draft/domain/route_draft.dart';
+import 'features/routes/domain/route_identity.dart';
 import 'features/stations/presentation/service_pattern_badge.dart';
 import 'features/stations/presentation/station_line_badges.dart';
 import 'mobile_error_reporter.dart';
@@ -327,6 +328,7 @@ class RouteSearchV2ApiRepository implements RouteSearchRepository {
       return RouteSearchResult.fromV2(
         RouteSearchV2Result.fromJson(data),
         objective: routeRequest.objective,
+        queryIdentity: routeRequest.queryIdentity,
       );
     } on RouteSearchOnlineException {
       rethrow;
@@ -856,6 +858,20 @@ class RouteSearchRequest {
   String get effectiveConstraintMode =>
       constraintMode ?? _defaultConstraintMode(mobilityType);
 
+  RouteQueryIdentity get queryIdentity {
+    final request = trimmed();
+    return RouteQueryIdentity(
+      originStationId: request.originStationId,
+      destinationStationId: request.destinationStationId,
+      mobilityType: request.mobilityType,
+      constraintMode: request.effectiveConstraintMode,
+      waypointStationId: request.waypointStationId,
+      mobilityPreset: request.mobilityPreset,
+      transportScope: request.transportScope.serverValue,
+      objective: request.objective.serverValue,
+    );
+  }
+
   RouteSearchRequest trimmed() {
     return RouteSearchRequest(
       originStationId: originStationId.trim(),
@@ -1346,7 +1362,13 @@ class RouteSearchResult {
     this.officialFare,
     this.stepFreeAlternative,
     this.stairAccess = '',
-  }) : // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
+    this.queryIdentity,
+    this.candidateIdentity,
+    String? providerRouteSearchId,
+    String? providerItineraryId,
+  }) : providerRouteSearchId = providerRouteSearchId ?? routeSearchId,
+       providerItineraryId = providerItineraryId ?? '',
+       // `burdenCost`는 API contract 이름이고 저장 필드는 private 값이다.
        // ignore: prefer_initializing_formals
        _accessibilityScore = accessibilityScore,
        // ignore: prefer_initializing_formals
@@ -1462,6 +1484,7 @@ class RouteSearchResult {
   factory RouteSearchResult.fromV2(
     RouteSearchV2Result result, {
     RouteObjective objective = RouteObjective.fastest,
+    RouteQueryIdentity? queryIdentity,
   }) {
     if (result.itineraries.isEmpty) {
       if (result.statuses.isEmpty) {
@@ -1498,6 +1521,7 @@ class RouteSearchResult {
         transportScope: RouteTransportScope.subwayAndItxCheongchun,
         objective: objective,
         departureTimeIso: result.departureTime,
+        queryIdentity: queryIdentity,
       );
     }
     final selection = _selectRouteV2Itinerary(result.itineraries, objective);
@@ -1506,6 +1530,7 @@ class RouteSearchResult {
       result: result,
       itinerary: selection.primary,
       objective: objective,
+      queryIdentity: queryIdentity,
       // 대안도 같은 변환을 거쳐 동일한 화면 모델이 된다 — 탭 전환 시 그대로 주
       // 결과가 되므로 별도 변환 경로를 두지 않는다(#2582).
       stepFreeAlternative: alternative == null
@@ -1514,11 +1539,16 @@ class RouteSearchResult {
               result: result,
               itinerary: alternative,
               objective: objective,
+              queryIdentity: queryIdentity,
             ),
     );
   }
 
   final String routeSearchId;
+  final RouteQueryIdentity? queryIdentity;
+  final RouteCandidateIdentity? candidateIdentity;
+  final String providerRouteSearchId;
+  final String providerItineraryId;
   final String originStationId;
   final String originStationName;
   final String destinationStationId;
@@ -1735,6 +1765,10 @@ class RouteSearchResult {
   }) {
     return RouteSearchResult(
       routeSearchId: routeSearchId,
+      queryIdentity: queryIdentity,
+      candidateIdentity: candidateIdentity,
+      providerRouteSearchId: providerRouteSearchId,
+      providerItineraryId: providerItineraryId,
       originStationId: originStationId,
       originStationName: originStationName ?? this.originStationName,
       destinationStationId: destinationStationId,
@@ -2004,11 +2038,33 @@ RouteSearchResult _routeSearchResultFromV2Itinerary({
   required RouteSearchV2Result result,
   required RouteSearchV2Itinerary itinerary,
   required RouteObjective objective,
+  required RouteQueryIdentity? queryIdentity,
   RouteSearchResult? stepFreeAlternative,
 }) {
   final lineId = _routeV2SummaryLineId(itinerary.legs);
   return RouteSearchResult(
     routeSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
+    queryIdentity: queryIdentity,
+    candidateIdentity: queryIdentity == null
+        ? null
+        : RouteCandidateIdentity(
+            query: queryIdentity,
+            legs: [
+              for (final leg in itinerary.legs)
+                RouteCandidateLegSignature(
+                  stepType: leg.legType,
+                  fromStationId: leg.fromStationId,
+                  toStationId: leg.toStationId,
+                  fromNodeId: leg.fromNodeId,
+                  toNodeId: leg.toNodeId,
+                  lineId: leg.lineId,
+                  serviceClass: leg.serviceClass ?? '',
+                  servicePattern: leg.servicePattern ?? '',
+                ),
+            ],
+          ),
+    providerRouteSearchId: _routeV2RouteSearchId(itinerary.itineraryId),
+    providerItineraryId: itinerary.itineraryId,
     originStationId: result.originStationId,
     originStationName: result.originStationId,
     destinationStationId: result.destinationStationId,

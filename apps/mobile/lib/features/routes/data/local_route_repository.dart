@@ -15,6 +15,7 @@ import '../application/route_engine.dart';
 import '../domain/route_request.dart' as local;
 import '../domain/route_result.dart' as local;
 import '../domain/route_step.dart' as route_step;
+import '../domain/route_identity.dart';
 
 class LocalRouteRepository implements RouteSearchRepository {
   LocalRouteRepository({
@@ -587,6 +588,26 @@ class LocalRouteRepository implements RouteSearchRepository {
       officialOdFareQuote: officialOdFareQuote,
       transportScope: request.transportScope,
       objective: request.objective,
+      queryIdentity: request.queryIdentity,
+      candidateIdentity: steps.isEmpty
+          ? null
+          : RouteCandidateIdentity(
+              query: request.queryIdentity,
+              legs: [
+                for (final step in result.steps)
+                  RouteCandidateLegSignature(
+                    stepType: step.type.name,
+                    fromStationId: catalog.stationIdForNode(step.fromNodeId),
+                    toStationId: catalog.stationIdForNode(step.toNodeId),
+                    fromNodeId: step.fromNodeId,
+                    toNodeId: step.toNodeId,
+                    edgeId: step.edgeId,
+                    lineId: step.lineId,
+                    serviceClass: step.type.name == 'ride' ? 'SUBWAY' : '',
+                    servicePattern: step.servicePattern ?? '',
+                  ),
+              ],
+            ),
     );
   }
 

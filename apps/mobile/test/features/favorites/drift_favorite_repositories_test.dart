@@ -9,6 +9,7 @@ import 'package:easysubway_mobile/features/favorites/data/drift_favorite_reposit
 import 'package:easysubway_mobile/features/preferences/data/drift_notification_settings_repository.dart';
 import 'package:easysubway_mobile/features/search_history/data/drift_search_history_repository.dart';
 import 'package:easysubway_mobile/route_search.dart';
+import 'package:easysubway_mobile/features/routes/domain/route_identity.dart';
 import 'package:easysubway_mobile/user_data_deletion.dart';
 import 'package:flutter_test/flutter_test.dart';
 
@@ -275,6 +276,32 @@ void main() {
       warnings: const [],
       blockedReasons: const [],
       createdAt: '2026-06-19T09:00:00.000Z',
+      queryIdentity: RouteQueryIdentity(
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityType: 'SENIOR',
+        constraintMode: 'PREFER_STEP_FREE',
+        transportScope: 'SUBWAY',
+        objective: 'FASTEST',
+      ),
+      candidateIdentity: RouteCandidateIdentity(
+        query: RouteQueryIdentity(
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityType: 'SENIOR',
+          constraintMode: 'PREFER_STEP_FREE',
+          transportScope: 'SUBWAY',
+          objective: 'FASTEST',
+        ),
+        legs: [
+          RouteCandidateLegSignature(
+            stepType: 'RIDE',
+            fromStationId: 'station-sangnoksu',
+            toStationId: 'station-sadang',
+            lineId: 'seoul-4',
+          ),
+        ],
+      ),
     );
 
     final saved = await repository.saveFavoriteRoute(
@@ -285,6 +312,7 @@ void main() {
 
     expect(saved.summaryTitle, '상록수에서 사당까지');
     expect(saved.routeSearchId, result.routeSearchId);
+    expect(saved.favoriteRouteId, startsWith('rc:v1:'));
     expect(favorites.single.lineName, '수도권 4호선');
     expect(favorites.single.score, 92);
     final snapshotRows = await userDatabase
@@ -292,7 +320,7 @@ void main() {
           'SELECT value FROM app_preferences WHERE key = ?',
           variables: [
             Variable.withString(
-              'favorite_route_snapshot:${result.routeSearchId}::SENIOR',
+              'favorite_route_snapshot:${saved.favoriteRouteId}',
             ),
           ],
           readsFrom: {userDatabase.appPreferences},
@@ -310,6 +338,8 @@ void main() {
       'DURATION_ESTIMATED',
       'DISTANCE_MEASURED',
     ]);
+    expect(snapshot['queryIdentity'], result.queryIdentity!.value);
+    expect(snapshot['candidateIdentity'], result.candidateIdentity!.value);
 
     await repository.removeFavoriteRoute(saved.favoriteRouteId);
 

@@ -746,6 +746,10 @@ String _favoriteRouteStorageId({
   required String routeSearchId,
   required RouteSearchResult result,
 }) {
+  final candidateIdentity = result.candidateIdentity;
+  if (candidateIdentity != null) {
+    return candidateIdentity.value;
+  }
   final baseId = routeSearchId.trim().isNotEmpty
       ? routeSearchId.trim()
       : result.routeSearchId.trim();
@@ -762,6 +766,11 @@ String _favoriteRouteStorageId({
 Map<String, Object?> _routeResultToJson(RouteSearchResult result) {
   return {
     'routeSearchId': result.routeSearchId,
+    'providerRouteSearchId': result.providerRouteSearchId,
+    'providerItineraryId': result.providerItineraryId,
+    if (result.queryIdentity != null) 'querySnapshot': result.queryIdentity!.toSnapshot(),
+    if (result.queryIdentity != null) 'queryIdentity': result.queryIdentity!.value,
+    if (result.candidateIdentity != null) 'candidateIdentity': result.candidateIdentity!.value,
     'originStationId': result.originStationId,
     'originStationName': result.originStationName,
     'destinationStationId': result.destinationStationId,
