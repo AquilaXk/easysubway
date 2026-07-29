@@ -37,8 +37,7 @@ const OPERATION_SITUATION_STATES = new Map([
 const REMOVED_OPERATION_SITUATION = "D";
 
 export function normalizeAccessibilityRows(rows, { source = "accessibility" } = {}) {
-  const sourceConfig = SOURCES[source];
-  if (!sourceConfig) throw new Error(`${INVALID_RESPONSE}: source`);
+  if (!Object.hasOwn(SOURCES, source)) throw new Error(`${INVALID_RESPONSE}: source`);
   if (!Array.isArray(rows)) {
     throw new Error(INVALID_RESPONSE);
   }
@@ -87,8 +86,8 @@ export function buildAccessibilitySnapshot(
   retrievedAt,
   { source = "accessibility", rawRowCount, rawSha256, previousSnapshot = null },
 ) {
+  if (!Object.hasOwn(SOURCES, source)) throw new Error(`${INVALID_RESPONSE}: source`);
   const sourceConfig = SOURCES[source];
-  if (!sourceConfig) throw new Error(`${INVALID_RESPONSE}: source`);
   if (
     !Array.isArray(rows) ||
     rows.some(
@@ -199,7 +198,7 @@ export async function collectSeoulAccessibility({
   fetchImpl = fetch,
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 }) {
-  if (!SOURCES[source]) throw new Error(`${INVALID_RESPONSE}: source`);
+  if (!Object.hasOwn(SOURCES, source)) throw new Error(`${INVALID_RESPONSE}: source`);
   const endpointUrl = new URL(endpoint);
   if (endpointUrl.protocol !== "https:") {
     throw new Error("HTTPS endpoint is required");
@@ -281,8 +280,8 @@ export async function writeSeoulAccessibilityEvidence({
   previousSnapshot = null,
 }) {
   const { outputPath: requestedOutputPath } = await validatedOutputPath(output, outputRoot);
+  if (!Object.hasOwn(SOURCES, source)) throw new Error(`${INVALID_RESPONSE}: source`);
   const sourceConfig = SOURCES[source];
-  if (!sourceConfig) throw new Error(`${INVALID_RESPONSE}: source`);
   if (source === "facility-location" && endpoint !== undefined && endpoint !== sourceConfig.endpoint) {
     throw new Error(`${INVALID_RESPONSE}: endpoint`);
   }
@@ -417,7 +416,7 @@ async function main() {
     );
   }
   const source = sourceArgument ? process.argv[7] : "accessibility";
-  if (!SOURCES[source]) throw new Error(`${INVALID_RESPONSE}: source`);
+  if (!Object.hasOwn(SOURCES, source)) throw new Error(`${INVALID_RESPONSE}: source`);
   const serviceKey = process.env.DATA_GO_KR_SERVICE_KEY;
   if (!serviceKey) {
     throw new Error("DATA_GO_KR_SERVICE_KEY env is required");

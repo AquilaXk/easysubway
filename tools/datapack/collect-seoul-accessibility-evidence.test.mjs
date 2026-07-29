@@ -25,17 +25,19 @@ test("collector rejects non-HTTPS endpoints", async () => {
 
 test("collector rejects unknown sources before fetching", async () => {
   let fetched = false;
-  await assert.rejects(
-    collectSeoulAccessibility({
-      endpoint: "https://apis.data.go.kr/example",
-      serviceKey: "secret",
-      source: "other",
-      fetchImpl: async () => {
-        fetched = true;
-      },
-    }),
-    /Seoul accessibility API response invalid: source/,
-  );
+  for (const source of ["other", "toString", "constructor"]) {
+    await assert.rejects(
+      collectSeoulAccessibility({
+        endpoint: "https://apis.data.go.kr/example",
+        serviceKey: "secret",
+        source,
+        fetchImpl: async () => {
+          fetched = true;
+        },
+      }),
+      /Seoul accessibility API response invalid: source/,
+    );
+  }
   assert.equal(fetched, false);
 });
 
