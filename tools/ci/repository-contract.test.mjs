@@ -9385,6 +9385,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-uijeongbu-route-map-positions",
     "kric-wheelchair-lift-location",
     "kric-wheelchair-lift-movement",
+    "molit-railway-transfer-movement",
     "molit-tago-subway-info",
     "molit-urban-rail-full-route",
     "molit-urban-rail-full-route-daegu-line1-membership",
@@ -10648,7 +10649,7 @@ test("KRIC source 후보는 상세 근거 완료 상태와 production 분리를 
   assert.equal(candidates.schemaVersion, 1);
   assert.equal(candidates.artifactKind, "production-source-candidates");
   assert.equal(candidates.source, "tools/datapack/source-candidates.json");
-  assert.equal(candidates.updatedAt, "2026-07-25");
+  assert.equal(candidates.updatedAt, "2026-07-29");
   assert.deepEqual(
     kricCandidates.map((candidate) => candidate.id).sort(),
     [

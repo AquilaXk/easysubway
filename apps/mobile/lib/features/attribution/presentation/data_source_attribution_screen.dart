@@ -88,6 +88,9 @@ class _DataSourceAttributionScreenState
                     .cast<Map<String, Object?>>();
                 final sources = (inventory['sources'] as List)
                     .cast<Map<String, Object?>>()
+                    .where(
+                      (source) => !source.containsKey('rawSnapshotAdmission'),
+                    )
                     .toList(growable: false);
                 return ListView(
                   padding: mainPagePadding,

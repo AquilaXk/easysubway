@@ -61,6 +61,28 @@ test("번들 source-inventory 실물이 계약 스키마를 통과한다", () =>
   assert.deepEqual(validateSchema(schema, inventory).errors, []);
 });
 
+test("UNMAPPED_RAW_SNAPSHOT schema는 raw admission과 non-production 빈 scope를 결합한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const raw = inventory.sources.find(({ coverageScope }) => coverageScope.mappingStatus === "UNMAPPED_RAW_SNAPSHOT");
+  assert.ok(raw);
+  assert.deepEqual(validateSchema(schema, inventory).errors, []);
+
+  for (const mutate of [
+    (source) => { delete source.rawSnapshotAdmission; },
+    (source) => { source.requiredForProductionPack = true; },
+    (source) => { delete source.productionUseAllowed; },
+    (source) => { source.productionUseAllowed = true; },
+    (source) => { source.capabilities.facility.productionUseAllowed = true; },
+    (source) => { source.coverageScope.regionIds.push("capital"); },
+    (source) => { source.coverageScope.operatorIds.push("seoul-metro"); },
+  ]) {
+    const invalid = structuredClone(inventory);
+    mutate(invalid.sources.find(({ id }) => id === raw.id));
+    assert.ok(validateSchema(schema, invalid).errors.some((error) => error.includes("oneOf")));
+  }
+});
+
 test("accessibility admission evidence는 기존형과 source-governance형 필수 필드를 각각 유지한다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   for (const [selector, requiredField] of [
