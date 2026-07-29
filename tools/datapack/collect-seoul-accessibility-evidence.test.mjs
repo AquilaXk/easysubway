@@ -435,10 +435,22 @@ test("facility-location snapshot identity is stable for duplicate station names 
   assert.equal(build(rows).contentSha256, build([...rows].reverse()).contentSha256);
 });
 
-test("facility-location writer rejects endpoint overrides before fetching", async () => {
+test("facility-location collection rejects endpoint overrides before fetching", async () => {
   const outputRoot = await mkdtemp(join(tmpdir(), "easysubway-facility-location-endpoint-"));
   let fetched = false;
   try {
+    await assert.rejects(
+      collectSeoulAccessibility({
+        endpoint: "https://apis.data.go.kr/example",
+        serviceKey: "secret",
+        source: "facility-location",
+        fetchImpl: async () => {
+          fetched = true;
+          throw new Error("must not fetch");
+        },
+      }),
+      /endpoint/,
+    );
     await assert.rejects(
       writeSeoulAccessibilityEvidence({
         endpoint: "https://apis.data.go.kr/example",

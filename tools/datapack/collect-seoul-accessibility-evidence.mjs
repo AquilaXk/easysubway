@@ -199,6 +199,10 @@ export async function collectSeoulAccessibility({
   requestTimeoutMs = DEFAULT_REQUEST_TIMEOUT_MS,
 }) {
   if (!Object.hasOwn(SOURCES, source)) throw new Error(`${INVALID_RESPONSE}: source`);
+  const sourceConfig = SOURCES[source];
+  if (source === "facility-location" && endpoint !== sourceConfig.endpoint) {
+    throw new Error(`${INVALID_RESPONSE}: endpoint`);
+  }
   const endpointUrl = new URL(endpoint);
   if (endpointUrl.protocol !== "https:") {
     throw new Error("HTTPS endpoint is required");
@@ -282,9 +286,6 @@ export async function writeSeoulAccessibilityEvidence({
   const { outputPath: requestedOutputPath } = await validatedOutputPath(output, outputRoot);
   if (!Object.hasOwn(SOURCES, source)) throw new Error(`${INVALID_RESPONSE}: source`);
   const sourceConfig = SOURCES[source];
-  if (source === "facility-location" && endpoint !== undefined && endpoint !== sourceConfig.endpoint) {
-    throw new Error(`${INVALID_RESPONSE}: endpoint`);
-  }
   const collected = await collectSeoulAccessibility({
     endpoint: endpoint ?? sourceConfig.endpoint,
     serviceKey,
