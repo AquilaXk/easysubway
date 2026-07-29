@@ -7915,6 +7915,7 @@
         "sourceDomains": ["indoor_movement_paths"]
       },
       "requiredForProductionPack": false,
+      "productionUseAllowed": false,
       "updateFrequency": "annual snapshot",
       "observedDataUpdatedAt": "2025-08-11",
       "retrievedAt": "2026-07-29",

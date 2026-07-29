@@ -105,8 +105,9 @@ export async function runMolitRailwayTransferMovementCollector(argv, fixture = {
       bytes: gunzipSync(gzipBytes), capturedAt: required(args["captured-at"], "--captured-at"),
       expectedRowCount: fixture.expectedRowCount, expectedRawSha256: fixture.expectedRawSha256,
     });
-    const { gzipBytes: ignored, rows, ...rebuiltMetadata } = rebuilt;
-    if (JSON.stringify({ ...rebuiltMetadata, gzipPath: path.basename(output) }) !== JSON.stringify(metadata)) {
+    const { gzipBytes: ignored, gzipSha256: ignoredRebuiltGzipSha256, rows, ...rebuiltMetadata } = rebuilt;
+    const { gzipSha256: ignoredMetadataGzipSha256, ...logicalMetadata } = metadata;
+    if (JSON.stringify({ ...rebuiltMetadata, gzipPath: path.basename(output) }) !== JSON.stringify(logicalMetadata)) {
       throw new Error("metadata mismatch");
     }
     return metadata;

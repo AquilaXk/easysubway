@@ -83,11 +83,22 @@ test("MOLIT transfer movement collector CLI는 output gzip과 metadata hash 변�
     assert.deepEqual(await runMolitRailwayTransferMovementCollector([
       "--input", input, "--output", output, "--captured-at", "2026-07-29T00:00:00.000Z", "--verify-existing", "true",
     ], fixture), metadata);
-    await writeFile(`${output}.json`, JSON.stringify({ ...metadata, rowCount: 3 }));
+    const alternateGzip = gzipSync(gunzipSync(await readFile(output)), { level: 1, mtime: 0 });
+    const alternateMetadata = {
+      ...metadata,
+      gzipSha256: createHash("sha256").update(alternateGzip).digest("hex"),
+    };
+    assert.notEqual(alternateMetadata.gzipSha256, metadata.gzipSha256);
+    await writeFile(output, alternateGzip);
+    await writeFile(`${output}.json`, JSON.stringify(alternateMetadata));
+    assert.deepEqual(await runMolitRailwayTransferMovementCollector([
+      "--input", input, "--output", output, "--captured-at", "2026-07-29T00:00:00.000Z", "--verify-existing", "true",
+    ], fixture), alternateMetadata);
+    await writeFile(`${output}.json`, JSON.stringify({ ...alternateMetadata, rowCount: 3 }));
     await assert.rejects(() => runMolitRailwayTransferMovementCollector([
       "--input", input, "--output", output, "--captured-at", "2026-07-29T00:00:00.000Z", "--verify-existing", "true",
     ], fixture), /metadata mismatch/);
-    await writeFile(`${output}.json`, JSON.stringify(metadata));
+    await writeFile(`${output}.json`, JSON.stringify(alternateMetadata));
     await writeFile(output, Buffer.from("mutated"));
     await assert.rejects(() => runMolitRailwayTransferMovementCollector([
       "--input", input,

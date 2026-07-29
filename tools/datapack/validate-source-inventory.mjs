@@ -515,6 +515,7 @@ function validateCoverageScope(coverageScope, source, sourceId) {
   const unmappedRawSnapshot = coverageScope.mappingStatus === "UNMAPPED_RAW_SNAPSHOT"
     && source.rawSnapshotAdmission != null
     && source.requiredForProductionPack === false
+    && source.productionUseAllowed === false
     && ["facility", "schedule", "realtime"].every(
       (capability) => source.capabilities?.[capability]?.productionUseAllowed === false,
     );

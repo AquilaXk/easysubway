@@ -35,6 +35,16 @@ test("official snapshot admission validates exact non-production raw binding", a
     await writeFile(inventoryPath, JSON.stringify(inventory));
     await writeFile(candidatesPath, JSON.stringify(candidates));
     await execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root });
+    for (const value of [undefined, true]) {
+      if (value === undefined) delete source.productionUseAllowed;
+      else source.productionUseAllowed = value;
+      await writeFile(inventoryPath, JSON.stringify(inventory));
+      await assert.rejects(
+        execFileAsync("node", ["tools/datapack/validate-source-inventory.mjs", "--inventory", inventoryPath, "--candidates", candidatesPath], { cwd: root }),
+        /coverageScope.mappingStatus requires a non-production raw snapshot/,
+      );
+      source.productionUseAllowed = false;
+    }
     const metadata = JSON.parse(await readFile(binding.metadataPath, "utf8"));
     assert.equal(metadata.observedRailOperatorCodes.length, 18);
     const rawBytes = gunzipSync(await readFile(path.join(path.dirname(binding.metadataPath), metadata.gzipPath)));

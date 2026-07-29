@@ -16,6 +16,44 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["coverageScope", "rawSnapshotAdmission", "requiredForProductionPack", "productionUseAllowed", "capabilities"],
+            "properties": {
+              "coverageScope": {
+                "type": "object",
+                "required": ["mappingStatus", "regionIds", "operatorIds"],
+                "properties": {
+                  "mappingStatus": { "const": "UNMAPPED_RAW_SNAPSHOT" },
+                  "regionIds": { "type": "array", "maxItems": 0 },
+                  "operatorIds": { "type": "array", "maxItems": 0 }
+                }
+              },
+              "requiredForProductionPack": { "const": false },
+              "productionUseAllowed": { "const": false },
+              "capabilities": {
+                "type": "object",
+                "required": ["schedule", "realtime", "facility"],
+                "properties": {
+                  "schedule": { "type": "object", "required": ["productionUseAllowed"], "properties": { "productionUseAllowed": { "const": false } } },
+                  "realtime": { "type": "object", "required": ["productionUseAllowed"], "properties": { "productionUseAllowed": { "const": false } } },
+                  "facility": { "type": "object", "required": ["productionUseAllowed"], "properties": { "productionUseAllowed": { "const": false } } }
+                }
+              }
+            }
+          },
+          {
+            "type": "object",
+            "not": { "type": "object", "required": ["rawSnapshotAdmission"] },
+            "properties": {
+              "coverageScope": {
+                "type": "object",
+                "not": { "type": "object", "required": ["mappingStatus"] }
+              }
+            }
+          }
+        ],
         "required": [
           "id",
           "displayName",
