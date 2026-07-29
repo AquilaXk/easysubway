@@ -97,10 +97,14 @@ test("core-only strips facility quality targets and dependent pathway claims", (
       ('exit-1', 1, 'fixture-capital-catalog', 'fixture-capital-catalog-20260619');
     INSERT INTO station_pathway_edges VALUES
       ('legacy-pathway', 'legacy-facility', 'AVAILABLE', '', '', '', ''),
+      ('null-provenance-pathway', NULL, 'AVAILABLE', NULL, 'snapshot',
+       '${"c".repeat(64)}', '${"d".repeat(64)}'),
       ('static-facility-pathway', NULL, 'AVAILABLE', 'kric-station-convenience-standard',
        'snapshot', '${"a".repeat(64)}', '${"b".repeat(64)}');
     INSERT INTO out_of_station_transfer_links VALUES
-      ('legacy-outside-transfer', 'LIMITED', '', '', '', '');
+      ('legacy-outside-transfer', 'LIMITED', '', '', '', ''),
+      ('null-provenance-transfer', 'AVAILABLE', NULL, 'snapshot',
+       '${"c".repeat(64)}', '${"d".repeat(64)}');
   `);
 
   assert.throws(
@@ -120,13 +124,19 @@ test("core-only strips facility quality targets and dependent pathway claims", (
     `).all().map((row) => ({ ...row })),
     [
       { id: "legacy-pathway", requiresFacilityId: null, accessibilityStatus: "UNKNOWN" },
+      { id: "null-provenance-pathway", requiresFacilityId: null, accessibilityStatus: "UNKNOWN" },
       { id: "static-facility-pathway", requiresFacilityId: null, accessibilityStatus: "UNKNOWN" },
     ],
   );
   assert.deepEqual(database.prepare("PRAGMA foreign_key_check").all(), []);
-  assert.equal(
-    database.prepare("SELECT accessibility_status AS status FROM out_of_station_transfer_links").get().status,
-    "UNKNOWN",
+  assert.deepEqual(
+    database.prepare(`
+      SELECT id, accessibility_status AS status FROM out_of_station_transfer_links ORDER BY id
+    `).all().map((row) => ({ ...row })),
+    [
+      { id: "legacy-outside-transfer", status: "UNKNOWN" },
+      { id: "null-provenance-transfer", status: "UNKNOWN" },
+    ],
   );
   assert.equal(
     database.prepare("SELECT has_elevator_connection AS hasElevatorConnection FROM station_exits").get()

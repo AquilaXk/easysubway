@@ -406,9 +406,11 @@ function incompleteRouteProvenanceSql(columns) {
 function incompleteProvenanceSql(columns) {
   if (!["source_id", "source_snapshot_id", "provider_record_hash", "evidence_hash"]
     .every((name) => columns.has(name))) return "1";
-  return `source_id = '' OR source_snapshot_id = ''
-    OR length(provider_record_hash) <> 64 OR provider_record_hash GLOB '*[^0-9a-f]*'
-    OR length(evidence_hash) <> 64 OR evidence_hash GLOB '*[^0-9a-f]*'`;
+  return `COALESCE(source_id, '') = '' OR COALESCE(source_snapshot_id, '') = ''
+    OR length(COALESCE(provider_record_hash, '')) <> 64
+    OR COALESCE(provider_record_hash, '') GLOB '*[^0-9a-f]*'
+    OR length(COALESCE(evidence_hash, '')) <> 64
+    OR COALESCE(evidence_hash, '') GLOB '*[^0-9a-f]*'`;
 }
 
 export function normalizeUnprovenInternalRouteEdges(database, { check }) {
