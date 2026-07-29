@@ -748,77 +748,6 @@ void main() {
     );
   });
 
-  test('querySnapshot과 최상위 query가 다른 레거시 경로는 이관하지 않는다', () async {
-    final catalogDatabase = CatalogDatabase.memory();
-    final userDatabase = user_db.UserDatabase.memory();
-    addTearDown(catalogDatabase.close);
-    addTearDown(userDatabase.close);
-    await catalogDatabase.seedBaselineIfEmpty();
-    final repository = DriftFavoriteRouteRepository(
-      catalogDatabase: catalogDatabase,
-      userDatabase: userDatabase,
-    );
-    final snapshot = jsonEncode({
-      'querySnapshot': RouteQueryIdentity(
-        originStationId: 'station-sangnoksu',
-        destinationStationId: 'station-sadang',
-        mobilityType: 'SENIOR',
-        constraintMode: 'PREFER_STEP_FREE',
-        transportScope: 'SUBWAY',
-        objective: 'FASTEST',
-      ).toSnapshot(),
-      'originStationId': 'station-other',
-      'originStationName': '손상된 출발',
-      'destinationStationId': 'station-sadang',
-      'destinationStationName': '사당',
-      'mobilityType': 'SENIOR',
-      'status': 'FOUND',
-      'score': 1,
-      'createdAt': '2026-07-01T00:00:00.000Z',
-      'steps': [
-        {
-          'stepType': 'RIDE',
-          'fromStationId': 'station-sangnoksu',
-          'toStationId': 'station-sadang',
-        },
-      ],
-    });
-    await userDatabase.transaction(() async {
-      await userDatabase
-          .into(userDatabase.favoriteRoutes)
-          .insert(
-            user_db.FavoriteRoutesCompanion.insert(
-              routeId: 'local-mismatched-query',
-              originStationId: 'station-sangnoksu',
-              destinationStationId: 'station-sadang',
-              mobilityProfile: 'SENIOR',
-              addedAt: DateTime.utc(2026, 7),
-            ),
-          );
-      await userDatabase
-          .into(userDatabase.appPreferences)
-          .insert(
-            user_db.AppPreferencesCompanion.insert(
-              key: 'favorite_route_snapshot:local-mismatched-query',
-              value: snapshot,
-              updatedAt: DateTime.utc(2026, 7),
-            ),
-          );
-    });
-
-    final favorite = (await repository.listFavoriteRoutes()).single;
-
-    expect(favorite.favoriteRouteId, 'local-mismatched-query');
-    expect(favorite.needsResearch, isTrue);
-    expect(
-      (await userDatabase
-              .customSelect('SELECT route_id FROM favorite_routes')
-              .getSingle())
-          .read<String>('route_id'),
-      'local-mismatched-query',
-    );
-  });
-
   test('손상된 기존 candidate 대상 fallback은 대상 행으로 제거할 수 있다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();
@@ -987,6 +916,34 @@ void main() {
         }),
       ),
       (
+        'local-query-snapshot-mismatch',
+        jsonEncode({
+          'querySnapshot': RouteQueryIdentity(
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityType: 'WHEELCHAIR',
+            constraintMode: 'STRICT_STEP_FREE',
+            transportScope: 'SUBWAY',
+            objective: 'FASTEST',
+          ).toSnapshot(),
+          'originStationId': 'station-other',
+          'originStationName': '다른 출발',
+          'destinationStationId': 'station-sadang',
+          'destinationStationName': '사당',
+          'mobilityType': 'WHEELCHAIR',
+          'status': 'FOUND',
+          'score': 1,
+          'createdAt': '2026-07-01T00:00:00.000Z',
+          'steps': [
+            {
+              'stepType': 'RIDE',
+              'fromStationId': 'station-sangnoksu',
+              'toStationId': 'station-sadang',
+            },
+          ],
+        }),
+      ),
+      (
         'local-waypoint-number',
         jsonEncode({
           'originStationId': 'station-sangnoksu',
@@ -1034,7 +991,7 @@ void main() {
 
     final favorites = await repository.listFavoriteRoutes();
 
-    expect(favorites, hasLength(6));
+    expect(favorites, hasLength(7));
     expect(favorites.every((favorite) => favorite.needsResearch), isTrue);
     expect(favorites.map((favorite) => favorite.statusLabel).toSet(), {
       '다시 검색 필요',
@@ -1071,7 +1028,7 @@ void main() {
       await userDatabase
           .customSelect('SELECT route_id FROM favorite_routes')
           .get(),
-      hasLength(5),
+      hasLength(6),
     );
     expect(
       await userDatabase
