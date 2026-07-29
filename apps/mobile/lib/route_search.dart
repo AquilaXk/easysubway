@@ -736,6 +736,7 @@ class FavoriteRoute {
     required this.addedAt,
     this.etaSource = '',
     this.transportScope = RouteTransportScope.subway,
+    this.needsResearch = false,
   });
 
   factory FavoriteRoute.fromJson(Map<String, Object?> json) {
@@ -759,6 +760,7 @@ class FavoriteRoute {
       addedAt: _requiredRouteString(json, 'addedAt'),
       etaSource: _optionalRouteString(json, 'etaSource'),
       transportScope: _routeTransportScopeFromValue(json['transportScope']),
+      needsResearch: json['needsResearch'] == true,
     );
   }
 
@@ -778,6 +780,9 @@ class FavoriteRoute {
   final String addedAt;
   final String etaSource;
   final RouteTransportScope transportScope;
+  final bool needsResearch;
+
+  String get statusLabel => needsResearch ? '다시 검색 필요' : status;
 
   String get summaryTitle => '$originStationName에서 $destinationStationName까지';
 
@@ -815,6 +820,7 @@ class FavoriteRoute {
       summaryTitle,
       if (hasLine) lineLabel,
       mobilityLabel,
+      if (needsResearch) statusLabel,
       scoreBasisSemanticLabel,
     ].join(', ');
   }

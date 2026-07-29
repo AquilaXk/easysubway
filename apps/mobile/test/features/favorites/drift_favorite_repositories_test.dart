@@ -415,7 +415,7 @@ void main() {
     );
   });
 
-  test('경로 즐겨찾기 snapshot이 없으면 요약 경로를 대체 생성하지 않는다', () async {
+  test('복원 가능한 레거시 경로 즐겨찾기는 identity로 한 번 이관되고 재시작 후에도 안정적이다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(catalogDatabase.close);
@@ -426,24 +426,74 @@ void main() {
       userDatabase: userDatabase,
     );
     await userDatabase
-        .into(userDatabase.favoriteRoutes)
-        .insert(
-          user_db.FavoriteRoutesCompanion.insert(
-            routeId: 'legacy-route-without-snapshot',
-            originStationId: 'station-sangnoksu',
-            destinationStationId: 'station-sadang',
-            mobilityProfile: 'WHEELCHAIR',
-            addedAt: DateTime.utc(2026, 7),
-          ),
-        );
+        .transaction(() async {
+          await userDatabase.into(userDatabase.favoriteRoutes).insert(
+            user_db.FavoriteRoutesCompanion.insert(
+              routeId: 'local-legacy-route',
+              originStationId: 'station-sangnoksu',
+              destinationStationId: 'station-sadang',
+              mobilityProfile: 'WHEELCHAIR',
+              addedAt: DateTime.utc(2026, 7),
+            ),
+          );
+          await userDatabase.into(userDatabase.appPreferences).insert(
+            user_db.AppPreferencesCompanion.insert(
+              key: 'favorite_route_snapshot:local-legacy-route',
+              value: jsonEncode({
+                'routeSearchId': 'local-legacy-route',
+                'originStationId': 'station-sangnoksu',
+                'originStationName': '상록수',
+                'destinationStationId': 'station-sadang',
+                'destinationStationName': '사당',
+                'mobilityType': 'WHEELCHAIR',
+                'status': 'FOUND',
+                'score': 71,
+                'createdAt': '2026-07-01T00:00:00.000Z',
+                'steps': [
+                  {
+                    'stepType': 'RIDE',
+                    'fromStationId': 'station-sangnoksu',
+                    'toStationId': 'station-sadang',
+                    'lineId': 'seoul-4',
+                  },
+                ],
+              }),
+              updatedAt: DateTime.utc(2026, 7),
+            ),
+          );
+        });
 
-    await expectLater(
-      repository.listFavoriteRoutes(),
-      throwsA(isA<FavoriteRouteException>()),
+    final first = await repository.listFavoriteRoutes();
+    final restarted = DriftFavoriteRouteRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+    final second = await restarted.listFavoriteRoutes();
+
+    expect(first.single.favoriteRouteId, startsWith('rc:v1:'));
+    expect(second.single.favoriteRouteId, first.single.favoriteRouteId);
+    expect(
+      await userDatabase
+          .customSelect('SELECT route_id FROM favorite_routes')
+          .get(),
+      hasLength(1),
+    );
+    expect(
+      await userDatabase
+          .customSelect(
+            'SELECT value FROM app_preferences WHERE key = ?',
+            variables: [
+              Variable.withString(
+                'favorite_route_snapshot:${first.single.favoriteRouteId}',
+              ),
+            ],
+          )
+          .get(),
+      hasLength(1),
     );
   });
 
-  test('경로 즐겨찾기 snapshot이 손상되면 빈 요약 경로를 만들지 않는다', () async {
+  test('같은 출발지와 도착지의 레거시 경로도 identity 입력이 다르면 분리 이관한다', () async {
     final catalogDatabase = CatalogDatabase.memory();
     final userDatabase = user_db.UserDatabase.memory();
     addTearDown(catalogDatabase.close);
@@ -453,33 +503,152 @@ void main() {
       catalogDatabase: catalogDatabase,
       userDatabase: userDatabase,
     );
-    await userDatabase.transaction(() async {
-      await userDatabase
-          .into(userDatabase.favoriteRoutes)
-          .insert(
-            user_db.FavoriteRoutesCompanion.insert(
-              routeId: 'route-with-corrupt-snapshot',
-              originStationId: 'station-sangnoksu',
-              destinationStationId: 'station-sadang',
-              mobilityProfile: 'WHEELCHAIR',
-              addedAt: DateTime.utc(2026, 7),
-            ),
-          );
-      await userDatabase
-          .into(userDatabase.appPreferences)
-          .insert(
-            user_db.AppPreferencesCompanion.insert(
-              key: 'favorite_route_snapshot:route-with-corrupt-snapshot',
-              value: '{}',
-              updatedAt: DateTime.utc(2026, 7),
-            ),
-          );
-    });
+    for (final fixture in [
+      ('local-legacy-fastest', 'FASTEST', 'RIDE'),
+      ('local-legacy-transfer', 'FEWEST_TRANSFERS', 'WALK'),
+    ]) {
+      await userDatabase.transaction(() async {
+        await userDatabase.into(userDatabase.favoriteRoutes).insert(
+          user_db.FavoriteRoutesCompanion.insert(
+            routeId: fixture.$1,
+            originStationId: 'station-sangnoksu',
+            destinationStationId: 'station-sadang',
+            mobilityProfile: 'SENIOR',
+            addedAt: DateTime.utc(2026, 7),
+          ),
+        );
+        await userDatabase.into(userDatabase.appPreferences).insert(
+          user_db.AppPreferencesCompanion.insert(
+            key: 'favorite_route_snapshot:${fixture.$1}',
+            value: jsonEncode({
+              'originStationId': 'station-sangnoksu',
+              'originStationName': '상록수',
+              'destinationStationId': 'station-sadang',
+              'destinationStationName': '사당',
+              'mobilityType': 'SENIOR',
+              'status': 'FOUND',
+              'score': 70,
+              'createdAt': '2026-07-01T00:00:00.000Z',
+              'objective': fixture.$2,
+              'steps': [
+                {
+                  'stepType': fixture.$3,
+                  'fromStationId': 'station-sangnoksu',
+                  'toStationId': 'station-sadang',
+                },
+              ],
+            }),
+            updatedAt: DateTime.utc(2026, 7),
+          ),
+        );
+      });
+    }
 
-    await expectLater(
-      repository.listFavoriteRoutes(),
-      throwsA(isA<FavoriteRouteException>()),
+    final favorites = await repository.listFavoriteRoutes();
+
+    expect(favorites, hasLength(2));
+    expect(favorites.map((favorite) => favorite.favoriteRouteId).toSet(), hasLength(2));
+  });
+
+  test('복원할 수 없는 레거시 snapshot은 보존하고 다시 검색 필요로 표시한다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    final repository = DriftFavoriteRouteRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
     );
+    for (final fixture in [
+      ('missing', null),
+      ('invalid', '{'),
+      ('waypoint', jsonEncode({
+        'originStationName': '상록수',
+        'destinationStationName': '사당',
+        'waypointStationId': 'station-seonjeongneung',
+      })),
+    ]) {
+      await userDatabase.into(userDatabase.favoriteRoutes).insert(
+        user_db.FavoriteRoutesCompanion.insert(
+          routeId: fixture.$1,
+          originStationId: 'station-sangnoksu',
+          destinationStationId: 'station-sadang',
+          mobilityProfile: 'WHEELCHAIR',
+          addedAt: DateTime.utc(2026, 7),
+        ),
+      );
+      if (fixture.$2 case final String value) {
+        await userDatabase.into(userDatabase.appPreferences).insert(
+          user_db.AppPreferencesCompanion.insert(
+            key: 'favorite_route_snapshot:${fixture.$1}',
+            value: value,
+            updatedAt: DateTime.utc(2026, 7),
+          ),
+        );
+      }
+    }
+
+    final favorites = await repository.listFavoriteRoutes();
+
+    expect(favorites, hasLength(3));
+    expect(favorites.every((favorite) => favorite.needsResearch), isTrue);
+    expect(favorites.map((favorite) => favorite.statusLabel).toSet(), {'다시 검색 필요'});
+    expect(await userDatabase.customSelect('SELECT route_id FROM favorite_routes').get(), hasLength(3));
+    expect(await userDatabase.customSelect('SELECT key FROM app_preferences').get(), hasLength(2));
+  });
+
+  test('손상된 레거시 행 하나가 정상 즐겨찾기 목록을 가리지 않는다', () async {
+    final catalogDatabase = CatalogDatabase.memory();
+    final userDatabase = user_db.UserDatabase.memory();
+    addTearDown(catalogDatabase.close);
+    addTearDown(userDatabase.close);
+    await catalogDatabase.seedBaselineIfEmpty();
+    final repository = DriftFavoriteRouteRepository(
+      catalogDatabase: catalogDatabase,
+      userDatabase: userDatabase,
+    );
+    await userDatabase.into(userDatabase.favoriteRoutes).insert(
+      user_db.FavoriteRoutesCompanion.insert(
+        routeId: 'bad',
+        originStationId: 'station-sangnoksu',
+        destinationStationId: 'station-sadang',
+        mobilityProfile: 'SENIOR',
+        addedAt: DateTime.utc(2026, 7),
+      ),
+    );
+    await userDatabase.into(userDatabase.appPreferences).insert(
+      user_db.AppPreferencesCompanion.insert(
+        key: 'favorite_route_snapshot:bad',
+        value: '[]',
+        updatedAt: DateTime.utc(2026, 7),
+      ),
+    );
+    final saved = await repository.saveFavoriteRoute(
+      'good',
+      result: RouteSearchResult(
+        routeSearchId: 'good',
+        originStationId: 'station-sangnoksu',
+        originStationName: '상록수',
+        destinationStationId: 'station-sadang',
+        destinationStationName: '사당',
+        mobilityType: 'SENIOR',
+        status: 'FOUND',
+        lineId: '',
+        lineName: '',
+        score: 1,
+        steps: const [],
+        warnings: const [],
+        blockedReasons: const [],
+        createdAt: '2026-07-01T00:00:00.000Z',
+      ),
+    );
+
+    final favorites = await repository.listFavoriteRoutes();
+
+    expect(favorites, hasLength(2));
+    expect(favorites.any((favorite) => favorite.favoriteRouteId == saved.favoriteRouteId), isTrue);
+    expect(favorites.singleWhere((favorite) => favorite.favoriteRouteId == 'bad').needsResearch, isTrue);
   });
 
   test('V2 경로 즐겨찾기는 ETA 출처와 step metadata를 snapshot에 보존한다', () async {
