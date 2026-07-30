@@ -4,8 +4,11 @@ import {
   executeIssueTransfer,
   parseArguments,
   preflightIssueTransfer,
+  runMigration,
+  validateMigrationLedger,
   verifyTransferredIssue,
 } from "./migrate-issue.mjs";
+import { readFileSync } from "node:fs";
 
 const SOURCE_REPOSITORY = "AquilaXk/easysubway";
 const TARGET_REPOSITORY = "AquilaXk/easysubway-data";
@@ -33,7 +36,7 @@ function metadata({ url = SOURCE_URL, number = SOURCE_ISSUE, title, state = "OPE
   return { id: `I_${number}`, url, number, title: title ?? transferEntry().title, state, repository: { nameWithOwner: repo }, labels: connection(labels.map((name) => ({ name }))), milestone: milestone === null ? null : { title: milestone, dueOn: null }, comments: { totalCount: commentCount }, assignees: connection([]), projectItems: connection([]), parent: null, subIssues: connection([]), blocking: connection([]), blockedBy: connection([]), closedByPullRequestsReferences: connection(closingPullRequests) };
 }
 
-function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, number: 7 }), targetExists = true, linkedPullRequests = [] } = {}) {
+function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, number: 7 }), targetExists = true, unassignableLogin, malformedAssigneeResponse } = {}) {
   const calls = [];
   let transferred = false;
   const execGh = async (args) => {
@@ -44,6 +47,11 @@ function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, numb
     }
     if (args[0] === "issue" && args[1] === "transfer") {
       transferred = true;
+      return "";
+    }
+    if (args[0] === "api" && args.at(-1).includes("/assignees/")) {
+      if (args.at(-1).endsWith(`/${encodeURIComponent(unassignableLogin)}`)) throw new Error("not assignable");
+      if (malformedAssigneeResponse !== undefined) return malformedAssigneeResponse;
       return "";
     }
     if (args[0] === "api" && args.includes("--paginate")) {
@@ -60,6 +68,13 @@ function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, numb
     throw new Error(`unexpected gh invocation: ${args.join(" ")}`);
   };
   return { calls, execGh };
+}
+
+function migrationContract() {
+  return {
+    ledger: JSON.parse(readFileSync("release/migrations/repository-split-issues.json", "utf8")),
+    schema: JSON.parse(readFileSync("contracts/repository-split-issues.schema.json", "utf8")),
+  };
 }
 
 function transferCalls(calls) {
@@ -110,6 +125,50 @@ test("dry-run preflight returns redacted metadata and never transfers", async ()
   });
   assert.deepEqual(transferCalls(fake.calls), []);
   assert.ok(fake.calls.every((args) => !args.some((value) => value.includes("body"))));
+});
+
+test("migration validates whole-ledger schema and semantics before any GitHub call", async (t) => {
+  const cases = [
+    ["schemaVersion", (ledger) => { ledger.schemaVersion = 2; }],
+    ["classificationState", (ledger) => { ledger.issues[0].classificationState = "PENDING"; }],
+    ["required metadata", (ledger) => { delete ledger.issues[0].reason; }],
+    ["semantic mapping", (ledger) => { ledger.issues[0].targetRepository = "AquilaXk/easysubway-backend"; }],
+  ];
+
+  for (const [name, mutate] of cases) await t.test(name, async () => {
+    const { ledger, schema } = migrationContract();
+    mutate(ledger);
+    const fake = fakeGh();
+    assert.ok(validateMigrationLedger({ ledger, schema }).length > 0);
+    await assert.rejects(() => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
+      ledger,
+      schema,
+      execGh: fake.execGh,
+    }), /ledger validation failed/);
+    assert.deepEqual(fake.calls, []);
+  });
+});
+
+test("preflight verifies every source assignee can be assigned in the target before transfer", async () => {
+  const source = metadata();
+  source.assignees = { totalCount: 2, nodes: [{ id: "U_1", login: "space user" }, { id: "U_2", login: "owner" }] };
+  const fake = fakeGh({ source });
+
+  await preflightIssueTransfer({ entry: transferEntry(), execGh: fake.execGh });
+
+  assert.ok(fake.calls.some((args) => args.at(-1) === "repos/AquilaXk/easysubway-data/assignees/space%20user"));
+  assert.ok(fake.calls.some((args) => args.at(-1) === "repos/AquilaXk/easysubway-data/assignees/owner"));
+});
+
+test("preflight rejects unassignable or malformed target assignee responses before transfer", async (t) => {
+  const source = metadata();
+  source.assignees = { totalCount: 1, nodes: [{ id: "U_1", login: "owner" }] };
+  for (const options of [{ unassignableLogin: "owner" }, { malformedAssigneeResponse: "{}" }]) await t.test(JSON.stringify(options), async () => {
+    const fake = fakeGh({ source, ...options });
+    await assert.rejects(() => preflightIssueTransfer({ entry: transferEntry(), execGh: fake.execGh }));
+    assert.deepEqual(transferCalls(fake.calls), []);
+  });
 });
 
 test("execution requires exact source and target confirmations before transfer", async () => {

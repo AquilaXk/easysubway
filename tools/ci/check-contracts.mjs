@@ -238,18 +238,18 @@ export function validateBoundariesPayload(boundaries) {
     } else {
       repositories.add(target.repository);
     }
-    const sourceAreas = Array.isArray(target.sourceAreas) ? target.sourceAreas : [];
+    const sourceAreas = requiredStringArray(targetName, target, "sourceAreas", errors);
     if (new Set(sourceAreas).size !== sourceAreas.length) {
       errors.push(`contracts/boundaries.json: ${targetName} sourceAreas 중복`);
     }
     for (const area of sourceAreas) {
       if (!(area in (boundaries.areas ?? {}))) errors.push(`contracts/boundaries.json: ${targetName}.${area} area 누락`);
     }
-    for (const root of Array.isArray(target.ownedRoots) ? target.ownedRoots : []) {
+    for (const root of requiredStringArray(targetName, target, "ownedRoots", errors)) {
       if (ownedRoots.has(root)) errors.push(`contracts/boundaries.json: ${root} ownedRoots 중복`);
       ownedRoots.add(root);
     }
-    for (const root of Array.isArray(target.partialRoots) ? target.partialRoots : []) {
+    for (const root of requiredStringArray(targetName, target, "partialRoots", errors)) {
       partialRoots.push({ targetName, root });
     }
   }
@@ -257,6 +257,20 @@ export function validateBoundariesPayload(boundaries) {
     if (ownedRoots.has(root)) errors.push(`contracts/boundaries.json: ${targetName}.${root} partialRoots가 ownedRoots와 겹친다`);
   }
   return errors;
+}
+
+function requiredStringArray(targetName, target, field, errors) {
+  const value = target?.[field];
+  const path = `contracts/boundaries.json: ${targetName}.${field}`;
+  if (!Array.isArray(value) || value.length === 0) {
+    errors.push(`${path}는 비어 있지 않은 배열이 필요하다`);
+    return [];
+  }
+  if (value.some((item) => typeof item !== "string" || item.trim() === "")) {
+    errors.push(`${path}는 비어 있지 않은 문자열만 허용한다`);
+  }
+  if (new Set(value).size !== value.length) errors.push(`${path} 중복`);
+  return value;
 }
 
 function validateOpenApiFixtures(errors) {

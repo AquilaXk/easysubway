@@ -387,6 +387,22 @@ test("boundaries v2는 malformed repository, source area, global root 충돌을 
   assert.ok(errors.some((error) => error.includes("mobile.tools/route-map partialRoots가 ownedRoots와 겹친다")));
 });
 
+test("boundaries v2는 extraction target ownership metadata의 배열·빈 값·중복을 거부한다", () => {
+  const boundaries = loadJson("contracts/boundaries.json");
+  const cases = [
+    ["missing", (target) => { delete target.sourceAreas; }],
+    ["non-array", (target) => { target.ownedRoots = "tools/route-map"; }],
+    ["empty array", (target) => { target.partialRoots = []; }],
+    ["empty string", (target) => { target.sourceAreas = [""]; }],
+    ["duplicate", (target) => { target.partialRoots = ["tools/routes", "tools/routes"]; }],
+  ];
+  for (const [name, mutate] of cases) {
+    const malformed = structuredClone(boundaries);
+    mutate(malformed.extractionTargets.data);
+    assert.ok(validateBoundariesPayload(malformed).length > 0, `${name} ownership metadata 오류가 필요하다`);
+  }
+});
+
 test("check-contracts CLI 검증 오류가 없다", () => {
   assert.deepEqual(collectContractErrors(), []);
 });

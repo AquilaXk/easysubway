@@ -2,6 +2,7 @@ import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { validateLedger } from "./issue-migration-ledger.mjs";
+import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
 
 const SOURCE_REPOSITORY = "AquilaXk/easysubway";
 const APPROVED_TARGETS = new Set([
@@ -59,6 +60,24 @@ export function parseArguments(argv) {
   return { ledgerPath: values.ledgerPath, sourceIssue: Number(values.sourceIssue), mode: values.mode, confirmations: { source: values.confirmSource, target: values.confirmTarget } };
 }
 
+export function validateMigrationLedger({ ledger, schema }) {
+  const schemaErrors = validateSchema(schema, ledger).errors;
+  return [...schemaErrors, ...validateLedger(ledger)];
+}
+
+export async function runMigration({ arguments_, ledger, schema, execGh }) {
+  if (validateMigrationLedger({ ledger, schema }).length !== 0) throw new Error("ledger validation failed");
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === arguments_.sourceIssue);
+  if (!entry) throw new Error("source issue is not in the ledger");
+  if (arguments_.mode === "dry-run") return preflightIssueTransfer({ entry, execGh });
+  const transferResult = await executeIssueTransfer({
+    entry,
+    confirmations: arguments_.confirmations,
+    execGh,
+  });
+  return verifyTransferredIssue({ entry, transferResult, execGh });
+}
+
 export async function preflightIssueTransfer({ entry, execGh }) {
   const details = await preflightDetails({ entry, execGh });
   return reportForPreflight(entry, details);
@@ -110,7 +129,24 @@ async function preflightDetails({ entry, execGh }) {
   if (source.milestone !== null && !targetMilestones.has(JSON.stringify(source.milestone))) {
     throw new Error("target repository milestone does not match source");
   }
+  await preflightTargetAssignees(entry.targetRepository, source.assignees, execGh);
   return { source, targetLabels, targetMilestones };
+}
+
+async function preflightTargetAssignees(repository, assignees, execGh) {
+  for (const { login } of assignees) {
+    if (typeof login !== "string" || login.length === 0) throw new Error("source assignee metadata is invalid");
+    let output;
+    try {
+      output = await execGh([
+        "api", "-H", "X-GitHub-Api-Version: 2022-11-28",
+        `repos/${repository}/assignees/${encodeURIComponent(login)}`,
+      ]);
+    } catch {
+      throw new Error("target assignee is not assignable");
+    }
+    if (typeof output !== "string" || output.trim() !== "") throw new Error("target assignee response is invalid");
+  }
 }
 
 function validateEntry(entry) {
@@ -181,7 +217,10 @@ async function readIssueMetadata(repository, number, execGh) {
     labels: connection(issue.labels, "labels").map(({ name }) => name).sort(),
     milestone: issue.milestone === null ? null : { title: issue.milestone.title, dueOn: canonicalDueOn(issue.milestone.dueOn) },
     commentCount: issue.comments.totalCount,
-    assignees: connection(issue.assignees, "assignees").map(({ id, login }) => ({ id, login })).sort(compareIdentity),
+    assignees: connection(issue.assignees, "assignees").map(({ id, login }) => {
+      if (typeof id !== "string" || typeof login !== "string" || login.length === 0) throw new Error("assignee metadata is invalid");
+      return { id, login };
+    }).sort(compareIdentity),
     projectItems: connection(issue.projectItems, "project items").map(({ id, project }) => ({ id, project: { id: project.id, number: project.number, title: project.title, url: project.url } })).sort(compareIdentity),
     parent: issue.parent === null ? null : issueIdentity(issue.parent),
     subIssues: connection(issue.subIssues, "sub issues").map(issueIdentity).sort(compareIdentity),
@@ -257,20 +296,16 @@ async function execGh(args) {
 async function main() {
   try {
     const arguments_ = parseArguments(process.argv.slice(2));
-    const ledger = JSON.parse(await readFile(arguments_.ledgerPath, "utf8"));
-    if (validateLedger(ledger).length !== 0) throw new Error("ledger validation failed");
-    const entry = ledger?.issues?.find(({ sourceIssue }) => sourceIssue === arguments_.sourceIssue);
-    if (!entry) throw new Error("source issue is not in the ledger");
-    if (arguments_.mode === "dry-run") {
-      console.log(JSON.stringify(await preflightIssueTransfer({ entry, execGh })));
-      return;
-    }
-    const transferResult = await executeIssueTransfer({
-      entry,
-      confirmations: arguments_.confirmations,
+    const [ledgerText, schemaText] = await Promise.all([
+      readFile(arguments_.ledgerPath, "utf8"),
+      readFile("contracts/repository-split-issues.schema.json", "utf8"),
+    ]);
+    console.log(JSON.stringify(await runMigration({
+      arguments_,
+      ledger: JSON.parse(ledgerText),
+      schema: JSON.parse(schemaText),
       execGh,
-    });
-    console.log(JSON.stringify(await verifyTransferredIssue({ entry, transferResult, execGh })));
+    })));
   } catch {
     console.error("issue migration was not executed");
     process.exitCode = 1;
