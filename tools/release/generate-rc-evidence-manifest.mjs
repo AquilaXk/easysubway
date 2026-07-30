@@ -10,7 +10,7 @@ import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
-import { validateSystemReleaseManifest } from "./validate-system-release-manifest.mjs";
+import { selectSystemReleaseDecision, validateSystemReleaseManifest } from "./validate-system-release-manifest.mjs";
 
 const SUCCESSFUL_FRESHNESS_REASON_CODES = new Set([
   "PACK_PUBLISH_FRESHNESS_EXPIRED",
@@ -399,8 +399,10 @@ function buildSystemReleaseManifest(legacyManifest, inputs) {
     contracts: inputs.contracts,
     ...inputs.components,
   };
-  const goErrors = validateSystemReleaseManifest({ manifest: { ...base, decision: "GO" }, ...inputs.schemas });
-  const manifest = { ...base, decision: legacyManifest.decision === "GO" && goErrors.length === 0 ? "GO" : "NO_GO" };
+  const manifest = {
+    ...base,
+    decision: selectSystemReleaseDecision({ legacyDecision: legacyManifest.decision, manifest: base, ...inputs.schemas }),
+  };
   const errors = validateSystemReleaseManifest({ manifest, ...inputs.schemas });
   if (errors.length > 0) fail(`system release manifest validation failed: ${errors.join(", ")}`);
   return manifest;
@@ -419,6 +421,7 @@ function assertComponentCandidateIdentity(components, candidate) {
     ["platform", "backendImageDigest", components.platform?.artifactIdentity?.deployedImageDigest],
   ];
   for (const [component, field, value] of comparisons) {
+    if (candidate?.[field] == null) continue;
     if (String(candidate?.[field]) !== String(value)) fail(`${component} component manifest drifts from candidate context`);
   }
 }

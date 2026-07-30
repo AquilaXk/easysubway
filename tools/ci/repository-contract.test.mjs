@@ -20,6 +20,7 @@ import {
 } from "../release/generate-route-integration-verdict.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { validateLineage } from "../datapack/source-snapshot-policy.mjs";
+import { selectSystemReleaseDecision } from "../release/validate-system-release-manifest.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -42,6 +43,57 @@ async function initializeFixtureGitRepo(repoPath) {
     "commit", "-q", "-m", "fixture",
   ], { cwd: repoPath });
   return execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoPath, encoding: "utf8" }).trim();
+}
+
+async function writeFinalSystemReleaseArgs(candidatePath, finalOutputPath) {
+  const candidate = JSON.parse(await readFile(candidatePath, "utf8"));
+  const identity = candidate.releaseCandidateIdentity;
+  const fallbackDigest = `sha256:${"a".repeat(64)}`;
+  const fallbackHash = "b".repeat(64);
+  const value = (field, fallback) => identity[field] ?? fallback;
+  const componentPaths = Object.fromEntries(["mobile", "backend", "data", "platform"].map(
+    (component) => [component, `${finalOutputPath}.${component}-component.json`],
+  ));
+  const common = {
+    schemaVersion: 1, repository: "AquilaXk/easysubway", gitSha: currentGitSha,
+    contractVersion: "1.0.0", evidenceSha256: fallbackHash,
+  };
+  const components = {
+    mobile: {
+      ...common, component: "mobile", issueRefs: ["AquilaXk/easysubway#2693"],
+      artifactIdentity: {
+        versionName: value("appVersionName", "1.0.0"), versionCode: Number(value("versionCode", 1)),
+        aabSha256: value("aabSha256", fallbackHash), bundledDataManifestSha256: value("dataPackManifestSha256", fallbackHash),
+      },
+    },
+    backend: {
+      ...common, component: "backend", issueRefs: ["AquilaXk/easysubway#2693"],
+      artifactIdentity: { imageDigest: value("backendImageDigest", fallbackDigest), apiContractVersion: "1.0.0" },
+    },
+    data: {
+      ...common, component: "data", issueRefs: ["AquilaXk/easysubway#2693"],
+      artifactIdentity: {
+        dataVersion: "1.0.0", releaseSequence: Number(value("releaseSequence", 0)),
+        manifestSha256: value("dataPackManifestSha256", fallbackHash), sourceSnapshotSetHash: value("sourceSnapshotSetHash", fallbackHash),
+      },
+    },
+    platform: {
+      ...common, component: "platform", issueRefs: ["AquilaXk/easysubway#2693"],
+      artifactIdentity: { environment: "ci", deployedImageDigest: value("backendImageDigest", fallbackDigest), deploymentEvidenceSha256: fallbackHash },
+    },
+  };
+  for (const [component, document] of Object.entries(components)) await writeFile(componentPaths[component], JSON.stringify(document));
+  const contractsPath = `${finalOutputPath}.contracts-identity.json`;
+  await writeFile(contractsPath, JSON.stringify({ version: "1.0.0", sha256: fallbackHash }));
+  return [
+    "--mobile-component-manifest", componentPaths.mobile,
+    "--backend-component-manifest", componentPaths.backend,
+    "--data-component-manifest", componentPaths.data,
+    "--platform-component-manifest", componentPaths.platform,
+    "--contracts-identity", contractsPath,
+    "--system-release-output", `${finalOutputPath}.system-release.json`,
+    "--product-release-id", "easysubway-test-2693",
+  ];
 }
 
 function mobileProductionDartFiles() {
@@ -3801,6 +3853,14 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "tools/ci/validate-store-privacy-env.mjs",
       "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a",
     ],
+    [
+      "apps/mobile/release/rc-evidence-manifest-contract.json",
+      "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41",
+    ],
+    [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "18becb8c1ae390c89cbf303c2e4f2ee83ba3c00d6290f7ea42869fef90c212cf",
+    ],
   ]);
   for (const binding of refreshBindings) {
     assert.ok(binding.files.length > 0, `${binding.refreshOn} must bind at least one file`);
@@ -3808,7 +3868,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       const liveSha256 = createHash("sha256").update(read(file.path)).digest("hex");
       const supersededSha256 = supersededFinalRcBindings.get(file.path);
       if (supersededSha256 != null) {
-        // #2068과 #2655가 고정 RC 입력을 변경해 기존 evidence를 중단(superseded)했다.
+        // #2068, #2655, #2693이 고정 RC 입력을 변경해 기존 evidence를 중단(superseded)했다.
         // 마지막 RC 기록값은 보존하고 live hash 불일치로 재사용 불가를 증명한다.
         // #1016(final RC) 재개 시 전체 identity와 함께 재바인딩한다.
         assert.equal(
@@ -5202,8 +5262,9 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     await execFileAsync(process.execPath, [
       ...withoutOutput, "--phase", "CANDIDATE", "--output", candidateOutput,
     ], options);
+    const systemReleaseArgs = await writeFinalSystemReleaseArgs(candidateOutput, finalOutput);
     return execFileAsync(process.execPath, [
-      ...withoutOutput, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
+      ...withoutOutput, ...systemReleaseArgs, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
     ], options);
   };
   const appVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
@@ -5226,7 +5287,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   }));
   await writeFile(
     backendInspectPath,
-    JSON.stringify([{ RepoDigests: ["ghcr.io/aquilaxk/easysubway-backend@sha256:abcdef"] }]),
+    JSON.stringify([{ RepoDigests: [`ghcr.io/aquilaxk/easysubway-backend@sha256:${"a".repeat(64)}`] }]),
   );
 
   await runFinalGenerator([
@@ -5273,7 +5334,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(
     manifest.readiness.blockers.some((blocker) => blocker.id === "mismatch_android_release_metadata_aabPayloadSha256"),
   );
-  assert.equal(manifest.backendImageDigest, "sha256:abcdef");
+  assert.equal(manifest.backendImageDigest, `sha256:${"a".repeat(64)}`);
   assert.equal(manifest.backendArtifactSha256, null);
   assert.match(manifest.dataPackManifestSha256, /^[a-f0-9]{64}$/);
   assert.equal(manifest.routeContractVersion, "route-map-contract-v1");
@@ -5747,6 +5808,31 @@ test("[system-release-generator] FINAL은 component manifest에서 검증된 sys
     assert.deepEqual(system.platform.artifactIdentity, components.platform.artifactIdentity);
     assert.equal(Object.hasOwn(legacy, "mobile"), false);
     await execFileAsync(process.execPath, ["tools/release/validate-system-release-manifest.mjs", "--manifest", systemOutputPath], { cwd: root });
+    const semanticSchemas = {
+      componentSchema: JSON.parse(read("contracts/release/component-manifest.schema.json")),
+      systemSchema: JSON.parse(read("contracts/release/system-release-manifest.schema.json")),
+      issueRefSchema: JSON.parse(read("contracts/release/issue-ref.schema.json")),
+    };
+    const canonicalGoCandidate = structuredClone(system);
+    for (const component of ["mobile", "backend", "data", "platform"]) {
+      canonicalGoCandidate[component].repository = `AquilaXk/easysubway-${component}`;
+    }
+    canonicalGoCandidate.platform.artifactIdentity.environment = "production";
+    canonicalGoCandidate.data.artifactIdentity.releaseSequence = Math.max(1, canonicalGoCandidate.data.artifactIdentity.releaseSequence);
+    assert.equal(
+      selectSystemReleaseDecision({ legacyDecision: "GO", manifest: canonicalGoCandidate, ...semanticSchemas }),
+      "GO",
+    );
+    const ciSemanticFailure = structuredClone(canonicalGoCandidate);
+    ciSemanticFailure.platform.artifactIdentity.environment = "ci";
+    assert.equal(
+      selectSystemReleaseDecision({ legacyDecision: "GO", manifest: ciSemanticFailure, ...semanticSchemas }),
+      "NO_GO",
+    );
+    assert.equal(
+      selectSystemReleaseDecision({ legacyDecision: "NO_GO", manifest: canonicalGoCandidate, ...semanticSchemas }),
+      "NO_GO",
+    );
 
     await assert.rejects(
       execFileAsync(process.execPath, [...systemArgs({ mobilePath: path.join(tempDir, "missing-mobile.json") }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
@@ -6035,7 +6121,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "FINAL",
     "--candidate-context", invalidCandidatePath, "--output", path.join(tempDir, "invalid-final.json")], generatorOptions),
   /without readiness or decision fields/);
-  args.push("--phase", "FINAL", "--candidate-context", baselineOutput);
+  args.push(...await writeFinalSystemReleaseArgs(baselineOutput, path.join(tempDir, "final-readiness.json")), "--phase", "FINAL", "--candidate-context", baselineOutput);
   for (const invalidCount of ["1abc", "1.5", "-0.5"]) {
     await assert.rejects(execFileAsync(process.execPath, [
       ...args, "--open-android-p0-count", invalidCount,
@@ -6467,8 +6553,9 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     await execFileAsync(process.execPath, [
       ...withoutOutput, "--phase", "CANDIDATE", "--output", candidateOutput,
     ], options);
+    const systemReleaseArgs = await writeFinalSystemReleaseArgs(candidateOutput, finalOutput);
     return execFileAsync(process.execPath, [
-      ...withoutOutput, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
+      ...withoutOutput, ...systemReleaseArgs, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
     ], options);
   };
   const rejects = (extraArgs, expected) => assert.rejects(

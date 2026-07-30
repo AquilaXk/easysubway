@@ -44,6 +44,13 @@ export function validateSystemReleaseManifest({ manifest, componentSchema, syste
   return redact(errors);
 }
 
+export function selectSystemReleaseDecision({ legacyDecision, manifest, componentSchema, systemSchema, issueRefSchema }) {
+  const semanticErrors = validateSystemReleaseManifest({
+    manifest: { ...manifest, decision: "GO" }, componentSchema, systemSchema, issueRefSchema,
+  });
+  return legacyDecision === "GO" && semanticErrors.length === 0 ? "GO" : "NO_GO";
+}
+
 function redact(errors) {
   return [...new Set(errors.map((error) => String(error).replace(/\$\.[^:]+/g, "$")))];
 }
