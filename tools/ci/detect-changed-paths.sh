@@ -127,12 +127,17 @@ while IFS= read -r file; do
       repository=true
       release=true
       ;;
-    apps/mobile/release/**|release/product-gates/**)
+    apps/mobile/release/**)
       # repository=true여야 contract test(claim 스캔)가 실행된다(#2390). 이 게이트가 지키는 자산이 여기 있다.
       repository=true
       mobile=true
       android=true
       ios=true
+      release=true
+      contracts=true
+      ;;
+    release/product-gates/**)
+      repository=true
       release=true
       contracts=true
       ;;

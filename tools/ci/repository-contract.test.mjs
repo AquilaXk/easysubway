@@ -19349,8 +19349,11 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
 test("[gate-ownership] product gate 경로도 release 계약 게이트로 분류한다", async () => {
   const productGate = await classifyChangedFiles(["release/product-gates/release-governance-gate.json"]);
 
-  for (const gate of ["repository", "contracts", "mobile", "android", "ios", "release"]) {
+  for (const gate of ["repository", "contracts", "release"]) {
     assert.equal(productGate[gate], "true", `product gate must map to ${gate}=true`);
+  }
+  for (const gate of ["mobile", "android", "ios"]) {
+    assert.equal(productGate[gate], "false", `product gate must not map to ${gate}=true`);
   }
 });
 

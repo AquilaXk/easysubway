@@ -1,30 +1,13 @@
 #!/usr/bin/env node
 import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
 import { validateLedger } from "../repo/issue-migration-ledger.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
-const DATAPACK_MANIFEST_SCHEMA_PATH = "contracts/datapack/datapack-manifest.schema.json";
-const DATAPACK_INDEX_SCHEMA_PATH = "contracts/datapack/datapack-index.schema.json";
-const DATAPACK_COMPATIBILITY_MATRIX_PATH = "contracts/datapack/compatibility-matrix.json";
-const DATAPACK_INDEX_PATH = "apps/mobile/assets/datapacks/index.json";
 const DEFAULT_WORKSPACE_PATH = "contracts/workspaces/hub.json";
-const SOURCE_INVENTORY_PATH = "apps/mobile/assets/datapacks/source-inventory.json";
-const SOURCE_INVENTORY_SCHEMA_PATH = "contracts/datapack/source-inventory.schema.json";
-const SOURCE_GOVERNANCE_POLICY_PATH = "tools/datapack/source-governance-policy.json";
-const CANONICAL_NUMBER_CONTRACT_SCHEMA_PATH = "contracts/datapack/canonical-number-contract.schema.json";
-const CANONICAL_NUMBER_CONTRACT_PATH = "contracts/datapack/canonical-number-contract.json";
-const FRESHNESS_POLICY_PATH = "release/product-gates/datapack-freshness-sla.json";
-const PACK_APP_SCHEMA_PARITY_ALLOWLIST_PATH = "contracts/datapack/pack-app-schema-parity-allowlist.json";
-const PACK_APP_SCHEMA_PARITY_ALLOWLIST_SCHEMA_PATH =
-  "contracts/datapack/pack-app-schema-parity-allowlist.schema.json";
-const CATALOG_RAW_SQL_TABLES_PATH = "contracts/datapack/catalog-raw-sql-tables.json";
-const CATALOG_RAW_SQL_TABLES_SCHEMA_PATH = "contracts/datapack/catalog-raw-sql-tables.schema.json";
-const REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH = "contracts/repository-split-issues.schema.json";
-const REPOSITORY_SPLIT_ISSUES_PATH = "release/migrations/repository-split-issues.json";
 const EXTRACTION_REPOSITORIES = {
   data: "AquilaXk/easysubway-data",
   platform: "AquilaXk/easysubway-platform",
@@ -181,9 +164,19 @@ export function validateJson(schemaPath, valuePath, errors) {
   }
   const result = validateSchema(schema, value);
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
-  if (schemaPath === DATAPACK_MANIFEST_SCHEMA_PATH) validateDatapackManifest(value, valuePath, errors);
-  if (schemaPath === DATAPACK_INDEX_SCHEMA_PATH) validateDatapackIndex(value, valuePath, errors);
-  if (schemaPath === SOURCE_INVENTORY_SCHEMA_PATH) validateSourceInventory(value, valuePath, errors);
+  switch (basename(schemaPath)) {
+    case "datapack-manifest.schema.json":
+      validateDatapackManifest(value, valuePath, errors);
+      break;
+    case "datapack-index.schema.json":
+      validateDatapackIndex(value, valuePath, errors);
+      break;
+    case "source-inventory.schema.json":
+      validateSourceInventory(value, valuePath, errors);
+      break;
+    default:
+      break;
+  }
   return result.errors.length === 0;
 }
 
@@ -415,11 +408,14 @@ export function validateCompatibilityMatrixPayload(matrix, index, errors) {
   }
 }
 
-function validateGateIndex(errors, indexPath, gateDirectories) {
+export function validateGateIndex(errors, indexPath, gateDirectories) {
   if (!existsSync(indexPath)) return;
   const index = loadJson(indexPath);
   const ownerComponents = { product: "hub", mobile: "mobile" };
+  const files = new Set();
   for (const gate of index.gates ?? []) {
+    if (files.has(gate.file)) errors.push(`${indexPath}: ${gate.file} gate.file 중복`);
+    files.add(gate.file);
     const ownerComponent = ownerComponents[gate.scope];
     if (ownerComponent === undefined) {
       errors.push(`${indexPath}: ${gate.file} scope 불량`);

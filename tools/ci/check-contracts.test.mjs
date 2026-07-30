@@ -1,8 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { join, relative, resolve } from "node:path";
 import {
   collectContractErrors,
   loadWorkspace,
@@ -15,15 +15,48 @@ import {
   validateSourceGovernanceContracts,
   validateBoundariesPayload,
   validateRepositorySplitIssueLedger,
+  validateGateIndex,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
-test("[gate-ownership] workspace는 legacy 경로 밖 fixture를 기준으로 상대 경로를 해석한다", () => {
-  const workspace = loadWorkspace("tools/ci/fixtures/gate-ownership-workspace/hub.json");
+function createExternalWorkspace() {
+  const directory = mkdtempSync(join(tmpdir(), "gate-ownership-workspace-"));
+  mkdirSync(join(directory, "inputs"), { recursive: true });
+  const copy = (source, target) => cpSync(source, join(directory, target), { recursive: true });
+  copy("apps/mobile/assets/datapacks/index.json", "inputs/datapack-index.json");
+  copy("apps/mobile/assets/datapacks/source-inventory.json", "inputs/source-inventory.json");
+  copy("tools/datapack/source-governance-policy.json", "inputs/governance-policy.json");
+  copy("release/product-gates/datapack-freshness-sla.json", "inputs/freshness-policy.json");
+  copy("release/product-gates", "gates/hub");
+  copy("apps/mobile/release", "gates/mobile");
+  const workspacePath = join(directory, "hub.json");
+  writeFileSync(workspacePath, JSON.stringify({
+    contracts: relative(directory, resolve("contracts")),
+    gateDirectories: { hub: "gates/hub", mobile: "gates/mobile" },
+    datapackIndex: "inputs/datapack-index.json",
+    sourceInventory: "inputs/source-inventory.json",
+    governancePolicy: "inputs/governance-policy.json",
+    freshnessPolicy: "inputs/freshness-policy.json",
+  }));
+  return { directory, workspacePath };
+}
 
-  assert.equal(workspace.gateDirectories.hub, "release/product-gates");
-  assert.equal(workspace.gateDirectories.mobile, "apps/mobile/release");
-  assert.equal(workspace.freshnessPolicy, "release/product-gates/datapack-freshness-sla.json");
+test("[gate-ownership] workspace는 legacy 경로 밖 복사 입력을 검증한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    assert.deepEqual(collectContractErrors(workspacePath), []);
+    const externalIndexPath = join(directory, "inputs/datapack-index.json");
+    const externalIndex = loadJson(externalIndexPath);
+    externalIndex.builtAt = "2026-02-31T00:00:00.000Z";
+    writeFileSync(externalIndexPath, JSON.stringify(externalIndex));
+
+    assert.ok(
+      collectContractErrors(workspacePath).some((error) => error.includes("builtAt은 유효한 UTC 시각이어야 한다")),
+      "외부 workspace datapack index의 semantic 검증이 필요하다",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("[gate-ownership] workspace는 필수 키 누락을 fail closed한다", () => {
@@ -614,6 +647,25 @@ test("gate-index는 ownerComponent별 gate 디렉터리 실물과 1:1 대응한�
     new Set(index.gates.filter((gate) => gate.scope === "mobile").map((gate) => gate.ownerComponent)),
     new Set(["mobile"]),
   );
+});
+
+test("[gate-ownership] gate-index는 owner 간에도 gate.file 중복을 거부한다", () => {
+  const directory = mkdtempSync(join(tmpdir(), "gate-index-duplicate-"));
+  const indexPath = join(directory, "gate-index.json");
+  const index = loadJson("contracts/release/gate-index.json");
+  const duplicate = structuredClone(index.gates.find((gate) => gate.ownerComponent === "hub"));
+  duplicate.scope = "mobile";
+  duplicate.ownerComponent = "mobile";
+  index.gates.push(duplicate);
+  writeFileSync(indexPath, JSON.stringify(index));
+  const errors = [];
+
+  validateGateIndex(errors, indexPath, {
+    hub: "release/product-gates",
+    mobile: "apps/mobile/release",
+  });
+
+  assert.ok(errors.some((error) => error.includes(`${duplicate.file} gate.file 중복`)));
 });
 
 test("env-scope-map이 .env.example 키와 1:1 대응한다", () => {
