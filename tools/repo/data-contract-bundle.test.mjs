@@ -3,6 +3,7 @@ import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 const resources = new Map([
+  ["datapack/mobility-profile-policy.json", "release/product-gates/mobility-profile-policy.json"],
   ["datapack/datapack-freshness-sla.json", "release/product-gates/datapack-freshness-sla.json"],
   ["datapack/datapack-manifest-acceptance-policy.json", "apps/mobile/release/datapack-manifest-acceptance-policy.json"],
   ["datapack/production-datapack-scope.json", "release/product-gates/production-datapack-scope.json"],
