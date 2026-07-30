@@ -212,6 +212,9 @@ test("접근성 source snapshot의 lineage와 governance 값을 그대로 materi
   assert.match(childStatement, new RegExp(`, '${parent.snapshotId}', 'CHANGED', `));
   assert.match(childStatement, /'\{"status":"CHANGED","rowDelta":8,"coverageDelta":1\}'/);
   assert.match(childStatement, /, '2026-07-15', 'a{64}' WHERE/);
+  const existingRowPredicate = childStatement.slice(childStatement.indexOf("WHERE NOT EXISTS"));
+  assert.doesNotMatch(existingRowPredicate, /governance_policy_(version|sha256)/);
+  assert.match(existingRowPredicate, /raw_sha256 IS NOT DISTINCT FROM/);
   const parentStatement = result.sql.split("\n")
     .find((line) => line.includes(`SELECT '${parent.snapshotId}'`));
   assert.match(parentStatement, /, '2026-07-15', '[a-f0-9]{64}' WHERE/);

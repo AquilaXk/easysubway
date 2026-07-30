@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "artifactKind": "server-timetable-snapshot-evidence",
   "schemaIdentity": "backend-timetable-snapshot-v1",
-  "snapshotId": "server-timetable-snapshot-3e94b82f0330cc10",
-  "snapshotSha256": "3e94b82f0330cc106fba0fbd646b0660b785817229dcb234ef636e6c97b14730",
-  "snapshotSqlByteSize": 9717674,
-  "snapshotGzipSha256": "5352d237a954fd28c0a41f4e3149474ac3b33e93dba0bdf0a46fe70221356111",
-  "snapshotGzipByteSize": 348263,
+  "snapshotId": "server-timetable-snapshot-f4a913821f9a1c68",
+  "snapshotSha256": "f4a913821f9a1c68f4430346777ab040a62c01eaaeb927a24f3834786957e824",
+  "snapshotSqlByteSize": 9717312,
+  "snapshotGzipSha256": "a0733905d91bb0725c4415a13392ef74a8f404ec94ade893d76193e8dd15bd92",
+  "snapshotGzipByteSize": 348245,
   "freshUntil": "2026-08-03T00:00:00+09:00",
   "serviceIdentity": {
     "serviceId": "ITX_CHEONGCHUN",
@@ -31,7 +31,7 @@
     "readmissionCount": 27
   },
   "accessibilitySource": {
-    "materializedSqlSha256": "3d877a17f547ede83a879f4079951daf64dbbd31e94ec4a1bfa2187f5f276a31"
+    "materializedSqlSha256": "b52c7b1e9d9937c26fe464de1ed58d58ced6ffe912b14f04beafdf337ec7dc2a"
   },
   "canonicalStationSet": {
     "version": "sha256:1d44e5838691cb5103a864713f50d1d867d1337477544347b31e0f3ee94dd273",
@@ -123,5 +123,5 @@
     "transferRules": 0,
     "routeEdgeEvidence": 4
   },
-  "evidenceHash": "97abcb43de569aa2075eda4bb19af070dd227db208867a92978a1e7bc1acf904"
+  "evidenceHash": "5983e69fd314c9deb787ea1ee45b128cce403b59a6eda28302505a8c9ec24395"
 }

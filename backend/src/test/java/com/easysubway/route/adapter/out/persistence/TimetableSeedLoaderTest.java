@@ -232,6 +232,33 @@ class TimetableSeedLoaderTest {
 	}
 
 	@Test
+	void trackedSnapshotReusesExistingSourceRowWhenOnlyGovernanceBindingChanged() {
+		trackedLoader().run(null);
+		String snapshotId = "seoul-metro-accessibility-capital-admission-20260712";
+		String priorPolicySha = "e".repeat(64);
+		jdbc.update(
+			"UPDATE data_source_snapshots SET governance_policy_sha256 = ? WHERE snapshot_id = ?",
+			priorPolicySha,
+			snapshotId
+		);
+		jdbc.update("DELETE FROM timetable_snapshot_active");
+
+		trackedLoader().run(null);
+
+		assertThat(jdbc.queryForObject(
+			"SELECT governance_policy_sha256 FROM data_source_snapshots WHERE snapshot_id = ?",
+			String.class,
+			snapshotId
+		)).isEqualTo(priorPolicySha);
+		assertThat(jdbc.queryForObject(
+			"SELECT COUNT(*) FROM data_source_snapshots WHERE snapshot_id = ?",
+			Integer.class,
+			snapshotId
+		)).isOne();
+		assertThat(jdbc.queryForObject("SELECT COUNT(*) FROM transit_trips", Integer.class)).isEqualTo(1035);
+	}
+
+	@Test
 	void trackedCompleteSnapshotRejectsMismatchedExistingSourceSnapshot() {
 		jdbc.update("""
 			INSERT INTO data_source_snapshots (

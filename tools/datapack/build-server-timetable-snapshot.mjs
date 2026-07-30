@@ -341,7 +341,8 @@ function sourceSnapshotInsert(row) {
     "diff_summary", "diff_summary_json", "freshness_expires_at", "raw_retention_expires_at",
     "governance_policy_version", "governance_policy_sha256",
   ];
-  const exactIdentity = columns
+  // Global governance policy can be re-evaluated without changing locked source snapshot bytes.
+  const exactIdentity = columns.slice(0, -2)
     .map((column, index) => `${column} IS NOT DISTINCT FROM ${values[index]}`)
     .join(" AND ");
   return `INSERT INTO data_source_snapshots (${columns.join(", ")}) `
