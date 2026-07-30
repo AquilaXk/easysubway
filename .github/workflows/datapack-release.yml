@@ -49,6 +49,7 @@ jobs:
       name: ${{ (github.event.inputs.mode == 'production-publish' || github.event.inputs.mode == 'rollback' || github.event.inputs.mode == 'rollout-update' || (github.event_name == 'schedule' && vars.DATAPACK_SCHEDULED_PUBLISH_ENABLED == 'true')) && 'production-datapack' || 'datapack-release-check' }}
     env:
       NODE_OPTIONS: --disable-warning=ExperimentalWarning
+      GH_TOKEN: ${{ github.token }}
 
     steps:
       - name: Data Pack Release / Checkout repository
@@ -652,6 +653,12 @@ jobs:
             --governance-policy tools/datapack/source-governance-policy.json \
             --freshness-policy release/product-gates/datapack-freshness-sla.json
 
+      - name: Data Pack Release / Stage candidate provenance
+        if: ${{ steps.release-mode.outputs.mode == 'release-candidate' }}
+        run: |
+          set -euo pipefail
+          cp "${EASYSUBWAY_DATAPACK_OUTPUT}/current.provenance.json" "${EASYSUBWAY_DATAPACK_STAGE}/current.provenance.json"
+
       - name: Data Pack Release / Validate generated data packs
         if: ${{ steps.release-mode.outputs.is-pointer-only != 'true' && steps.release-mode.outputs.mode != 'production-publish' }}
         run: |
@@ -685,7 +692,8 @@ jobs:
           node tools/datapack/build-accessibility-source-coverage-report.mjs \
             --manifest "${EASYSUBWAY_DATAPACK_OUTPUT}/current.json" \
             --manifest-root "${EASYSUBWAY_DATAPACK_OUTPUT}" \
-            --bundled-index "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json" \
+            --bundled-index "${EASYSUBWAY_DATAPACK_OUTPUT}/current.json" \
+            --bundled-root "${EASYSUBWAY_DATAPACK_OUTPUT}" \
             --inventory tools/datapack/source-inventory.json \
             --source-snapshots tools/datapack/release/source-snapshots.json \
             --evaluation-at "${evaluation_at}" \
