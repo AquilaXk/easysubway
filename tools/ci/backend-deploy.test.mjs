@@ -746,6 +746,33 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   assert.match(cd, /migration DDL gate absent at deploy target \(pre-#2365 SHA\); skipping/);
 });
 
+test("CD는 exact Release Artifacts run의 backend digest만 배포한다", () => {
+  const workflow = read(".github/workflows/cd.yml");
+
+  assert.match(workflow, /workflows:\n {6}- Release Artifacts/);
+  assert.match(workflow, /workflow_run\.id/);
+  assert.match(workflow, /workflow_run\.head_sha/);
+  assert.match(workflow, /producer_run_id: \$\{\{ steps\.target\.outputs\.producer_run_id \}\}/);
+  assert.match(workflow, /image_digest: \$\{\{ steps\.manifest\.outputs\.image_digest \}\}/);
+  assert.match(workflow, /require-successful-workflow-run\.mjs/);
+  assert.match(workflow, /Release Artifacts/);
+  assert.match(workflow, /easysubway-backend-release-\$\{\{ steps\.target\.outputs\.sha \}\}/);
+  assert.match(workflow, /actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093/);
+  assert.match(workflow, /run-id: \$\{\{ steps\.target\.outputs\.producer_run_id \}\}/);
+  assert.match(workflow, /backend-component-manifest\.json/);
+  assert.match(workflow, /component.*backend/);
+  assert.match(workflow, /repository/);
+  assert.match(workflow, /gitSha/);
+  assert.match(workflow, /evidenceSha256/);
+  assert.match(workflow, /needs\.plan\.outputs\.image_digest/);
+  assert.match(workflow, /docker pull "\$\{IMAGE\}@\$\{DEPLOY_IMAGE_DIGEST\}"/);
+  assert.doesNotMatch(workflow, /^  build-image:/m);
+  assert.doesNotMatch(workflow, /working-directory: backend/);
+  assert.doesNotMatch(workflow, /gradlew bootJar/);
+  assert.doesNotMatch(workflow, /backend\/Dockerfile/);
+  assert.doesNotMatch(workflow, /docker buildx build/);
+});
+
 test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API 스모크로 게이트한다", () => {
   const cd = read(".github/workflows/cd.yml");
 
@@ -764,7 +791,7 @@ test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API
   assert.match(cd, /if: \$\{\{ needs\.deploy\.outputs\.deploy_ready == 'true' \}\}/);
 
   // Smoke failures must propagate into the CD result Slack notification.
-  assert.match(cd, /needs:\n {6}- plan\n {6}- build-image\n {6}- deploy\n {6}- record-deploy\n {6}- post-deploy-smoke/);
+  assert.match(cd, /needs:\n {6}- plan\n {6}- deploy\n {6}- record-deploy\n {6}- post-deploy-smoke/);
 });
 
 test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 시 Nginx 설정을 복원한다", () => {

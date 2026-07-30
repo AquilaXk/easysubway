@@ -39,8 +39,14 @@ function infraChecks() {
     check("infra.local-build-override", existsSync("infra/docker-compose.local-build.yml")),
     check("infra.env-scope-shared-explicit", scopeExists("shared")),
     { id: "infra.observability-required-metrics", status: "pass", note: "deferred until split execution" },
-    check("infra.deploy-consumes-digest-only", cd !== null && !cd.includes("working-directory: backend")),
-    check("infra.no-backend-build", cd !== null && !cd.includes("backend/Dockerfile")),
+    check(
+      "infra.deploy-consumes-digest-only",
+      cd !== null && cd.includes("Release Artifacts") && cd.includes("needs.plan.outputs.image_digest") && !cd.includes("build-image"),
+    ),
+    check(
+      "infra.no-backend-build",
+      cd !== null && !["working-directory: backend", "backend/Dockerfile", "gradlew bootJar", "docker buildx build"].some((value) => cd.includes(value)),
+    ),
     ...sharedChecks(),
   ];
 }

@@ -100,8 +100,8 @@ test("현재 분리 blocker를 readiness 결과에 fail로 드러낸다", () => 
 
   assert.equal(byId(datapack, "datapack.no-mobile-release-paths").status, "pass");
   assert.equal(byId(datapack, "datapack.candidate-promotion-separated").status, "fail");
-  assert.equal(byId(infra, "infra.deploy-consumes-digest-only").status, "fail");
-  assert.equal(byId(infra, "infra.no-backend-build").status, "fail");
+  assert.equal(byId(infra, "infra.deploy-consumes-digest-only").status, "pass");
+  assert.equal(byId(infra, "infra.no-backend-build").status, "pass");
   assert.equal(byId(backend, "backend.no-external-process-resources").status, "pass");
   assert.equal(byId(backend, "backend.contract-lock").status, "pass");
   assert.equal(byId(backend, "backend.contract-bundle").status, "pass");
