@@ -98,9 +98,16 @@ jobs:
                 -H "X-GitHub-Api-Version: 2022-11-28" \
                 --output "${producer_artifacts}" \
                 "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/runs/${producer_run_id}/artifacts?name=${artifact_name}&per_page=100"
-              if ! node tools/ci/require-workflow-artifact.mjs \
+              if node tools/ci/require-workflow-artifact.mjs \
                 "${producer_artifacts}" "${artifact_name}" "${producer_run_id}" "${deploy_sha}"; then
-                producer_run_id=""
+                :
+              else
+                artifact_status="$?"
+                if (( artifact_status == 3 )); then
+                  producer_run_id=""
+                else
+                  exit "${artifact_status}"
+                fi
               fi
             fi
             if [[ -z "${producer_run_id}" ]]; then
