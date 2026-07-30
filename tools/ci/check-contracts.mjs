@@ -57,7 +57,7 @@ export function collectContractErrors() {
   validateJson(CATALOG_RAW_SQL_TABLES_SCHEMA_PATH, CATALOG_RAW_SQL_TABLES_PATH, errors);
   validateJson(REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH, REPOSITORY_SPLIT_ISSUES_PATH, errors);
   if (existsSync(REPOSITORY_SPLIT_ISSUES_PATH)) {
-    errors.push(...validateLedger(loadJson(REPOSITORY_SPLIT_ISSUES_PATH), { requirePending: true }).map(
+    errors.push(...validateRepositorySplitIssueLedger(loadJson(REPOSITORY_SPLIT_ISSUES_PATH)).map(
       (error) => `${REPOSITORY_SPLIT_ISSUES_PATH}: ${error}`,
     ));
   }
@@ -75,6 +75,10 @@ export function collectContractErrors() {
   validateGateIndex(errors);
   validateEnvScopeMap(errors);
   return errors;
+}
+
+export function validateRepositorySplitIssueLedger(ledger) {
+  return validateLedger(ledger);
 }
 
 export function validateSourceGovernanceContracts(

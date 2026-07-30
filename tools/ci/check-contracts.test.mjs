@@ -13,6 +13,7 @@ import {
   validateSourceInventory,
   validateSourceGovernanceContracts,
   validateBoundariesPayload,
+  validateRepositorySplitIssueLedger,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
@@ -20,6 +21,17 @@ test("repository split issue migration ledger가 계약 gate를 통과한다", (
   const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
 
   assert.deepEqual(errors, []);
+});
+
+test("contract gate의 ledger semantic path는 valid APPROVED와 TRANSFERRED를 허용한다", () => {
+  const approved = loadJson("release/migrations/repository-split-issues.json");
+  approved.issues[0].executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  const transferred = structuredClone(approved);
+  transferred.issues[0].targetUrl = "https://github.com/AquilaXk/easysubway-mobile/issues/1";
+  transferred.issues[0].transferredAt = "2026-07-30T00:00:00.000Z";
+
+  assert.deepEqual(validateRepositorySplitIssueLedger(approved), []);
+  assert.deepEqual(validateRepositorySplitIssueLedger(transferred), []);
 });
 
 test("번들 datapack index 실물이 계약 스키마를 통과한다", () => {
