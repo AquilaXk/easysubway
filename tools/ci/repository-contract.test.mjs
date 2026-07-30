@@ -5901,6 +5901,13 @@ test("[system-release-generator] FINAL은 component manifest에서 검증된 sys
     await execFileAsync(process.execPath, [...candidateArgs, "--phase", "CANDIDATE"], { cwd: root });
     const candidate = JSON.parse(await readFile(candidatePath, "utf8"));
     const identity = candidate.releaseCandidateIdentity;
+    const legacyOnlyOutput = path.join(tempDir, "legacy-only-final.json");
+    const legacyOnlyArgs = [...candidateArgs];
+    legacyOnlyArgs[legacyOnlyArgs.indexOf("--output") + 1] = legacyOnlyOutput;
+    await execFileAsync(process.execPath, [
+      ...legacyOnlyArgs, "--phase", "FINAL", "--candidate-context", candidatePath,
+    ], { cwd: root });
+    assert.equal(JSON.parse(await readFile(legacyOnlyOutput, "utf8")).schemaVersion, 1);
     const issueRefs = ["AquilaXk/easysubway-mobile#2693", "AquilaXk/easysubway-backend#2694", "AquilaXk/easysubway-data#2695", "AquilaXk/easysubway-platform#2696"];
     const common = { schemaVersion: 1, repository: "AquilaXk/easysubway", gitSha: currentGitSha, contractVersion: "1.2.3", evidenceSha256: "d".repeat(64) };
     const components = {
@@ -6033,10 +6040,25 @@ test("[system-release-generator] FINAL은 component manifest에서 검증된 sys
     assert.equal(await readFile(hardlinkLegacyOutput, "utf8"), "hardlink sentinel");
     assert.equal(await readFile(hardlinkSystemOutput, "utf8"), "hardlink sentinel");
 
+    const prevalidationLegacyOutput = path.join(tempDir, "prevalidation-legacy.json");
+    const prevalidationSystemOutput = path.join(tempDir, "prevalidation-system.json");
+    const prevalidationMobilePath = path.join(tempDir, "prevalidation-mobile.json");
+    await writeFile(prevalidationLegacyOutput, "legacy sentinel");
+    await writeFile(prevalidationSystemOutput, "system sentinel");
+    await writeFile(prevalidationMobilePath, JSON.stringify({
+      ...components.mobile,
+      artifactIdentity: { ...components.mobile.artifactIdentity, versionName: "9.9.9" },
+    }));
     await assert.rejects(
-      execFileAsync(process.execPath, [...systemArgs({ mobilePath: path.join(tempDir, "missing-mobile.json") }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
-      /mobile component manifest is unreadable or invalid JSON/,
+      execFileAsync(process.execPath, [...systemArgs({
+        mobilePath: prevalidationMobilePath,
+        outputPath: prevalidationLegacyOutput,
+        systemOutputPath: prevalidationSystemOutput,
+      }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest drifts from candidate context/,
     );
+    assert.equal(await readFile(prevalidationLegacyOutput, "utf8"), "legacy sentinel");
+    assert.equal(await readFile(prevalidationSystemOutput, "utf8"), "system sentinel");
     await assert.rejects(
       execFileAsync(process.execPath, [...systemArgs({ systemOutputPath: outputPath }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
       /--system-release-output must differ from --output/,

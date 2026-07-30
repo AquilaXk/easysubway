@@ -249,7 +249,9 @@ if (requestedPhase === "FINAL" && !candidateContextPath) {
 if (candidateContextPath) {
   validateCandidateContext(readJsonIfExists(resolvePath(candidateContextPath)), candidateContext);
 }
-const systemReleaseInputs = readSystemReleaseInputs();
+const systemReleaseInputs = arg("systemReleaseOutput", "system-release-output")
+  ? readSystemReleaseInputs()
+  : null;
 
 const gateEntries = requiredGateEntries(
   rcEvidenceContract.requiredGateStatuses, rcEvidenceContract.requiredGateChecks,
@@ -342,9 +344,13 @@ const manifest = {
   },
 };
 
-const systemReleaseManifest = buildSystemReleaseManifest(manifest, systemReleaseInputs);
+const systemReleaseManifest = systemReleaseInputs
+  ? buildSystemReleaseManifest(manifest, systemReleaseInputs)
+  : null;
 writeManifest(outputPath, manifest, "--output");
-writeManifest(systemReleaseInputs.outputPath, systemReleaseManifest, "--system-release-output");
+if (systemReleaseInputs) {
+  writeManifest(systemReleaseInputs.outputPath, systemReleaseManifest, "--system-release-output");
+}
 
 if (failOnBlocked && blockers.length > 0) {
   fail(`RC evidence manifest is blocked: ${blockers.map((blocker) => blocker.id).join(", ")}`);
