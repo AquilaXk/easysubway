@@ -47,7 +47,7 @@ function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, numb
       return "";
     }
     if (args[0] === "api" && args.includes("--paginate")) {
-      return JSON.stringify([args.at(-1).includes("labels") ? target.labels.nodes : (target.milestone === null ? [] : [target.milestone])]);
+      return JSON.stringify([args.at(-1).includes("labels") ? target.labels.nodes : (target.milestone === null ? [] : [{ title: target.milestone.title, due_on: target.milestone.dueOn }])]);
     }
     if (args[0] === "api" && args.at(-1) === `/repos/${SOURCE_REPOSITORY}/issues/${SOURCE_ISSUE}`) {
       if (!transferred) throw new Error("redirect requested before transfer");
@@ -166,4 +166,57 @@ test("post-transfer verification rejects metadata that does not identify the red
     () => verifyTransferredIssue({ entry, transferResult, execGh: fake.execGh }),
     /redirect target metadata is stale/,
   );
+});
+
+test("unsafe entries and incomplete connections never transfer", async (t) => {
+  const cases = [
+    transferEntry({ executionApproval: "bad" }),
+    transferEntry({ targetUrl: TARGET_URL }),
+    transferEntry({ transferredAt: "2026-07-30T00:00:00.000Z" }),
+    transferEntry(),
+  ];
+  for (const [index, entry] of cases.entries()) await t.test(String(index), async () => {
+    const source = index === 3 ? { ...metadata(), labels: { totalCount: 2, nodes: [{ name: "release-blocker" }] } } : metadata();
+    const fake = fakeGh({ source });
+    await assert.rejects(() => preflightIssueTransfer({ entry, execGh: fake.execGh }));
+    assert.deepEqual(transferCalls(fake.calls), []);
+  });
+});
+
+test("parser rejects duplicate and missing singleton values", () => {
+  for (const flag of ["--ledger", "--source-issue", "--confirm-source", "--confirm-target"]) {
+    const base = ["--ledger", "l", "--source-issue", "1", "--execute", "--confirm-source", "AquilaXk/easysubway#1", "--confirm-target", "AquilaXk/easysubway-data"];
+    assert.throws(() => parseArguments([...base, flag, "x"]));
+    assert.throws(() => parseArguments([...base.slice(0, base.indexOf(flag)), ...base.slice(base.indexOf(flag) + 1)]));
+  }
+});
+
+test("target milestone due-date mismatch rejects before transfer", async () => {
+  const fake = fakeGh({ target: metadata({ milestone: "P0" }) });
+  fake.execGh = fake.execGh;
+  const original = fake.execGh;
+  const execGh = async (args) => args[0] === "api" && args.includes("--paginate") && args.at(-1).includes("milestones")
+    ? JSON.stringify([[{ title: "P0", due_on: "2026-08-01T00:00:00Z" }]]) : original(args);
+  await assert.rejects(() => preflightIssueTransfer({ entry: transferEntry(), execGh }));
+  assert.deepEqual(transferCalls(fake.calls), []);
+});
+
+test("post-transfer relation snapshots reject every changed relation after one transfer", async (t) => {
+  const relation = { id: "I_9", number: 9, url: "https://github.com/AquilaXk/easysubway/issues/9", repository: { nameWithOwner: SOURCE_REPOSITORY } };
+  const cases = [
+    ["assignee", { assignees: { totalCount: 1, nodes: [{ id: "U_1", login: "owner" }] } }],
+    ["project", { projectItems: { totalCount: 1, nodes: [{ id: "PVTITEM_1", project: { id: "PVT_1", number: 1, title: "P", url: "https://github.com/orgs/AquilaXk/projects/1" } }] } }],
+    ["parent", { parent: relation }],
+    ["sub issue", { subIssues: { totalCount: 1, nodes: [relation] } }],
+    ["blocking", { blocking: { totalCount: 1, nodes: [relation] } }],
+    ["blocked by", { blockedBy: { totalCount: 1, nodes: [relation] } }],
+    ["closing PR", { closedByPullRequestsReferences: { totalCount: 1, nodes: [{ ...relation, id: "PR_9", state: "CLOSED" }] } }],
+  ];
+  for (const [name, changed] of cases) await t.test(name, async () => {
+    const fake = fakeGh({ target: { ...metadata({ url: TARGET_URL, number: 7 }), ...changed } });
+    const entry = transferEntry();
+    const transferResult = await executeIssueTransfer({ entry, confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, execGh: fake.execGh });
+    await assert.rejects(() => verifyTransferredIssue({ entry, transferResult, execGh: fake.execGh }));
+    assert.equal(transferCalls(fake.calls).length, 1);
+  });
 });

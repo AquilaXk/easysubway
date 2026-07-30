@@ -26,7 +26,7 @@ const ISSUE_METADATA_QUERY = [
   "      subIssues(first: 100) { totalCount nodes { id number url repository { nameWithOwner } } }",
   "      blocking(first: 100) { totalCount nodes { id number url repository { nameWithOwner } } }",
   "      blockedBy(first: 100) { totalCount nodes { id number url repository { nameWithOwner } } }",
-  "      closedByPullRequestsReferences(first: 100, includeClosedPrs: false) { totalCount nodes { id number url state repository { nameWithOwner } } }",
+  "      closedByPullRequestsReferences(first: 100, includeClosedPrs: true) { totalCount nodes { id number url state repository { nameWithOwner } } }",
   "    }",
   "  }",
   "}",
@@ -107,7 +107,7 @@ async function preflightDetails({ entry, execGh }) {
   if (source.title !== entry.title || source.state !== "OPEN") throw new Error("source issue title or state is stale");
   if (source.closingPullRequests.some(({ state }) => state === "OPEN")) throw new Error("source issue has an open linked pull request");
   if (!source.labels.every((label) => targetLabels.has(label))) throw new Error("target repository labels do not match source");
-  if (source.milestone !== null && !targetMilestones.has(source.milestone.title)) {
+  if (source.milestone !== null && !targetMilestones.has(JSON.stringify(source.milestone))) {
     throw new Error("target repository milestone does not match source");
   }
   return { source, targetLabels, targetMilestones };
@@ -153,10 +153,10 @@ async function readTargetLabels(repository, execGh) {
 async function readTargetMilestones(repository, execGh) {
   const output = await execGh(["api", "--paginate", "--slurp", "-H", "X-GitHub-Api-Version: 2022-11-28", `repos/${repository}/milestones?state=all&per_page=100`]);
   const milestones = JSON.parse(output).flat();
-  if (!Array.isArray(milestones) || !milestones.every(({ title }) => typeof title === "string")) {
+  if (!Array.isArray(milestones) || !milestones.every(({ title, due_on: dueOn }) => typeof title === "string" && (dueOn === null || typeof dueOn === "string"))) {
     throw new Error("target milestone metadata is invalid");
   }
-  return new Set(milestones.map(({ title }) => title));
+  return new Set(milestones.map(({ title, due_on: dueOn }) => JSON.stringify({ title, dueOn: canonicalDueOn(dueOn) })));
 }
 
 async function readIssueMetadata(repository, number, execGh) {
@@ -179,7 +179,7 @@ async function readIssueMetadata(repository, number, execGh) {
     title: issue.title,
     state: issue.state,
     labels: connection(issue.labels, "labels").map(({ name }) => name).sort(),
-    milestone: issue.milestone === null ? null : { title: issue.milestone.title, dueOn: issue.milestone.dueOn },
+    milestone: issue.milestone === null ? null : { title: issue.milestone.title, dueOn: canonicalDueOn(issue.milestone.dueOn) },
     commentCount: issue.comments.totalCount,
     assignees: connection(issue.assignees, "assignees").map(({ id, login }) => ({ id, login })).sort(compareIdentity),
     projectItems: connection(issue.projectItems, "project items").map(({ id, project }) => ({ id, project: { id: project.id, number: project.number, title: project.title, url: project.url } })).sort(compareIdentity),
@@ -197,6 +197,13 @@ function issueIdentity(issue) {
 }
 
 function compareIdentity(left, right) { return left.id < right.id ? -1 : left.id > right.id ? 1 : 0; }
+
+function canonicalDueOn(value) {
+  if (value === null) return null;
+  const date = new Date(value);
+  if (typeof value !== "string" || !Number.isFinite(date.getTime())) throw new Error("milestone due date is invalid");
+  return date.toISOString();
+}
 
 function redirectRepresentation(representation, targetRepository) {
   const match = typeof representation?.html_url === "string" && new RegExp(`^https://github\\.com/${escapeRegExp(targetRepository)}/issues/(\\d+)$`).exec(representation.html_url);
@@ -218,7 +225,8 @@ function sameMetadata(left, right) {
     && JSON.stringify(left.parent) === JSON.stringify(right.parent)
     && JSON.stringify(left.subIssues) === JSON.stringify(right.subIssues)
     && JSON.stringify(left.blocking) === JSON.stringify(right.blocking)
-    && JSON.stringify(left.blockedBy) === JSON.stringify(right.blockedBy);
+    && JSON.stringify(left.blockedBy) === JSON.stringify(right.blockedBy)
+    && JSON.stringify(left.closingPullRequests) === JSON.stringify(right.closingPullRequests);
 }
 
 function reportForPreflight(entry, details) {
