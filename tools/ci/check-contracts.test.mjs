@@ -61,16 +61,20 @@ test("[gate-ownership] workspace는 legacy 경로 밖 복사 입력을 검증한
 
 test("[gate-ownership] workspace는 필수 키 누락을 fail closed한다", () => {
   const directory = mkdtempSync(join(tmpdir(), "gate-ownership-workspace-"));
-  const workspacePath = join(directory, "hub.json");
-  writeFileSync(workspacePath, JSON.stringify({
-    contracts: "contracts",
-    gateDirectories: { hub: "release/product-gates", mobile: "apps/mobile/release" },
-    datapackIndex: "apps/mobile/assets/datapacks/index.json",
-    sourceInventory: "apps/mobile/assets/datapacks/source-inventory.json",
-    governancePolicy: "tools/datapack/source-governance-policy.json",
-  }));
+  try {
+    const workspacePath = join(directory, "hub.json");
+    writeFileSync(workspacePath, JSON.stringify({
+      contracts: "contracts",
+      gateDirectories: { hub: "release/product-gates", mobile: "apps/mobile/release" },
+      datapackIndex: "apps/mobile/assets/datapacks/index.json",
+      sourceInventory: "apps/mobile/assets/datapacks/source-inventory.json",
+      governancePolicy: "tools/datapack/source-governance-policy.json",
+    }));
 
-  assert.throws(() => loadWorkspace(workspacePath), /freshnessPolicy/);
+    assert.throws(() => loadWorkspace(workspacePath), /freshnessPolicy/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("repository split issue migration ledger가 계약 gate를 통과한다", () => {
@@ -651,21 +655,25 @@ test("gate-index는 ownerComponent별 gate 디렉터리 실물과 1:1 대응한�
 
 test("[gate-ownership] gate-index는 owner 간에도 gate.file 중복을 거부한다", () => {
   const directory = mkdtempSync(join(tmpdir(), "gate-index-duplicate-"));
-  const indexPath = join(directory, "gate-index.json");
-  const index = loadJson("contracts/release/gate-index.json");
-  const duplicate = structuredClone(index.gates.find((gate) => gate.ownerComponent === "hub"));
-  duplicate.scope = "mobile";
-  duplicate.ownerComponent = "mobile";
-  index.gates.push(duplicate);
-  writeFileSync(indexPath, JSON.stringify(index));
-  const errors = [];
+  try {
+    const indexPath = join(directory, "gate-index.json");
+    const index = loadJson("contracts/release/gate-index.json");
+    const duplicate = structuredClone(index.gates.find((gate) => gate.ownerComponent === "hub"));
+    duplicate.scope = "mobile";
+    duplicate.ownerComponent = "mobile";
+    index.gates.push(duplicate);
+    writeFileSync(indexPath, JSON.stringify(index));
+    const errors = [];
 
-  validateGateIndex(errors, indexPath, {
-    hub: "release/product-gates",
-    mobile: "apps/mobile/release",
-  });
+    validateGateIndex(errors, indexPath, {
+      hub: "release/product-gates",
+      mobile: "apps/mobile/release",
+    });
 
-  assert.ok(errors.some((error) => error.includes(`${duplicate.file} gate.file 중복`)));
+    assert.ok(errors.some((error) => error.includes(`${duplicate.file} gate.file 중복`)));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("env-scope-map이 .env.example 키와 1:1 대응한다", () => {
