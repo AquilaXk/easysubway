@@ -555,10 +555,17 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.match(candidateUpload, /path:\s*\$\{\{ env\.EASYSUBWAY_DATAPACK_STAGE \}\}/);
   assert.doesNotMatch(candidateUpload, /candidate-component|candidate-inventory|data-component-manifest|data-artifact-inventory/);
 
-  assert.match(promotion, /candidateRunId/);
-  assert.match(promotion, /compatibilityEvidenceRunId/);
-  assert.match(promotion, /compatibilityEvidenceArtifactName/);
-  assert.match(promotion, /issueRef/);
+  assert.deepEqual([...workflowDispatchInputNames(promotion)].sort(), [
+    "candidateRunId", "compatibilityEvidenceArtifactName", "compatibilityEvidenceRunId", "issueRef",
+  ]);
+  const permissionBlock = promotion.match(/permissions:\n([\s\S]*?)\n {4}environment:/)?.[1];
+  assert.ok(permissionBlock, "promotion permissions 블록을 찾지 못함");
+  const permissions = Object.fromEntries(
+    [...permissionBlock.matchAll(/^ {6}([\w-]+):\s*(read|write)$/gm)].map(([, key, value]) => [key, value]),
+  );
+  assert.deepEqual(permissions, {
+    contents: "read", actions: "read", "id-token": "write", attestations: "write",
+  });
   assert.match(promotion, /gh api "repos\/\$\{GITHUB_REPOSITORY\}\/actions\/runs\/\$\{candidate_run_id\}" --jq/);
   assert.match(promotion, /\.github\/workflows\/datapack-release\.yml/);
   assert.match(promotion, /head_sha/);
@@ -582,6 +589,31 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.match(promotion, /shopt -s dotglob nullglob/);
   assert.match(promotion, /entries=\("\$\{compatibility_root\}"\/\*\)/);
   assert.match(promotion, /! -L "\$\{entries\[0\]\}"/);
+  const nodeSetup = promotion.match(
+    /- name: Data Pack Promotion \/ Set up Node\.js[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(nodeSetup, "promotion Node setup 스텝을 찾지 못함");
+  assert.match(nodeSetup, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
+  assert.match(nodeSetup, /node-version:\s*"24"/);
+  assert.ok(
+    promotion.indexOf("Data Pack Promotion / Set up Node.js")
+      < promotion.indexOf("Data Pack Promotion / Rebuild exact candidate metadata"),
+    "Node setup은 candidate validator 전에 실행해야 함",
+  );
+  const candidateBinding = promotion.match(
+    /- name: Data Pack Promotion \/ Rebuild exact candidate metadata[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(candidateBinding, "candidate bytes 결속 스텝을 찾지 못함");
+  assert.match(candidateBinding, /-f "\$\{metadata\}" && ! -L "\$\{metadata\}" && -s "\$\{metadata\}"/);
+  assert.match(candidateBinding, /mv "\$\{component_manifest\}" "\$\{original_component_manifest\}"/);
+  assert.match(candidateBinding, /mv "\$\{artifact_inventory\}" "\$\{original_artifact_inventory\}"/);
+  assert.match(candidateBinding, /build-data-component-manifest\.mjs/);
+  assert.match(candidateBinding, /--git-sha "\$\{CANDIDATE_HEAD_SHA\}"/);
+  assert.match(candidateBinding, /--workflow-run-id "\$\{CANDIDATE_RUN_ID\}"/);
+  assert.match(candidateBinding, /--manifest "\$\{candidate_root\}\/catalog\/current\.json"/);
+  assert.match(candidateBinding, /--provenance "\$\{candidate_root\}\/current\.provenance\.json"/);
+  assert.match(candidateBinding, /cmp -s "\$\{component_manifest\}" "\$\{original_component_manifest\}"/);
+  assert.match(candidateBinding, /cmp -s "\$\{artifact_inventory\}" "\$\{original_artifact_inventory\}"/);
   assert.doesNotMatch(promotion, /\bcurl\b/);
   assert.doesNotMatch(promotion, /node --input-type=module/);
   assert.doesNotMatch(promotion, /<<'NODE'/);

@@ -39,6 +39,11 @@ jobs:
         with:
           persist-credentials: false
 
+      - name: Data Pack Promotion / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
       - name: Data Pack Promotion / Validate candidate producer run
         env:
           CANDIDATE_RUN_ID: ${{ inputs.candidateRunId }}
@@ -79,6 +84,33 @@ jobs:
           path: ${{ runner.temp }}/candidate
           run-id: ${{ inputs.candidateRunId }}
           github-token: ${{ github.token }}
+
+      - name: Data Pack Promotion / Rebuild exact candidate metadata
+        run: |
+          set -euo pipefail
+          candidate_root="${RUNNER_TEMP}/candidate"
+          component_manifest="${candidate_root}/data-component-manifest.json"
+          artifact_inventory="${candidate_root}/data-artifact-inventory.json"
+          for metadata in "${component_manifest}" "${artifact_inventory}"; do
+            [[ -f "${metadata}" && ! -L "${metadata}" && -s "${metadata}" ]]
+          done
+          original_component_manifest="${RUNNER_TEMP}/candidate-original-component-manifest.json"
+          original_artifact_inventory="${RUNNER_TEMP}/candidate-original-artifact-inventory.json"
+          mv "${component_manifest}" "${original_component_manifest}"
+          mv "${artifact_inventory}" "${original_artifact_inventory}"
+          node tools/datapack/build-data-component-manifest.mjs \
+            --root "${candidate_root}" \
+            --manifest "${candidate_root}/catalog/current.json" \
+            --provenance "${candidate_root}/current.provenance.json" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --git-sha "${CANDIDATE_HEAD_SHA}" \
+            --workflow-run-id "${CANDIDATE_RUN_ID}" \
+            --contract-version "datapack-contract-v3" \
+            --issue-ref "AquilaXk/easysubway#2699" \
+            --inventory-output "${artifact_inventory}" \
+            --output "${component_manifest}"
+          cmp -s "${component_manifest}" "${original_component_manifest}"
+          cmp -s "${artifact_inventory}" "${original_artifact_inventory}"
 
       - name: Data Pack Promotion / Validate compatibility evidence artifact
         env:
