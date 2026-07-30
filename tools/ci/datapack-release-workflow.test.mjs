@@ -572,6 +572,9 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.match(promotion, /workflow_path="\$\{workflow_path_raw%@\*\}"/);
   assert.match(promotion, /require-workflow-artifact\.mjs/);
   assert.match(promotion, /compatibility-evidence\.json/);
+  assert.match(promotion, /compatibility_event\}" != "workflow_dispatch"/);
+  assert.match(promotion, /compatibility_head_sha\}" != "\$\{GITHUB_SHA\}"/);
+  assert.match(promotion, /compatibility_workflow_path\}" != "\.github\/workflows\/release-artifacts\.yml"/);
   assert.match(promotion, /actions\/runs\/\$\{GITHUB_RUN_ID\}\/approvals/);
   assert.match(promotion, /build-promotion-request\.mjs/);
   assert.match(promotion, /validate-promotion-request\.mjs/);
@@ -614,6 +617,9 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.match(candidateBinding, /--provenance "\$\{candidate_root\}\/current\.provenance\.json"/);
   assert.match(candidateBinding, /cmp -s "\$\{component_manifest\}" "\$\{original_component_manifest\}"/);
   assert.match(candidateBinding, /cmp -s "\$\{artifact_inventory\}" "\$\{original_artifact_inventory\}"/);
+  assert.match(promotion, /EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM:\s*\$\{\{ secrets\.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM \}\}/);
+  assert.match(promotion, /EASYSUBWAY_DATAPACK_SIGNING_KEY_ID:\s*\$\{\{ secrets\.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID \}\}/);
+  assert.doesNotMatch(promotion, /EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM/);
   assert.doesNotMatch(promotion, /\bcurl\b/);
   assert.doesNotMatch(promotion, /node --input-type=module/);
   assert.doesNotMatch(promotion, /<<'NODE'/);

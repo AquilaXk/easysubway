@@ -86,6 +86,9 @@ jobs:
           github-token: ${{ github.token }}
 
       - name: Data Pack Promotion / Rebuild exact candidate metadata
+        env:
+          EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM }}
+          EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID }}
         run: |
           set -euo pipefail
           candidate_root="${RUNNER_TEMP}/candidate"
@@ -123,12 +126,13 @@ jobs:
             exit 1
           fi
           compatibility_metadata="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${COMPATIBILITY_RUN_ID}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_sha, .path] | @tsv')"
-          IFS=$'\t' read -r compatibility_run_id compatibility_conclusion compatibility_repository compatibility_head_repository compatibility_event compatibility_head_sha compatibility_workflow_path <<< "${compatibility_metadata}"
+          IFS=$'\t' read -r compatibility_run_id compatibility_conclusion compatibility_repository compatibility_head_repository compatibility_event compatibility_head_sha compatibility_workflow_path_raw <<< "${compatibility_metadata}"
+          compatibility_workflow_path="${compatibility_workflow_path_raw%@*}"
           if [[ "${compatibility_run_id}" != "${COMPATIBILITY_RUN_ID}" || "${compatibility_conclusion}" != "success" \
             || "${compatibility_repository}" != "${GITHUB_REPOSITORY}" || "${compatibility_head_repository}" != "${GITHUB_REPOSITORY}" \
-            || -z "${compatibility_event}" || ! "${compatibility_head_sha}" =~ ^[a-f0-9]{40}$ \
-            || -z "${compatibility_workflow_path}" ]]; then
-            echo "compatibility evidence must come from a successful same-repository run" >&2
+            || "${compatibility_event}" != "workflow_dispatch" || "${compatibility_head_sha}" != "${GITHUB_SHA}" \
+            || "${compatibility_workflow_path}" != ".github/workflows/release-artifacts.yml" ]]; then
+            echo "compatibility evidence must come from the current-SHA Release Artifacts workflow" >&2
             exit 1
           fi
           echo "COMPATIBILITY_HEAD_SHA=${compatibility_head_sha}" >> "${GITHUB_ENV}"

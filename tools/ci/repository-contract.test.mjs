@@ -889,6 +889,10 @@ function assertActionsEnvSecretPolicy(file, source) {
       "DATA_GO_KR_SERVICE_KEY",
       "KRIC_SERVICE_KEY",
     ]),
+    ".github/workflows/datapack-promotion.yml": new Set([
+      "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
+      "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
+    ]),
     ".github/workflows/release-artifacts.yml": new Set([
       "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
       "EASYSUBWAY_ANDROID_STORE_PASSWORD",
