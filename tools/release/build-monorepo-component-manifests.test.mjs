@@ -9,6 +9,8 @@ import test from "node:test";
 const script = path.resolve("tools/release/build-monorepo-component-manifests.mjs");
 const gitSha = "a".repeat(40);
 const imageDigest = `sha256:${"b".repeat(64)}`;
+const sourceSnapshotSetHash = "c".repeat(64);
+const sourceEvidence = JSON.stringify({ sourceSnapshotSetHash });
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 
 function fixture() {
@@ -24,7 +26,7 @@ function fixture() {
     dataManifest: file("data-manifest.json", "{\"data\":true}\n"),
     backendInspect: file("backend-inspect.json", JSON.stringify([{ RepoDigests: [`registry.example/easysubway@${imageDigest}`] }])),
     backendEvidence: file("backend-evidence.json", "backend evidence"),
-    sourceEvidence: file("source-evidence.json", "source evidence"),
+    sourceEvidence: file("source-evidence.json", sourceEvidence),
     platformEvidence: file("platform-evidence.json", "platform evidence"),
     contractsBundle: file("contracts.tgz", "contracts bundle"),
     output: path.join(directory, "output"),
@@ -87,8 +89,9 @@ test("builds deterministic truthful monorepo component manifests", () => {
     assert.equal(backend.artifactIdentity.apiContractVersion, "1.2.3");
     assert.equal(backend.evidenceSha256, sha256("backend evidence"));
     assert.equal(data.artifactIdentity.manifestSha256, mobile.artifactIdentity.bundledDataManifestSha256);
-    assert.equal(data.artifactIdentity.sourceSnapshotSetHash, sha256("source evidence"));
-    assert.equal(data.evidenceSha256, sha256("source evidence"));
+    assert.equal(data.artifactIdentity.sourceSnapshotSetHash, sourceSnapshotSetHash);
+    assert.equal(data.evidenceSha256, sha256(sourceEvidence));
+    assert.notEqual(data.artifactIdentity.sourceSnapshotSetHash, data.evidenceSha256);
     assert.equal(platform.artifactIdentity.environment, "ci");
     assert.equal(platform.artifactIdentity.deployedImageDigest, imageDigest);
     assert.equal(platform.artifactIdentity.deploymentEvidenceSha256, sha256("platform evidence"));
@@ -140,6 +143,19 @@ test("rejects version bounds and mismatched bundled data manifests", () => {
     writeFileSync(otherManifest, "different manifest");
     assert.notEqual(run(files, { "--bundled-data-manifest": otherManifest }).status, 0);
     assert.equal(requireFiles(files.output), null);
+  } finally {
+    rmSync(files.directory, { recursive: true, force: true });
+  }
+});
+
+test("rejects invalid source snapshot evidence before publication", () => {
+  const files = fixture();
+  try {
+    for (const evidence of ["not JSON", "{}", JSON.stringify({ sourceSnapshotSetHash: "C".repeat(64) }), JSON.stringify({ sourceSnapshotSetHash: "c".repeat(63) })]) {
+      writeFileSync(files.sourceEvidence, evidence);
+      assert.notEqual(run(files).status, 0);
+      assert.equal(requireFiles(files.output), null);
+    }
   } finally {
     rmSync(files.directory, { recursive: true, force: true });
   }
