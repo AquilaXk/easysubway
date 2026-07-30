@@ -3568,16 +3568,23 @@ test("[release-v2-workflow] release workflow assembles v2 and gates Play on GO",
   assert.match(backendJob, /needs\.changes\.outputs\.android == 'true'/);
   assert.match(backendJob, /needs\.changes\.outputs\.mobile == 'true'/);
   assert.match(backendJob, /github\.event_name == 'workflow_dispatch'/);
+  assert.equal(
+    (backendJob.match(/EASYSUBWAY_BACKEND_IMAGE_TAG="\$\{GITHUB_SHA\}" docker compose/g) ?? []).length,
+    2,
+  );
   assert.match(backendJob, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
   assert.match(backendJob, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config > release-artifacts\/backend\/rendered-compose\.yml/);
   assert.match(backendJob, /test -f release-artifacts\/backend\/rendered-compose\.yml/);
   assert.match(backendJob, /test ! -L release-artifacts\/backend\/rendered-compose\.yml/);
+  assert.match(backendJob, /grep -Fq "image: easysubway-backend:\$\{GITHUB_SHA\}" release-artifacts\/backend\/rendered-compose\.yml/);
   assert.match(backendJob, /path: release-artifacts\/backend/);
 
   assert.match(rcJob, /needs\.backend-release\.result == 'success'/);
   assert.match(rcJob, /needs\.android-release\.outputs\.artifact_available == 'true'/);
   assert.match(rcJob, /needs\.android-production-rc-release\.result == 'success'/);
+  assert.match(rcJob, /bundled_data_manifest=apps\/mobile\/assets\/datapacks\/index\.json/);
   assert.match(rcJob, /data_pack_manifest=apps\/mobile\/assets\/datapacks\/index\.json/);
+  assert.doesNotMatch(rcJob, /bundled_data_manifest=release-artifacts\/downloaded\/datapack-selected\/current\.json/);
   assert.match(rcJob, /data_pack_artifact=apps\/mobile\/assets\/datapacks\/capital\.sqlite\.gz/);
   assert.match(rcJob, /source_snapshot_evidence="\$\{data_pack_manifest\}"/);
   assert.match(rcJob, /release_sequence=0/);
@@ -3586,7 +3593,7 @@ test("[release-v2-workflow] release workflow assembles v2 and gates Play on GO",
   assert.match(rcJob, /node tools\/release\/build-monorepo-component-manifests\.mjs/);
   assert.match(rcJob, /--output-dir "\$\{component_output\}"/);
   assert.match(rcJob, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
-  assert.match(rcJob, /--bundled-data-manifest "\$\{data_pack_manifest\}"/);
+  assert.match(rcJob, /--bundled-data-manifest "\$\{bundled_data_manifest\}"/);
   assert.match(rcJob, /--data-manifest "\$\{data_pack_manifest\}"/);
   assert.match(rcJob, /--source-snapshot-evidence "\$\{source_snapshot_evidence\}"/);
   assert.doesNotMatch(rcJob, /--backend-artifact/);

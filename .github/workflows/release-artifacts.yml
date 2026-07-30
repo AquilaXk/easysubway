@@ -691,10 +691,11 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-artifacts/backend
-          docker compose --env-file .env.example -f infra/docker-compose.yml config --quiet
-          docker compose --env-file .env.example -f infra/docker-compose.yml config > release-artifacts/backend/rendered-compose.yml
+          EASYSUBWAY_BACKEND_IMAGE_TAG="${GITHUB_SHA}" docker compose --env-file .env.example -f infra/docker-compose.yml config --quiet
+          EASYSUBWAY_BACKEND_IMAGE_TAG="${GITHUB_SHA}" docker compose --env-file .env.example -f infra/docker-compose.yml config > release-artifacts/backend/rendered-compose.yml
           test -f release-artifacts/backend/rendered-compose.yml
           test ! -L release-artifacts/backend/rendered-compose.yml
+          grep -Fq "image: easysubway-backend:${GITHUB_SHA}" release-artifacts/backend/rendered-compose.yml
 
       - name: Backend Release Image / Collect release metadata
         shell: bash
@@ -837,6 +838,7 @@ jobs:
         run: |
           set -euo pipefail
           mkdir -p release-artifacts/rc
+          bundled_data_manifest=apps/mobile/assets/datapacks/index.json
           data_pack_manifest=apps/mobile/assets/datapacks/index.json
           data_pack_artifact=apps/mobile/assets/datapacks/capital.sqlite.gz
           data_pack_fallback_artifact="${data_pack_artifact}"
@@ -942,7 +944,7 @@ jobs:
             --mobile-version-name "${version_name}" \
             --mobile-version-code "${version_code}" \
             --aab "${aab_path}" \
-            --bundled-data-manifest "${data_pack_manifest}" \
+            --bundled-data-manifest "${bundled_data_manifest}" \
             --backend-image-inspect release-artifacts/downloaded/backend/image-inspect.json \
             --backend-evidence release-artifacts/downloaded/backend/release-metadata.txt \
             --data-version "${data_version}" \
