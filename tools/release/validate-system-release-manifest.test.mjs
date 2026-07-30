@@ -108,3 +108,33 @@ test("CLI emits fixed redacted errors for argument, file, and JSON failures", ()
     rmSync(directory, { recursive: true, force: true });
   }
 });
+
+test("CLI require-decision GO rejects NO_GO and accepts GO", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "release-manifest-decision-"));
+  const manifestPath = path.join(directory, "system-release-manifest.json");
+  try {
+    const manifest = validManifest();
+    manifest.decision = "NO_GO";
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    const rejected = spawnSync(process.execPath, [
+      "tools/release/validate-system-release-manifest.mjs",
+      "--manifest", manifestPath,
+      "--require-decision", "GO",
+    ], { encoding: "utf8" });
+    assert.equal(rejected.status, 1);
+    assert.equal(rejected.stdout, "");
+    assert.equal(rejected.stderr, "system-release-manifest: invalid\ndecision must be GO\n");
+
+    manifest.decision = "GO";
+    writeFileSync(manifestPath, JSON.stringify(manifest));
+    const accepted = spawnSync(process.execPath, [
+      "tools/release/validate-system-release-manifest.mjs",
+      "--manifest", manifestPath,
+      "--require-decision", "GO",
+    ], { encoding: "utf8" });
+    assert.equal(accepted.status, 0, accepted.stderr);
+    assert.equal(accepted.stdout, `system-release-manifest: OK ${manifest.productReleaseId}\n`);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

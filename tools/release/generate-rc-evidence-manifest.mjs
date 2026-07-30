@@ -43,7 +43,7 @@ const evidenceRoot = normalizeEvidenceRoot(
 );
 const appVersion = readFlutterVersion(path.join(appRoot, "pubspec.yaml"));
 const dataPackManifestPath = resolvePath(
-  arg("dataPackManifest", "data-pack-manifest") ?? path.join(appRoot, "assets/datapacks/metro_map_pack/manifest.json"),
+  arg("dataPackManifest", "data-pack-manifest") ?? path.join(appRoot, "assets/datapacks/index.json"),
 );
 const dataPackManifest = readJsonIfExists(dataPackManifestPath);
 const dataPackArtifactArg = arg("dataPackArtifact", "data-pack-artifact");
@@ -84,8 +84,15 @@ const dataPackRehearsalBinding = readDataPackRehearsalBinding(
   dataPackManifest,
   dataPackArtifactPath,
 );
+if (
+  dataPackManifest?.sourceSnapshotSetHash !== undefined
+  && !/^[a-f0-9]{64}$/.test(dataPackManifest.sourceSnapshotSetHash)
+) {
+  fail("data pack manifest sourceSnapshotSetHash must be a SHA-256 digest");
+}
 const sourceSnapshotSetHash = dataPackReleaseDecision?.sourceSnapshotSetHash
   ?? dataPackRehearsalBinding?.sourceSnapshotSetHash
+  ?? dataPackManifest?.sourceSnapshotSetHash
   ?? null;
 if (requireProductionDataPackBinding) {
   validateProductionDataPackBinding(
@@ -1349,13 +1356,13 @@ function requirePositiveSafeInteger(value, name) {
 function normalizeReleaseSequence(explicitValue, manifestValue) {
   const value = explicitValue ?? manifestValue ?? null;
   if (value === null) return null;
-  const parsed = typeof value === "string" && /^[1-9]\d*$/.test(value)
+  const parsed = typeof value === "string" && /^(?:0|[1-9]\d*)$/.test(value)
     ? Number(value)
     : value;
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
     fail(explicitValue === undefined
-      ? "data pack manifest releaseSequence must be a positive safe integer"
-      : "--release-sequence must be a positive safe integer");
+      ? "data pack manifest releaseSequence must be a non-negative safe integer"
+      : "--release-sequence must be a non-negative safe integer");
   }
   return parsed;
 }

@@ -3557,6 +3557,61 @@ test("[release-v2] RC evidence contract uses repository-qualified issue referenc
   }
 });
 
+test("[release-v2-workflow] release workflow assembles v2 and gates Play on GO", () => {
+  const workflow = read(".github/workflows/release-artifacts.yml");
+  const generator = read("tools/release/generate-rc-evidence-manifest.mjs");
+  const validator = read("tools/release/validate-system-release-manifest.mjs");
+  const backendJob = jobBlock(workflow, "backend-release", "rc-evidence-manifest");
+  const rcJob = jobBlock(workflow, "rc-evidence-manifest", "notify-slack-release-result");
+  const playJob = jobBlock(workflow, "play-internal-upload", "backend-release");
+
+  assert.match(backendJob, /needs\.changes\.outputs\.android == 'true'/);
+  assert.match(backendJob, /needs\.changes\.outputs\.mobile == 'true'/);
+  assert.match(backendJob, /github\.event_name == 'workflow_dispatch'/);
+  assert.match(backendJob, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
+  assert.match(backendJob, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config > release-artifacts\/backend\/rendered-compose\.yml/);
+  assert.match(backendJob, /test -f release-artifacts\/backend\/rendered-compose\.yml/);
+  assert.match(backendJob, /test ! -L release-artifacts\/backend\/rendered-compose\.yml/);
+  assert.match(backendJob, /path: release-artifacts\/backend/);
+
+  assert.match(rcJob, /needs\.backend-release\.result == 'success'/);
+  assert.match(rcJob, /needs\.android-release\.outputs\.artifact_available == 'true'/);
+  assert.match(rcJob, /needs\.android-production-rc-release\.result == 'success'/);
+  assert.match(rcJob, /data_pack_manifest=apps\/mobile\/assets\/datapacks\/index\.json/);
+  assert.match(rcJob, /data_pack_artifact=apps\/mobile\/assets\/datapacks\/capital\.sqlite\.gz/);
+  assert.match(rcJob, /source_snapshot_evidence="\$\{data_pack_manifest\}"/);
+  assert.match(rcJob, /release_sequence=0/);
+  assert.match(rcJob, /--release-sequence "\$\{release_sequence\}"/);
+  assert.match(rcJob, /git archive --format=tar HEAD contracts > "\$\{RUNNER_TEMP\}\/contracts\.tar"/);
+  assert.match(rcJob, /node tools\/release\/build-monorepo-component-manifests\.mjs/);
+  assert.match(rcJob, /--output-dir "\$\{component_output\}"/);
+  assert.match(rcJob, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
+  assert.match(rcJob, /--bundled-data-manifest "\$\{data_pack_manifest\}"/);
+  assert.match(rcJob, /--data-manifest "\$\{data_pack_manifest\}"/);
+  assert.match(rcJob, /--source-snapshot-evidence "\$\{source_snapshot_evidence\}"/);
+  assert.doesNotMatch(rcJob, /--backend-artifact/);
+  for (const component of ["mobile", "backend", "data", "platform"]) {
+    assert.match(rcJob, new RegExp(`--${component}-component-manifest release-artifacts/rc/${component}-component-manifest\\.json`));
+    assert.match(rcJob, new RegExp(`cp "\\$\\{component_output\\}/${component}-component-manifest\\.json" release-artifacts/rc/${component}-component-manifest\\.json`));
+  }
+  assert.match(rcJob, /--contracts-identity release-artifacts\/rc\/contracts-identity\.json/);
+  assert.match(rcJob, /--output release-artifacts\/rc\/final-readiness\.json/);
+  assert.match(rcJob, /--system-release-output release-artifacts\/rc\/system-release-manifest\.json/);
+  assert.match(rcJob, /--product-release-id "android-v\$\{version_name\}\+\$\{version_code\}"/);
+  assert.match(rcJob, /node tools\/release\/validate-system-release-manifest\.mjs[\s\S]*--manifest release-artifacts\/rc\/system-release-manifest\.json/);
+  assert.ok(rcJob.indexOf("--system-release-output") < rcJob.indexOf("validate-system-release-manifest.mjs"));
+  assert.match(rcJob, /name: easysubway-rc-evidence-manifest-\$\{\{ github\.sha \}\}[\s\S]*path: release-artifacts\/rc/);
+
+  assert.match(playJob, /name: easysubway-rc-evidence-manifest-\$\{\{ github\.sha \}\}/);
+  assert.match(playJob, /--manifest release-artifacts\/downloaded\/rc\/system-release-manifest\.json[\s\S]*--require-decision GO/);
+  assert.ok(playJob.indexOf("--require-decision GO") < playJob.indexOf("Play internal upload / Restore release environment"));
+  assert.match(generator, /assets\/datapacks\/index\.json/);
+  assert.match(generator, /dataPackManifest\?\.sourceSnapshotSetHash/);
+  assert.match(generator, /!Number\.isSafeInteger\(parsed\) \|\| parsed < 0/);
+  assert.match(validator, /requireDecision/);
+  assert.match(validator, /manifest\.decision !== options\.requireDecision/);
+});
+
 test("모바일 signed release artifact gate와 광고 counter는 CI 산출물과 스토어 제출 준비 상태를 분리한다", () => {
   const gatePath = "apps/mobile/release/signed-release-artifact-gate.json";
 
@@ -4863,7 +4918,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /--gate-status productionDatapack=BLOCKED_EXTERNAL/);
   assert.match(workflow, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
   assert.match(workflow, /cp "\$\{boot_jar\[0\]\}" release-artifacts\/backend\/backend-boot\.jar/);
-  assert.match(workflow, /--backend-artifact release-artifacts\/downloaded\/backend\/backend-boot\.jar/);
+  assert.doesNotMatch(workflow, /--backend-artifact release-artifacts\/downloaded\/backend\/backend-boot\.jar/);
   assert.match(backendBuild, /preserveFileTimestamps\s*=\s*false/);
   assert.match(backendBuild, /reproducibleFileOrder\s*=\s*true/);
   assert.match(workflow, /--gate-status backendOperations=BLOCKED_EXTERNAL/);
@@ -6171,7 +6226,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   );
   await assert.rejects(execFileAsync(process.execPath, [...args, "--release-sequence", "2026.07.12",
     "--phase", "CANDIDATE", "--output", path.join(tempDir, "invalid-release-sequence.json")], generatorOptions),
-  /--release-sequence must be a positive safe integer/);
+  /--release-sequence must be a non-negative safe integer/);
   const evidenceRcIdentity = candidateManifest.releaseCandidateIdentity;
   const invalidCandidatePath = path.join(tempDir, "invalid-candidate-context.json");
   await writeFile(invalidCandidatePath, JSON.stringify({ ...candidateManifest, decision: "GO" }));
@@ -7262,7 +7317,7 @@ test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 �
   assert.match(androidReleaseJob, /if: \$\{\{ needs\.changes\.outputs\.android == 'true' \|\| needs\.changes\.outputs\.mobile == 'true' \}\}/);
   assert.doesNotMatch(workflow, /ios-release:/);
   assert.match(backendReleaseJob, /needs: changes/);
-  assert.match(backendReleaseJob, /if: \$\{\{ needs\.changes\.outputs\.backend == 'true' \|\| needs\.changes\.outputs\.deploy == 'true' \}\}/);
+  assert.match(backendReleaseJob, /needs\.changes\.outputs\.backend == 'true'[\s\S]*needs\.changes\.outputs\.android == 'true'[\s\S]*github\.event_name == 'workflow_dispatch'/);
   assert.match(detector, /apps\/mobile\/release\/\*\*/);
   assert.match(detector, /apps\/mobile\/android\/app\/build\.gradle\.kts/);
   assert.match(detector, /apps\/mobile\/ios\/Runner\.xcodeproj\/\*\*/);

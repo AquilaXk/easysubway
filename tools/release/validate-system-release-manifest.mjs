@@ -56,12 +56,12 @@ function redact(errors) {
 }
 
 function main() {
-  const manifestPath = parseManifestPath(process.argv.slice(2));
-  if (!manifestPath) return fail("invalid arguments");
+  const options = parseOptions(process.argv.slice(2));
+  if (!options) return fail("invalid arguments");
   const here = path.dirname(fileURLToPath(import.meta.url));
   let manifest;
   try {
-    manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    manifest = JSON.parse(readFileSync(options.manifestPath, "utf8"));
   } catch {
     return fail("manifest file is unreadable or invalid JSON");
   }
@@ -74,14 +74,26 @@ function main() {
       issueRefSchema: schema("issue-ref.schema.json"),
     });
     if (errors.length > 0) return fail(errors.join("\n"));
+    if (options.requireDecision && manifest.decision !== options.requireDecision) {
+      return fail(`decision must be ${options.requireDecision}`);
+    }
     process.stdout.write(`system-release-manifest: OK ${manifest.productReleaseId}\n`);
   } catch {
     fail("validator unavailable");
   }
 }
 
-function parseManifestPath(args) {
-  if (args.length === 2 && args[0] === "--manifest" && args[1]) return args[1];
+function parseOptions(args) {
+  if (args.length === 2 && args[0] === "--manifest" && args[1]) {
+    return { manifestPath: args[1], requireDecision: null };
+  }
+  if (
+    args.length === 4
+    && args[0] === "--manifest" && args[1]
+    && args[2] === "--require-decision" && args[3] === "GO"
+  ) {
+    return { manifestPath: args[1], requireDecision: args[3] };
+  }
   return null;
 }
 
