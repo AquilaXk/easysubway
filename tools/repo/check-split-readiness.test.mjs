@@ -24,6 +24,14 @@ test("datapack split readiness checks id와 상태를 고정한다", () => {
   }
 });
 
+test("canonical data와 platform target은 legacy readiness checks를 유지한다", () => {
+  for (const [canonical, legacy] of [["data", "datapack"], ["platform", "infra"]]) {
+    const result = evaluateReadiness(canonical);
+    assert.equal(result.target, canonical);
+    assert.deepEqual(result.checks, evaluateReadiness(legacy).checks);
+  }
+});
+
 test("split readiness target별 check id와 현재 pass 상태를 고정한다", () => {
   const expected = new Map([
     ["datapack", [

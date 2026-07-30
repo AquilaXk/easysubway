@@ -257,6 +257,10 @@ export function validateBoundariesPayload(boundaries) {
   const sourceAreaOwners = new Map();
   const partialRoots = [];
   for (const [targetName, target] of Object.entries(targets)) {
+    if (!Object.hasOwn(EXTRACTION_REPOSITORIES, targetName)) {
+      errors.push(`contracts/boundaries.json: ${targetName} extraction target 불량`);
+      continue;
+    }
     const expectedRepository = EXTRACTION_REPOSITORIES[targetName];
     if (target.repository !== expectedRepository) {
       errors.push(`contracts/boundaries.json: ${targetName} repository 불량`);

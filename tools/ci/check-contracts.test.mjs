@@ -394,13 +394,12 @@ test("boundaries v2는 target 이름과 repository를 정확히 고정한다", (
   boundaries.extractionTargets.backend.repository = "AquilaXk/easysubway-mobile";
   boundaries.extractionTargets.unknown = {
     ...structuredClone(boundaries.extractionTargets.data),
-    repository: "AquilaXk/easysubway-unknown",
   };
   boundaries.splitOrder.push("unknown");
 
   const errors = validateBoundariesPayload(boundaries);
   assert.ok(errors.some((error) => error.includes("backend repository 불량")));
-  assert.ok(errors.some((error) => error.includes("unknown repository 불량")));
+  assert.ok(errors.some((error) => error.includes("unknown extraction target 불량")));
 });
 
 test("boundaries v2는 extraction target ownership metadata의 배열·빈 값·중복을 거부한다", () => {

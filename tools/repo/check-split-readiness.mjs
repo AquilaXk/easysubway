@@ -5,8 +5,8 @@ import { collectContractErrors, loadJson } from "../ci/check-contracts.mjs";
 import { findViolations } from "../ci/check-boundaries.mjs";
 
 export function evaluateReadiness(target) {
-  if (target === "datapack") return { target, checks: datapackChecks() };
-  if (target === "infra") return { target, checks: infraChecks() };
+  if (target === "datapack" || target === "data") return { target, checks: datapackChecks() };
+  if (target === "infra" || target === "platform") return { target, checks: infraChecks() };
   if (target === "backend") return { target, checks: backendChecks() };
   if (target === "mobile") return { target, checks: mobileChecks() };
   throw new Error(`unknown target: ${target}`);
