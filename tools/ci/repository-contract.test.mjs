@@ -20086,6 +20086,16 @@ test("tools/**/*.mjs는 로케일 미지정 localeCompare 호출을 두지 않�
   );
 });
 
+test("issue migration CLI는 단일 issue argv 실행 경계를 유지한다 (#2691)", () => {
+  const source = read("tools/repo/migrate-issue.mjs");
+
+  assert.match(source, /\bexecFile\b/);
+  assert.doesNotMatch(source, /\bexec\s*\(/);
+  assert.doesNotMatch(source, /shell\s*:\s*true/);
+  assert.doesNotMatch(source, /for\s*\([^)]*\bissues?\b/);
+  assert.doesNotMatch(source, /(?:gh\s+issue\s+(?:clone|close)|["']issue["']\s*,\s*["'](?:clone|close)["'])/);
+});
+
 test("error-codes.json은 ErrorCode enum과 완전 일치하고 category·httpStatus 조합이 유효하다", () => {
   const HTTP_STATUS_BY_NAME = {
     BAD_REQUEST: 400,

@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://easysubway.local/schema/repository-split-issues.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "sourceRepository", "inventory", "issues"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "sourceRepository": { "const": "AquilaXk/easysubway" },
+    "inventory": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["capturedAt", "sourceHead", "openIssueCount"],
+      "properties": {
+        "capturedAt": { "const": "2026-07-30T00:00:00.000Z" },
+        "sourceHead": { "const": "b5eed07a53b0d97f282c6c11712ee138944169e1" },
+        "openIssueCount": { "const": 71 }
+      }
+    },
+    "issues": {
+      "type": "array",
+      "minItems": 71,
+      "maxItems": 71,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["executionApproval", "targetUrl", "transferredAt"],
+            "properties": {
+              "executionApproval": { "type": "null" },
+              "targetUrl": { "type": "null" },
+              "transferredAt": { "type": "null" }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["executionApproval", "targetUrl", "transferredAt"],
+            "properties": {
+              "executionApproval": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway/issues/[0-9]+#issuecomment-[0-9]+$" },
+              "targetUrl": { "type": "null" },
+              "transferredAt": { "type": "null" }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["executionApproval", "targetUrl", "transferredAt"],
+            "properties": {
+              "executionApproval": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway/issues/[0-9]+#issuecomment-[0-9]+$" },
+              "targetUrl": { "type": "string", "format": "uri" },
+              "transferredAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        ],
+        "required": [
+          "sourceIssue", "sourceUrl", "title", "disposition", "targetRepository",
+          "reason", "classificationState", "executionApproval", "targetUrl", "transferredAt"
+        ],
+        "properties": {
+          "sourceIssue": { "type": "integer", "minimum": 1 },
+          "sourceUrl": { "type": "string", "format": "uri" },
+          "title": { "type": "string", "minLength": 1 },
+          "disposition": { "enum": ["KEEP_HUB", "TRANSFER", "SPLIT_CHILDREN"] },
+          "targetRepository": {
+            "type": ["string", "null"],
+            "enum": [
+              "AquilaXk/easysubway", "AquilaXk/easysubway-data", "AquilaXk/easysubway-platform",
+              "AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile", null
+            ]
+          },
+          "childRepositories": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "uniqueItems": true,
+            "items": { "enum": ["AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile"] }
+          },
+          "reason": { "type": "string", "minLength": 1 },
+          "classificationState": { "const": "REVIEWED" },
+          "executionApproval": { "type": ["string", "null"] },
+          "targetUrl": { "type": ["string", "null"] },
+          "transferredAt": { "type": ["string", "null"] }
+        }
+      }
+    }
+  }
+}

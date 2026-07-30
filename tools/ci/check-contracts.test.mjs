@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -12,8 +12,27 @@ import {
   validateJson,
   validateSourceInventory,
   validateSourceGovernanceContracts,
+  validateBoundariesPayload,
+  validateRepositorySplitIssueLedger,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
+
+test("repository split issue migration ledger가 계약 gate를 통과한다", () => {
+  const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
+
+  assert.deepEqual(errors, []);
+});
+
+test("contract gate의 ledger semantic path는 valid APPROVED와 TRANSFERRED를 허용한다", () => {
+  const approved = loadJson("release/migrations/repository-split-issues.json");
+  approved.issues[0].executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  const transferred = structuredClone(approved);
+  transferred.issues[0].targetUrl = "https://github.com/AquilaXk/easysubway-mobile/issues/1";
+  transferred.issues[0].transferredAt = "2026-07-30T00:00:00.000Z";
+
+  assert.deepEqual(validateRepositorySplitIssueLedger(approved), []);
+  assert.deepEqual(validateRepositorySplitIssueLedger(transferred), []);
+});
 
 test("번들 datapack index 실물이 계약 스키마를 통과한다", () => {
   const schema = loadJson("contracts/datapack/datapack-index.schema.json");
@@ -331,9 +350,76 @@ test("route map admission evidence는 승인 필드 외 값을 거부한다", ()
 test("boundaries.json이 스스로 정합하다", () => {
   const boundaries = loadJson("contracts/boundaries.json");
 
-  assert.equal(boundaries.schemaVersion, 1);
-  for (const area of boundaries.splitOrder) {
-    assert.ok(area in boundaries.areas, `splitOrder의 ${area}가 areas에 없다`);
+  assert.equal(boundaries.schemaVersion, 2);
+  for (const targetName of boundaries.splitOrder) {
+    const target = boundaries.extractionTargets[targetName];
+    assert.ok(target, `splitOrder의 ${targetName} extraction target이 없다`);
+    for (const area of target.sourceAreas) {
+      assert.ok(area in boundaries.areas, `${targetName}의 ${area} area가 없다`);
+    }
+  }
+});
+
+test("boundaries v2는 모든 target과 정확히 한 번의 splitOrder를 요구한다", () => {
+  const boundaries = loadJson("contracts/boundaries.json");
+  const missing = structuredClone(boundaries);
+  missing.splitOrder = ["data", "platform", "backend"];
+  const extra = structuredClone(boundaries);
+  extra.splitOrder = [...extra.splitOrder, "unknown"];
+  const duplicate = structuredClone(boundaries);
+  duplicate.splitOrder = ["data", "platform", "backend", "backend", "mobile"];
+  const absent = structuredClone(boundaries);
+  delete absent.extractionTargets.mobile;
+  absent.splitOrder = absent.splitOrder.filter((target) => target !== "mobile");
+
+  assert.ok(validateBoundariesPayload(missing).some((error) => error.includes("mobile splitOrder 누락")));
+  assert.ok(validateBoundariesPayload(extra).some((error) => error.includes("unknown extraction target 누락")));
+  assert.ok(validateBoundariesPayload(duplicate).some((error) => error.includes("backend splitOrder 중복")));
+  assert.ok(validateBoundariesPayload(absent).some((error) => error.includes("mobile extraction target 누락")));
+  assert.ok(validateBoundariesPayload(absent).some((error) => error.includes("mobile splitOrder 누락")));
+});
+
+test("boundaries v2는 malformed repository, source area, global root 충돌을 거부한다", () => {
+  const boundaries = loadJson("contracts/boundaries.json");
+  const malformed = structuredClone(boundaries);
+  malformed.extractionTargets.data.repository = "AquilaXk/not-easysubway";
+  malformed.extractionTargets.platform.sourceAreas = ["missing-area"];
+  malformed.extractionTargets.backend.sourceAreas = ["mobile"];
+  malformed.extractionTargets.mobile.partialRoots.push("tools/route-map");
+
+  const errors = validateBoundariesPayload(malformed);
+  assert.ok(errors.some((error) => error.includes("data repository 불량")));
+  assert.ok(errors.some((error) => error.includes("platform.missing-area area 누락")));
+  assert.ok(errors.some((error) => error.includes("mobile sourceArea가 backend, mobile에 중복 귀속됨")));
+  assert.ok(errors.some((error) => error.includes("mobile.tools/route-map partialRoots가 ownedRoots와 겹친다")));
+});
+
+test("boundaries v2는 target 이름과 repository를 정확히 고정한다", () => {
+  const boundaries = loadJson("contracts/boundaries.json");
+  boundaries.extractionTargets.backend.repository = "AquilaXk/easysubway-mobile";
+  boundaries.extractionTargets.unknown = {
+    ...structuredClone(boundaries.extractionTargets.data),
+  };
+  boundaries.splitOrder.push("unknown");
+
+  const errors = validateBoundariesPayload(boundaries);
+  assert.ok(errors.some((error) => error.includes("backend repository 불량")));
+  assert.ok(errors.some((error) => error.includes("unknown extraction target 불량")));
+});
+
+test("boundaries v2는 extraction target ownership metadata의 배열·빈 값·중복을 거부한다", () => {
+  const boundaries = loadJson("contracts/boundaries.json");
+  const cases = [
+    ["missing", (target) => { delete target.sourceAreas; }],
+    ["non-array", (target) => { target.ownedRoots = "tools/route-map"; }],
+    ["empty array", (target) => { target.partialRoots = []; }],
+    ["empty string", (target) => { target.sourceAreas = [""]; }],
+    ["duplicate", (target) => { target.partialRoots = ["tools/routes", "tools/routes"]; }],
+  ];
+  for (const [name, mutate] of cases) {
+    const malformed = structuredClone(boundaries);
+    mutate(malformed.extractionTargets.data);
+    assert.ok(validateBoundariesPayload(malformed).length > 0, `${name} ownership metadata 오류가 필요하다`);
   }
 });
 
@@ -360,6 +446,22 @@ test("필수 계약 입력 파일이 없으면 실패한다", () => {
   validateJson("contracts/missing.schema.json", "contracts/missing-value.json", errors);
 
   assert.deepEqual(errors, ["contracts/missing.schema.json 누락", "contracts/missing-value.json 누락"]);
+});
+
+test("유효하지 않은 JSON은 예외 대신 계약 오류로 수집한다", () => {
+  const directory = mkdtempSync(join(tmpdir(), "easysubway-contract-"));
+  const schemaPath = join(directory, "schema.json");
+  const valuePath = join(directory, "value.json");
+  writeFileSync(schemaPath, JSON.stringify({ type: "object" }));
+  writeFileSync(valuePath, "{");
+  const errors = [];
+
+  try {
+    assert.equal(validateJson(schemaPath, valuePath, errors), false);
+    assert.deepEqual(errors, [`${valuePath}: 유효한 JSON이 필요하다`]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("v1 datapack manifest는 activePack을 요구하고 v2는 생략할 수 있다", () => {

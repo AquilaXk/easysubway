@@ -3,6 +3,7 @@ import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
+import { validateLedger } from "../repo/issue-migration-ledger.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
@@ -23,6 +24,14 @@ const PACK_APP_SCHEMA_PARITY_ALLOWLIST_SCHEMA_PATH =
   "contracts/datapack/pack-app-schema-parity-allowlist.schema.json";
 const CATALOG_RAW_SQL_TABLES_PATH = "contracts/datapack/catalog-raw-sql-tables.json";
 const CATALOG_RAW_SQL_TABLES_SCHEMA_PATH = "contracts/datapack/catalog-raw-sql-tables.schema.json";
+const REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH = "contracts/repository-split-issues.schema.json";
+const REPOSITORY_SPLIT_ISSUES_PATH = "release/migrations/repository-split-issues.json";
+const EXTRACTION_REPOSITORIES = {
+  data: "AquilaXk/easysubway-data",
+  platform: "AquilaXk/easysubway-platform",
+  backend: "AquilaXk/easysubway-backend",
+  mobile: "AquilaXk/easysubway-mobile",
+};
 
 export function loadJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -52,6 +61,16 @@ export function collectContractErrors() {
     errors,
   );
   validateJson(CATALOG_RAW_SQL_TABLES_SCHEMA_PATH, CATALOG_RAW_SQL_TABLES_PATH, errors);
+  const repositorySplitIssueLedgerValid = validateJson(
+    REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH,
+    REPOSITORY_SPLIT_ISSUES_PATH,
+    errors,
+  );
+  if (repositorySplitIssueLedgerValid) {
+    errors.push(...validateRepositorySplitIssueLedger(loadJson(REPOSITORY_SPLIT_ISSUES_PATH)).map(
+      (error) => `${REPOSITORY_SPLIT_ISSUES_PATH}: ${error}`,
+    ));
+  }
   if (!existsSync(FRESHNESS_POLICY_PATH)) errors.push(`${FRESHNESS_POLICY_PATH} 누락`);
   if ([SOURCE_INVENTORY_PATH, SOURCE_GOVERNANCE_POLICY_PATH, FRESHNESS_POLICY_PATH].every(existsSync)) {
     validateSourceGovernanceContracts({
@@ -66,6 +85,10 @@ export function collectContractErrors() {
   validateGateIndex(errors);
   validateEnvScopeMap(errors);
   return errors;
+}
+
+export function validateRepositorySplitIssueLedger(ledger) {
+  return validateLedger(ledger);
 }
 
 export function validateSourceGovernanceContracts(
@@ -89,12 +112,27 @@ export function validateJson(schemaPath, valuePath, errors) {
     errors.push(`${valuePath} 누락`);
     missing = true;
   }
-  if (missing) return;
-  const result = validateSchema(loadJson(schemaPath), loadJson(valuePath));
+  if (missing) return false;
+  let schema;
+  let value;
+  try {
+    schema = loadJson(schemaPath);
+  } catch {
+    errors.push(`${schemaPath}: 유효한 JSON이 필요하다`);
+    return false;
+  }
+  try {
+    value = loadJson(valuePath);
+  } catch {
+    errors.push(`${valuePath}: 유효한 JSON이 필요하다`);
+    return false;
+  }
+  const result = validateSchema(schema, value);
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
-  if (schemaPath === DATAPACK_MANIFEST_SCHEMA_PATH) validateDatapackManifest(loadJson(valuePath), valuePath, errors);
-  if (schemaPath === DATAPACK_INDEX_SCHEMA_PATH) validateDatapackIndex(loadJson(valuePath), valuePath, errors);
-  if (schemaPath === SOURCE_INVENTORY_SCHEMA_PATH) validateSourceInventory(loadJson(valuePath), valuePath, errors);
+  if (schemaPath === DATAPACK_MANIFEST_SCHEMA_PATH) validateDatapackManifest(value, valuePath, errors);
+  if (schemaPath === DATAPACK_INDEX_SCHEMA_PATH) validateDatapackIndex(value, valuePath, errors);
+  if (schemaPath === SOURCE_INVENTORY_SCHEMA_PATH) validateSourceInventory(value, valuePath, errors);
+  return result.errors.length === 0;
 }
 
 export function validateSourceInventory(inventory, valuePath, errors) {
@@ -194,11 +232,87 @@ export function validateDatapackManifest(manifest, valuePath, errors) {
 
 function validateBoundaries(errors) {
   if (!existsSync("contracts/boundaries.json")) return;
-  const boundaries = loadJson("contracts/boundaries.json");
-  if (boundaries.schemaVersion !== 1) errors.push("contracts/boundaries.json: schemaVersion은 1이어야 한다");
-  for (const area of boundaries.splitOrder ?? []) {
-    if (!(area in (boundaries.areas ?? {}))) errors.push(`contracts/boundaries.json: ${area} area 누락`);
+  errors.push(...validateBoundariesPayload(loadJson("contracts/boundaries.json")));
+}
+
+export function validateBoundariesPayload(boundaries) {
+  const errors = [];
+  if (boundaries.schemaVersion !== 2) errors.push("contracts/boundaries.json: schemaVersion은 2이어야 한다");
+  const targets = boundaries.extractionTargets ?? {};
+  const splitOrder = Array.isArray(boundaries.splitOrder) ? boundaries.splitOrder : [];
+  const splitTargets = new Set();
+  for (const targetName of splitOrder) {
+    if (splitTargets.has(targetName)) {
+      errors.push(`contracts/boundaries.json: ${targetName} splitOrder 중복`);
+      continue;
+    }
+    splitTargets.add(targetName);
+    if (!(targetName in targets)) errors.push(`contracts/boundaries.json: ${targetName} extraction target 누락`);
   }
+  for (const targetName of Object.keys(targets)) {
+    if (!splitTargets.has(targetName)) errors.push(`contracts/boundaries.json: ${targetName} splitOrder 누락`);
+  }
+  for (const targetName of Object.keys(EXTRACTION_REPOSITORIES)) {
+    if (!Object.hasOwn(targets, targetName) && !splitTargets.has(targetName)) {
+      errors.push(`contracts/boundaries.json: ${targetName} extraction target 누락`);
+      errors.push(`contracts/boundaries.json: ${targetName} splitOrder 누락`);
+    }
+  }
+  const repositories = new Set();
+  const ownedRoots = new Set();
+  const sourceAreaOwners = new Map();
+  const partialRoots = [];
+  for (const [targetName, target] of Object.entries(targets)) {
+    if (!Object.hasOwn(EXTRACTION_REPOSITORIES, targetName)) {
+      errors.push(`contracts/boundaries.json: ${targetName} extraction target 불량`);
+      continue;
+    }
+    const expectedRepository = EXTRACTION_REPOSITORIES[targetName];
+    if (target.repository !== expectedRepository) {
+      errors.push(`contracts/boundaries.json: ${targetName} repository 불량`);
+    } else if (repositories.has(target.repository)) {
+      errors.push(`contracts/boundaries.json: ${target.repository} repository 중복`);
+    } else {
+      repositories.add(target.repository);
+    }
+    const sourceAreas = requiredStringArray(targetName, target, "sourceAreas", errors);
+    if (new Set(sourceAreas).size !== sourceAreas.length) {
+      errors.push(`contracts/boundaries.json: ${targetName} sourceAreas 중복`);
+    }
+    for (const area of sourceAreas) {
+      if (!(area in (boundaries.areas ?? {}))) errors.push(`contracts/boundaries.json: ${targetName}.${area} area 누락`);
+      const owner = sourceAreaOwners.get(area);
+      if (owner !== undefined && owner !== targetName) {
+        errors.push(`contracts/boundaries.json: ${area} sourceArea가 ${owner}, ${targetName}에 중복 귀속됨`);
+      }
+      sourceAreaOwners.set(area, targetName);
+    }
+    for (const root of requiredStringArray(targetName, target, "ownedRoots", errors)) {
+      if (ownedRoots.has(root)) errors.push(`contracts/boundaries.json: ${root} ownedRoots 중복`);
+      ownedRoots.add(root);
+    }
+    for (const root of requiredStringArray(targetName, target, "partialRoots", errors)) {
+      partialRoots.push({ targetName, root });
+    }
+  }
+  for (const { targetName, root } of partialRoots) {
+    if (ownedRoots.has(root)) errors.push(`contracts/boundaries.json: ${targetName}.${root} partialRoots가 ownedRoots와 겹친다`);
+  }
+  return errors;
+}
+
+function requiredStringArray(targetName, target, field, errors) {
+  const value = target?.[field];
+  const path = `contracts/boundaries.json: ${targetName}.${field}`;
+  if (!Array.isArray(value) || value.length === 0) {
+    errors.push(`${path}는 비어 있지 않은 배열이 필요하다`);
+    return [];
+  }
+  if (value.some((item) => typeof item !== "string" || item.trim() === "")) {
+    errors.push(`${path}는 비어 있지 않은 문자열만 허용한다`);
+  }
+  if (new Set(value).size !== value.length) errors.push(`${path} 중복`);
+  return value;
 }
 
 function validateOpenApiFixtures(errors) {
