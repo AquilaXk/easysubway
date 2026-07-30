@@ -41,7 +41,14 @@ function infraChecks() {
     { id: "infra.observability-required-metrics", status: "pass", note: "deferred until split execution" },
     check(
       "infra.deploy-consumes-digest-only",
-      cd !== null && cd.includes("Release Artifacts") && cd.includes("needs.plan.outputs.image_digest") && !cd.includes("build-image"),
+      cd !== null &&
+        cd.includes("Release Artifacts") &&
+        cd.includes("needs.plan.outputs.image_digest") &&
+        cd.includes('manifest?.contractVersion !== "1.0.0"') &&
+        cd.includes("manifest?.artifactIdentity?.apiContractVersion !== manifest.contractVersion") &&
+        cd.includes("createHash(\"sha256\").update(evidence).digest(\"hex\") !== manifest.evidenceSha256") &&
+        cd.includes("process.stdout.write(`image_digest=${digest}\\n`);") &&
+        !cd.includes("build-image"),
     ),
     check(
       "infra.no-backend-build",

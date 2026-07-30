@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -746,8 +747,47 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   assert.match(cd, /migration DDL gate absent at deploy target \(pre-#2365 SHA\); skipping/);
 });
 
-test("CD는 exact Release Artifacts run의 backend digest만 배포한다", () => {
+test("CD는 exact Release Artifacts run의 backend digest만 배포한다", async () => {
   const workflow = read(".github/workflows/cd.yml");
+  const validator = workflow.match(
+    /node --input-type=module - <<'NODE' >> "\$\{GITHUB_OUTPUT\}"\n([\s\S]*?)\n {10}NODE/,
+  )?.[1]?.replace(/^ {10}/gm, "");
+  const digest = `sha256:${"a".repeat(64)}`;
+  const evidence = "release evidence\n";
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-component-manifest-"));
+  deploymentTempDirs.add(dir);
+  const manifestPath = path.join(dir, "backend-component-manifest.json");
+  const evidencePath = path.join(dir, "release-metadata.txt");
+  const outputPath = path.join(dir, "github-output");
+  const validatorPath = path.join(dir, "validate-component-manifest.mjs");
+  const runnerPath = path.join(dir, "run-validator.sh");
+
+  assert.ok(validator, "CD manifest validator heredoc must exist");
+  await Promise.all([
+    writeFile(evidencePath, evidence),
+    writeFile(outputPath, ""),
+    writeFile(validatorPath, validator),
+    writeFile(runnerPath, `node "${validatorPath}" >> "\${GITHUB_OUTPUT}"\n`),
+  ]);
+  const manifest = {
+    schemaVersion: 1,
+    component: "backend",
+    repository: "AquilaXk/easysubway",
+    gitSha: "b".repeat(40),
+    artifactIdentity: { imageDigest: digest, apiContractVersion: "1.0.0" },
+    contractVersion: "1.0.0",
+    evidenceSha256: createHash("sha256").update(evidence).digest("hex"),
+  };
+  const runValidator = () => execFileAsync("bash", [runnerPath], {
+    env: {
+      ...process.env,
+      DEPLOY_SHA: manifest.gitSha,
+      GITHUB_REPOSITORY: manifest.repository,
+      GITHUB_OUTPUT: outputPath,
+      MANIFEST_PATH: manifestPath,
+      EVIDENCE_PATH: evidencePath,
+    },
+  });
 
   assert.match(workflow, /workflows:\n {6}- Release Artifacts/);
   assert.match(workflow, /workflow_run\.id/);
@@ -763,6 +803,8 @@ test("CD는 exact Release Artifacts run의 backend digest만 배포한다", () =
   assert.match(workflow, /component.*backend/);
   assert.match(workflow, /repository/);
   assert.match(workflow, /gitSha/);
+  assert.match(workflow, /contractVersion !== "1\.0\.0"/);
+  assert.match(workflow, /apiContractVersion !== manifest\.contractVersion/);
   assert.match(workflow, /evidenceSha256/);
   assert.match(workflow, /needs\.plan\.outputs\.image_digest/);
   assert.match(workflow, /docker pull "\$\{IMAGE\}@\$\{DEPLOY_IMAGE_DIGEST\}"/);
@@ -771,6 +813,24 @@ test("CD는 exact Release Artifacts run의 backend digest만 배포한다", () =
   assert.doesNotMatch(workflow, /gradlew bootJar/);
   assert.doesNotMatch(workflow, /backend\/Dockerfile/);
   assert.doesNotMatch(workflow, /docker buildx build/);
+
+  await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`);
+  await runValidator();
+  assert.equal(await readFile(outputPath, "utf8"), `image_digest=${digest}\n`);
+
+  for (const invalidManifest of [
+    { ...manifest, contractVersion: undefined },
+    {
+      ...manifest,
+      artifactIdentity: { ...manifest.artifactIdentity, apiContractVersion: "2.0.0" },
+    },
+  ]) {
+    await writeFile(manifestPath, `${JSON.stringify(invalidManifest)}\n`);
+    await assert.rejects(runValidator(), (error) => {
+      assert.match(String(error.stderr), /backend component manifest is invalid/);
+      return true;
+    });
+  }
 });
 
 test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API 스모크로 게이트한다", () => {

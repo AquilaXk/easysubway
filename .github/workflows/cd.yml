@@ -151,11 +151,13 @@ jobs:
             manifest?.component !== "backend" ||
             manifest?.repository !== process.env.GITHUB_REPOSITORY ||
             manifest?.gitSha !== process.env.DEPLOY_SHA ||
+            manifest?.contractVersion !== "1.0.0" ||
+            manifest?.artifactIdentity?.apiContractVersion !== manifest.contractVersion ||
             !/^sha256:[a-f0-9]{64}$/.test(digest ?? "") ||
             !/^[a-f0-9]{64}$/.test(manifest?.evidenceSha256 ?? "") ||
             createHash("sha256").update(evidence).digest("hex") !== manifest.evidenceSha256
           ) throw new Error("backend component manifest is invalid for the exact producer run");
-          process.stdout.write(`image_digest=${digest}\\n`);
+          process.stdout.write(`image_digest=${digest}\n`);
           NODE
 
   deploy:
