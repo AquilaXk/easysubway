@@ -651,6 +651,7 @@ jobs:
     permissions:
       actions: read
       contents: read
+      # Main push에서 GHCR image를 publish할 때만 사용한다.
       packages: write
     if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.deploy == 'true' || needs.changes.outputs.android == 'true' || needs.changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch' }}
 
