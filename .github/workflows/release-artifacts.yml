@@ -652,7 +652,7 @@ jobs:
       actions: read
       contents: read
       packages: write
-    if: ${{ github.event_name == 'push' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.deploy == 'true' || needs.changes.outputs.android == 'true' || needs.changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.deploy == 'true' || needs.changes.outputs.android == 'true' || needs.changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch' }}
 
     steps:
       - name: Backend Release Image / Checkout repository

@@ -3506,7 +3506,8 @@ test("backend release artifact는 main에서 immutable arm64 image와 component 
   assert.match(backendJob, /runs-on: ubuntu-24\.04-arm/);
   assert.match(backendJob, /actions: read/);
   assert.match(backendJob, /packages: write/);
-  assert.match(backendJob, /\n    if: \$\{\{ github\.event_name == 'push' \|\|/);
+  assert.doesNotMatch(backendJob, /\n    if: \$\{\{ github\.event_name == 'push' \|\|/);
+  assert.match(backendJob, /needs\.changes\.outputs\.deploy == 'true'/);
   assert.match(backendJob, /Backend Release Image \/ Require successful main CI/);
   assert.match(
     backendJob,
