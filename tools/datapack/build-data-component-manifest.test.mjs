@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -111,6 +111,20 @@ test("한 metadata output 충돌은 선존재 파일을 보존하고 새 partial
   }
 });
 
+test("destination write failure는 metadata partial과 root temp를 남기지 않는다", () => {
+  const fixture = createFixture();
+  try {
+    writeFileSync(path.join(fixture.root, "large-payload.bin"), Buffer.alloc(4096, "x"));
+    const result = runWithFileSizeLimit(fixture);
+    assert.notEqual(result.status, 0, result.stderr);
+    assert.equal(exists(fixture.inventory), false);
+    assert.equal(exists(fixture.output), false);
+    assert.deepEqual(readdirSync(fixture.root).sort(), ["catalog", "large-payload.bin", "nested"]);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 function createFixture(mutate = undefined) {
   const root = mkdtempSync(path.join(os.tmpdir(), "data-component-manifest-"));
   const catalog = path.join(root, "catalog");
@@ -142,7 +156,17 @@ function createFixture(mutate = undefined) {
 }
 
 function run(fixture, overrides = {}) {
-  return spawnSync(process.execPath, [
+  return spawnSync(process.execPath, commandArguments(fixture, overrides), { encoding: "utf8" });
+}
+
+function runWithFileSizeLimit(fixture) {
+  return spawnSync("/bin/sh", [
+    "-c", "ulimit -f 0; exec \"$@\"", "sh", process.execPath, ...commandArguments(fixture),
+  ], { encoding: "utf8" });
+}
+
+function commandArguments(fixture, overrides = {}) {
+  return [
     script,
     "--root", fixture.root,
     "--manifest", fixture.manifest,
@@ -154,7 +178,7 @@ function run(fixture, overrides = {}) {
     "--issue-ref", "AquilaXk/easysubway#2699",
     "--inventory-output", overrides.inventory ?? fixture.inventory,
     "--output", overrides.output ?? fixture.output,
-  ], { encoding: "utf8" });
+  ];
 }
 
 function currentManifest() {

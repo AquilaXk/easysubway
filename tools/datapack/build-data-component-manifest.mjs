@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
+import { link, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -59,15 +59,7 @@ export async function buildDataComponentManifest(input) {
   };
   await assertAbsent(inventoryOutput, "--inventory-output");
   await assertAbsent(output, "--output");
-  let inventoryWritten = false;
-  try {
-    await writeJson(inventoryOutput, inventoryBytes);
-    inventoryWritten = true;
-    await writeJson(output, jsonBytes(componentManifest));
-  } catch (error) {
-    if (inventoryWritten) await rm(inventoryOutput, { force: true });
-    throw error;
-  }
+  await writeOutputs(root, inventoryOutput, inventoryBytes, output, jsonBytes(componentManifest));
   return { inventory, componentManifest };
 }
 
@@ -156,6 +148,29 @@ async function assertAbsent(target, label) {
   throw new Error(`${label} must not already exist`);
 }
 
+async function writeOutputs(root, inventoryOutput, inventoryBytes, output, outputBytes) {
+  await Promise.all([mkdir(path.dirname(inventoryOutput), { recursive: true }), mkdir(path.dirname(output), { recursive: true })]);
+  const temporaryDirectory = await mkdtemp(path.join(root, ".data-component-manifest-"));
+  const temporaryInventory = path.join(temporaryDirectory, "inventory.json");
+  const temporaryOutput = path.join(temporaryDirectory, "component-manifest.json");
+  let inventoryPublished = false;
+  let outputPublished = false;
+  try {
+    await writeFile(temporaryInventory, inventoryBytes, { flag: "wx" });
+    await writeFile(temporaryOutput, outputBytes, { flag: "wx" });
+    await link(temporaryInventory, inventoryOutput);
+    inventoryPublished = true;
+    await link(temporaryOutput, output);
+    outputPublished = true;
+  } catch (error) {
+    if (outputPublished) await rm(output, { force: true });
+    if (inventoryPublished) await rm(inventoryOutput, { force: true });
+    throw error;
+  } finally {
+    await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+}
+
 function isContained(root, target) {
   const relative = path.relative(root, target);
   return relative !== "" && !relative.startsWith(`..${path.sep}`) && relative !== ".." && !path.isAbsolute(relative);
@@ -198,11 +213,6 @@ function sha256(bytes) {
 
 function jsonBytes(value) {
   return Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
-}
-
-async function writeJson(target, bytes) {
-  await mkdir(path.dirname(target), { recursive: true });
-  await writeFile(target, bytes, { flag: "wx" });
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
