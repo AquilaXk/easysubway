@@ -152,7 +152,7 @@ function escapeRegExp(value) {
 
 function sameValues(value, expected) {
   return Array.isArray(value) && value.length === expected.length
-    && [...value].sort().every((item, index) => item === expected[index]);
+    && expected.every((item) => value.includes(item));
 }
 
 function numberCompare(left, right) {
