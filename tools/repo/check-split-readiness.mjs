@@ -57,6 +57,7 @@ function backendChecks() {
     check("backend.contract-lock", existsSync("backend/contracts.lock.json")),
     check("backend.contract-bundle", existsSync("contracts/bundles/backend-contracts-v1.0.0.json")),
     check("backend.contract-staging", backendBuildUsesStagedContracts()),
+    check("backend.prelaunch-contract-bundle", prelaunchBackendUsesContractBundle()),
     componentManifestCheck("backend"),
     ...sharedChecks(),
   ];
@@ -113,6 +114,11 @@ function backendBuildUsesExternalProcessResources() {
 function backendBuildUsesStagedContracts() {
   const build = readTextIfExists("backend/build.gradle");
   return build !== null && build.includes("stageContracts") && build.includes("build/contracts-staging");
+}
+
+function prelaunchBackendUsesContractBundle() {
+  const workflow = readTextIfExists(".github/workflows/datapack-prelaunch-gates.yml");
+  return workflow !== null && /EASYSUBWAY_CONTRACTS_BUNDLE:\s*\$\{\{ github\.workspace \}\}\/contracts\/bundles\/backend-contracts-v1\.0\.0\.json[\s\S]*backend\/gradlew -p backend test/.test(workflow);
 }
 
 function check(id, ok) {

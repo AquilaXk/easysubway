@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import test from "node:test";
@@ -102,6 +102,31 @@ test("stage-contracts는 symlink input과 backend/build 밖 output을 거부한�
     assert.throws(() => run({ ...fixture, output: join(fixture.directory, "outside") }), /backend.build|output/i);
   } finally {
     fixture.cleanup();
+  }
+});
+
+test("stage-contracts는 symlink output parent를 거부하고 외부 sentinel을 변경하지 않는다", () => {
+  const fixture = createFixture();
+  const sentinelDirectory = mkdtempSync(join(tmpdir(), "stage-contracts-sentinel-"));
+  const sentinel = join(sentinelDirectory, "sentinel.txt");
+  const link = join(dirname(fixture.output), "escape");
+  const escapedOutput = join(link, "staged");
+  writeFileSync(sentinel, "unchanged\n");
+  symlinkSync(sentinelDirectory, link);
+  let error;
+  try {
+    try {
+      run({ ...fixture, output: escapedOutput });
+    } catch (caught) {
+      error = caught;
+    }
+    assert.ok(error, "symlink output parent must fail closed");
+    assert.equal(readFileSync(sentinel, "utf8"), "unchanged\n");
+    assert.equal(existsSync(join(sentinelDirectory, "staged")), false);
+  } finally {
+    unlinkSync(link);
+    fixture.cleanup();
+    rmSync(sentinelDirectory, { recursive: true, force: true });
   }
 });
 

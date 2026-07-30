@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { lstatSync, mkdirSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, lstatSync, mkdirSync, readFileSync, realpathSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, relative, resolve } from "node:path";
 
 const requiredResources = [
@@ -15,7 +15,7 @@ try {
   const { lock, input, output } = parseArguments(process.argv.slice(2));
   assertRegularFile(lock, "lock");
   assertRegularFile(input, "input");
-  assertOutputBelowBuild(output);
+  const stagedOutput = assertOutputBelowBuild(output);
 
   const lockDocument = parseJson(readFileSync(lock), "lock");
   assertExactKeys(lockDocument, ["schemaVersion", "bundleVersion", "artifactUrl", "sha256"], "lock");
@@ -32,7 +32,7 @@ try {
   if (Object.keys(bundle.resources).sort().join("\n") !== requiredResources.slice().sort().join("\n")) throw new Error("invalid resources");
   if (requiredResources.some((resource) => bundle.resources[resource] === null || typeof bundle.resources[resource] !== "object" || Array.isArray(bundle.resources[resource]))) throw new Error("invalid resources");
 
-  const temporary = `${output}.tmp-${process.pid}`;
+  const temporary = `${stagedOutput}.tmp-${process.pid}`;
   rmSync(temporary, { recursive: true, force: true });
   try {
     for (const resource of requiredResources) {
@@ -40,9 +40,9 @@ try {
       mkdirSync(dirname(destination), { recursive: true });
       writeFileSync(destination, `${JSON.stringify(bundle.resources[resource], null, 2)}\n`);
     }
-    mkdirSync(dirname(output), { recursive: true });
-    rmSync(output, { recursive: true, force: true });
-    renameSync(temporary, output);
+    mkdirSync(dirname(stagedOutput), { recursive: true });
+    rmSync(stagedOutput, { recursive: true, force: true });
+    renameSync(temporary, stagedOutput);
   } finally {
     rmSync(temporary, { recursive: true, force: true });
   }
@@ -73,6 +73,21 @@ function assertOutputBelowBuild(path) {
   const output = resolve(path);
   const pathBelowBuild = relative(backendBuild, output);
   if (pathBelowBuild === "" || pathBelowBuild.startsWith("..") || pathBelowBuild.includes("../")) throw new Error("output must be below backend/build");
+  mkdirSync(backendBuild, { recursive: true });
+  if (lstatSync(backendBuild).isSymbolicLink()) throw new Error("backend/build must not be a symlink");
+  const normalizedBuild = realpathSync(backendBuild);
+  let current = backendBuild;
+  for (const segment of pathBelowBuild.split("/")) {
+    current = resolve(current, segment);
+    if (!existsSync(current)) continue;
+    const metadata = lstatSync(current);
+    if (metadata.isSymbolicLink()) throw new Error("output must not have a symlink ancestor");
+    if (!metadata.isDirectory()) throw new Error("output ancestor must be a directory");
+    const normalizedAncestor = realpathSync(current);
+    const ancestorBelowBuild = relative(normalizedBuild, normalizedAncestor);
+    if (ancestorBelowBuild.startsWith("..") || ancestorBelowBuild.includes("../")) throw new Error("output must be below backend/build");
+  }
+  return resolve(normalizedBuild, pathBelowBuild);
 }
 
 function parseJson(bytes, label) {
