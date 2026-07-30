@@ -342,8 +342,10 @@ function sourceSnapshotInsert(row) {
     "governance_policy_version", "governance_policy_sha256",
   ];
   // Global governance policy can be re-evaluated without changing locked source snapshot bytes.
-  const exactIdentity = columns.slice(0, -2)
-    .map((column, index) => `${column} IS NOT DISTINCT FROM ${values[index]}`)
+  const exactIdentity = columns
+    .map((column, index) => [column, values[index]])
+    .filter(([column]) => !["governance_policy_version", "governance_policy_sha256"].includes(column))
+    .map(([column, value]) => `${column} IS NOT DISTINCT FROM ${value}`)
     .join(" AND ");
   return `INSERT INTO data_source_snapshots (${columns.join(", ")}) `
     + `SELECT ${values.join(", ")} WHERE NOT EXISTS (SELECT 1 FROM data_source_snapshots WHERE ${exactIdentity});`;
