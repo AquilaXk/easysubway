@@ -69,6 +69,8 @@ jobs:
             fi
             producer_runs="${RUNNER_TEMP}/release-artifacts-runs.json"
             curl -fsS \
+              --connect-timeout 5 \
+              --max-time 20 \
               -H "Accept: application/vnd.github+json" \
               -H "Authorization: Bearer ${GITHUB_TOKEN}" \
               -H "X-GitHub-Api-Version: 2022-11-28" \
@@ -713,13 +715,15 @@ jobs:
       - name: CD Deploy / Summarize deployment result
         if: ${{ always() }}
         shell: bash
+        env:
+          IMAGE_DIGEST: ${{ needs.plan.outputs.image_digest }}
         run: |
           set -euo pipefail
 
           {
             echo "### CD Deploy"
             echo "- target sha: ${DEPLOY_SHA:-unknown}"
-            echo "- image digest: ${{ needs.plan.outputs.image_digest || 'unknown' }}"
+            echo "- image digest: ${IMAGE_DIGEST:-unknown}"
             echo "- dotenv source: ${{ steps.dotenv.outputs.source || 'unknown' }}"
             echo "- mode: ${{ steps.target.outputs.mode || 'unknown' }}"
             echo "- remote deployment: ${{ steps.remote.outputs.deploy_ready == 'true' && 'started' || 'not_started' }}"

@@ -1491,6 +1491,7 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /CD Deploy \/ Validate manual dispatch CI/);
   assert.match(workflow, /manual deployment requires a successful CI workflow/);
   assert.match(workflow, /https:\/\/api\.github\.com\/repos\/\$\{GITHUB_REPOSITORY\}\/actions\/runs/);
+  assert.match(workflow, /curl -fsS \\\n\s+--connect-timeout 5 \\\n\s+--max-time 20 \\\n\s+-H "Accept: application\/vnd\.github\+json"/);
   assert.doesNotMatch(workflow, /\bgh api\b/);
   assert.match(workflow, /CD Deploy \/ Restore GitHub Actions dotenv secret/);
   assert.match(workflow, /CD Deploy \/ Restore GitHub Actions dotenv secret[\s\S]*?env:\s*\n\s*EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
@@ -1553,6 +1554,7 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /CD Deploy \/ Pull backend image by digest/);
   assert.match(workflow, /docker tag "\$\{IMAGE\}@\$\{DEPLOY_IMAGE_DIGEST\}" "easysubway-backend:\$\{DEPLOY_SHA\}"/);
   assert.match(workflow, /DEPLOY_IMAGE_DIGEST="\$\{DEPLOY_IMAGE_DIGEST\}"/);
+  assert.match(workflow, /CD Deploy \/ Summarize deployment result[\s\S]*IMAGE_DIGEST: \$\{\{ needs\.plan\.outputs\.image_digest \}\}[\s\S]*image digest: \$\{IMAGE_DIGEST:-unknown\}/);
   assert.doesNotMatch(workflow, /CD Deploy \/ Build backend bootJar/);
   assert.doesNotMatch(workflow, /sha256sum backend\.jar > backend\.jar\.sha256/);
   assert.match(workflow, /CD Deploy \/ Run local deployment/);
@@ -3503,7 +3505,10 @@ test("backend release artifact는 main에서 immutable arm64 image와 component 
 
   assert.match(backendJob, /runs-on: ubuntu-24\.04-arm/);
   assert.match(backendJob, /packages: write/);
+  assert.match(backendJob, /mkdir -p \.\.\/release-artifacts\/backend\n\s+\.\/gradlew test --no-daemon/);
   assert.match(backendJob, /if: \$\{\{ github\.event_name != 'push' \}\}[\s\S]*docker buildx build --load --platform linux\/arm64/);
+  assert.match(backendJob, /docker buildx build --load --platform linux\/arm64 -f backend\/Dockerfile -t easysubway-backend:\$\{GITHUB_SHA\} backend/);
+  assert.match(backendJob, /docker image inspect easysubway-backend:\$\{GITHUB_SHA\}/);
   assert.doesNotMatch(backendJob.match(/Build PR validation image[\s\S]*?(?=\n      - name:|$)/)?.[0] ?? "", /--push|docker\/login-action/);
   assert.match(backendJob, /if: \$\{\{ github\.event_name == 'push' \}\}[\s\S]*docker\/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567/);
   assert.match(backendJob, /ghcr\.io\/aquilaxk\/easysubway-backend:sha-\$\{GITHUB_SHA\}/);
@@ -3519,7 +3524,8 @@ test("backend release artifact는 main에서 immutable arm64 image와 component 
   assert.match(backendJob, /\[\[ -z "\$\{sbom\}" \|\| "\$\{sbom\}" == "null" \|\| -z "\$\{provenance\}" \|\| "\$\{provenance\}" == "null" \]\]/);
   assert.match(backendJob, /\{\{range \.Manifest\.Manifests\}\}\{\{if eq \.Platform\.OS "linux"\}\}\{\{\.Platform\.OS\}\}\/\{\{\.Platform\.Architecture\}\}\{\{end\}\}\{\{end\}\}/);
   assert.match(backendJob, /\[\[ "\$\{arch\}" != "linux\/arm64" \]\]/);
-  assert.match(backendJob, /FROM .+@sha256:\[a-f0-9\]\{64\}/);
+  assert.match(backendJob, /final_from="\$\(awk 'toupper\(\$1\) == "FROM" \{ line=\$0 \} END \{ print line \}' backend\/Dockerfile\)"/);
+  assert.match(backendJob, /\^FROM\[\[:space:\]\]\+\[\^\[:space:\]\]\+@sha256:\[a-f0-9\]\{64\}\(\[\[:space:\]\]\+AS\[\[:space:\]\]\+\[A-Za-z0-9\._-\]\+\)\?\$/);
   assert.match(backendJob, /identity\.env/);
   assert.match(backendJob, /backend-component-manifest\.json/);
   assert.match(backendJob, /backend\/tools\/build-component-manifest\.mjs/);

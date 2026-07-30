@@ -15,9 +15,8 @@ test("stage-contracts는 해시가 고정된 정확한 두 계약을 staging한�
   try {
     run(fixture);
 
-    assert.deepEqual(JSON.parse(readFileSync(join(fixture.output, "datapack/source-governance-policy.json"))), fixture.bundle.resources["datapack/source-governance-policy.json"]);
-    assert.deepEqual(JSON.parse(readFileSync(join(fixture.output, "datapack/datapack-freshness-sla.json"))), fixture.bundle.resources["datapack/datapack-freshness-sla.json"]);
-    assert.equal(readFileSync(join(fixture.output, "datapack/source-governance-policy.json"), "utf8").endsWith("\n"), true);
+    assert.equal(readFileSync(join(fixture.output, "datapack/source-governance-policy.json"), "utf8"), fixture.bundle.resources["datapack/source-governance-policy.json"]);
+    assert.equal(readFileSync(join(fixture.output, "datapack/datapack-freshness-sla.json"), "utf8"), fixture.bundle.resources["datapack/datapack-freshness-sla.json"]);
   } finally {
     fixture.cleanup();
   }
@@ -61,22 +60,22 @@ test("stage-contracts는 resource 누락이나 추가를 거부한다", () => {
   ]) {
     const fixture = createFixture({ resources });
     try {
-      assert.throws(() => run(fixture), /resources/i);
+      assert.throws(() => run(fixture), /resource/i);
     } finally {
       fixture.cleanup();
     }
   }
 });
 
-test("stage-contracts는 object가 아닌 resource 값을 거부한다", () => {
+test("stage-contracts는 JSON object 원문이 아닌 resource 값을 거부한다", () => {
   for (const resources of [
     { "datapack/source-governance-policy.json": null, "datapack/datapack-freshness-sla.json": { freshness: true } },
-    { "datapack/source-governance-policy.json": ["policy"], "datapack/datapack-freshness-sla.json": { freshness: true } },
-    { "datapack/source-governance-policy.json": { policy: true }, "datapack/datapack-freshness-sla.json": "freshness" },
+    { "datapack/source-governance-policy.json": "[\"policy\"]\n", "datapack/datapack-freshness-sla.json": "{\"freshness\":true}\n" },
+    { "datapack/source-governance-policy.json": "{invalid", "datapack/datapack-freshness-sla.json": "{\"freshness\":true}\n" },
   ]) {
     const fixture = createFixture({ resources });
     try {
-      assert.throws(() => run(fixture), /resources/i);
+      assert.throws(() => run(fixture), /resource/i);
     } finally {
       fixture.cleanup();
     }
@@ -138,8 +137,8 @@ function createFixture(options = {}) {
     schemaVersion: 1,
     bundleVersion: options.bundleVersion ?? "1.0.0",
     resources: options.resources ?? {
-      "datapack/source-governance-policy.json": { policy: true },
-      "datapack/datapack-freshness-sla.json": { freshness: true },
+      "datapack/source-governance-policy.json": "{\n  \"policy\": true,\n  \"values\": [1, 2]\n}\n",
+      "datapack/datapack-freshness-sla.json": "{\"freshness\":true}\n",
     },
   };
   const input = join(directory, "bundle.json");

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -61,6 +61,21 @@ test("build-component-manifest는 unreadable evidence와 duplicate 또는 extra 
     assert.throws(() => run(fixture, ["--evidence", join(fixture.directory, "missing.txt")]), /evidence/i);
     assert.throws(() => run(fixture, [], ["--repository", "AquilaXk/easysubway"]), /duplicate/i);
     assert.throws(() => run(fixture, [], ["--unexpected", "value"]), /unknown|arguments/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("build-component-manifest는 symlink output과 없는 output parent를 거부한다", () => {
+  const fixture = createFixture();
+  try {
+    const symlinkOutput = join(fixture.directory, "manifest-link.json");
+    symlinkSync(fixture.evidence, symlinkOutput);
+    assert.throws(() => run({ ...fixture, output: symlinkOutput }), /output must not be a symlink/);
+    assert.throws(
+      () => run({ ...fixture, output: join(fixture.directory, "missing", "manifest.json") }),
+      /output parent is unavailable/,
+    );
   } finally {
     fixture.cleanup();
   }

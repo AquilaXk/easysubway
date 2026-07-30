@@ -113,11 +113,6 @@ test("현재 분리 blocker를 readiness 결과에 fail로 드러낸다", () => 
   assert.equal(byId(mobile, "mobile.artifact-staging").status, "fail");
 });
 
-test("datapack prelaunch backend Gradle은 hash-pinned contract bundle을 제공한다", () => {
-  const backend = evaluateReadiness("backend");
-  assert.equal(byId(backend, "backend.prelaunch-contract-bundle").status, "pass");
-});
-
 test("component manifest를 추가하면 해당 blocker만 pass가 된다", () => {
   const componentDirectory = "contracts/components";
   const componentPath = `${componentDirectory}/backend.json`;

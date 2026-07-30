@@ -30,7 +30,12 @@ try {
   if (bundle.schemaVersion !== 1 || bundle.bundleVersion !== lockDocument.bundleVersion) throw new Error("bundleVersion mismatch");
   if (bundle.resources === null || typeof bundle.resources !== "object" || Array.isArray(bundle.resources)) throw new Error("invalid resources");
   if (Object.keys(bundle.resources).sort((left, right) => left.localeCompare(right)).join("\n") !== requiredResources.slice().sort((left, right) => left.localeCompare(right)).join("\n")) throw new Error("invalid resources");
-  if (requiredResources.some((resource) => bundle.resources[resource] === null || typeof bundle.resources[resource] !== "object" || Array.isArray(bundle.resources[resource]))) throw new Error("invalid resources");
+  for (const resource of requiredResources) {
+    const content = bundle.resources[resource];
+    if (typeof content !== "string") throw new Error("invalid resources");
+    const document = parseJson(Buffer.from(content), `resource ${resource}`);
+    if (document === null || typeof document !== "object" || Array.isArray(document)) throw new Error("invalid resources");
+  }
 
   const temporary = `${stagedOutput}.tmp-${process.pid}`;
   rmSync(temporary, { recursive: true, force: true });
@@ -38,7 +43,7 @@ try {
     for (const resource of requiredResources) {
       const destination = resolve(temporary, resource);
       mkdirSync(dirname(destination), { recursive: true });
-      writeFileSync(destination, `${JSON.stringify(bundle.resources[resource], null, 2)}\n`);
+      writeFileSync(destination, bundle.resources[resource]);
     }
     mkdirSync(dirname(stagedOutput), { recursive: true });
     rmSync(stagedOutput, { recursive: true, force: true });

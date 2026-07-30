@@ -683,17 +683,18 @@ jobs:
           EASYSUBWAY_CONTRACTS_BUNDLE: ${{ github.workspace }}/contracts/bundles/backend-contracts-v1.0.0.json
           EASYSUBWAY_PLANNER_SUCCESS_OUTPUT: ../release-artifacts/backend/planner-canary-result.json
           EASYSUBWAY_CANONICAL_PACK_PATH: ../apps/mobile/assets/datapacks/capital.sqlite.gz
-        run: >-
-          ./gradlew test --no-daemon
-          --tests com.easysubway.route.application.service.RouteSearchServiceTest.routeV2PlannerProducesSyntheticCanaryResult
+        run: |
+          mkdir -p ../release-artifacts/backend
+          ./gradlew test --no-daemon \
+            --tests com.easysubway.route.application.service.RouteSearchServiceTest.routeV2PlannerProducesSyntheticCanaryResult
 
       - name: Backend Release Image / Build PR validation image
         if: ${{ github.event_name != 'push' }}
         shell: bash
         run: |
           set -euo pipefail
-          docker buildx build --load --platform linux/arm64 -f backend/Dockerfile -t easysubway-backend:${{ github.sha }} backend
-          docker image inspect easysubway-backend:${{ github.sha }}
+          docker buildx build --load --platform linux/arm64 -f backend/Dockerfile -t easysubway-backend:${GITHUB_SHA} backend
+          docker image inspect easysubway-backend:${GITHUB_SHA}
 
       - name: Backend Release Image / Log in to GHCR
         if: ${{ github.event_name == 'push' }}
@@ -734,7 +735,8 @@ jobs:
             echo "published image runtime platform ${arch}, expected linux/arm64" >&2
             exit 1
           fi
-          if ! grep -Eq '^FROM .+@sha256:[a-f0-9]{64}$' backend/Dockerfile; then
+          final_from="$(awk 'toupper($1) == "FROM" { line=$0 } END { print line }' backend/Dockerfile)"
+          if [[ ! "${final_from}" =~ ^FROM[[:space:]]+[^[:space:]]+@sha256:[a-f0-9]{64}([[:space:]]+AS[[:space:]]+[A-Za-z0-9._-]+)?$ ]]; then
             echo "backend base image must be digest pinned" >&2
             exit 1
           fi
@@ -768,7 +770,7 @@ jobs:
           fi
           cp "${boot_jar[0]}" release-artifacts/backend/backend-boot.jar
           if [[ "${GITHUB_EVENT_NAME}" != "push" ]]; then
-            docker image inspect easysubway-backend:${{ github.sha }} > release-artifacts/backend/image-inspect.json
+            docker image inspect easysubway-backend:${GITHUB_SHA} > release-artifacts/backend/image-inspect.json
           fi
           backend_artifact_sha256="$(sha256sum release-artifacts/backend/backend-boot.jar | awk '{print $1}')"
           {

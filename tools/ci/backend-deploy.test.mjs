@@ -798,9 +798,9 @@ test("CD는 exact Release Artifacts run의 backend digest만 배포한다", asyn
   assert.match(workflow, /actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093/);
   assert.match(workflow, /run-id: \$\{\{ steps\.target\.outputs\.producer_run_id \}\}/);
   assert.match(workflow, /backend-component-manifest\.json/);
-  assert.match(workflow, /component.*backend/);
-  assert.match(workflow, /repository/);
-  assert.match(workflow, /gitSha/);
+  assert.match(workflow, /manifest\?\.component !== "backend"/);
+  assert.match(workflow, /manifest\?\.repository !== process\.env\.GITHUB_REPOSITORY/);
+  assert.match(workflow, /manifest\?\.gitSha !== process\.env\.DEPLOY_SHA/);
   assert.match(workflow, /contractVersion !== "1\.0\.0"/);
   assert.match(workflow, /apiContractVersion !== manifest\.contractVersion/);
   assert.match(workflow, /evidenceSha256/);
