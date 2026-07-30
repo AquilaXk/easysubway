@@ -55,7 +55,7 @@ const LAT_LON_SWAP_LAT_AS_LON = Object.freeze({ min: 124, max: 132 });
 //
 // lineageOnlyOperatorIds는 그 등재 집합 안에서 "정본 대조에는 쓰되 pack coverage scope로는 내지 않는"
 // 항목을 가른다. FILE admission 당시 표기가 노선 운영기관과 다른 노선에서 두 표기를 그대로 scope 행으로
-// 내면 #2138 activeLineScopes에 대응이 없는 (운영기관, 노선) 결속이 datapack 조립까지 흘러간다.
+// 내면 AquilaXk/easysubway-data#3 activeLineScopes에 대응이 없는 (운영기관, 노선) 결속이 datapack 조립까지 흘러간다.
 const LINE_DEFINITIONS = Object.freeze([
   {
     key: "shinbundang",
@@ -64,7 +64,7 @@ const LINE_DEFINITIONS = Object.freeze([
     slug: "shinbundang",
     operatorId: "seoul-metro",
     operatorNameKo: "서울교통공사",
-    // operatorId(서울교통공사)는 FILE admission 당시 표기를 유지하는 계보 항목이라 #2138 activeLineScopes에
+    // operatorId(서울교통공사)는 FILE admission 당시 표기를 유지하는 계보 항목이라 AquilaXk/easysubway-data#3 activeLineScopes에
     // 대응 scope가 없다. requirement에 매칭되는 것은 노선 운영기관인 네오트랜스다(admission 정본 서술) —
     // 그래서 정본 대조에는 두 표기를 함께 쓰고 pack scope로는 네오트랜스만 낸다.
     additionalCoverageOperators: Object.freeze([

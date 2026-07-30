@@ -18,7 +18,7 @@ const LINE_OPERATOR_NAME_KO = "서울시메트로9호선";
 const COVERAGE_OPERATOR_IDS = Object.freeze([FILE_OPERATOR_ID, LINE_OPERATOR_ID]);
 // pack coverage scope로 낼 운영기관. FILE_OPERATOR_ID(서울교통공사)는 이 소스의 FILE admission 당시
 // 표기를 유지하는 계보 항목이라 admission 정본(coverageScope.operatorIds) 대조와 운영기관 등재에는 쓰되
-// scope 행으로는 내지 않는다 — 9호선의 #2138 activeLineScopes는 노선 운영기관 하나뿐이라, 계보 표기를
+// scope 행으로는 내지 않는다 — 9호선의 AquilaXk/easysubway-data#3 activeLineScopes는 노선 운영기관 하나뿐이라, 계보 표기를
 // 그대로 행으로 내면 근거 없는 (운영기관, 노선) 결속이 pack에 남는다(경전철 신분당선과 같은 축).
 const SCOPE_OPERATOR_IDS = Object.freeze([LINE_OPERATOR_ID]);
 const REGION = "수도권";

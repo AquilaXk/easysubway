@@ -206,7 +206,7 @@ test("공식 서울 9호선 2·3단계 역사좌표 snapshot을 누적 productio
   assert.ok(pack.operators.some(({ id }) => id === FILE_OPERATOR_ID));
   assert.ok(pack.operators.some(({ id }) => id === LINE_OPERATOR_ID));
   // 정본은 두 운영기관을 dual coverage로 등재하지만 pack scope로 나오는 것은 노선 운영기관 하나다 —
-  // FILE 계보 표기(서울교통공사)는 #2138 activeLineScopes에 대응 scope가 없어 행으로 내지 않는다.
+  // FILE 계보 표기(서울교통공사)는 AquilaXk/easysubway-data#3 activeLineScopes에 대응 scope가 없어 행으로 내지 않는다.
   assert.deepEqual(
     pack.coverageLineOperatorScopes
       .filter(({ lineId }) => lineId === LINE_ID)

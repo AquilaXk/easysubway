@@ -888,7 +888,7 @@ function auditableScopeKeys({ claims, activeScopeKeys, rosters, violations }) {
   const auditedScopeKeys = [];
   const seen = new Set();
   for (const claim of claims) {
-    // activeLineScopes에 없는 (operator, line) 조합은 #2138 requirement가 아니라 lineage 표기다.
+    // activeLineScopes에 없는 (operator, line) 조합은 AquilaXk/easysubway-data#3 requirement가 아니라 lineage 표기다.
     if (!activeScopeKeys.has(claim.key) || seen.has(claim.key)) {
       continue;
     }

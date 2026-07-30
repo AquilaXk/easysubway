@@ -688,10 +688,10 @@
         "requiredTables": 0,
         "sourceInventory": 5
       },
-      "addedRowsKo": "5개 snapshot의 좌표 63행에는 노선끼리 겹치는 역이 없지만(고유 역 63) 그중 5곳이 광역철도 편입이 이미 실은 역과 같아 역은 58행만 는다 — 겹친 역은 소속(역·노선 쌍)만 늘고 역 자체는 다시 실리지 않는다(신분당선 판교·정자·미금 3곳과 나머지 네 노선 2곳). 운영기관 5곳은 다섯 노선이 각각 다른 사업자이고 신분당선이 노선 운영기관인 네오트랜스를 더하기 때문이다 — 신분당선 정본의 다른 운영기관 표기(서울교통공사)는 승계 원본에 이미 있다. coverageLineOperatorScopes 5행은 노선 하나에 scope 하나씩이다 — 신분당선 정본은 두 운영기관을 등재하지만 서울교통공사 표기는 FILE admission 계보 항목이라(#2138 activeLineScopes에 대응 scope가 없다) 카탈로그가 lineageOnlyOperatorIds로 갈라 scope 행으로는 내지 않는다.",
+      "addedRowsKo": "5개 snapshot의 좌표 63행에는 노선끼리 겹치는 역이 없지만(고유 역 63) 그중 5곳이 광역철도 편입이 이미 실은 역과 같아 역은 58행만 는다 — 겹친 역은 소속(역·노선 쌍)만 늘고 역 자체는 다시 실리지 않는다(신분당선 판교·정자·미금 3곳과 나머지 네 노선 2곳). 운영기관 5곳은 다섯 노선이 각각 다른 사업자이고 신분당선이 노선 운영기관인 네오트랜스를 더하기 때문이다 — 신분당선 정본의 다른 운영기관 표기(서울교통공사)는 승계 원본에 이미 있다. coverageLineOperatorScopes 5행은 노선 하나에 scope 하나씩이다 — 신분당선 정본은 두 운영기관을 등재하지만 서울교통공사 표기는 FILE admission 계보 항목이라(AquilaXk/easysubway-data#3 activeLineScopes에 대응 scope가 없다) 카탈로그가 lineageOnlyOperatorIds로 갈라 scope 행으로는 내지 않는다.",
       "reorderedTables": ["coverageLineOperatorScopes", "lines", "operators"],
       "reorderedTablesKo": "이 materializer도 append 뒤 pack.operators·pack.lines를 id 오름차순으로 다시 정렬하며, 광역철도 편입이 이미 만들어 둔 coverageLineOperatorScopes까지 같은 축으로 다시 정렬한다(실측). 그래서 선언 표가 광역철도 편입보다 하나 많다 — 그 표가 이 편입에는 승계 행이 있는 표이기 때문이다.",
-      "reasonKo": "#2595 B3. 수도권 경전철 5노선(신분당·에버라인·우이신설·신림·김포골드라인) route_map_positions requirement를 판정에 올리려면 candidate root pack이 공식 노선도 좌표 행을 담아야 한다. 광역철도 편입과 형상이 같고(노선별 snapshot 체인) 서로 선행 조건이 없다. 신분당선은 이 배치의 첫 묶음에서 빠져 있었다: admission coverageScope.operatorIds가 2개라 서해선·GTX-A와 같은 이유로 거부됐고, 같은 카탈로그 등재 축으로 열렸다. 신분당선 정본은 두 운영기관을 등재하지만 pack scope와 requirement는 하나씩이다 — 정본의 서울교통공사 표기는 FILE admission 계보 항목이라 #2138 activeLineScopes에 대응 scope가 없고, 카탈로그가 그 표기를 lineageOnlyOperatorIds로 갈라 정본 대조·운영기관 등재에만 쓰고 scope 행으로는 내지 않는다. 이미 admission이 끝난 snapshot(#2505)을 재생한다.",
+      "reasonKo": "#2595 B3. 수도권 경전철 5노선(신분당·에버라인·우이신설·신림·김포골드라인) route_map_positions requirement를 판정에 올리려면 candidate root pack이 공식 노선도 좌표 행을 담아야 한다. 광역철도 편입과 형상이 같고(노선별 snapshot 체인) 서로 선행 조건이 없다. 신분당선은 이 배치의 첫 묶음에서 빠져 있었다: admission coverageScope.operatorIds가 2개라 서해선·GTX-A와 같은 이유로 거부됐고, 같은 카탈로그 등재 축으로 열렸다. 신분당선 정본은 두 운영기관을 등재하지만 pack scope와 requirement는 하나씩이다 — 정본의 서울교통공사 표기는 FILE admission 계보 항목이라 AquilaXk/easysubway-data#3 activeLineScopes에 대응 scope가 없고, 카탈로그가 그 표기를 lineageOnlyOperatorIds로 갈라 정본 대조·운영기관 등재에만 쓰고 scope 행으로는 내지 않는다. 이미 admission이 끝난 snapshot(#2505)을 재생한다.",
       "materializedAtReasonKo": "이 편입이 싣는 5개 소스는 모두 P1Y 신선도 창 [2026-07-25T06:00:00Z, 2027-07-25T06:00:00Z)을 공유하고 materializer가 양끝 밖을 fail closed 한다. 광역철도 편입과 현재 pin 값이 같아도 한쪽 snapshot 갱신이 다른 편입의 기준 시각을 흔들지 않도록 pin은 따로 둔다."
     },
     {
@@ -823,7 +823,7 @@
         "requiredTables": 0,
         "sourceInventory": 1
       },
-      "addedRowsKo": "2·3단계 좌표 13행 중 앞선 편입이 이미 실은 역 3곳(선정릉·종합운동장·석촌)이 있어 역은 10행만 늘고 소속은 13행 전부 는다. 1단계 소스와 겹치는 역은 없다(두 소스가 9호선을 구간으로 나눠 덮는다). 운영기관·노선은 0행 — 1단계 편입이 이미 만들었다. coverageLineOperatorScopes도 0행이다: 이 소스는 dual coverage(FILE 계보 표기 서울교통공사 + 노선 운영기관 서울시메트로9호선)로 등재돼 있지만 계보 표기에는 #2138 activeLineScopes에 대응 scope가 없어 scope 행으로 내지 않고, 노선 운영기관 scope는 1단계 편입이 이미 실었다. 그래서 이 편입은 어느 표에도 재정렬을 일으키지 않는다(reorderedTables 선언 없음).",
+      "addedRowsKo": "2·3단계 좌표 13행 중 앞선 편입이 이미 실은 역 3곳(선정릉·종합운동장·석촌)이 있어 역은 10행만 늘고 소속은 13행 전부 는다. 1단계 소스와 겹치는 역은 없다(두 소스가 9호선을 구간으로 나눠 덮는다). 운영기관·노선은 0행 — 1단계 편입이 이미 만들었다. coverageLineOperatorScopes도 0행이다: 이 소스는 dual coverage(FILE 계보 표기 서울교통공사 + 노선 운영기관 서울시메트로9호선)로 등재돼 있지만 계보 표기에는 AquilaXk/easysubway-data#3 activeLineScopes에 대응 scope가 없어 scope 행으로 내지 않고, 노선 운영기관 scope는 1단계 편입이 이미 실었다. 그래서 이 편입은 어느 표에도 재정렬을 일으키지 않는다(reorderedTables 선언 없음).",
       "reasonKo": "#2595 B3. 9호선 2·3단계 소스를 같은 노선 위에 이어 싣는다. 1단계 편입과 서로 선행 조건은 없지만 두 편입이 같은 노선의 역을 나눠 실어 중복 제거 결과가 순서에 따라 갈리므로 선언 행수 대조가 순서를 고정한다. 이미 admission이 끝난 snapshot(#2498)을 재생한다.",
       "materializedAtReasonKo": "이 소스의 P1Y 신선도 창은 [2026-07-25T04:00:00Z, 2027-07-25T04:00:00Z)이고 materializer가 양끝 밖을 fail closed 한다. pin은 이 창의 하한 정각에 둔다."
     },
@@ -1360,7 +1360,7 @@
         "capital:korail:line-051552e50435:route_map_positions",
         "capital:operator-38450e138464:line-051552e50435:route_map_positions"
       ],
-      "reasonKo": "B4. 서해선 route_map_position·route_map_label_polygon을 대는 공식 좌표 snapshot 소스다. 이 노선은 일산~부천종합운동장 구간(코레일)과 소사~원시 구간(서해철도)을 두 사업자가 나눠 운영해 admission 정본이 두 운영기관 scope를 dual coverage로 등재했고 #2138 activeLineScopes도 같은 두 scope를 둔다 — 그래서 이 재기술 하나가 requirement 둘을 연다.",
+      "reasonKo": "B4. 서해선 route_map_position·route_map_label_polygon을 대는 공식 좌표 snapshot 소스다. 이 노선은 일산~부천종합운동장 구간(코레일)과 소사~원시 구간(서해철도)을 두 사업자가 나눠 운영해 admission 정본이 두 운영기관 scope를 dual coverage로 등재했고 AquilaXk/easysubway-data#3 activeLineScopes도 같은 두 scope를 둔다 — 그래서 이 재기술 하나가 requirement 둘을 연다.",
       "inventorySyncKo": "하네스가 spec lineIds와 tracked source-inventory coverageScope.lineIds의 일치를 fail closed로 확인한다."
     },
     {
@@ -1379,7 +1379,7 @@
       "sourceDomain": "route_map_positions",
       "lineIds": ["shinbundang"],
       "requirementKeys": ["capital:operator-28e01fb8509d:shinbundang:route_map_positions"],
-      "reasonKo": "B4. 신분당선 route_map_position·route_map_label_polygon을 대는 공식 좌표 snapshot 소스다. admission 정본의 operatorIds 두 항목 중 서울교통공사는 FILE admission 당시 표기를 유지하는 계보 항목이라 #2138 activeLineScopes에 대응 scope가 없고, requirement에 매칭되는 것은 노선 운영기관인 네오트랜스뿐이다 — 그래서 dual coverage 소스인데도 이 재기술이 여는 requirement는 하나다.",
+      "reasonKo": "B4. 신분당선 route_map_position·route_map_label_polygon을 대는 공식 좌표 snapshot 소스다. admission 정본의 operatorIds 두 항목 중 서울교통공사는 FILE admission 당시 표기를 유지하는 계보 항목이라 AquilaXk/easysubway-data#3 activeLineScopes에 대응 scope가 없고, requirement에 매칭되는 것은 노선 운영기관인 네오트랜스뿐이다 — 그래서 dual coverage 소스인데도 이 재기술이 여는 requirement는 하나다.",
       "inventorySyncKo": "하네스가 spec lineIds와 tracked source-inventory coverageScope.lineIds의 일치를 fail closed로 확인한다."
     },
     {

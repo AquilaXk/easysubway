@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // #2507 전국 270 coverage 집계 정본화 — tally 도구(tracked ledger 생성기).
 //
-// #2138 전국 requirement 진행 집계를 이슈 코멘트 수기 집계에서 재현 가능한 커밋 산출물로 옮긴다.
+// AquilaXk/easysubway-data#3 전국 requirement 진행 집계를 이슈 코멘트 수기 집계에서 재현 가능한 커밋 산출물로 옮긴다.
 // requirement 분모는 targets의 activeLineScopes × requiredSourceDomains이며, LAUNCH_REQUIRED tier가
 // 270건(45 scope × 6 domain), ENHANCEMENT tier가 45건(45 scope × 1 domain)이다.
 //

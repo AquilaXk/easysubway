@@ -8,7 +8,7 @@ import {
   validateLedger,
 } from "./issue-migration-ledger.mjs";
 
-const OPEN_ISSUE_NUMBERS = [
+const REVIEWED_SOURCE_ISSUE_NUMBERS = [
   571, 1016, 1019, 1020, 1021, 1022, 1393, 1414, 1918, 2050, 2055, 2058,
   2065, 2095, 2126, 2138, 2268, 2406, 2523, 2524, 2525, 2526, 2533, 2535,
   2536, 2537, 2538, 2539, 2540, 2541, 2542, 2543, 2544, 2545, 2547, 2548,
@@ -17,22 +17,32 @@ const OPEN_ISSUE_NUMBERS = [
   2667, 2674, 2675, 2676, 2677, 2678, 2679, 2680, 2684, 2690, 2691,
 ];
 const DATA_APPROVAL_URL = "https://github.com/AquilaXk/easysubway/issues/2705#issuecomment-5134093671";
-const DATA_TRANSFER_ISSUES = new Set([2138, 2523, 2533, 2607, 2608, 2610, 2611, 2684]);
+const DATA_TRANSFERS = new Map([
+  [2138, ["https://github.com/AquilaXk/easysubway-data/issues/3", "2026-07-30T18:59:46Z"]],
+  [2523, ["https://github.com/AquilaXk/easysubway-data/issues/4", "2026-07-30T19:23:33Z"]],
+  [2533, ["https://github.com/AquilaXk/easysubway-data/issues/5", "2026-07-30T19:39:57Z"]],
+  [2607, ["https://github.com/AquilaXk/easysubway-data/issues/6", "2026-07-30T19:41:26Z"]],
+  [2608, ["https://github.com/AquilaXk/easysubway-data/issues/7", "2026-07-30T19:43:04Z"]],
+  [2610, ["https://github.com/AquilaXk/easysubway-data/issues/8", "2026-07-30T19:45:12Z"]],
+  [2611, ["https://github.com/AquilaXk/easysubway-data/issues/9", "2026-07-30T19:46:15Z"]],
+  [2684, ["https://github.com/AquilaXk/easysubway-data/issues/10", "2026-07-30T19:47:10Z"]],
+]);
 
 function ledgerFixture() {
   return JSON.parse(readFileSync("release/migrations/repository-split-issues.json", "utf8"));
 }
 
-test("71개 open issue ledger는 data Task6 approval과 나머지 pending state를 만족한다", () => {
+test("71개 reviewed source issue ledger는 data Task6 transfer와 나머지 pending state를 만족한다", () => {
   const ledger = ledgerFixture();
 
   assert.equal(ledger.issues.length, 71);
-  assert.deepEqual(validateLedger(ledger, { openIssueNumbers: OPEN_ISSUE_NUMBERS }), []);
-  assert.ok(ledger.issues.every((entry) => (
-    entry.executionApproval === (DATA_TRANSFER_ISSUES.has(entry.sourceIssue) ? DATA_APPROVAL_URL : null)
-  )));
-  assert.ok(ledger.issues.every((entry) => entry.targetUrl === null));
-  assert.ok(ledger.issues.every((entry) => entry.transferredAt === null));
+  assert.deepEqual(validateLedger(ledger, { openIssueNumbers: REVIEWED_SOURCE_ISSUE_NUMBERS }), []);
+  for (const entry of ledger.issues) {
+    const transfer = DATA_TRANSFERS.get(entry.sourceIssue);
+    assert.equal(entry.executionApproval, transfer ? DATA_APPROVAL_URL : null);
+    assert.equal(entry.targetUrl, transfer?.[0] ?? null);
+    assert.equal(entry.transferredAt, transfer?.[1] ?? null);
+  }
 });
 
 test("target과 source issue 조회는 direct target과 split child를 모두 반환한다", () => {
@@ -56,7 +66,7 @@ test("open fixture와 frozen reviewed mapping 밖의 source issue는 ledger를 �
   const ledger = ledgerFixture();
   ledger.issues[0].sourceIssue = 9999;
 
-  assert.deepEqual(validateLedger(ledger, { openIssueNumbers: OPEN_ISSUE_NUMBERS }), [
+  assert.deepEqual(validateLedger(ledger, { openIssueNumbers: REVIEWED_SOURCE_ISSUE_NUMBERS }), [
     "issues[0].sourceUrl: sourceIssue와 URL 번호 불일치",
     "issues[0]: frozen reviewed mapping에 없는 sourceIssue",
     "issues: frozen reviewed mapping 누락 (571)",
@@ -140,6 +150,8 @@ test("TRANSFER는 approved와 transferred execution state를 차례로 허용한
   const entry = ledger.issues[0];
   for (const otherEntry of ledger.issues.slice(1)) {
     otherEntry.executionApproval = null;
+    otherEntry.targetUrl = null;
+    otherEntry.transferredAt = null;
   }
   entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
 
