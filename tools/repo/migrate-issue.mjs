@@ -206,7 +206,7 @@ function canonicalDueOn(value) {
 }
 
 function redirectRepresentation(representation, targetRepository) {
-  const match = typeof representation?.html_url === "string" && new RegExp(`^https://github\\.com/${escapeRegExp(targetRepository)}/issues/(\\d+)$`).exec(representation.html_url);
+  const match = typeof representation?.html_url === "string" && representation.html_url.match(new RegExp(`^https://github\\.com/${escapeRegExp(targetRepository)}/issues/(\\d+)$`));
   if (!match || representation.number !== Number(match[1]) || representation.repository_url !== `https://api.github.com/repos/${targetRepository}`) {
     throw new Error("source issue redirect is missing or invalid");
   }
