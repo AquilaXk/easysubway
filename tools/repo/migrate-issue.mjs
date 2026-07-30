@@ -95,15 +95,23 @@ export async function preflightIssueTransfer({ entry, execGh }) {
 export async function executeIssueTransfer({ entry, confirmations, execGh }) {
   confirmExecution(entry, confirmations);
   const details = await preflightDetails({ entry, execGh });
-  await execGh(["issue", "transfer", String(entry.sourceIssue), entry.targetRepository, "--repo", SOURCE_REPOSITORY]);
-  return { sourceUrl: entry.sourceUrl, expectedMetadata: details.source };
+  try {
+    await execGh(["issue", "transfer", String(entry.sourceIssue), entry.targetRepository, "--repo", SOURCE_REPOSITORY]);
+    return { sourceUrl: entry.sourceUrl, expectedMetadata: details.source };
+  } catch {
+    try {
+      const redirectedIssue = await readRedirectedIssue(entry, execGh);
+      return { sourceUrl: entry.sourceUrl, expectedMetadata: details.source, redirectedIssue };
+    } catch {
+      const indeterminate = new Error("issue transfer response is indeterminate; source redirect could not be confirmed");
+      indeterminate.transferIndeterminate = true;
+      throw indeterminate;
+    }
+  }
 }
 
 export async function verifyTransferredIssue({ entry, transferResult, execGh }) {
-  const representation = JSON.parse(await execGh([
-    "api", "-H", "X-GitHub-Api-Version: 2022-11-28", `/repos/${SOURCE_REPOSITORY}/issues/${entry.sourceIssue}`,
-  ]));
-  const targetUrl = redirectRepresentation(representation, entry.targetRepository);
+  const targetUrl = transferResult?.redirectedIssue ?? await readRedirectedIssue(entry, execGh);
   const target = await readIssueMetadata(targetUrl.repository, targetUrl.number, execGh);
   const expected = transferResult?.expectedMetadata;
   if (target.number !== targetUrl.number || target.url !== `https://github.com/${targetUrl.repository}/issues/${targetUrl.number}`) {
@@ -120,6 +128,13 @@ export async function verifyTransferredIssue({ entry, transferResult, execGh }) 
     milestone: target.milestone?.title ?? null,
     commentCount: target.commentCount,
   };
+}
+
+async function readRedirectedIssue(entry, execGh) {
+  const representation = JSON.parse(await execGh([
+    "api", "-H", "X-GitHub-Api-Version: 2022-11-28", `/repos/${SOURCE_REPOSITORY}/issues/${entry.sourceIssue}`,
+  ]));
+  return redirectRepresentation(representation, entry.targetRepository);
 }
 
 async function preflightDetails({ entry, execGh }) {
@@ -316,7 +331,7 @@ async function main() {
       execGh,
     })));
   } catch (error) {
-    if (error?.transferCompleted === true) console.error(error.message);
+    if (error?.transferCompleted === true || error?.transferIndeterminate === true) console.error(error.message);
     else console.error(`issue migration was not executed: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
   }

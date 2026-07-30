@@ -36,7 +36,7 @@ function metadata({ url = SOURCE_URL, number = SOURCE_ISSUE, title, state = "OPE
   return { id: `I_${number}`, url, number, title: title ?? transferEntry().title, state, repository: { nameWithOwner: repo }, labels: connection(labels.map((name) => ({ name }))), milestone: milestone === null ? null : { title: milestone, dueOn: null }, comments: { totalCount: commentCount }, assignees: connection([]), projectItems: connection([]), parent: null, subIssues: connection([]), blocking: connection([]), blockedBy: connection([]), closedByPullRequestsReferences: connection(closingPullRequests) };
 }
 
-function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, number: 7 }), targetExists = true, unassignableLogin, malformedAssigneeResponse } = {}) {
+function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, number: 7 }), targetExists = true, unassignableLogin, malformedAssigneeResponse, transferFailure = false, redirectedAfterTransferFailure = false } = {}) {
   const calls = [];
   let transferred = false;
   const execGh = async (args) => {
@@ -46,7 +46,8 @@ function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, numb
       return JSON.stringify({ nameWithOwner: TARGET_REPOSITORY });
     }
     if (args[0] === "issue" && args[1] === "transfer") {
-      transferred = true;
+      transferred = !transferFailure || redirectedAfterTransferFailure;
+      if (transferFailure) throw new Error("transfer response lost");
       return "";
     }
     if (args[0] === "api" && args.at(-1).includes("/assignees/")) {
@@ -227,6 +228,42 @@ test("completed transfer with failed verification reports a partial-success erro
     }),
     (error) => error.message.startsWith("issue transfer completed but post-transfer verification failed:")
       && error.transferCompleted === true,
+  );
+  assert.equal(transferCalls(fake.calls).length, 1);
+});
+
+test("lost transfer response follows a confirmed redirect through verification", async () => {
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  const fake = fakeGh({ transferFailure: true, redirectedAfterTransferFailure: true });
+
+  const verified = await runMigration({
+    arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
+    ledger,
+    schema,
+    execGh: fake.execGh,
+  });
+
+  assert.equal(verified.targetUrl, TARGET_URL);
+  assert.equal(transferCalls(fake.calls).length, 1);
+  assert.equal(fake.calls.filter((args) => args.at(-1) === `/repos/${SOURCE_REPOSITORY}/issues/${SOURCE_ISSUE}`).length, 1);
+});
+
+test("unconfirmed transfer response reports an indeterminate result", async () => {
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  const fake = fakeGh({ transferFailure: true });
+
+  await assert.rejects(
+    () => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
+      ledger,
+      schema,
+      execGh: fake.execGh,
+    }),
+    (error) => error.message.includes("indeterminate") && error.transferIndeterminate === true,
   );
   assert.equal(transferCalls(fake.calls).length, 1);
 });
