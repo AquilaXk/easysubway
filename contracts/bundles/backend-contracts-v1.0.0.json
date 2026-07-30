@@ -1,0 +1,528 @@
+{
+  "schemaVersion": 1,
+  "bundleVersion": "1.0.0",
+  "resources": {
+    "datapack/source-governance-policy.json": {
+      "schemaVersion": 1,
+      "artifactKind": "datapack-source-governance-policy",
+      "policyVersion": "2026-07-15",
+      "retentionClasses": [
+        {
+          "id": "standard-90d",
+          "retentionDays": 90
+        }
+      ],
+      "reasonCodeEscalations": [
+        {
+          "reasonCodes": [
+            "SOURCE_LINEAGE_BROKEN",
+            "SOURCE_DIFF_MISSING"
+          ],
+          "responsibleRole": "datapack-data-steward",
+          "alertRoute": "github:area-datapack",
+          "escalationHours": 4
+        },
+        {
+          "reasonCodes": [
+            "SOURCE_FRESHNESS_POLICY_MISSING",
+            "SOURCE_SNAPSHOT_EXPIRED"
+          ],
+          "responsibleRole": "datapack-source-owner",
+          "alertRoute": "github:release-blocker",
+          "escalationHours": 4
+        },
+        {
+          "reasonCodes": [
+            "RAW_RETENTION_OVERDUE",
+            "LEGAL_HOLD_INVALID"
+          ],
+          "responsibleRole": "datapack-data-steward",
+          "alertRoute": "github:area-operations",
+          "escalationHours": 24
+        },
+        {
+          "reasonCodes": [
+            "LICENSE_REVIEW_REQUIRED",
+            "REDISTRIBUTION_NOT_APPROVED"
+          ],
+          "responsibleRole": "datapack-release-approver",
+          "alertRoute": "github:release-blocker",
+          "escalationHours": 4
+        },
+        {
+          "reasonCodes": [
+            "SOURCE_GOVERNANCE_OWNER_MISSING"
+          ],
+          "responsibleRole": "datapack-source-owner",
+          "alertRoute": "github:area-release-governance",
+          "escalationHours": 4
+        }
+      ],
+      "sources": [
+        {
+          "sourceId": "kric-train-operation-organ",
+          "sourceClassId": "static_network_metadata",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "bd7b209e47aeb0996ccdd6d1913d8a732ae8539cb9e648a55cfbebb9a64d0fd8",
+            "reviewedAt": "2026-07-13T13:30:00Z",
+            "nextReviewAt": "2027-07-13T13:30:00Z",
+            "termsUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=266&service=convenientInfo&operation=trainOperationOrgan&page=3",
+            "reviewedProvider": "국가철도공단",
+            "reviewedDatasetUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=266&service=convenientInfo&operation=trainOperationOrgan&page=3",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "kric-station-convenience-standard",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "39978b3c3dd3fb64b7f15d739453b19ad0b51a0f216cea22d3efb77dbfebf398",
+            "reviewedAt": "2026-07-28T12:42:27Z",
+            "nextReviewAt": "2027-07-28T12:42:27Z",
+            "termsUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=430&service=handicapped&operation=stationCnvFacl&page=1",
+            "reviewedProvider": "국가철도공단",
+            "reviewedDatasetUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=430&service=handicapped&operation=stationCnvFacl&page=1",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "kric-station-elevator",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "08892ea7773d84a351e1f9f3ea208501fada4d062350b0f588c972af75c1c859",
+            "reviewedAt": "2026-07-11T15:00:00Z",
+            "nextReviewAt": "2027-07-11T15:00:00Z",
+            "termsUrl": "https://www.data.go.kr/data/15041682/openapi.do",
+            "reviewedProvider": "국가철도공단",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15041682/openapi.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "kric-station-elevator-movement",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "084ab0ae620b74c4ac6633cecd46fae4d91cfc831582beeb84bfe5b2222cd280",
+            "reviewedAt": "2026-07-11T15:00:00Z",
+            "nextReviewAt": "2027-07-11T15:00:00Z",
+            "termsUrl": "https://www.data.go.kr/data/15041689/openapi.do",
+            "reviewedProvider": "국가철도공단",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15041689/openapi.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "kric-station-escalator",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "2953cce5b977132db7e7a428c677e6d292401f77c40a1e8f8dd84af5a3e61df2",
+            "reviewedAt": "2026-07-11T15:00:00Z",
+            "nextReviewAt": "2027-07-11T15:00:00Z",
+            "termsUrl": "https://www.data.go.kr/data/15041683/openapi.do",
+            "reviewedProvider": "국가철도공단",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15041683/openapi.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "kric-subway-timetable",
+          "sourceClassId": "planned_timetable",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "3496800e96105558c3ce0e96df3bdd425a56c8420f8c7b93cca3e8309823d0f2",
+            "reviewedAt": "2026-07-09T00:00:00Z",
+            "nextReviewAt": "2027-07-09T00:00:00Z",
+            "termsUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=162&service=trainUseInfo&operation=subwayTimetable&page=2",
+            "reviewedProvider": "국가철도공단",
+            "reviewedDatasetUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=162&service=trainUseInfo&operation=subwayTimetable&page=2",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "kric-wheelchair-lift-location",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "1148013f21d3b4e66095ae428518b8e69c315bd624c2c09391d60584532e41b1",
+            "reviewedAt": "2026-07-11T15:00:00Z",
+            "nextReviewAt": "2027-07-11T15:00:00Z",
+            "termsUrl": "https://www.data.go.kr/data/15041686/openapi.do",
+            "reviewedProvider": "국가철도공단",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15041686/openapi.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "kric-wheelchair-lift-movement",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "8363159b325e09fbce4084c635e443db60272d8f973136e927d1348649001803",
+            "reviewedAt": "2026-07-11T15:00:00Z",
+            "nextReviewAt": "2027-07-11T15:00:00Z",
+            "termsUrl": "https://www.data.go.kr/data/15041690/openapi.do",
+            "reviewedProvider": "국가철도공단",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15041690/openapi.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "molit-urban-rail-full-route",
+          "sourceClassId": "static_network_metadata",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "2d0f88d855cf96413c17a412cb8197f1fb7d1e904b4ee0d42f99ead4fa558d53",
+            "reviewedAt": "2026-07-11T15:00:00Z",
+            "nextReviewAt": "2027-07-11T15:00:00Z",
+            "termsUrl": "https://www.data.go.kr/data/15122916/fileData.do",
+            "reviewedProvider": "국토교통부",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15122916/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "seoul-metro-accessibility",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "cd1063d4aa4b6290b1f4edabb9a74e62d70f8da5044aa4608b7f1e45e10c5963",
+            "reviewedAt": "2026-07-11T15:00:00Z",
+            "nextReviewAt": "2027-07-11T15:00:00Z",
+            "termsUrl": "https://www.data.go.kr/data/15143843/openapi.do",
+            "reviewedProvider": "서울교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15143843/openapi.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "seoulmetro-cyberstation-route-map",
+          "sourceClassId": "route_map_asset",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "846453610a0713353caad62ce8eea88648e7dbe8f73acfcb8e2f70a369a59c2c",
+            "reviewedAt": "2026-07-11T15:00:00Z",
+            "nextReviewAt": "2027-07-11T15:00:00Z",
+            "termsUrl": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
+            "reviewedProvider": "서울교통공사",
+            "reviewedDatasetUrl": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        {
+          "sourceId": "seoulmetro-station-line-info",
+          "sourceClassId": "static_network_metadata",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "6925923cc0f86eb151280da6f7d5a08c3ab3cc8588aecdb12fab003cd6252e2b",
+            "reviewedAt": "2026-07-11T15:00:00Z",
+            "nextReviewAt": "2027-07-11T15:00:00Z",
+            "termsUrl": "https://data.seoul.go.kr/dataList/OA-15442/S/1/datasetView.do",
+            "reviewedProvider": "서울교통공사",
+            "reviewedDatasetUrl": "https://data.seoul.go.kr/dataList/OA-15442/S/1/datasetView.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      ]
+    },
+    "datapack/datapack-freshness-sla.json": {
+      "schemaVersion": 2,
+      "applicationId": "easysubway",
+      "androidApplicationId": "com.easysubway.app",
+      "releaseGate": "datapack-freshness-sla",
+      "issue": 1418,
+      "policyOwner": "QA",
+      "clockSkewSeconds": 300,
+      "sourceClasses": [
+        {
+          "id": "static_network_metadata",
+          "sourceIds": [
+            "molit-urban-rail-full-route",
+            "seoulmetro-station-line-info",
+            "kric-train-operation-organ"
+          ],
+          "examples": [
+            "station",
+            "line",
+            "operator identity"
+          ],
+          "basisField": "retrievedAt",
+          "reverificationCadence": "P30D",
+          "offlinePackEligible": true,
+          "eventTriggers": [
+            "station rename",
+            "operator change",
+            "line extension opening"
+          ],
+          "changePublishSla": "P3D",
+          "freshnessMetric": "freshnessValidRatio"
+        },
+        {
+          "id": "static_accessibility_facility",
+          "sourceIds": [
+            "kric-station-convenience-standard",
+            "kric-station-elevator",
+            "kric-station-elevator-movement",
+            "kric-station-escalator",
+            "kric-wheelchair-lift-location",
+            "kric-wheelchair-lift-movement",
+            "seoul-metro-accessibility"
+          ],
+          "examples": [
+            "KRIC elevator",
+            "KRIC escalator",
+            "KRIC wheelchair lift"
+          ],
+          "basisField": "retrievedAt",
+          "reverificationCadence": "P90D",
+          "offlinePackEligible": true,
+          "eventTriggers": [
+            "operator construction notice",
+            "facility outage notice",
+            "field verification override"
+          ],
+          "changePublishSla": "P3D",
+          "freshnessMetric": "freshnessValidRatio"
+        },
+        {
+          "id": "planned_timetable",
+          "sourceIds": [
+            "kric-subway-timetable"
+          ],
+          "examples": [
+            "service calendar",
+            "trips",
+            "stop_times",
+            "headway"
+          ],
+          "basisField": "serviceEffectiveAt",
+          "maximumReverificationCadence": "P30D",
+          "futureBasisAllowed": true,
+          "providerValidityEndField": "serviceEffectiveUntil",
+          "offlinePackEligible": true,
+          "eventTriggers": [
+            "operator timetable revision",
+            "service calendar expiry",
+            "line extension opening"
+          ],
+          "changePublishSla": "before-effective-date",
+          "freshnessMetric": "plannedEtaCoverageRatio"
+        },
+        {
+          "id": "route_map_asset",
+          "sourceIds": [
+            "seoulmetro-cyberstation-route-map"
+          ],
+          "examples": [
+            "official cyber-station SVG",
+            "route map label polygons"
+          ],
+          "basisField": "retrievedAt",
+          "reverificationCadence": "P1Y",
+          "offlinePackEligible": true,
+          "eventTriggers": [
+            "new station opening",
+            "line extension opening",
+            "official map revision"
+          ],
+          "changePublishSla": "P14D",
+          "freshnessMetric": "routeMapPositionFreshnessRatio"
+        },
+        {
+          "id": "realtime_overlay",
+          "sourceIds": [],
+          "examples": [
+            "Seoul TOPIS arrival",
+            "provider train position"
+          ],
+          "basisField": "observedAt",
+          "reverificationCadence": "PT90S",
+          "offlinePackEligible": false,
+          "eventTriggers": [
+            "provider stale",
+            "mapping failure spike",
+            "quota or terms change"
+          ],
+          "changePublishSla": "online-overlay-only",
+          "freshnessMetric": "providerFreshnessSecondsMax"
+        }
+      ],
+      "monitoring": {
+        "manualCheckCadence": "P1D",
+        "channels": [
+          "operator notices",
+          "public data portal update metadata",
+          "GitHub Actions schedule"
+        ],
+        "alertBeforePackExpiry": "PT6H",
+        "alertWhenFreshnessInvalid": true,
+        "productionChannelAllowsExpiredPack": false
+      },
+      "scheduledPipeline": {
+        "cadence": "P1D",
+        "requiredStages": [
+          "source-snapshot",
+          "change-detection",
+          "build",
+          "strict-validation",
+          "conditional-publish",
+          "conditional-post-publish-artifact-validation"
+        ],
+        "releaseSequenceManagedByPipeline": true,
+        "expiresAtManagedByPipeline": true,
+        "reusesProductionValidationIssue": 1393
+      },
+      "reasonCodes": [
+        "SOURCE_FRESHNESS_POLICY_MISSING",
+        "SOURCE_FRESHNESS_DERIVATION_MISMATCH",
+        "SOURCE_SNAPSHOT_EXPIRED",
+        "PACK_PUBLISH_FRESHNESS_EXPIRING",
+        "PACK_PUBLISH_FRESHNESS_EXPIRED",
+        "BUNDLED_PACK_EXPIRED",
+        "MATERIAL_CHANGE_UNAPPROVED",
+        "PUBLISH_REQUIRED_NOT_COMPLETED",
+        "PUBLISH_SEQUENCE_NOT_INCREASING",
+        "POST_PUBLISH_REMOTE_VALIDATION_FAILED"
+      ],
+      "staleExposurePolicy": {
+        "expiredManifestAppBehavior": "continue-with-visible-stale-label",
+        "expiredManifestEtaSource": "STALE",
+        "visibleLabelKo": "저장된 데이터 기준 · 갱신 필요",
+        "strictProfileCanUseStaleAsFound": false,
+        "supportClaimDowngradeRequired": true,
+        "linkedUiIssues": [
+          1396,
+          1398
+        ]
+      },
+      "rollback": {
+        "runbookCommand": "node tools/datapack/run-emergency-datapack-drill.mjs --input <drill-input.json> --output <drill-evidence.json>",
+        "rehearsalEvidenceRequired": true,
+        "requiredEvidence": [
+          "manifest-hashes",
+          "rollback-time-seconds",
+          "route-regression-replay"
+        ]
+      },
+      "requiredEvidence": [
+        "freshness-policy-json",
+        "scheduled-pipeline-log-one-cycle",
+        "expiry-alert-evidence",
+        "rollback-rehearsal-evidence",
+        "stale-label-android-ui-tree-or-screenshot"
+      ]
+    }
+  }
+}

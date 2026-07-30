@@ -54,7 +54,9 @@ function backendChecks() {
     check("backend.cd-ghcr-digest", cd !== null && cd.includes("ghcr.io/aquilaxk/easysubway-backend") && cd.includes("DEPLOY_IMAGE_DIGEST") && cd.includes('docker tag "${IMAGE}@${DEPLOY_IMAGE_DIGEST}"')),
     check("backend.boundary", findViolations(boundaries.forbiddenReferences ?? [], { allowlist: boundaries.allowlist ?? [] }).length === 0),
     check("backend.no-external-process-resources", !backendBuildUsesExternalProcessResources()),
-    check("backend.contract-lock", existsSync("contracts/backend/contract-lock.json")),
+    check("backend.contract-lock", existsSync("backend/contracts.lock.json")),
+    check("backend.contract-bundle", existsSync("contracts/bundles/backend-contracts-v1.0.0.json")),
+    check("backend.contract-staging", backendBuildUsesStagedContracts()),
     componentManifestCheck("backend"),
     ...sharedChecks(),
   ];
@@ -89,7 +91,7 @@ function componentManifestCheck(component) {
 function sharedChecks() {
   return [
     check("release.system-manifest-v2", hasSystemManifestV2()),
-    check("contracts.explicit-workspace", existsSync("contracts/workspace.json")),
+    check("contracts.explicit-workspace", existsSync("contracts/workspaces/hub.json")),
   ];
 }
 
@@ -105,7 +107,12 @@ function hasSystemManifestV2() {
 
 function backendBuildUsesExternalProcessResources() {
   const build = readTextIfExists("backend/build.gradle");
-  return build !== null && (build.includes("../tools/") || build.includes("../apps/"));
+  return build !== null && (build.includes("../tools/") || build.includes("../apps/") || build.includes("../release/"));
+}
+
+function backendBuildUsesStagedContracts() {
+  const build = readTextIfExists("backend/build.gradle");
+  return build !== null && build.includes("stageContracts") && build.includes("build/contracts-staging");
 }
 
 function check(id, ok) {

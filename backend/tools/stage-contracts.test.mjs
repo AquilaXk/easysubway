@@ -1,0 +1,144 @@
+import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { dirname, join, resolve } from "node:path";
+import test from "node:test";
+
+const repositoryRoot = resolve(import.meta.dirname, "../..");
+const script = join(repositoryRoot, "backend/tools/stage-contracts.mjs");
+const outputRoot = join(repositoryRoot, "backend/build/stage-contracts-test");
+
+test("stage-contracts는 해시가 고정된 정확한 두 계약을 staging한다", () => {
+  const fixture = createFixture();
+  try {
+    run(fixture);
+
+    assert.deepEqual(JSON.parse(readFileSync(join(fixture.output, "datapack/source-governance-policy.json"))), fixture.bundle.resources["datapack/source-governance-policy.json"]);
+    assert.deepEqual(JSON.parse(readFileSync(join(fixture.output, "datapack/datapack-freshness-sla.json"))), fixture.bundle.resources["datapack/datapack-freshness-sla.json"]);
+    assert.equal(readFileSync(join(fixture.output, "datapack/source-governance-policy.json"), "utf8").endsWith("\n"), true);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("stage-contracts는 raw-byte hash가 다른 bundle을 거부한다", () => {
+  const fixture = createFixture({ hash: "0".repeat(64) });
+  try {
+    assert.throws(() => run(fixture), /sha256/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("stage-contracts는 lock과 다른 bundle version을 거부한다", () => {
+  const fixture = createFixture({ bundleVersion: "1.0.1" });
+  try {
+    assert.throws(() => run(fixture), /bundleVersion/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("stage-contracts는 Task 1에 고정되지 않은 artifact URL을 거부한다", () => {
+  const fixture = createFixture({ artifactUrl: "https://example.invalid/backend-contracts-v1.0.0.json" });
+  try {
+    assert.throws(() => run(fixture));
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("stage-contracts는 resource 누락이나 추가를 거부한다", () => {
+  for (const resources of [
+    { "datapack/source-governance-policy.json": { policy: true } },
+    {
+      "datapack/source-governance-policy.json": { policy: true },
+      "datapack/datapack-freshness-sla.json": { freshness: true },
+      "datapack/unapproved.json": { extra: true },
+    },
+  ]) {
+    const fixture = createFixture({ resources });
+    try {
+      assert.throws(() => run(fixture), /resources/i);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+});
+
+test("stage-contracts는 object가 아닌 resource 값을 거부한다", () => {
+  for (const resources of [
+    { "datapack/source-governance-policy.json": null, "datapack/datapack-freshness-sla.json": { freshness: true } },
+    { "datapack/source-governance-policy.json": ["policy"], "datapack/datapack-freshness-sla.json": { freshness: true } },
+    { "datapack/source-governance-policy.json": { policy: true }, "datapack/datapack-freshness-sla.json": "freshness" },
+  ]) {
+    const fixture = createFixture({ resources });
+    try {
+      assert.throws(() => run(fixture), /resources/i);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+});
+
+test("stage-contracts는 duplicate 또는 extra CLI option을 거부한다", () => {
+  const fixture = createFixture();
+  try {
+    assert.throws(() => run(fixture, ["--input", fixture.input]), /duplicate|unknown/i);
+    assert.throws(() => run(fixture, ["--unexpected", "value"]), /unknown/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("stage-contracts는 symlink input과 backend/build 밖 output을 거부한다", () => {
+  const fixture = createFixture();
+  const link = join(fixture.directory, "bundle-link.json");
+  symlinkSync(fixture.input, link);
+  try {
+    assert.throws(() => run({ ...fixture, input: link }), /regular file|symlink/i);
+    assert.throws(() => run({ ...fixture, output: join(fixture.directory, "outside") }), /backend.build|output/i);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+function createFixture(options = {}) {
+  const directory = mkdtempSync(join(tmpdir(), "stage-contracts-"));
+  const output = join(outputRoot, directory.split("/").at(-1));
+  mkdirSync(dirname(output), { recursive: true });
+  const bundle = {
+    schemaVersion: 1,
+    bundleVersion: options.bundleVersion ?? "1.0.0",
+    resources: options.resources ?? {
+      "datapack/source-governance-policy.json": { policy: true },
+      "datapack/datapack-freshness-sla.json": { freshness: true },
+    },
+  };
+  const input = join(directory, "bundle.json");
+  const bytes = `${JSON.stringify(bundle)}\n`;
+  writeFileSync(input, bytes);
+  writeFileSync(join(directory, "lock.json"), `${JSON.stringify({
+    schemaVersion: 1,
+    bundleVersion: "1.0.0",
+    artifactUrl: options.artifactUrl ?? "https://raw.githubusercontent.com/AquilaXk/easysubway/main/contracts/bundles/backend-contracts-v1.0.0.json",
+    sha256: options.hash ?? createHash("sha256").update(bytes).digest("hex"),
+  })}\n`);
+  return {
+    directory,
+    input,
+    lock: join(directory, "lock.json"),
+    output,
+    bundle,
+    cleanup() {
+      rmSync(directory, { recursive: true, force: true });
+      rmSync(output, { recursive: true, force: true });
+    },
+  };
+}
+
+function run(fixture, extraArguments = []) {
+  return execFileSync(process.execPath, [script, "--lock", fixture.lock, "--input", fixture.input, "--output", fixture.output, ...extraArguments], { encoding: "utf8", stdio: "pipe" });
+}

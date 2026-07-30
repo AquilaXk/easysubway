@@ -54,6 +54,8 @@ test("split readiness target별 check id와 현재 pass 상태를 고정한다",
       "backend.boundary",
       "backend.no-external-process-resources",
       "backend.contract-lock",
+      "backend.contract-bundle",
+      "backend.contract-staging",
       "backend.component-manifest",
       "release.system-manifest-v2",
       "contracts.explicit-workspace",
@@ -99,36 +101,30 @@ test("현재 분리 blocker를 readiness 결과에 fail로 드러낸다", () => 
   assert.equal(byId(datapack, "datapack.candidate-promotion-separated").status, "fail");
   assert.equal(byId(infra, "infra.deploy-consumes-digest-only").status, "fail");
   assert.equal(byId(infra, "infra.no-backend-build").status, "fail");
-  assert.equal(byId(backend, "backend.no-external-process-resources").status, "fail");
+  assert.equal(byId(backend, "backend.no-external-process-resources").status, "pass");
+  assert.equal(byId(backend, "backend.contract-lock").status, "pass");
+  assert.equal(byId(backend, "backend.contract-bundle").status, "pass");
+  assert.equal(byId(backend, "backend.contract-staging").status, "pass");
   assert.equal(byId(backend, "release.system-manifest-v2").status, "fail");
-  assert.equal(byId(backend, "contracts.explicit-workspace").status, "fail");
+  assert.equal(byId(backend, "contracts.explicit-workspace").status, "pass");
   assert.equal(byId(mobile, "mobile.datapack-lock").status, "fail");
   assert.equal(byId(mobile, "mobile.artifact-staging").status, "fail");
 });
 
-test("component manifest와 backend contract lock을 추가하면 해당 blocker만 pass가 된다", () => {
+test("component manifest를 추가하면 해당 blocker만 pass가 된다", () => {
   const componentDirectory = "contracts/components";
-  const backendDirectory = "contracts/backend";
   const componentPath = `${componentDirectory}/backend.json`;
-  const lockPath = `${backendDirectory}/contract-lock.json`;
   const componentDirectoryExisted = existsSync(componentDirectory);
-  const backendDirectoryExisted = existsSync(backendDirectory);
   assert.equal(existsSync(componentPath), false);
-  assert.equal(existsSync(lockPath), false);
 
   mkdirSync(componentDirectory, { recursive: true });
-  mkdirSync(backendDirectory, { recursive: true });
   writeFileSync(componentPath, "{}\n");
-  writeFileSync(lockPath, "{}\n");
   try {
     const backend = evaluateReadiness("backend");
     assert.equal(byId(backend, "backend.component-manifest").status, "pass");
-    assert.equal(byId(backend, "backend.contract-lock").status, "pass");
   } finally {
     unlinkSync(componentPath);
-    unlinkSync(lockPath);
     if (!componentDirectoryExisted) rmdirSync(componentDirectory);
-    if (!backendDirectoryExisted) rmdirSync(backendDirectory);
   }
 });
 
