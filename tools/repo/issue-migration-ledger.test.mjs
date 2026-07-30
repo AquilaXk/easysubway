@@ -16,17 +16,21 @@ const OPEN_ISSUE_NUMBERS = [
   2619, 2620, 2621, 2622, 2623, 2624, 2625, 2626, 2627, 2628, 2629, 2630,
   2667, 2674, 2675, 2676, 2677, 2678, 2679, 2680, 2684, 2690, 2691,
 ];
+const DATA_APPROVAL_URL = "https://github.com/AquilaXk/easysubway/issues/2705#issuecomment-5134093671";
+const DATA_TRANSFER_ISSUES = new Set([2138, 2523, 2533, 2607, 2608, 2610, 2611, 2684]);
 
 function ledgerFixture() {
   return JSON.parse(readFileSync("release/migrations/repository-split-issues.json", "utf8"));
 }
 
-test("71개 open issue ledger는 inventory와 execution guard를 모두 만족한다", () => {
+test("71개 open issue ledger는 data Task6 approval과 나머지 pending state를 만족한다", () => {
   const ledger = ledgerFixture();
 
   assert.equal(ledger.issues.length, 71);
-  assert.deepEqual(validateLedger(ledger, { openIssueNumbers: OPEN_ISSUE_NUMBERS, requirePending: true }), []);
-  assert.ok(ledger.issues.every((entry) => entry.executionApproval === null));
+  assert.deepEqual(validateLedger(ledger, { openIssueNumbers: OPEN_ISSUE_NUMBERS }), []);
+  assert.ok(ledger.issues.every((entry) => (
+    entry.executionApproval === (DATA_TRANSFER_ISSUES.has(entry.sourceIssue) ? DATA_APPROVAL_URL : null)
+  )));
   assert.ok(ledger.issues.every((entry) => entry.targetUrl === null));
   assert.ok(ledger.issues.every((entry) => entry.transferredAt === null));
 });
