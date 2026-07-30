@@ -1,5 +1,6 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
+import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
 import { validateLedger } from "./issue-migration-ledger.mjs";
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
@@ -68,7 +69,7 @@ export function validateMigrationLedger({ ledger, schema }) {
   return [...schemaErrors, ...validateLedger(ledger)];
 }
 
-export async function runMigration({ arguments_, ledger, schema, execGh }) {
+export async function runMigration({ arguments_, ledger, schema, execGh, retryDelayMs = 0 }) {
   if (validateMigrationLedger({ ledger, schema }).length !== 0) throw new Error("ledger validation failed");
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === arguments_.sourceIssue);
   if (!entry) throw new Error("source issue is not in the ledger");
@@ -79,7 +80,7 @@ export async function runMigration({ arguments_, ledger, schema, execGh }) {
     execGh,
   });
   try {
-    return await verifyTransferredIssue({ entry, transferResult, execGh });
+    return await verifyTransferredIssue({ entry, transferResult, execGh, retryDelayMs });
   } catch (error) {
     const partialFailure = new Error(`issue transfer completed but post-transfer verification failed: ${error instanceof Error ? error.message : String(error)}`);
     partialFailure.transferCompleted = true;
@@ -111,25 +112,34 @@ export async function executeIssueTransfer({ entry, confirmations, execGh }) {
   }
 }
 
-export async function verifyTransferredIssue({ entry, transferResult, execGh }) {
+export async function verifyTransferredIssue({ entry, transferResult, execGh, retryDelayMs = 0 }) {
   const targetUrl = transferResult?.redirectedIssue;
   if (!targetUrl) throw new Error("transferred issue identity is missing");
-  const target = await readIssueMetadata(targetUrl.repository, targetUrl.number, execGh);
   const expected = transferResult?.expectedMetadata;
-  if (target.number !== targetUrl.number || target.url !== `https://github.com/${targetUrl.repository}/issues/${targetUrl.number}`) {
-    throw new Error("redirect target metadata is stale");
+  let verificationError;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const target = await readIssueMetadata(targetUrl.repository, targetUrl.number, execGh);
+      if (target.number !== targetUrl.number || target.url !== `https://github.com/${targetUrl.repository}/issues/${targetUrl.number}`) {
+        throw new Error("redirect target metadata is stale");
+      }
+      if (!expected || !sameMetadata(expected, target)) throw new Error("transferred issue metadata does not match source");
+      return {
+        sourceUrl: entry.sourceUrl,
+        targetUrl: target.url,
+        number: target.number,
+        title: target.title,
+        state: target.state,
+        labelCount: target.labels.length,
+        milestone: target.milestone?.title ?? null,
+        commentCount: target.commentCount,
+      };
+    } catch (error) {
+      verificationError = error;
+      if (attempt < 2) await delay(retryDelayMs);
+    }
   }
-  if (!expected || !sameMetadata(expected, target)) throw new Error("transferred issue metadata does not match source");
-  return {
-    sourceUrl: entry.sourceUrl,
-    targetUrl: target.url,
-    number: target.number,
-    title: target.title,
-    state: target.state,
-    labelCount: target.labels.length,
-    milestone: target.milestone?.title ?? null,
-    commentCount: target.commentCount,
-  };
+  throw verificationError;
 }
 
 async function preflightDetails({ entry, execGh }) {
@@ -322,6 +332,7 @@ async function main() {
       ledger: JSON.parse(ledgerText),
       schema: JSON.parse(schemaText),
       execGh,
+      retryDelayMs: 1_000,
     })));
   } catch (error) {
     if (error?.transferCompleted === true || error?.transferIndeterminate === true) console.error(error.message);
