@@ -170,15 +170,28 @@ test("post-transfer verification rejects metadata that does not identify the red
 
 test("unsafe entries and incomplete connections never transfer", async (t) => {
   const cases = [
-    transferEntry({ executionApproval: "bad" }),
-    transferEntry({ targetUrl: TARGET_URL }),
-    transferEntry({ transferredAt: "2026-07-30T00:00:00.000Z" }),
     transferEntry(),
   ];
   for (const [index, entry] of cases.entries()) await t.test(String(index), async () => {
-    const source = index === 3 ? { ...metadata(), labels: { totalCount: 2, nodes: [{ name: "release-blocker" }] } } : metadata();
+    const source = { ...metadata(), labels: { totalCount: 2, nodes: [{ name: "release-blocker" }] } };
     const fake = fakeGh({ source });
     await assert.rejects(() => preflightIssueTransfer({ entry, execGh: fake.execGh }));
+    assert.deepEqual(transferCalls(fake.calls), []);
+  });
+});
+
+test("execute rejects malformed approval and completed transfer state before transfer", async (t) => {
+  const cases = [
+    transferEntry({ executionApproval: "bad" }),
+    transferEntry({ targetUrl: TARGET_URL, transferredAt: "2026-07-30T00:00:00.000Z" }),
+  ];
+  for (const entry of cases) await t.test(entry.executionApproval, async () => {
+    const fake = fakeGh();
+    await assert.rejects(() => executeIssueTransfer({
+      entry,
+      confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY },
+      execGh: fake.execGh,
+    }));
     assert.deepEqual(transferCalls(fake.calls), []);
   });
 });
@@ -187,8 +200,11 @@ test("parser rejects duplicate and missing singleton values", () => {
   for (const flag of ["--ledger", "--source-issue", "--confirm-source", "--confirm-target"]) {
     const base = ["--ledger", "l", "--source-issue", "1", "--execute", "--confirm-source", "AquilaXk/easysubway#1", "--confirm-target", "AquilaXk/easysubway-data"];
     assert.throws(() => parseArguments([...base, flag, "x"]));
-    assert.throws(() => parseArguments([...base.slice(0, base.indexOf(flag)), ...base.slice(base.indexOf(flag) + 1)]));
+    const index = base.indexOf(flag);
+    assert.throws(() => parseArguments([...base.slice(0, index), ...base.slice(index + 1)]));
   }
+  assert.throws(() => parseArguments(["--ledger", "l", "--source-issue", "1", "--execute", "--confirm-source", "AquilaXk/easysubway#1", "--confirm-target"]));
+  assert.throws(() => parseArguments(["--ledger", "--source-issue", "1", "--execute", "--confirm-source", "AquilaXk/easysubway#1", "--confirm-target", "AquilaXk/easysubway-data"]));
 });
 
 test("target milestone due-date mismatch rejects before transfer", async () => {
