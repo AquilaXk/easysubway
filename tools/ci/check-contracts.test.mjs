@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
@@ -74,6 +75,23 @@ test("[gate-ownership] workspace는 필수 키 누락을 fail closed한다", () 
     assert.throws(() => loadWorkspace(workspacePath), /freshnessPolicy/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("[gate-ownership] check-contracts CLI는 정확한 workspace 인자만 허용한다", () => {
+  const run = (args) => execFileSync("node", ["tools/ci/check-contracts.mjs", ...args], {
+    encoding: "utf8",
+    stdio: "pipe",
+  });
+
+  assert.doesNotThrow(() => run(["--workspace", "contracts/workspaces/hub.json"]));
+  for (const args of [
+    [],
+    ["--workspace"],
+    ["--unexpected", "--workspace", "contracts/workspaces/hub.json"],
+    ["--workspace", "contracts/workspaces/hub.json", "--workspace", "contracts/workspaces/hub.json"],
+  ]) {
+    assert.throws(() => run(args), /사용법/);
   }
 });
 
@@ -674,6 +692,17 @@ test("[gate-ownership] gate-index는 owner 간에도 gate.file 중복을 거부�
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("[gate-ownership] gate-index 누락은 계약 오류로 수집한다", () => {
+  const errors = [];
+
+  validateGateIndex(errors, "contracts/release/missing-gate-index.json", {
+    hub: "release/product-gates",
+    mobile: "apps/mobile/release",
+  });
+
+  assert.deepEqual(errors, ["contracts/release/missing-gate-index.json 누락"]);
 });
 
 test("env-scope-map이 .env.example 키와 1:1 대응한다", () => {

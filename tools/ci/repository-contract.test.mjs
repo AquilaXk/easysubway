@@ -7084,7 +7084,7 @@ test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계�
   assert.match(runtimeScript, /summary\.txt/);
 });
 
-test("Android release 100 governance gate는 Android-only 범위와 evidence schema를 고정한다", () => {
+test("[gate-ownership] Android release 100 governance gate는 Android-only 범위와 evidence schema를 고정한다", () => {
   const gatePath = "release/product-gates/release-governance-gate.json";
   assert.equal(existsSync(path.join(root, gatePath)), true, "release governance gate must exist");
 
@@ -7404,8 +7404,9 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.ok(gate.requiredChecks.includes("CI / Repository CI"));
   assert.ok(gate.requiredChecks.includes("CI / Release Gate Consistency"));
   assert.ok(gate.releaseImpactPaths.includes("apps/mobile/release/**"));
+  assert.ok(gate.releaseImpactPaths.includes("release/product-gates/**"));
   const allowedStatuses = new Set(gate.gateStatusEnum);
-  for (const releaseFile of execFileSync("git", ["ls-files", "apps/mobile/release/*.json"], {
+  for (const releaseFile of execFileSync("git", ["ls-files", "apps/mobile/release/*.json", "release/product-gates/*.json"], {
     cwd: root,
     encoding: "utf8",
   }).trim().split("\n").filter(Boolean)) {
@@ -19198,7 +19199,7 @@ test("경로 분류기는 README를 문서 전용 변경으로 처리한다", as
   assert.equal(outputs.deploy, "false");
 });
 
-test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경을 구분한다", async () => {
+test("[gate-ownership] 경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경을 구분한다", async () => {
   const repository = await classifyChangedFiles([".github/ISSUE_TEMPLATE/task_request.yml"]);
   assert.equal(repository.repository, "true");
   assert.equal(repository.docs_only, "false");
@@ -19341,20 +19342,11 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
   const releaseGate = await classifyChangedFiles(["release/product-gates/release-governance-gate.json"]);
   assert.equal(releaseGate.release, "true");
   assert.equal(releaseGate.contracts, "true");
-  assert.equal(releaseGate.mobile, "true");
+  assert.equal(releaseGate.mobile, "false");
+  assert.equal(releaseGate.android, "false");
+  assert.equal(releaseGate.ios, "false");
   // #2390: release 자산 변경은 repository=true여야 claim 스캔(contract test)이 스킵되지 않는다.
   assert.equal(releaseGate.repository, "true");
-});
-
-test("[gate-ownership] product gate 경로도 release 계약 게이트로 분류한다", async () => {
-  const productGate = await classifyChangedFiles(["release/product-gates/release-governance-gate.json"]);
-
-  for (const gate of ["repository", "contracts", "release"]) {
-    assert.equal(productGate[gate], "true", `product gate must map to ${gate}=true`);
-  }
-  for (const gate of ["mobile", "android", "ios"]) {
-    assert.equal(productGate[gate], "false", `product gate must not map to ${gate}=true`);
-  }
 });
 
 // #2518: tools/ 하위에 새 디렉토리가 생겨도 detect-changed-paths.sh 매핑 누락이

@@ -409,7 +409,10 @@ export function validateCompatibilityMatrixPayload(matrix, index, errors) {
 }
 
 export function validateGateIndex(errors, indexPath, gateDirectories) {
-  if (!existsSync(indexPath)) return;
+  if (!existsSync(indexPath)) {
+    errors.push(`${indexPath} 누락`);
+    return;
+  }
   const index = loadJson(indexPath);
   const ownerComponents = { product: "hub", mobile: "mobile" };
   const files = new Set();
@@ -458,12 +461,12 @@ function compareText(left, right) {
 }
 
 if (isMainModule(import.meta.url)) {
-  const workspaceIndex = process.argv.indexOf("--workspace");
-  if (workspaceIndex === -1 || workspaceIndex !== process.argv.length - 2) {
+  const args = process.argv.slice(2);
+  if (args.length !== 2 || args[0] !== "--workspace" || args[1].trim() === "") {
     console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json>");
     process.exit(1);
   }
-  const errors = collectContractErrors(process.argv[workspaceIndex + 1]);
+  const errors = collectContractErrors(args[1]);
   if (errors.length) {
     console.error(errors.map((error) => `- ${error}`).join("\n"));
     process.exit(1);

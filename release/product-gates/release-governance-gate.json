@@ -181,6 +181,7 @@
     "tools/release/**",
     ".github/workflows/**",
     "apps/mobile/release/**",
+    "release/product-gates/**",
     ".env.example",
     "README.md"
   ],
