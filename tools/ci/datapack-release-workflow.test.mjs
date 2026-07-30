@@ -542,6 +542,7 @@ test("expiry alert는 publish 없이 같은 decision engine을 소비한다", ()
 
 test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 검증하고 request만 attest한다", () => {
   const promotion = readFileSync(path.join(root, ".github/workflows/datapack-promotion.yml"), "utf8");
+  const releaseArtifacts = readFileSync(path.join(root, ".github/workflows/release-artifacts.yml"), "utf8");
 
   assert.match(yml, /build-data-component-manifest\.mjs/);
   assert.match(yml, /easysubway-datapack-candidate-\$\{\{ github\.run_id \}\}/);
@@ -625,6 +626,11 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.doesNotMatch(promotion, /<<'NODE'/);
   assert.doesNotMatch(promotion, /EASYSUBWAY_DATA_PACK/);
   assert.doesNotMatch(promotion, /OBJECT_STORAGE/);
+  assert.match(releaseArtifacts, /datapack_candidate_run_id:/);
+  assert.match(releaseArtifacts, /Data Pack Mobile Compatibility/);
+  assert.match(releaseArtifacts, /build-datapack-mobile-compatibility-evidence\.mjs/);
+  assert.match(releaseArtifacts, /name: easysubway-datapack-compatibility-\$\{\{ github\.run_id \}\}/);
+  assert.match(releaseArtifacts, /path: \$\{\{ runner\.temp \}\}\/compatibility-evidence\.json/);
 });
 
 test("production-publish는 attested candidate를 no-rebuild로 소비한다", () => {
