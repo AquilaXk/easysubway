@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { validateSystemReleaseManifest } from "./validate-system-release-manifest.mjs";
 
 const sha = "a".repeat(64);
@@ -68,5 +71,40 @@ test("system release manifest v2 rejects every locked identity violation", () =>
     const manifest = validManifest();
     mutate(manifest);
     assert.ok(validateSystemReleaseManifest({ manifest, ...schemas }).length > 0, name);
+  }
+});
+
+test("system and component non-array issue refs return validation errors without throwing", () => {
+  for (const mutate of [
+    (manifest) => { manifest.issueRefs = 2693; },
+    (manifest) => { manifest.mobile.issueRefs = {}; },
+  ]) {
+    const manifest = validManifest();
+    mutate(manifest);
+    assert.doesNotThrow(() => validateSystemReleaseManifest({ manifest, ...schemas }));
+    assert.ok(validateSystemReleaseManifest({ manifest, ...schemas }).length > 0);
+  }
+});
+
+test("CLI emits fixed redacted errors for argument, file, and JSON failures", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "release-manifest-test-"));
+  const missingPath = path.join(directory, "TOP_SECRET_MANIFEST_BODY.json");
+  const malformedPath = path.join(directory, "malformed.json");
+  writeFileSync(malformedPath, '{"secret":"TOP_SECRET_MANIFEST_BODY"');
+  try {
+    const cases = [
+      [[], "invalid arguments"],
+      [["--manifest", missingPath], "manifest file is unreadable or invalid JSON"],
+      [["--manifest", malformedPath], "manifest file is unreadable or invalid JSON"],
+    ];
+    for (const [args, message] of cases) {
+      const result = spawnSync(process.execPath, ["tools/release/validate-system-release-manifest.mjs", ...args], { encoding: "utf8" });
+      assert.equal(result.status, 1);
+      assert.equal(result.stdout, "");
+      assert.equal(result.stderr, `system-release-manifest: invalid\n${message}\n`);
+      assert.doesNotMatch(result.stderr, /TOP_SECRET_MANIFEST_BODY|release-manifest-test/);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });

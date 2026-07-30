@@ -19,12 +19,16 @@ export function validateSystemReleaseManifest({ manifest, componentSchema, syste
     errors.push(...validateSchema(componentSchema, component).errors.map((error) => `${slot}${error.slice(1)}`));
     if (component.component !== slot) errors.push(`${slot}: component must match slot`);
     if (!allowedRepositories[slot].has(component.repository)) errors.push(`${slot}: repository is not allowed for slot`);
-    for (const issueRef of component.issueRefs ?? []) {
-      errors.push(...validateSchema(issueRefSchema, issueRef).errors.map(() => `${slot}: invalid issue ref`));
+    if (Array.isArray(component.issueRefs)) {
+      for (const issueRef of component.issueRefs) {
+        errors.push(...validateSchema(issueRefSchema, issueRef).errors.map(() => `${slot}: invalid issue ref`));
+      }
     }
   }
-  for (const issueRef of manifest.issueRefs ?? []) {
-    errors.push(...validateSchema(issueRefSchema, issueRef).errors.map(() => "system: invalid issue ref"));
+  if (Array.isArray(manifest.issueRefs)) {
+    for (const issueRef of manifest.issueRefs) {
+      errors.push(...validateSchema(issueRefSchema, issueRef).errors.map(() => "system: invalid issue ref"));
+    }
   }
 
   const components = slots.map((slot) => manifest[slot]).filter(Boolean);
@@ -46,9 +50,15 @@ function redact(errors) {
 
 function main() {
   const manifestPath = parseManifestPath(process.argv.slice(2));
+  if (!manifestPath) return fail("invalid arguments");
   const here = path.dirname(fileURLToPath(import.meta.url));
+  let manifest;
   try {
-    const manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+    manifest = JSON.parse(readFileSync(manifestPath, "utf8"));
+  } catch {
+    return fail("manifest file is unreadable or invalid JSON");
+  }
+  try {
     const schema = (name) => JSON.parse(readFileSync(path.join(here, "../../contracts/release", name), "utf8"));
     const errors = validateSystemReleaseManifest({
       manifest,
@@ -56,17 +66,21 @@ function main() {
       systemSchema: schema("system-release-manifest.schema.json"),
       issueRefSchema: schema("issue-ref.schema.json"),
     });
-    if (errors.length > 0) throw new Error(errors.join("\n"));
+    if (errors.length > 0) return fail(errors.join("\n"));
     process.stdout.write(`system-release-manifest: OK ${manifest.productReleaseId}\n`);
-  } catch (error) {
-    process.stderr.write(`system-release-manifest: invalid\n${error.message}\n`);
-    process.exitCode = 1;
+  } catch {
+    fail("validator unavailable");
   }
 }
 
 function parseManifestPath(args) {
   if (args.length === 2 && args[0] === "--manifest" && args[1]) return args[1];
-  throw new Error("usage: --manifest <path>");
+  return null;
+}
+
+function fail(message) {
+  process.stderr.write(`system-release-manifest: invalid\n${message}\n`);
+  process.exitCode = 1;
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) main();
