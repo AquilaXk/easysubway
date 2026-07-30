@@ -971,7 +971,7 @@ export function parseMolitDaejeonStationMappings(csvBytes) {
   });
 }
 
-// #2138 activeLineScopes의 evidenceRef(source:molit-urban-rail-full-route) 원본에서
+// AquilaXk/easysubway-data#3 activeLineScopes의 evidenceRef(source:molit-urban-rail-full-route) 원본에서
 // (regionId, operatorId, lineId) scope별 역명 roster를 그대로 복원한다.
 // source-inventory coverageScope의 dual-operator 주장을 기계 검증하는 회귀(#2508)가 소비한다.
 export function parseMolitLineOperatorRosters(csvBytes) {

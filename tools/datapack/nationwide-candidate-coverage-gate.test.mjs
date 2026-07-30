@@ -142,7 +142,7 @@ const GWANGJU_MATERIALIZERS = [
 ];
 // #2595 B3 두 번째 배치. 수도권 노선도 카탈로그의 남은 3노선(서해선·GTX-A·신분당선)은 admission 정본이
 // 두 운영기관 scope를 dual coverage로 등재해 materializer 정본 대조가 단일 운영기관만 허용하던 동안 막혀
-// 있었다. 서해선·GTX-A는 두 scope가 모두 #2138 activeLineScopes에 있어 노선마다 requirement가 둘이고,
+// 있었다. 서해선·GTX-A는 두 scope가 모두 AquilaXk/easysubway-data#3 activeLineScopes에 있어 노선마다 requirement가 둘이고,
 // 신분당선은 정본의 서울교통공사 표기가 FILE admission 계보 항목이라 대응 scope가 없어 하나다.
 // 9호선은 한 노선을 두 소스가 나눠 덮어 requirement 하나를 두 소스가 함께 뒷받침한다.
 const CAPITAL_DUAL_OPERATOR_REQUIREMENT_KEYS = [
@@ -1286,7 +1286,7 @@ test("수도권 dual-operator 노선 6 requirement는 편입으로 MISSING에서
   assert.equal("reorderedTables" in phase23, false);
 });
 
-// #2138 증거 모델 축. 감사자가 evidence만 보고 "어느 건이 어느 근거 성격으로 섰는지" 알 수 있어야 한다.
+// AquilaXk/easysubway-data#3 증거 모델 축. 감사자가 evidence만 보고 "어느 건이 어느 근거 성격으로 섰는지" 알 수 있어야 한다.
 // 값은 하네스가 지어내지 않고 판정 경로(report-coverage-gaps.mjs)가 requirement마다 실어 준 domain 선언
 // 그대로이며, 범주별 합이 SUPPORTED 총계와 같아야 한다.
 test("게이트 evidence는 SUPPORTED를 근거 성격별로 나눠 기록하고 합이 총계와 같다", async () => {

@@ -213,7 +213,7 @@ test("execution transfers one approved issue and verifies redirected metadata", 
 test("completed transfer with failed verification reports a partial-success error", async () => {
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
-  entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  Object.assign(entry, { executionApproval: "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1", targetUrl: null, transferredAt: null });
   const fake = fakeGh({ target: metadata({ url: TARGET_URL, number: 8 }) });
 
   await assert.rejects(
@@ -232,7 +232,7 @@ test("completed transfer with failed verification reports a partial-success erro
 test("post-transfer verification retries temporary target metadata propagation lag", async () => {
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
-  entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  Object.assign(entry, { executionApproval: "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1", targetUrl: null, transferredAt: null });
   const target = metadata({ url: TARGET_URL, number: 7 });
   const fake = fakeGh({ target, targetResponses: [{ ...target, comments: { totalCount: 0 } }, target] });
 
@@ -251,7 +251,7 @@ test("post-transfer verification retries temporary target metadata propagation l
 test("unconfirmed transfer response reports an indeterminate result", async () => {
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
-  entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  Object.assign(entry, { executionApproval: "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1", targetUrl: null, transferredAt: null });
   const fake = fakeGh({ transferFailure: true });
 
   await assert.rejects(
@@ -270,7 +270,7 @@ test("unconfirmed transfer response reports an indeterminate result", async () =
 test("malformed successful transfer output reports an indeterminate result", async () => {
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
-  entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  Object.assign(entry, { executionApproval: "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1", targetUrl: null, transferredAt: null });
   const fake = fakeGh({ transferOutput: "Transferred\n" });
 
   await assert.rejects(

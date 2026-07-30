@@ -885,7 +885,7 @@ test("재기술만으로는 containment 감사가 사라진 scope를 통과시�
 test("activeLineScopes에서 빠진 scope는 재기술 claim으로 통과시킬 수 없다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const targets = structuredClone(inputs.targets);
-  // snapshot이 그대로 커버해도 #2138 requirement에서 빠지면 containment 감사 자체가 사라진다.
+  // snapshot이 그대로 커버해도 AquilaXk/easysubway-data#3 requirement에서 빠지면 containment 감사 자체가 사라진다.
   targets.activeLineScopes = targets.activeLineScopes
     .filter((scope) => scopeKeyOf(scope) !== CANDIDATE_REDESCRIBED_SCOPE_KEY);
 

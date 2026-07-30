@@ -14,7 +14,7 @@ const PUBLIC_API_ORIGINS = new Set([
   "https://openapi.seoul.go.kr",
 ]);
 const COVERAGE_FALLBACKS = new Set(["PLANNED", "STATIC_LOCAL", "UNSUPPORTED_REGION"]);
-// #2138 증거 모델 축. domain이 "그 도메인의 정본 근거가 어떤 성격인가"를 machine-checkable하게 선언한다.
+// AquilaXk/easysubway-data#3 증거 모델 축. domain이 "그 도메인의 정본 근거가 어떤 성격인가"를 machine-checkable하게 선언한다.
 // official-source: 공식 기관이 그 값 자체를 공표한다(기본값 — 선언하지 않은 도메인은 이 성격이다).
 // owner-authored-canonical: 정본이 오너 제작물이고 공식 데이터는 신원 식별·provenance를 댄다.
 //   route_map_positions가 그렇다 — 도식 위 좌표를 공표하는 공식 기관이 존재하지 않는다.
@@ -22,7 +22,7 @@ const COVERAGE_FALLBACKS = new Set(["PLANNED", "STATIC_LOCAL", "UNSUPPORTED_REGI
 // 이 값은 requirement 레코드에 실려 "어느 건이 어느 근거 성격으로 섰는가"를 집계 가능하게 만들 뿐이다.
 const DEFAULT_DOMAIN_EVIDENCE_MODEL = "official-source";
 const DOMAIN_EVIDENCE_MODELS = new Set([DEFAULT_DOMAIN_EVIDENCE_MODEL, "owner-authored-canonical"]);
-// #2138이 production 유입을 거부하는 범주. 소스가 스스로 선언하며, 선언한 소스가 requirement를 하나라도
+// AquilaXk/easysubway-data#3이 production 유입을 거부하는 범주. 소스가 스스로 선언하며, 선언한 소스가 requirement를 하나라도
 // 뒷받침하면 판정을 내지 않고 그 자리에서 멈춘다(임시값이 완료로 집계되는 경로를 없앤다).
 // 선언하지 않은 소스는 기존 판정을 그대로 유지한다(하위 호환).
 const PLACEHOLDER_EVIDENCE_CATEGORY = "placeholder-fixture";
@@ -117,7 +117,7 @@ function buildCoverageGapReport(
     .map((source) => normalizeSource(source, targetIndex));
   const provenanceIndex = provenance ? provenanceFieldIndex(provenance, candidateManifest) : null;
 
-  // 임시값(placeholder-fixture)으로 선언된 소스는 어떤 requirement도 뒷받침할 수 없다(#2138).
+  // 임시값(placeholder-fixture)으로 선언된 소스는 어떤 requirement도 뒷받침할 수 없다(AquilaXk/easysubway-data#3).
   const placeholderSourceIds = new Set(
     sources.filter(({ evidenceCategory }) => evidenceCategory === PLACEHOLDER_EVIDENCE_CATEGORY)
       .map(({ id }) => id),
@@ -531,7 +531,7 @@ function evaluateRequirements(targets, sources, provenanceIndex, options = {}) {
               }
             : {}),
           sourceDomain: domain.id,
-          // 근거 성격 선언(#2138). 판정에는 관여하지 않고 requirement마다 실려 범주별 집계의 축이 된다 —
+          // 근거 성격 선언(AquilaXk/easysubway-data#3). 판정에는 관여하지 않고 requirement마다 실려 범주별 집계의 축이 된다 —
           // 선언하지 않은 도메인은 official-source로 기록돼 기존 판정·기록이 그대로 유지된다.
           evidenceModel: domainEvidenceModel(domain),
           status: targets.schemaVersion === 2
@@ -655,7 +655,7 @@ function domainEvidenceModel(domain) {
 }
 
 // placeholder-fixture로 선언된 소스가 requirement를 하나라도 뒷받침하면 판정을 내지 않는다.
-// #2138은 임시값이 완료로 집계되는 것을 막는데, 그 경계를 서술이 아니라 판정 경로에서 강제한다.
+// AquilaXk/easysubway-data#3은 임시값이 완료로 집계되는 것을 막는데, 그 경계를 서술이 아니라 판정 경로에서 강제한다.
 function assertNoPlaceholderSupport(requirements, placeholderSourceIds, label) {
   if (placeholderSourceIds.size === 0) return;
   for (const requirement of requirements) {
@@ -965,7 +965,7 @@ function normalizeSource(source, targetIndex) {
   const sourceDomains = requiredStringArray(coverage.sourceDomains, `${id}.coverageScope.sourceDomains`);
   const lineIds = optionalStringArray(coverage.lineIds, `${id}.coverageScope.lineIds`);
   const fields = requiredStringArray(source.fieldsProvided ?? source.fields, `${id}.fieldsProvided`);
-  // 소스 증거 범주 선언(#2138). 선언하지 않으면 undefined로 남아 기존 판정이 그대로 유지된다.
+  // 소스 증거 범주 선언(AquilaXk/easysubway-data#3). 선언하지 않으면 undefined로 남아 기존 판정이 그대로 유지된다.
   if (source.evidenceCategory !== undefined) {
     const evidenceCategory = requiredString(source.evidenceCategory, `${id}.evidenceCategory`);
     if (!SOURCE_EVIDENCE_CATEGORIES.has(evidenceCategory)) {

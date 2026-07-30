@@ -236,7 +236,7 @@ test("dual-operator 노선은 카탈로그 등재 집합과 정본이 같을 때
     declaredOperatorIds,
   );
   // 등재 집합은 정본 대조와 운영기관 등재에 그대로 쓰이지만 pack scope 행은 계보 표기를 뺀 나머지다 —
-  // 서울교통공사 표기에는 #2138 activeLineScopes에 대응 scope가 없어 행으로 내지 않는다.
+  // 서울교통공사 표기에는 AquilaXk/easysubway-data#3 activeLineScopes에 대응 scope가 없어 행으로 내지 않는다.
   assert.deepEqual(line.lineageOnlyOperatorIds, ["seoul-metro"]);
   assert.deepEqual(
     pack.coverageLineOperatorScopes

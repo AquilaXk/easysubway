@@ -9527,7 +9527,7 @@ test("전국 coverage v2는 LAUNCH_REQUIRED domain이 없는 target을 거부한
   );
 });
 
-// #2138 증거 모델 축. route_map_positions는 도식 위 좌표를 공표하는 공식 기관이 없어 정본이 오너
+// AquilaXk/easysubway-data#3 증거 모델 축. route_map_positions는 도식 위 좌표를 공표하는 공식 기관이 없어 정본이 오너
 // 자작 도식이고 공식 데이터는 역 신원 식별·provenance를 댄다. 그 성격을 판정 경로가 읽는 필드로 적되,
 // 판정 자체는 한 톨도 느슨해지지 않는다는 것이 이 축의 계약이다.
 test("전국 coverage v2는 domain 증거 모델 선언을 판정 레코드에 싣고 판정은 그대로 둔다", async () => {
@@ -9598,7 +9598,7 @@ test("전국 coverage v2는 등재되지 않은 domain 증거 모델과 사유 �
   );
 });
 
-// #2138이 production 유입을 거부하는 범주. 선언한 소스가 requirement를 하나라도 뒷받침하면 판정을 내지
+// AquilaXk/easysubway-data#3이 production 유입을 거부하는 범주. 선언한 소스가 requirement를 하나라도 뒷받침하면 판정을 내지
 // 않는다. 현재 선언한 소스는 0건이라 판정은 그대로이고, 이 축은 그 경계를 기계로 옮긴 것이다.
 // 전국 targets(schemaVersion 2)는 provenance 없이는 어떤 소스도 뒷받침 소스로 세지 않으므로, 소스가 실제로
 // requirement를 뒷받침하는 pilot 계약(schemaVersion 1)으로 이 축을 때린다.
@@ -13423,7 +13423,7 @@ test("수도권 pilot source coverage는 완결되지만 route coverage는 edge 
     [],
   );
 
-  // #2609 source governance 완료만으로 route availability를 추정하지 않는다. #2611 전수 평가와 #2612 strict
+  // #2609 source governance 완료만으로 route availability를 추정하지 않는다. AquilaXk/easysubway-data#9 전수 평가와 #2612 strict
   // fail-closed가 닫힐 때까지 production route coverage는 명시적으로 NO_GO다.
   await assert.rejects(
     execFileAsync(

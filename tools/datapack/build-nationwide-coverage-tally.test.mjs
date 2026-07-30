@@ -179,7 +179,7 @@ test("커밋된 전국 coverage tally ledger는 현행 입력에서 바이트 �
       expectedLaunchRequiredTotal: 270,
     });
     // 아래 집계 상수는 tracked ledger와 짝을 이루는 이중 장부다. targets·inventory·resolutions를 바꾸는
-    // 후속 #2138 admission PR은 (1) ledger.regeneration.command로 ledger를 재생성하고 (2) 이 상수를
+    // 후속 AquilaXk/easysubway-data#3 admission PR은 (1) ledger.regeneration.command로 ledger를 재생성하고 (2) 이 상수를
     // 같은 커밋에서 함께 갱신해야 한다. 둘 중 하나만 하면 이 테스트가 fail closed 된다.
     assert.equal(ledger.launchRequired.totalCount, 270);
     assert.equal(ledger.launchRequired.inventoryAdmittedCount, 83);

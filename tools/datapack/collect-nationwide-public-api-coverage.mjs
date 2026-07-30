@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// #2138 전국 coverage 재크롤 파이프라인 — search plan 생성기 + 공공기관 API 실조회 collector.
+// AquilaXk/easysubway-data#3 전국 coverage 재크롤 파이프라인 — search plan 생성기 + 공공기관 API 실조회 collector.
 //
 // 두 단계로 쓴다.
 //   1) plan 생성(오프라인): --targets/--fixture/--source-candidates/--inventory → plan.json

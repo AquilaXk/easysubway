@@ -132,7 +132,7 @@ function coverageOperators(line) {
 }
 
 // pack coverage scope 행으로 낼 운영기관. 계보 항목(lineageOnlyOperatorIds)은 admission 정본 대조와
-// 운영기관 등재에는 그대로 쓰되 scope 행으로는 내지 않는다 — 그 표기는 #2138 activeLineScopes에 대응이
+// 운영기관 등재에는 그대로 쓰되 scope 행으로는 내지 않는다 — 그 표기는 AquilaXk/easysubway-data#3 activeLineScopes에 대응이
 // 없어, 행으로 내면 근거 없는 (운영기관, 노선) 결속이 pack에 남는다. 카탈로그가 등재 집합 밖 id를
 // 계보로 적거나 모든 운영기관을 계보로 적으면(그 노선의 scope가 사라진다) 그 자리에서 거부한다.
 function scopeOperators(line) {

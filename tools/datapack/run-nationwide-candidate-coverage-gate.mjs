@@ -1584,7 +1584,7 @@ function summarizeVariant(spec, report, provenance) {
   const supportedRequirementKeys = supported.map(requirementKey).sort(codepointCompare);
   return {
     supportedRequirementKeys,
-    // #2138 범주별 집계. 어느 건이 어느 근거 성격으로 섰는지 evidence만 보고 알 수 있어야 한다 —
+    // AquilaXk/easysubway-data#3 범주별 집계. 어느 건이 어느 근거 성격으로 섰는지 evidence만 보고 알 수 있어야 한다 —
     // 값은 판정 경로(report-coverage-gaps.mjs)가 requirement마다 실어 준 domain 증거 모델 그대로다.
     supportedByEvidenceModel: supportedByEvidenceModel(supported),
     launchRequired: supportedCounts(report.summary.launchRequired),
