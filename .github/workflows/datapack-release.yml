@@ -8,6 +8,7 @@ on:
       - tools/datapack/**
       - tools/route-map/**
       - release/product-gates/datapack-freshness-sla.json
+      - release/product-gates/production-datapack-scope.json
       - apps/mobile/lib/core/datapack/**
       - apps/mobile/lib/core/database/catalog/**
       - .github/workflows/datapack-release.yml

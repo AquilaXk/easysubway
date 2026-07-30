@@ -7,6 +7,11 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const yml = readFileSync(path.join(root, ".github/workflows/datapack-release.yml"), "utf8");
 
+test("product datapack 정책 변경은 release workflow를 실행한다", () => {
+  assert.match(yml, /paths:[\s\S]*release\/product-gates\/datapack-freshness-sla\.json/);
+  assert.match(yml, /paths:[\s\S]*release\/product-gates\/production-datapack-scope\.json/);
+});
+
 // 외부 yaml 의존성 없이(리포는 node 내장 --test만 사용) workflow_dispatch 입력 이름을
 // 들여쓰기로 추출한다: "    inputs:" 다음, 4칸 이하 들여쓰기로 블록이 끝나기 전까지의 6칸 키.
 function workflowDispatchInputNames(source) {

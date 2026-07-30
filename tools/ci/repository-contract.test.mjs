@@ -3968,6 +3968,10 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe",
     ],
     [
+      "release/product-gates/operations-release-evidence.json",
+      "5bbe9b3d3aa90f3f273ca396bcabebb48ecff9d0a3634fa1b9f86db95e4bc6cb",
+    ],
+    [
       "tools/ops/generate-operations-phase-a-summary.mjs",
       "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d",
     ],
@@ -8307,7 +8311,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       snapshotId: "server-timetable-snapshot-3e94b82f0330cc10",
       snapshotSha256: "3e94b82f0330cc106fba0fbd646b0660b785817229dcb234ef636e6c97b14730",
       freshUntil: "2026-08-03T00:00:00+09:00",
-      evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
+      evidencePath: "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json",
     },
     sharedRouteResponseCacheAllowed: false,
   });

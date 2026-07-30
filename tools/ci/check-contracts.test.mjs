@@ -84,7 +84,12 @@ test("[gate-ownership] check-contracts CLI는 정확한 workspace 인자만 허�
     stdio: "pipe",
   });
 
-  assert.doesNotThrow(() => run(["--workspace", "contracts/workspaces/hub.json"]));
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    assert.doesNotThrow(() => run(["--workspace", workspacePath]));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
   for (const args of [
     [],
     ["--workspace"],
