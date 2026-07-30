@@ -423,7 +423,9 @@ function readSystemReleaseInputs() {
   const systemReleaseOutputPath = resolvePath(output);
   const legacyOutput = outputDestination(outputPath, "--output");
   const systemOutput = outputDestination(systemReleaseOutputPath, "--system-release-output");
-  if (legacyOutput.canonicalPath === systemOutput.canonicalPath) fail("--system-release-output must differ from --output");
+  if (legacyOutput.canonicalPath.toLowerCase() === systemOutput.canonicalPath.toLowerCase()) {
+    fail("--system-release-output must differ from --output");
+  }
   if (
     legacyOutput.existing?.isFile() && systemOutput.existing?.isFile()
     && legacyOutput.existing.dev === systemOutput.existing.dev

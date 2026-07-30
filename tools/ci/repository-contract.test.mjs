@@ -6063,6 +6063,13 @@ test("[system-release-generator] FINAL은 component manifest에서 검증된 sys
       execFileAsync(process.execPath, [...systemArgs({ systemOutputPath: outputPath }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
       /--system-release-output must differ from --output/,
     );
+    const caseFoldedOutput = path.join(tempDir, "CASE-SYSTEM-RELEASE.JSON");
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({
+        outputPath: path.join(tempDir, "case-system-release.json"), systemOutputPath: caseFoldedOutput,
+      }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /--system-release-output must differ from --output/,
+    );
     await writeFile(componentPaths.mobile, "not-json");
     await assert.rejects(
       execFileAsync(process.execPath, [...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
