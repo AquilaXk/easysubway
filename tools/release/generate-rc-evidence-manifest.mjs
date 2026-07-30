@@ -120,9 +120,9 @@ const gitSha = suppliedGitSha ?? process.env.GITHUB_SHA ?? checkoutGitSha;
 if (!/^[a-f0-9]{40}$/.test(gitSha) || gitSha !== checkoutGitSha) {
   fail("--git-sha must match the current checkout HEAD");
 }
-const rcEvidenceContract = readJsonIfExists(
+const rcEvidenceContract = projectRcEvidenceContract(readJsonIfExists(
   path.join(appRoot, "release/rc-evidence-manifest-contract.json"),
-);
+));
 if (!Array.isArray(rcEvidenceContract?.requiredEvidenceEntries)) {
   fail("RC evidence manifest contract with requiredEvidenceEntries is required");
 }
@@ -340,6 +340,34 @@ if (failOnBlocked && blockers.length > 0) {
 function writeManifest(filePath, value) {
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function projectRcEvidenceContract(contract) {
+  const sourceIssue = (issueRef) => {
+    const match = typeof issueRef === "string" && issueRef.match(/^AquilaXk\/easysubway#([1-9][0-9]*)$/);
+    if (!match) fail(`Invalid EasySubway issue reference: ${issueRef}`);
+    return Number(match[1]);
+  };
+  return {
+    ...contract,
+    issue: sourceIssue(contract?.issueRef),
+    parentIssues: contract.parentIssueRefs.map(sourceIssue),
+    linkedEvidenceIssues: contract.linkedEvidenceIssueRefs.map(sourceIssue),
+    phaseConsumers: Object.fromEntries(
+      Object.entries(contract.phaseConsumers ?? {}).map(([phase, issueRefs]) => [phase, issueRefs.map(sourceIssue)]),
+    ),
+    requiredFinalFragmentIssues: contract.requiredFinalFragmentIssueRefs.map(sourceIssue),
+    activeBlockerIssues: contract.activeBlockerIssueRefs.map(sourceIssue),
+    requiredEvidenceEntryFields: contract.requiredEvidenceEntryFields.map(
+      (field) => field === "issueRef" ? "sourceIssue" : field,
+    ),
+    requiredEvidenceEntries: contract.requiredEvidenceEntries.map(({ issueRef, ...entry }) => ({
+      ...entry, sourceIssue: sourceIssue(issueRef),
+    })),
+    requiredDatapackGates: contract.requiredDatapackGates.map(({ issueRef, ...gate }) => ({
+      ...gate, sourceIssue: sourceIssue(issueRef),
+    })),
+  };
 }
 
 function validateCandidateContext(candidate, expected) {

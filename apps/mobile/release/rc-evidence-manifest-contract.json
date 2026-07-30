@@ -1,14 +1,14 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "rc-evidence-manifest",
-  "issue": 1020,
-  "parentIssues": [1014, 1020],
-  "linkedEvidenceIssues": [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1393, 1914, 2051, 2054, 2055, 2056, 2057, 2058, 2133],
-  "phaseConsumers": { "CANDIDATE": [2058, 1393], "FINAL": [1020] },
-  "requiredFinalFragmentIssues": [2058, 1393],
-  "activeBlockerIssues": [],
+  "issueRef": "AquilaXk/easysubway#1020",
+  "parentIssueRefs": ["AquilaXk/easysubway#1014", "AquilaXk/easysubway#1020"],
+  "linkedEvidenceIssueRefs": ["AquilaXk/easysubway#547", "AquilaXk/easysubway#571", "AquilaXk/easysubway#1015", "AquilaXk/easysubway#1016", "AquilaXk/easysubway#1017", "AquilaXk/easysubway#1018", "AquilaXk/easysubway#1019", "AquilaXk/easysubway#1021", "AquilaXk/easysubway#1022", "AquilaXk/easysubway#1393", "AquilaXk/easysubway#1914", "AquilaXk/easysubway#2051", "AquilaXk/easysubway#2054", "AquilaXk/easysubway#2055", "AquilaXk/easysubway#2056", "AquilaXk/easysubway#2057", "AquilaXk/easysubway#2058", "AquilaXk/easysubway#2133"],
+  "phaseConsumers": { "CANDIDATE": ["AquilaXk/easysubway#2058", "AquilaXk/easysubway#1393"], "FINAL": ["AquilaXk/easysubway#1020"] },
+  "requiredFinalFragmentIssueRefs": ["AquilaXk/easysubway#2058", "AquilaXk/easysubway#1393"],
+  "activeBlockerIssueRefs": [],
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "signedReleaseArtifactGate": "apps/mobile/release/signed-release-artifact-gate.json",
   "releaseGovernanceGate": "apps/mobile/release/release-governance-gate.json",
@@ -37,7 +37,7 @@
   "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
   "requiredEvidenceEntryFields": [
     "id",
-    "sourceIssue",
+    "issueRef",
     "device",
     "androidVersion",
     "testedAt",
@@ -47,66 +47,66 @@
   "requiredEvidenceEntries": [
     {
       "id": "rc_device_qa",
-      "sourceIssue": 571,
+      "issueRef": "AquilaXk/easysubway#571",
       "expiresAfterDays": 14, "requiredChecks": ["exactRcInstalled", "launchSmokePassed", "accessibilityPassed", "crashFree", "evidenceRedacted"]
     },
     {
       "id": "production_datapack",
-      "sourceIssue": 547,
+      "issueRef": "AquilaXk/easysubway#547",
       "expiresAfterDays": 14, "requiredChecks": ["signedManifestVerified", "artifactHashVerified", "schemaValidated", "sqliteIntegrityVerified", "productionScopeValidated"]
     },
     {
       "id": "signed_rc_store_submission",
-      "sourceIssue": 1015,
+      "issueRef": "AquilaXk/easysubway#1015",
       "expiresAfterDays": 14, "requiredChecks": ["signedAabVerified", "payloadIdentityVerified", "signingCertificateVerified", "storeReady"]
     },
     {
       "id": "play_generated_install",
-      "sourceIssue": 1016,
+      "issueRef": "AquilaXk/easysubway#1016",
       "expiresAfterDays": 14, "requiredChecks": ["playGeneratedApkInstalled", "artifactProvenanceVerified", "launchSmokePassed", "crashFree"]
     },
     {
       "id": "store_privacy_submission",
-      "sourceIssue": 1018,
+      "issueRef": "AquilaXk/easysubway#1018",
       "expiresAfterDays": 14, "requiredChecks": ["dataSafetyMatched", "privacyPolicyVerified", "permissionsAudited", "storeListingReady"]
     },
     {
       "id": "backend_operations",
-      "sourceIssue": 1017,
+      "issueRef": "AquilaXk/easysubway#1017",
       "expiresAfterDays": 14, "requiredChecks": ["backendArtifactVerified", "migrationsValidated", "healthChecksPassed", "rollbackReady"]
     },
     {
       "id": "post_launch_operations",
-      "sourceIssue": 1019,
+      "issueRef": "AquilaXk/easysubway#1019",
       "expiresAfterDays": 14
     },
     {
       "id": "android_release_quality",
-      "sourceIssue": 1021,
+      "issueRef": "AquilaXk/easysubway#1021",
       "expiresAfterDays": 14, "requiredChecks": ["qualitySuitePassed", "performancePassed", "accessibilityPassed", "recoveryPassed"]
     },
     {
       "id": "abuse_penetration_rehearsal",
-      "sourceIssue": 1022,
+      "issueRef": "AquilaXk/easysubway#1022",
       "expiresAfterDays": 14
     },
     {
       "id": "container_hardening",
-      "sourceIssue": 1914,
+      "issueRef": "AquilaXk/easysubway#1914",
       "expiresAfterDays": 14, "requiredChecks": ["nonRootVerified", "imageScanPassed", "immutableDigestVerified", "runtimePolicyPassed"]
     },
-    { "id": "production_equivalent_rehearsal", "sourceIssue": 2058, "expiresAfterDays": 14,
+    { "id": "production_equivalent_rehearsal", "issueRef": "AquilaXk/easysubway#2058", "expiresAfterDays": 14,
       "requiredChecks": ["currentBaselineCaptured", "appFirstCompatibilityPassed", "governanceNegativeNoProductionMutation", "restrictedCohortPassed", "monotonicRescueRollbackPassed", "finalTestCohortPassed"] },
-    { "id": "production_artifact_android_integration", "sourceIssue": 1393, "expiresAfterDays": 14,
+    { "id": "production_artifact_android_integration", "issueRef": "AquilaXk/easysubway#1393", "expiresAfterDays": 14,
       "requiredChecks": ["productionBaselineValidated", "candidateArtifactStrictValidated", "negativeArtifactsRejected", "playTestInstalledRcVerified", "installerRecoveryPassed", "routeAndItxSmokesPassed"] }
   ],
   "requiredDatapackGates": [
-    { "id": "source_admission", "sourceIssue": 2133, "expiresAfterDays": 14 },
-    { "id": "source_governance", "sourceIssue": 2133, "expiresAfterDays": 14 },
-    { "id": "freshness_conditional_publish", "sourceIssue": 2054, "expiresAfterDays": 14 },
-    { "id": "rollback_rescue", "sourceIssue": 2051, "expiresAfterDays": 14 },
-    { "id": "device_performance", "sourceIssue": 2055, "expiresAfterDays": 14 },
-    { "id": "callback_reconciliation", "sourceIssue": 2057, "expiresAfterDays": 14 }
+    { "id": "source_admission", "issueRef": "AquilaXk/easysubway#2133", "expiresAfterDays": 14 },
+    { "id": "source_governance", "issueRef": "AquilaXk/easysubway#2133", "expiresAfterDays": 14 },
+    { "id": "freshness_conditional_publish", "issueRef": "AquilaXk/easysubway#2054", "expiresAfterDays": 14 },
+    { "id": "rollback_rescue", "issueRef": "AquilaXk/easysubway#2051", "expiresAfterDays": 14 },
+    { "id": "device_performance", "issueRef": "AquilaXk/easysubway#2055", "expiresAfterDays": 14 },
+    { "id": "callback_reconciliation", "issueRef": "AquilaXk/easysubway#2057", "expiresAfterDays": 14 }
   ],
   "requiredGateStatuses": ["androidRcEvidence", "productionDatapack", "playGeneratedApkDeviceMatrix", "backendOperations",
     "androidReleaseQuality", "abusePenetrationRehearsal", "postLaunchOperations", "scopeCoverage",

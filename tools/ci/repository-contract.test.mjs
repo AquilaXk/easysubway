@@ -3397,6 +3397,32 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
 });
 
+test("[release-v2] RC evidence contract uses repository-qualified issue references", () => {
+  const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
+  const issueRefSchema = readJson("contracts/release/issue-ref.schema.json");
+  const issueRefPattern = new RegExp(issueRefSchema.pattern);
+  const issueRefs = [
+    contract.issueRef,
+    ...contract.parentIssueRefs,
+    ...contract.linkedEvidenceIssueRefs,
+    ...Object.values(contract.phaseConsumers).flat(),
+    ...contract.requiredFinalFragmentIssueRefs,
+    ...contract.activeBlockerIssueRefs,
+    ...contract.requiredEvidenceEntries.map(({ issueRef }) => issueRef),
+    ...contract.requiredDatapackGates.map(({ issueRef }) => issueRef),
+  ];
+
+  assert.equal(contract.schemaVersion, 2);
+  assert.equal(Object.hasOwn(contract, "issue"), false);
+  assert.equal(Object.hasOwn(contract, "parentIssues"), false);
+  assert.equal(Object.hasOwn(contract, "linkedEvidenceIssues"), false);
+  assert.equal(Object.hasOwn(contract, "requiredFinalFragmentIssues"), false);
+  assert.equal(Object.hasOwn(contract, "activeBlockerIssues"), false);
+  assert.ok(contract.requiredEvidenceEntryFields.includes("issueRef"));
+  assert.ok(!contract.requiredEvidenceEntryFields.includes("sourceIssue"));
+  assert.ok(issueRefs.every((issueRef) => issueRefPattern.test(issueRef)));
+});
+
 test("모바일 signed release artifact gate와 광고 counter는 CI 산출물과 스토어 제출 준비 상태를 분리한다", () => {
   const gatePath = "apps/mobile/release/signed-release-artifact-gate.json";
 
@@ -4514,18 +4540,18 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("retention-duplicate-override-recovery-policy"));
   assert.ok(androidRcEvidence.evidencePolicy.localOnlyEvidenceRoot.startsWith(".codex/evidence/"));
   assert.equal(rcEvidenceManifestContract.releaseGate, "rc-evidence-manifest");
-  assert.equal(rcEvidenceManifestContract.issue, 1020);
-  assert.deepEqual(rcEvidenceManifestContract.parentIssues, [1014, 1020]);
+  assert.equal(rcEvidenceManifestContract.issueRef, "AquilaXk/easysubway#1020");
+  assert.deepEqual(rcEvidenceManifestContract.parentIssueRefs, ["AquilaXk/easysubway#1014", "AquilaXk/easysubway#1020"]);
   assert.deepEqual(
-    rcEvidenceManifestContract.linkedEvidenceIssues,
-    [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1393, 1914, 2051, 2054, 2055, 2056, 2057, 2058, 2133],
+    rcEvidenceManifestContract.linkedEvidenceIssueRefs,
+    [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1393, 1914, 2051, 2054, 2055, 2056, 2057, 2058, 2133].map((issue) => `AquilaXk/easysubway#${issue}`),
   );
   assert.deepEqual(rcEvidenceManifestContract.phaseConsumers, {
-    CANDIDATE: [2058, 1393],
-    FINAL: [1020],
+    CANDIDATE: ["AquilaXk/easysubway#2058", "AquilaXk/easysubway#1393"],
+    FINAL: ["AquilaXk/easysubway#1020"],
   });
-  assert.deepEqual(rcEvidenceManifestContract.requiredFinalFragmentIssues, [2058, 1393]);
-  assert.deepEqual(rcEvidenceManifestContract.activeBlockerIssues, []);
+  assert.deepEqual(rcEvidenceManifestContract.requiredFinalFragmentIssueRefs, ["AquilaXk/easysubway#2058", "AquilaXk/easysubway#1393"]);
+  assert.deepEqual(rcEvidenceManifestContract.activeBlockerIssueRefs, []);
   assert.equal(rcEvidenceManifestContract.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(rcEvidenceManifestContract.signedReleaseArtifactGate, gatePath);
   assert.equal(rcEvidenceManifestContract.releaseGovernanceGate, "apps/mobile/release/release-governance-gate.json");
@@ -4550,24 +4576,24 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     assert.ok(rcEvidenceManifestContract.requiredRcIdentityFields.includes(field), `${field} must be required`);
   }
   assert.deepEqual(rcEvidenceManifestContract.backendIdentityFieldsAnyOf, ["backendImageDigest", "backendArtifactSha256"]);
-  for (const field of ["device", "androidVersion", "testedAt", "evidencePaths", "expiresWhen"]) {
+  for (const field of ["issueRef", "device", "androidVersion", "testedAt", "evidencePaths", "expiresWhen"]) {
     assert.ok(rcEvidenceManifestContract.requiredEvidenceEntryFields.includes(field), `${field} must be required`);
   }
   assert.deepEqual(
-    rcEvidenceManifestContract.requiredEvidenceEntries.map(({ id, sourceIssue }) => ({ id, sourceIssue })),
+    rcEvidenceManifestContract.requiredEvidenceEntries.map(({ id, issueRef }) => ({ id, issueRef })),
     [
-      { id: "rc_device_qa", sourceIssue: 571 },
-      { id: "production_datapack", sourceIssue: 547 },
-      { id: "signed_rc_store_submission", sourceIssue: 1015 },
-      { id: "play_generated_install", sourceIssue: 1016 },
-      { id: "store_privacy_submission", sourceIssue: 1018 },
-      { id: "backend_operations", sourceIssue: 1017 },
-      { id: "post_launch_operations", sourceIssue: 1019 },
-      { id: "android_release_quality", sourceIssue: 1021 },
-      { id: "abuse_penetration_rehearsal", sourceIssue: 1022 },
-      { id: "container_hardening", sourceIssue: 1914 },
-      { id: "production_equivalent_rehearsal", sourceIssue: 2058 },
-      { id: "production_artifact_android_integration", sourceIssue: 1393 },
+      { id: "rc_device_qa", issueRef: "AquilaXk/easysubway#571" },
+      { id: "production_datapack", issueRef: "AquilaXk/easysubway#547" },
+      { id: "signed_rc_store_submission", issueRef: "AquilaXk/easysubway#1015" },
+      { id: "play_generated_install", issueRef: "AquilaXk/easysubway#1016" },
+      { id: "store_privacy_submission", issueRef: "AquilaXk/easysubway#1018" },
+      { id: "backend_operations", issueRef: "AquilaXk/easysubway#1017" },
+      { id: "post_launch_operations", issueRef: "AquilaXk/easysubway#1019" },
+      { id: "android_release_quality", issueRef: "AquilaXk/easysubway#1021" },
+      { id: "abuse_penetration_rehearsal", issueRef: "AquilaXk/easysubway#1022" },
+      { id: "container_hardening", issueRef: "AquilaXk/easysubway#1914" },
+      { id: "production_equivalent_rehearsal", issueRef: "AquilaXk/easysubway#2058" },
+      { id: "production_artifact_android_integration", issueRef: "AquilaXk/easysubway#1393" },
     ],
   );
   assert.equal(rcEvidenceManifestContract.readinessPolicy.openAndroidP0BlocksGo, true);
@@ -5615,7 +5641,12 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
     { id: "freshness_conditional_publish", sourceIssue: 2054, expiresAfterDays: 14 }, { id: "rollback_rescue", sourceIssue: 2051, expiresAfterDays: 14 },
     { id: "device_performance", sourceIssue: 2055, expiresAfterDays: 14 }, { id: "callback_reconciliation", sourceIssue: 2057, expiresAfterDays: 14 },
   ];
-  assert.deepEqual(contract.requiredDatapackGates, requiredDatapackGates);
+  assert.deepEqual(
+    contract.requiredDatapackGates,
+    requiredDatapackGates.map(({ id, sourceIssue, expiresAfterDays }) => ({
+      id, issueRef: `AquilaXk/easysubway#${sourceIssue}`, expiresAfterDays,
+    })),
+  );
   const producerFiles = execFileSync("git", ["grep", "-l", "summaryArtifactDigest", "--", "tools", "apps", ".github"],
     { cwd: root, encoding: "utf8" }).trim().split("\n").filter((file) => !file.includes(".test."));
   assert.deepEqual(producerFiles, ["tools/release/generate-rc-evidence-manifest.mjs"]);
@@ -6000,7 +6031,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     const evidencePath = path.join(tempDir, `required-evidence-${entry.id}.json`);
     if (entry.id === "post_launch_operations") postLaunchEvidencePath = evidencePath;
     const evidence = {
-      schemaVersion: 1, evidenceId: entry.id, sourceIssue: entry.sourceIssue,
+      schemaVersion: 1, evidenceId: entry.id, sourceIssue: Number(entry.issueRef.slice(entry.issueRef.indexOf("#") + 1)),
       status: "SATISFIED", reasonCodes: [], rcIdentity: evidenceRcIdentity,
       evidenceValidity: { testedAt: now, expiresWhen: "2026-07-30T00:00:00.000Z" },
     };
@@ -6460,7 +6491,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
 
   const missingFinalFragmentArgs = await contractArgs("missing-final-fragment-app", (contract) => {
     contract.requiredEvidenceEntries = contract.requiredEvidenceEntries.filter(
-    ({ sourceIssue }) => sourceIssue !== 2058,
+    ({ issueRef }) => issueRef !== "AquilaXk/easysubway#2058",
     );
   });
   await assert.rejects(
@@ -6486,7 +6517,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   );
 
   const closedBlockerArgs = await contractArgs("closed-blocker-app", (contract) => {
-    contract.activeBlockerIssues = [2133];
+    contract.activeBlockerIssueRefs = ["AquilaXk/easysubway#2133"];
   });
   await runFinalGenerator([
     ...closedBlockerArgs,
