@@ -11,6 +11,9 @@ const APPROVED_TARGETS = new Set([
   "AquilaXk/easysubway-backend",
   "AquilaXk/easysubway-mobile",
 ]);
+const APPROVAL_URL_PATTERN = new RegExp(
+  `^https://github\\.com/${escapeRegExp(SOURCE_REPOSITORY)}/issues/\\d+#issuecomment-\\d+$`,
+);
 const execFileAsync = promisify(execFile);
 const ISSUE_METADATA_QUERY = [
   "query($owner: String!, $name: String!, $number: Int!) {",
@@ -152,7 +155,7 @@ async function preflightTargetAssignees(repository, assignees, execGh) {
 function validateEntry(entry) {
   if (entry?.disposition !== "TRANSFER") throw new Error("entry disposition must be TRANSFER");
   if (typeof entry?.executionApproval !== "string"
-    || !/^https:\/\/github\.com\/AquilaXk\/easysubway\/issues\/\d+#issuecomment-\d+$/.test(entry.executionApproval)
+    || !APPROVAL_URL_PATTERN.test(entry.executionApproval)
     || entry.targetUrl !== null || entry.transferredAt !== null) {
     throw new Error("entry requires execution approval");
   }

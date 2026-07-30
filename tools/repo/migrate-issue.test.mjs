@@ -268,7 +268,6 @@ test("parser rejects duplicate and missing singleton values", () => {
 
 test("target milestone due-date mismatch rejects before transfer", async () => {
   const fake = fakeGh({ target: metadata({ milestone: "P0" }) });
-  fake.execGh = fake.execGh;
   const original = fake.execGh;
   const execGh = async (args) => args[0] === "api" && args.includes("--paginate") && args.at(-1).includes("milestones")
     ? JSON.stringify([[{ title: "P0", due_on: "2026-08-01T00:00:00Z" }]]) : original(args);

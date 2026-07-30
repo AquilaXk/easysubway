@@ -379,12 +379,28 @@ test("boundaries v2는 malformed repository, source area, global root 충돌을 
   const malformed = structuredClone(boundaries);
   malformed.extractionTargets.data.repository = "AquilaXk/not-easysubway";
   malformed.extractionTargets.platform.sourceAreas = ["missing-area"];
+  malformed.extractionTargets.backend.sourceAreas = ["mobile"];
   malformed.extractionTargets.mobile.partialRoots.push("tools/route-map");
 
   const errors = validateBoundariesPayload(malformed);
   assert.ok(errors.some((error) => error.includes("data repository 불량")));
   assert.ok(errors.some((error) => error.includes("platform.missing-area area 누락")));
+  assert.ok(errors.some((error) => error.includes("mobile sourceArea가 backend, mobile에 중복 귀속됨")));
   assert.ok(errors.some((error) => error.includes("mobile.tools/route-map partialRoots가 ownedRoots와 겹친다")));
+});
+
+test("boundaries v2는 target 이름과 repository를 정확히 고정한다", () => {
+  const boundaries = loadJson("contracts/boundaries.json");
+  boundaries.extractionTargets.backend.repository = "AquilaXk/easysubway-mobile";
+  boundaries.extractionTargets.unknown = {
+    ...structuredClone(boundaries.extractionTargets.data),
+    repository: "AquilaXk/easysubway-unknown",
+  };
+  boundaries.splitOrder.push("unknown");
+
+  const errors = validateBoundariesPayload(boundaries);
+  assert.ok(errors.some((error) => error.includes("backend repository 불량")));
+  assert.ok(errors.some((error) => error.includes("unknown repository 불량")));
 });
 
 test("boundaries v2는 extraction target ownership metadata의 배열·빈 값·중복을 거부한다", () => {
@@ -426,6 +442,22 @@ test("필수 계약 입력 파일이 없으면 실패한다", () => {
   validateJson("contracts/missing.schema.json", "contracts/missing-value.json", errors);
 
   assert.deepEqual(errors, ["contracts/missing.schema.json 누락", "contracts/missing-value.json 누락"]);
+});
+
+test("유효하지 않은 JSON은 예외 대신 계약 오류로 수집한다", () => {
+  const directory = mkdtempSync(join(tmpdir(), "easysubway-contract-"));
+  const schemaPath = join(directory, "schema.json");
+  const valuePath = join(directory, "value.json");
+  writeFileSync(schemaPath, JSON.stringify({ type: "object" }));
+  writeFileSync(valuePath, "{");
+  const errors = [];
+
+  try {
+    assert.equal(validateJson(schemaPath, valuePath, errors), false);
+    assert.deepEqual(errors, [`${valuePath}: 유효한 JSON이 필요하다`]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("v1 datapack manifest는 activePack을 요구하고 v2는 생략할 수 있다", () => {

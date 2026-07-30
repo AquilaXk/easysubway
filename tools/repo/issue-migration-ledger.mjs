@@ -7,6 +7,9 @@ const ALLOWED_REPOSITORIES = new Set([
   "AquilaXk/easysubway-mobile",
 ]);
 const CHILD_REPOSITORIES = ["AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile"];
+const APPROVAL_URL_PATTERN = new RegExp(
+  `^https://github\\.com/${escapeRegExp(HUB_REPOSITORY)}/issues/\\d+#issuecomment-\\d+$`,
+);
 const DISPOSITIONS = new Set(["KEEP_HUB", "TRANSFER", "SPLIT_CHILDREN"]);
 const REVIEWED_GROUPS = [
   {
@@ -128,7 +131,7 @@ function isPending(entry) {
 function isTransferExecutionState(entry) {
   if (isPending(entry)) return true;
   const approvalValid = typeof entry?.executionApproval === "string"
-    && /^https:\/\/github\.com\/AquilaXk\/easysubway\/issues\/\d+#issuecomment-\d+$/.test(entry.executionApproval);
+    && APPROVAL_URL_PATTERN.test(entry.executionApproval);
   const approved = approvalValid && entry.targetUrl === null && entry.transferredAt === null;
   const transferred = approvalValid && isTargetIssueUrl(entry.targetUrl, entry.targetRepository)
     && isDateTime(entry.transferredAt);

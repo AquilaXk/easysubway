@@ -26,6 +26,12 @@ const CATALOG_RAW_SQL_TABLES_PATH = "contracts/datapack/catalog-raw-sql-tables.j
 const CATALOG_RAW_SQL_TABLES_SCHEMA_PATH = "contracts/datapack/catalog-raw-sql-tables.schema.json";
 const REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH = "contracts/repository-split-issues.schema.json";
 const REPOSITORY_SPLIT_ISSUES_PATH = "release/migrations/repository-split-issues.json";
+const EXTRACTION_REPOSITORIES = {
+  data: "AquilaXk/easysubway-data",
+  platform: "AquilaXk/easysubway-platform",
+  backend: "AquilaXk/easysubway-backend",
+  mobile: "AquilaXk/easysubway-mobile",
+};
 
 export function loadJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -55,8 +61,12 @@ export function collectContractErrors() {
     errors,
   );
   validateJson(CATALOG_RAW_SQL_TABLES_SCHEMA_PATH, CATALOG_RAW_SQL_TABLES_PATH, errors);
-  validateJson(REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH, REPOSITORY_SPLIT_ISSUES_PATH, errors);
-  if (existsSync(REPOSITORY_SPLIT_ISSUES_PATH)) {
+  const repositorySplitIssueLedgerValid = validateJson(
+    REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH,
+    REPOSITORY_SPLIT_ISSUES_PATH,
+    errors,
+  );
+  if (repositorySplitIssueLedgerValid) {
     errors.push(...validateRepositorySplitIssueLedger(loadJson(REPOSITORY_SPLIT_ISSUES_PATH)).map(
       (error) => `${REPOSITORY_SPLIT_ISSUES_PATH}: ${error}`,
     ));
@@ -102,12 +112,27 @@ export function validateJson(schemaPath, valuePath, errors) {
     errors.push(`${valuePath} 누락`);
     missing = true;
   }
-  if (missing) return;
-  const result = validateSchema(loadJson(schemaPath), loadJson(valuePath));
+  if (missing) return false;
+  let schema;
+  let value;
+  try {
+    schema = loadJson(schemaPath);
+  } catch {
+    errors.push(`${schemaPath}: 유효한 JSON이 필요하다`);
+    return false;
+  }
+  try {
+    value = loadJson(valuePath);
+  } catch {
+    errors.push(`${valuePath}: 유효한 JSON이 필요하다`);
+    return false;
+  }
+  const result = validateSchema(schema, value);
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
-  if (schemaPath === DATAPACK_MANIFEST_SCHEMA_PATH) validateDatapackManifest(loadJson(valuePath), valuePath, errors);
-  if (schemaPath === DATAPACK_INDEX_SCHEMA_PATH) validateDatapackIndex(loadJson(valuePath), valuePath, errors);
-  if (schemaPath === SOURCE_INVENTORY_SCHEMA_PATH) validateSourceInventory(loadJson(valuePath), valuePath, errors);
+  if (schemaPath === DATAPACK_MANIFEST_SCHEMA_PATH) validateDatapackManifest(value, valuePath, errors);
+  if (schemaPath === DATAPACK_INDEX_SCHEMA_PATH) validateDatapackIndex(value, valuePath, errors);
+  if (schemaPath === SOURCE_INVENTORY_SCHEMA_PATH) validateSourceInventory(value, valuePath, errors);
+  return result.errors.length === 0;
 }
 
 export function validateSourceInventory(inventory, valuePath, errors) {
@@ -229,9 +254,11 @@ export function validateBoundariesPayload(boundaries) {
   }
   const repositories = new Set();
   const ownedRoots = new Set();
+  const sourceAreaOwners = new Map();
   const partialRoots = [];
   for (const [targetName, target] of Object.entries(targets)) {
-    if (!/^AquilaXk\/easysubway(?:-(?:data|platform|backend|mobile))?$/.test(target.repository ?? "")) {
+    const expectedRepository = EXTRACTION_REPOSITORIES[targetName];
+    if (target.repository !== expectedRepository) {
       errors.push(`contracts/boundaries.json: ${targetName} repository 불량`);
     } else if (repositories.has(target.repository)) {
       errors.push(`contracts/boundaries.json: ${target.repository} repository 중복`);
@@ -244,6 +271,11 @@ export function validateBoundariesPayload(boundaries) {
     }
     for (const area of sourceAreas) {
       if (!(area in (boundaries.areas ?? {}))) errors.push(`contracts/boundaries.json: ${targetName}.${area} area 누락`);
+      const owner = sourceAreaOwners.get(area);
+      if (owner !== undefined && owner !== targetName) {
+        errors.push(`contracts/boundaries.json: ${area} sourceArea가 ${owner}, ${targetName}에 중복 귀속됨`);
+      }
+      sourceAreaOwners.set(area, targetName);
     }
     for (const root of requiredStringArray(targetName, target, "ownedRoots", errors)) {
       if (ownedRoots.has(root)) errors.push(`contracts/boundaries.json: ${root} ownedRoots 중복`);
