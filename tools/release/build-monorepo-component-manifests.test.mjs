@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -69,6 +69,7 @@ test("builds deterministic truthful monorepo component manifests", () => {
   try {
     const result = run(files);
     assert.equal(result.status, 0, result.stderr);
+    assert.equal(lstatSync(files.output).isSymbolicLink(), true);
     assert.deepEqual(requireFiles(files.output), [
       "backend-component-manifest.json", "contracts-identity.json", "data-component-manifest.json",
       "mobile-component-manifest.json", "platform-component-manifest.json",
@@ -152,6 +153,7 @@ test("preserves an existing output directory and rejects required CLI boundaries
     writeFileSync(sentinel, "preserve me");
     assert.notEqual(run(files).status, 0);
     assert.equal(readFileSync(sentinel, "utf8"), "preserve me");
+    assert.equal(readdirSync(files.directory).some((name) => name.startsWith(".output.tmp-")), false);
     const base = args(files, { "--output-dir": path.join(files.directory, "boundary-output") });
     const without = (option) => {
       const index = base.indexOf(option);

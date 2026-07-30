@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 import { createHash } from "node:crypto";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
 
@@ -81,17 +81,12 @@ function writeOutput(outputDir, documents) {
   const parent = path.dirname(outputDir);
   if (!existsSync(parent)) fail("output parent directory does not exist");
   const temporary = mkdtempSync(path.join(parent, `.${path.basename(outputDir)}.tmp-`));
-  let claimedOutput = false;
   try {
     for (const [name, document] of documents) writeFileSync(path.join(temporary, name), `${JSON.stringify(document, null, 2)}\n`);
     if (outputFiles.some((name) => !existsSync(path.join(temporary, name)))) fail("output write failed");
-    mkdirSync(outputDir);
-    claimedOutput = true;
-    for (const name of outputFiles) renameSync(path.join(temporary, name), path.join(outputDir, name));
-    rmSync(temporary, { recursive: true, force: true });
+    symlinkSync(path.basename(temporary), outputDir, "dir");
   } catch (error) {
     rmSync(temporary, { recursive: true, force: true });
-    if (claimedOutput) rmSync(outputDir, { recursive: true, force: true });
     throw error;
   }
 }
