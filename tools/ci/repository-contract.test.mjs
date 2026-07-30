@@ -3499,11 +3499,35 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 
   assert.match(workflow, /backend-release:/);
   assert.match(workflow, /name: Backend Release Image/);
+  assert.match(workflow, /runs-on: ubuntu-24\.04-arm/);
   assert.match(workflow, /working-directory: backend[\s\S]*?\.\/gradlew bootJar --no-daemon/);
-  assert.match(workflow, /docker build -f backend\/Dockerfile -t easysubway-backend:\$\{\{ github\.sha \}\} backend/);
-  assert.match(workflow, /docker image inspect easysubway-backend:\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /docker buildx build --load --platform linux\/arm64/);
+  assert.match(workflow, /docker buildx build --platform linux\/arm64 --push --sbom=true --provenance=mode=max/);
+  assert.match(workflow, /backend\/tools\/build-component-manifest\.mjs/);
   assert.match(workflow, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
+});
+
+test("backend release artifact는 main에서 immutable arm64 image와 component manifest를 발행한다", () => {
+  const workflow = read(".github/workflows/release-artifacts.yml");
+  const backendJob = jobBlock(workflow, "backend-release", "rc-evidence-manifest");
+
+  assert.match(backendJob, /runs-on: ubuntu-24\.04-arm/);
+  assert.match(backendJob, /packages: write/);
+  assert.match(backendJob, /if: \$\{\{ github\.event_name != 'push' \}\}[\s\S]*docker buildx build --load --platform linux\/arm64/);
+  assert.doesNotMatch(backendJob.match(/Build PR validation image[\s\S]*?(?=\n      - name:|$)/)?.[0] ?? "", /--push|docker\/login-action/);
+  assert.match(backendJob, /if: \$\{\{ github\.event_name == 'push' \}\}[\s\S]*docker\/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567/);
+  assert.match(backendJob, /ghcr\.io\/aquilaxk\/easysubway-backend:sha-\$\{GITHUB_SHA\}/);
+  assert.match(backendJob, /docker buildx build --platform linux\/arm64 --push --sbom=true --provenance=mode=max/);
+  assert.match(backendJob, /docker buildx imagetools inspect --format '\{\{\.Digest\}\}'/);
+  assert.match(backendJob, /image-index\.json/);
+  assert.match(backendJob, /"architecture":"arm64"/);
+  assert.match(backendJob, /FROM .+@sha256:\[a-f0-9\]\{64\}/);
+  assert.match(backendJob, /identity\.env/);
+  assert.match(backendJob, /backend-component-manifest\.json/);
+  assert.match(backendJob, /backend\/tools\/build-component-manifest\.mjs/);
+  assert.match(backendJob, /--image-digest "\$\{image_digest\}"/);
+  assert.match(backendJob, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
 });
 
 test("[release-v2] RC evidence contract uses repository-qualified issue references", async () => {
