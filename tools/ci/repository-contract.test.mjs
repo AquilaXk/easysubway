@@ -3499,6 +3499,7 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 test("backend release artifact는 main에서 immutable arm64 image와 component manifest를 발행한다", () => {
   const workflow = read(".github/workflows/release-artifacts.yml");
   const backendJob = jobBlock(workflow, "backend-release", "rc-evidence-manifest");
+  const deployBackend = read("tools/deploy/deploy-backend.sh");
 
   assert.match(backendJob, /runs-on: ubuntu-24\.04-arm/);
   assert.match(backendJob, /packages: write/);
@@ -3508,6 +3509,8 @@ test("backend release artifact는 main에서 immutable arm64 image와 component 
   assert.match(backendJob, /ghcr\.io\/aquilaxk\/easysubway-backend:sha-\$\{GITHUB_SHA\}/);
   assert.match(backendJob, /docker buildx create --driver docker-container --use/);
   assert.match(backendJob, /docker buildx build --platform linux\/arm64 --push --sbom=true --provenance=mode=max --metadata-file "\$\{metadata_file\}"/);
+  assert.match(backendJob, /--label "org\.opencontainers\.image\.revision=\$\{GITHUB_SHA\}"/);
+  assert.match(backendJob, /--label "org\.opencontainers\.image\.source=https:\/\/github\.com\/\$\{GITHUB_REPOSITORY\}"/);
   assert.match(backendJob, /docker buildx imagetools inspect --format '\{\{\.Manifest\.Digest\}\}'/);
   assert.match(backendJob, /containerimage\\\.digest/);
   assert.match(backendJob, /image-index\.json/);
@@ -3522,6 +3525,8 @@ test("backend release artifact는 main에서 immutable arm64 image와 component 
   assert.match(backendJob, /backend\/tools\/build-component-manifest\.mjs/);
   assert.match(backendJob, /--image-digest "\$\{image_digest\}"/);
   assert.match(backendJob, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
+  assert.match(deployBackend, /image_revision="\$\(docker image inspect "easysubway-backend:\$\{DEPLOY_SHA\}" --format '\{\{index \.Config\.Labels "org\.opencontainers\.image\.revision"\}\}'/);
+  assert.match(deployBackend, /\[\[ "\$\{image_revision\}" != "\$\{DEPLOY_SHA\}" \]\]/);
 });
 
 test("[release-v2] RC evidence contract uses repository-qualified issue references", async () => {
