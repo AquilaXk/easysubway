@@ -16,6 +16,12 @@ import {
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
+test("repository split issue migration ledger가 계약 gate를 통과한다", () => {
+  const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
+
+  assert.deepEqual(errors, []);
+});
+
 test("번들 datapack index 실물이 계약 스키마를 통과한다", () => {
   const schema = loadJson("contracts/datapack/datapack-index.schema.json");
   const index = loadJson("apps/mobile/assets/datapacks/index.json");

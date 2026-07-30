@@ -3,6 +3,7 @@ import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
+import { validateLedger } from "../repo/issue-migration-ledger.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
@@ -23,6 +24,8 @@ const PACK_APP_SCHEMA_PARITY_ALLOWLIST_SCHEMA_PATH =
   "contracts/datapack/pack-app-schema-parity-allowlist.schema.json";
 const CATALOG_RAW_SQL_TABLES_PATH = "contracts/datapack/catalog-raw-sql-tables.json";
 const CATALOG_RAW_SQL_TABLES_SCHEMA_PATH = "contracts/datapack/catalog-raw-sql-tables.schema.json";
+const REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH = "contracts/repository-split-issues.schema.json";
+const REPOSITORY_SPLIT_ISSUES_PATH = "release/migrations/repository-split-issues.json";
 
 export function loadJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -52,6 +55,12 @@ export function collectContractErrors() {
     errors,
   );
   validateJson(CATALOG_RAW_SQL_TABLES_SCHEMA_PATH, CATALOG_RAW_SQL_TABLES_PATH, errors);
+  validateJson(REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH, REPOSITORY_SPLIT_ISSUES_PATH, errors);
+  if (existsSync(REPOSITORY_SPLIT_ISSUES_PATH)) {
+    errors.push(...validateLedger(loadJson(REPOSITORY_SPLIT_ISSUES_PATH)).map(
+      (error) => `${REPOSITORY_SPLIT_ISSUES_PATH}: ${error}`,
+    ));
+  }
   if (!existsSync(FRESHNESS_POLICY_PATH)) errors.push(`${FRESHNESS_POLICY_PATH} 누락`);
   if ([SOURCE_INVENTORY_PATH, SOURCE_GOVERNANCE_POLICY_PATH, FRESHNESS_POLICY_PATH].every(existsSync)) {
     validateSourceGovernanceContracts({
