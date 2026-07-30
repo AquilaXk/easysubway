@@ -24,6 +24,35 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
+        "oneOf": [
+          {
+            "type": "object",
+            "required": ["executionApproval", "targetUrl", "transferredAt"],
+            "properties": {
+              "executionApproval": { "type": "null" },
+              "targetUrl": { "type": "null" },
+              "transferredAt": { "type": "null" }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["executionApproval", "targetUrl", "transferredAt"],
+            "properties": {
+              "executionApproval": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway/issues/[0-9]+#issuecomment-[0-9]+$" },
+              "targetUrl": { "type": "null" },
+              "transferredAt": { "type": "null" }
+            }
+          },
+          {
+            "type": "object",
+            "required": ["executionApproval", "targetUrl", "transferredAt"],
+            "properties": {
+              "executionApproval": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway/issues/[0-9]+#issuecomment-[0-9]+$" },
+              "targetUrl": { "type": "string", "format": "uri" },
+              "transferredAt": { "type": "string", "format": "date-time" }
+            }
+          }
+        ],
         "required": [
           "sourceIssue", "sourceUrl", "title", "disposition", "targetRepository",
           "reason", "classificationState", "executionApproval", "targetUrl", "transferredAt"
@@ -49,9 +78,9 @@
           },
           "reason": { "type": "string", "minLength": 1 },
           "classificationState": { "const": "REVIEWED" },
-          "executionApproval": { "type": "null" },
-          "targetUrl": { "type": "null" },
-          "transferredAt": { "type": "null" }
+          "executionApproval": { "type": ["string", "null"] },
+          "targetUrl": { "type": ["string", "null"] },
+          "transferredAt": { "type": ["string", "null"] }
         }
       }
     }
