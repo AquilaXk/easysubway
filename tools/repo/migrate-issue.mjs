@@ -96,22 +96,24 @@ export async function executeIssueTransfer({ entry, confirmations, execGh }) {
   confirmExecution(entry, confirmations);
   const details = await preflightDetails({ entry, execGh });
   try {
-    await execGh(["issue", "transfer", String(entry.sourceIssue), entry.targetRepository, "--repo", SOURCE_REPOSITORY]);
-    return { sourceUrl: entry.sourceUrl, expectedMetadata: details.source };
+    const output = await execGh([
+      "issue", "transfer", String(entry.sourceIssue), entry.targetRepository, "--repo", SOURCE_REPOSITORY,
+    ]);
+    return {
+      sourceUrl: entry.sourceUrl,
+      expectedMetadata: details.source,
+      redirectedIssue: transferredIssueFromUrl(output.trim(), entry.targetRepository),
+    };
   } catch {
-    try {
-      const redirectedIssue = await readRedirectedIssue(entry, execGh);
-      return { sourceUrl: entry.sourceUrl, expectedMetadata: details.source, redirectedIssue };
-    } catch {
-      const indeterminate = new Error("issue transfer response is indeterminate; source redirect could not be confirmed");
-      indeterminate.transferIndeterminate = true;
-      throw indeterminate;
-    }
+    const indeterminate = new Error("issue transfer response is indeterminate; do not retry without confirming the exact target issue");
+    indeterminate.transferIndeterminate = true;
+    throw indeterminate;
   }
 }
 
 export async function verifyTransferredIssue({ entry, transferResult, execGh }) {
-  const targetUrl = transferResult?.redirectedIssue ?? await readRedirectedIssue(entry, execGh);
+  const targetUrl = transferResult?.redirectedIssue;
+  if (!targetUrl) throw new Error("transferred issue identity is missing");
   const target = await readIssueMetadata(targetUrl.repository, targetUrl.number, execGh);
   const expected = transferResult?.expectedMetadata;
   if (target.number !== targetUrl.number || target.url !== `https://github.com/${targetUrl.repository}/issues/${targetUrl.number}`) {
@@ -128,13 +130,6 @@ export async function verifyTransferredIssue({ entry, transferResult, execGh }) 
     milestone: target.milestone?.title ?? null,
     commentCount: target.commentCount,
   };
-}
-
-async function readRedirectedIssue(entry, execGh) {
-  const representation = JSON.parse(await execGh([
-    "api", "-H", "X-GitHub-Api-Version: 2022-11-28", `/repos/${SOURCE_REPOSITORY}/issues/${entry.sourceIssue}`,
-  ]));
-  return redirectRepresentation(representation, entry.targetRepository);
 }
 
 async function preflightDetails({ entry, execGh }) {
@@ -268,11 +263,9 @@ function canonicalDueOn(value) {
   return date.toISOString();
 }
 
-function redirectRepresentation(representation, targetRepository) {
-  const match = typeof representation?.html_url === "string" && representation.html_url.match(new RegExp(`^https://github\\.com/${escapeRegExp(targetRepository)}/issues/(\\d+)$`));
-  if (!match || representation.number !== Number(match[1]) || representation.repository_url !== `https://api.github.com/repos/${targetRepository}`) {
-    throw new Error("source issue redirect is missing or invalid");
-  }
+function transferredIssueFromUrl(url, targetRepository) {
+  const match = typeof url === "string" && url.match(new RegExp(`^https://github\\.com/${escapeRegExp(targetRepository)}/issues/([1-9]\\d*)$`));
+  if (!match) throw new Error("transferred issue URL is missing or invalid");
   return { repository: targetRepository, number: Number(match[1]) };
 }
 

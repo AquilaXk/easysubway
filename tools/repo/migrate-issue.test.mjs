@@ -36,9 +36,8 @@ function metadata({ url = SOURCE_URL, number = SOURCE_ISSUE, title, state = "OPE
   return { id: `I_${number}`, url, number, title: title ?? transferEntry().title, state, repository: { nameWithOwner: repo }, labels: connection(labels.map((name) => ({ name }))), milestone: milestone === null ? null : { title: milestone, dueOn: null }, comments: { totalCount: commentCount }, assignees: connection([]), projectItems: connection([]), parent: null, subIssues: connection([]), blocking: connection([]), blockedBy: connection([]), closedByPullRequestsReferences: connection(closingPullRequests) };
 }
 
-function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, number: 7 }), targetExists = true, unassignableLogin, malformedAssigneeResponse, transferFailure = false, redirectedAfterTransferFailure = false } = {}) {
+function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, number: 7 }), targetExists = true, unassignableLogin, malformedAssigneeResponse, transferFailure = false, transferOutput = `${TARGET_URL}\n` } = {}) {
   const calls = [];
-  let transferred = false;
   const execGh = async (args) => {
     calls.push(args);
     if (args[0] === "repo" && args[1] === "view") {
@@ -46,9 +45,8 @@ function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, numb
       return JSON.stringify({ nameWithOwner: TARGET_REPOSITORY });
     }
     if (args[0] === "issue" && args[1] === "transfer") {
-      transferred = !transferFailure || redirectedAfterTransferFailure;
       if (transferFailure) throw new Error("transfer response lost");
-      return "";
+      return transferOutput;
     }
     if (args[0] === "api" && args.at(-1).includes("/assignees/")) {
       if (args.at(-1).endsWith(`/${encodeURIComponent(unassignableLogin)}`)) throw new Error("not assignable");
@@ -57,10 +55,6 @@ function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, numb
     }
     if (args[0] === "api" && args.includes("--paginate")) {
       return JSON.stringify([args.at(-1).includes("labels") ? target.labels.nodes : (target.milestone === null ? [] : [{ title: target.milestone.title, due_on: target.milestone.dueOn }])]);
-    }
-    if (args[0] === "api" && args.at(-1) === `/repos/${SOURCE_REPOSITORY}/issues/${SOURCE_ISSUE}`) {
-      if (!transferred) throw new Error("redirect requested before transfer");
-      return JSON.stringify({ html_url: TARGET_URL, number: 7, repository_url: `https://api.github.com/repos/${TARGET_REPOSITORY}` });
     }
     if (args[0] === "api" && args[1] === "graphql") {
       const issue = args.includes(`name=${TARGET_REPOSITORY.split("/")[1]}`) ? target : source;
@@ -232,29 +226,30 @@ test("completed transfer with failed verification reports a partial-success erro
   assert.equal(transferCalls(fake.calls).length, 1);
 });
 
-test("lost transfer response follows a confirmed redirect through verification", async () => {
-  const { ledger, schema } = migrationContract();
-  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
-  entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
-  const fake = fakeGh({ transferFailure: true, redirectedAfterTransferFailure: true });
-
-  const verified = await runMigration({
-    arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
-    ledger,
-    schema,
-    execGh: fake.execGh,
-  });
-
-  assert.equal(verified.targetUrl, TARGET_URL);
-  assert.equal(transferCalls(fake.calls).length, 1);
-  assert.equal(fake.calls.filter((args) => args.at(-1) === `/repos/${SOURCE_REPOSITORY}/issues/${SOURCE_ISSUE}`).length, 1);
-});
-
 test("unconfirmed transfer response reports an indeterminate result", async () => {
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
   entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
   const fake = fakeGh({ transferFailure: true });
+
+  await assert.rejects(
+    () => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
+      ledger,
+      schema,
+      execGh: fake.execGh,
+    }),
+    (error) => error.message.includes("indeterminate") && error.transferIndeterminate === true,
+  );
+  assert.equal(transferCalls(fake.calls).length, 1);
+  assert.equal(fake.calls.some((args) => args.at(-1) === `/repos/${SOURCE_REPOSITORY}/issues/${SOURCE_ISSUE}`), false);
+});
+
+test("malformed successful transfer output reports an indeterminate result", async () => {
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  const fake = fakeGh({ transferOutput: "Transferred\n" });
 
   await assert.rejects(
     () => runMigration({
