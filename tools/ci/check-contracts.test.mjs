@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -12,6 +12,7 @@ import {
   validateJson,
   validateSourceInventory,
   validateSourceGovernanceContracts,
+  validateBoundariesPayload,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
@@ -339,6 +340,33 @@ test("boundaries.json이 스스로 정합하다", () => {
       assert.ok(area in boundaries.areas, `${targetName}의 ${area} area가 없다`);
     }
   }
+});
+
+test("boundaries v2는 모든 target과 정확히 한 번의 splitOrder를 요구한다", () => {
+  const boundaries = loadJson("contracts/boundaries.json");
+  const missing = structuredClone(boundaries);
+  missing.splitOrder = ["data", "platform", "backend"];
+  const extra = structuredClone(boundaries);
+  extra.splitOrder = [...extra.splitOrder, "unknown"];
+  const duplicate = structuredClone(boundaries);
+  duplicate.splitOrder = ["data", "platform", "backend", "backend", "mobile"];
+
+  assert.ok(validateBoundariesPayload(missing).some((error) => error.includes("mobile splitOrder 누락")));
+  assert.ok(validateBoundariesPayload(extra).some((error) => error.includes("unknown extraction target 누락")));
+  assert.ok(validateBoundariesPayload(duplicate).some((error) => error.includes("backend splitOrder 중복")));
+});
+
+test("boundaries v2는 malformed repository, source area, global root 충돌을 거부한다", () => {
+  const boundaries = loadJson("contracts/boundaries.json");
+  const malformed = structuredClone(boundaries);
+  malformed.extractionTargets.data.repository = "AquilaXk/not-easysubway";
+  malformed.extractionTargets.platform.sourceAreas = ["missing-area"];
+  malformed.extractionTargets.mobile.partialRoots.push("tools/route-map");
+
+  const errors = validateBoundariesPayload(malformed);
+  assert.ok(errors.some((error) => error.includes("data repository 불량")));
+  assert.ok(errors.some((error) => error.includes("platform.missing-area area 누락")));
+  assert.ok(errors.some((error) => error.includes("mobile.tools/route-map partialRoots가 ownedRoots와 겹친다")));
 });
 
 test("check-contracts CLI 검증 오류가 없다", () => {

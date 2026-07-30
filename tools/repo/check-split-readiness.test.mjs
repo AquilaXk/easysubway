@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { evaluateReadiness } from "./check-split-readiness.mjs";
 
 test("datapack split readiness checks id와 상태를 고정한다", () => {
@@ -95,6 +96,30 @@ test("현재 분리 blocker를 readiness 결과에 fail로 드러낸다", () => 
   assert.equal(byId(backend, "contracts.explicit-workspace").status, "fail");
   assert.equal(byId(mobile, "mobile.datapack-lock").status, "fail");
   assert.equal(byId(mobile, "mobile.artifact-staging").status, "fail");
+});
+
+test("component manifest와 backend contract lock을 추가하면 해당 blocker만 pass가 된다", () => {
+  const componentDirectory = "contracts/components";
+  const backendDirectory = "contracts/backend";
+  const componentPath = `${componentDirectory}/backend.json`;
+  const lockPath = `${backendDirectory}/contract-lock.json`;
+  assert.equal(existsSync(componentPath), false);
+  assert.equal(existsSync(lockPath), false);
+
+  mkdirSync(componentDirectory, { recursive: true });
+  mkdirSync(backendDirectory, { recursive: true });
+  writeFileSync(componentPath, "{}\n");
+  writeFileSync(lockPath, "{}\n");
+  try {
+    const backend = evaluateReadiness("backend");
+    assert.equal(byId(backend, "backend.component-manifest").status, "pass");
+    assert.equal(byId(backend, "backend.contract-lock").status, "pass");
+  } finally {
+    rmSync(componentPath, { force: true });
+    rmSync(lockPath, { force: true });
+    rmSync(componentDirectory, { recursive: true, force: true });
+    rmSync(backendDirectory, { recursive: true, force: true });
+  }
 });
 
 function byId(result, id) {

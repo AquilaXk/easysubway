@@ -194,17 +194,30 @@ export function validateDatapackManifest(manifest, valuePath, errors) {
 
 function validateBoundaries(errors) {
   if (!existsSync("contracts/boundaries.json")) return;
-  const boundaries = loadJson("contracts/boundaries.json");
+  errors.push(...validateBoundariesPayload(loadJson("contracts/boundaries.json")));
+}
+
+export function validateBoundariesPayload(boundaries) {
+  const errors = [];
   if (boundaries.schemaVersion !== 2) errors.push("contracts/boundaries.json: schemaVersion은 2이어야 한다");
   const targets = boundaries.extractionTargets ?? {};
-  const repositories = new Set();
-  const ownedRoots = new Set();
-  for (const targetName of boundaries.splitOrder ?? []) {
-    if (!(targetName in targets)) {
-      errors.push(`contracts/boundaries.json: ${targetName} extraction target 누락`);
+  const splitOrder = Array.isArray(boundaries.splitOrder) ? boundaries.splitOrder : [];
+  const splitTargets = new Set();
+  for (const targetName of splitOrder) {
+    if (splitTargets.has(targetName)) {
+      errors.push(`contracts/boundaries.json: ${targetName} splitOrder 중복`);
       continue;
     }
-    const target = targets[targetName] ?? {};
+    splitTargets.add(targetName);
+    if (!(targetName in targets)) errors.push(`contracts/boundaries.json: ${targetName} extraction target 누락`);
+  }
+  for (const targetName of Object.keys(targets)) {
+    if (!splitTargets.has(targetName)) errors.push(`contracts/boundaries.json: ${targetName} splitOrder 누락`);
+  }
+  const repositories = new Set();
+  const ownedRoots = new Set();
+  const partialRoots = [];
+  for (const [targetName, target] of Object.entries(targets)) {
     if (!/^AquilaXk\/easysubway(?:-(?:data|platform|backend|mobile))?$/.test(target.repository ?? "")) {
       errors.push(`contracts/boundaries.json: ${targetName} repository 불량`);
     } else if (repositories.has(target.repository)) {
@@ -212,20 +225,25 @@ function validateBoundaries(errors) {
     } else {
       repositories.add(target.repository);
     }
-    const sourceAreas = target.sourceAreas ?? [];
+    const sourceAreas = Array.isArray(target.sourceAreas) ? target.sourceAreas : [];
     if (new Set(sourceAreas).size !== sourceAreas.length) {
       errors.push(`contracts/boundaries.json: ${targetName} sourceAreas 중복`);
     }
     for (const area of sourceAreas) {
       if (!(area in (boundaries.areas ?? {}))) errors.push(`contracts/boundaries.json: ${targetName}.${area} area 누락`);
     }
-    const partialRoots = new Set(target.partialRoots ?? []);
-    for (const root of target.ownedRoots ?? []) {
-      if (partialRoots.has(root)) errors.push(`contracts/boundaries.json: ${targetName}.${root} partialRoots와 ownedRoots가 겹친다`);
+    for (const root of Array.isArray(target.ownedRoots) ? target.ownedRoots : []) {
       if (ownedRoots.has(root)) errors.push(`contracts/boundaries.json: ${root} ownedRoots 중복`);
       ownedRoots.add(root);
     }
+    for (const root of Array.isArray(target.partialRoots) ? target.partialRoots : []) {
+      partialRoots.push({ targetName, root });
+    }
   }
+  for (const { targetName, root } of partialRoots) {
+    if (ownedRoots.has(root)) errors.push(`contracts/boundaries.json: ${targetName}.${root} partialRoots가 ownedRoots와 겹친다`);
+  }
+  return errors;
 }
 
 function validateOpenApiFixtures(errors) {
