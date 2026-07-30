@@ -3397,7 +3397,7 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
 });
 
-test("[release-v2] RC evidence contract uses repository-qualified issue references", () => {
+test("[release-v2] RC evidence contract uses repository-qualified issue references", async () => {
   const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
   const issueRefSchema = readJson("contracts/release/issue-ref.schema.json");
   const issueRefPattern = new RegExp(issueRefSchema.pattern);
@@ -3421,6 +3421,31 @@ test("[release-v2] RC evidence contract uses repository-qualified issue referenc
   assert.ok(contract.requiredEvidenceEntryFields.includes("issueRef"));
   assert.ok(!contract.requiredEvidenceEntryFields.includes("sourceIssue"));
   assert.ok(issueRefs.every((issueRef) => issueRefPattern.test(issueRef)));
+
+  const tempApp = await mkdtemp(path.join(tmpdir(), "release-v2-contract-"));
+  try {
+    await mkdir(path.join(tempApp, "release"), { recursive: true });
+    await writeFile(path.join(tempApp, "pubspec.yaml"), read("apps/mobile/pubspec.yaml"));
+    for (const issueRef of ["AquilaXk/easysubway-data#2133", "AquilaXk/easysubway#0"]) {
+      await writeFile(path.join(tempApp, "release/rc-evidence-manifest-contract.json"), JSON.stringify({
+        ...contract, issueRef,
+      }));
+      await assert.rejects(
+        execFileAsync(process.execPath, [
+          "tools/release/generate-rc-evidence-manifest.mjs",
+          "--repo-root", root,
+          "--app-root", tempApp,
+          "--git-sha", currentGitSha,
+          "--phase", "CANDIDATE",
+          "--output", path.join(tempApp, "candidate-context.json"),
+          "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
+        ], { cwd: root }),
+        new RegExp(`Invalid EasySubway issue reference: ${issueRef}`),
+      );
+    }
+  } finally {
+    await rm(tempApp, { recursive: true, force: true });
+  }
 });
 
 test("모바일 signed release artifact gate와 광고 counter는 CI 산출물과 스토어 제출 준비 상태를 분리한다", () => {
