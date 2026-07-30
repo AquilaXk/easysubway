@@ -3082,7 +3082,7 @@
       "sourceSystem": "국가철도공단·공공데이터포털",
       "datasetUrl": "https://data.kric.go.kr/rips/M_01_01/detail.do?id=1294",
       "datasetKind": "official-file-data",
-      "coverage": "KRIC 전국 도시광역철도 역사정보 id=1294 GTX-A 9행을 primary로 admit한다. 북부 일부 공식 lat/lon 컬럼 스왑(lon∈[33,43]∧lat∈[124,132]이면 swap)을 결정론 정규화한다. id=1279는 보조 참조. canvas join + pack station_code(추정 좌표·투영 금지). AquilaXk/easysubway-data#3 active line scope는 이 노선을 운영기관별로 분리하며, 동탄 1역 운영기관(주식회사 SR, operator-9e999d4aa596)과 동탄을 제외한 나머지 8역 운영기관(지티엑스에이운영, operator-5ca780d7dee1)이 모두 snapshot 9역 안에 있어 두 operator scope를 dual coverage로 등재한다(구간이 아닌 역 membership 기준).",
+      "coverage": "KRIC 전국 도시광역철도 역사정보 id=1294 GTX-A 9행을 primary로 admit한다. 북부 일부 공식 lat/lon 컬럼 스왑(lon∈[33,43]∧lat∈[124,132]이면 swap)을 결정론 정규화한다. id=1279는 보조 참조. canvas join + pack station_code(추정 좌표·투영 금지). #2138 active line scope는 이 노선을 운영기관별로 분리하며, 동탄 1역 운영기관(주식회사 SR, operator-9e999d4aa596)과 동탄을 제외한 나머지 8역 운영기관(지티엑스에이운영, operator-5ca780d7dee1)이 모두 snapshot 9역 안에 있어 두 operator scope를 dual coverage로 등재한다(구간이 아닌 역 membership 기준).",
       "coverageScope": {
         "regionIds": [
           "capital"
@@ -3762,7 +3762,7 @@
       "sourceSystem": "국가철도공단·공공데이터포털",
       "datasetUrl": "https://data.kric.go.kr/rips/M_01_01/detail.do?id=1294",
       "datasetKind": "official-file-data",
-      "coverage": "KRIC 전국 도시광역철도 역사정보 id=1294에서 노선명=서해선 21행 필터 fixture로 21역 전부 admit한다(시흥능곡 포함). id=32/data.go.kr 15093755는 보조 참조. canvas join + pack station_code(위경도 투영 금지). AquilaXk/easysubway-data#3 active line scope는 이 노선을 운영기관별로 분리하며, 일산~부천종합운동장 구간 운영기관(한국철도공사, korail) 외에 소사~원시 구간 운영기관(서해철도, operator-38450e138464) 12역(소사·소새울·시흥대야·신천·신현·시흥시청·시흥능곡·달미·선부·초지·시우·원시)이 모두 snapshot 21역 안에 있어 두 operator scope를 dual coverage로 등재한다.",
+      "coverage": "KRIC 전국 도시광역철도 역사정보 id=1294에서 노선명=서해선 21행 필터 fixture로 21역 전부 admit한다(시흥능곡 포함). id=32/data.go.kr 15093755는 보조 참조. canvas join + pack station_code(위경도 투영 금지). #2138 active line scope는 이 노선을 운영기관별로 분리하며, 일산~부천종합운동장 구간 운영기관(한국철도공사, korail) 외에 소사~원시 구간 운영기관(서해철도, operator-38450e138464) 12역(소사·소새울·시흥대야·신천·신현·시흥시청·시흥능곡·달미·선부·초지·시우·원시)이 모두 snapshot 21역 안에 있어 두 operator scope를 dual coverage로 등재한다.",
       "coverageScope": {
         "regionIds": [
           "capital"
@@ -3977,7 +3977,7 @@
       "sourceSystem": "국가철도공단·공공데이터포털",
       "datasetUrl": "https://www.data.go.kr/data/15041337/fileData.do",
       "datasetKind": "official-file-data",
-      "coverage": "국가철도공단 data.go.kr FILE 15041337 신분당선 역위치 CSV 16역 admit(상현은 KRIC 1294 overlay). canvas join + pack station_code(위경도 투영 금지). operatorIds의 seoul-metro는 FILE admission 당시 표기를 유지하는 lineage 연속성 항목이며, AquilaXk/easysubway-data#3 activeLineScopes에 (capital, seoul-metro, shinbundang) scope가 없어 어떤 requirement에도 매칭되지 않는다. requirement 매칭 operator는 노선 운영기관(네오트랜스, operator-28e01fb8509d)이고, 해당 scope 16역(신사~광교) 전체가 snapshot 16역과 일치해 dual coverage로 등재한다.",
+      "coverage": "국가철도공단 data.go.kr FILE 15041337 신분당선 역위치 CSV 16역 admit(상현은 KRIC 1294 overlay). canvas join + pack station_code(위경도 투영 금지). operatorIds의 seoul-metro는 FILE admission 당시 표기를 유지하는 lineage 연속성 항목이며, #2138 activeLineScopes에 (capital, seoul-metro, shinbundang) scope가 없어 어떤 requirement에도 매칭되지 않는다. requirement 매칭 operator는 노선 운영기관(네오트랜스, operator-28e01fb8509d)이고, 해당 scope 16역(신사~광교) 전체가 snapshot 16역과 일치해 dual coverage로 등재한다.",
       "coverageScope": {
         "regionIds": [
           "capital"
@@ -6973,7 +6973,7 @@
       "sourceSystem": "서울교통공사·공공데이터포털",
       "datasetUrl": "https://www.data.go.kr/data/15099317/fileData.do",
       "datasetKind": "official-file-data",
-      "coverage": "서울교통공사 9호선 2·3단계(언주~중앙보훈병원) 공식 FILE 위경도 13역(FILE codes 926–938)을 provenance로 유지하고, pack station 26–38은 capital topology 정규화 역명 join + owner-self-drawn-sma-schematic canvas x/y로 admission한다(위경도 투영 금지). FILE·2·3단계 운영기관은 서울교통공사(seoul-metro)이며, AquilaXk/easysubway-data#3 active line scope의 line operator(서울시메트로9호선, operator-936e454d0bfb)도 coverage에 포함한다. 1단계(개화~신논현)는 이번 FILE 범위 밖이다.",
+      "coverage": "서울교통공사 9호선 2·3단계(언주~중앙보훈병원) 공식 FILE 위경도 13역(FILE codes 926–938)을 provenance로 유지하고, pack station 26–38은 capital topology 정규화 역명 join + owner-self-drawn-sma-schematic canvas x/y로 admission한다(위경도 투영 금지). FILE·2·3단계 운영기관은 서울교통공사(seoul-metro)이며, #2138 active line scope의 line operator(서울시메트로9호선, operator-936e454d0bfb)도 coverage에 포함한다. 1단계(개화~신논현)는 이번 FILE 범위 밖이다.",
       "coverageScope": {
         "regionIds": [
           "capital"
@@ -7932,7 +7932,7 @@
       "capabilities": {
         "schedule": { "status": "UNSUPPORTED", "productionUseAllowed": false, "coverageStatus": "NOT_PROVIDED_BY_SOURCE", "updateFrequency": "annual snapshot", "unsupportedNotes": "환승 이동경로 file은 시간표를 제공하지 않는다." },
         "realtime": { "status": "UNSUPPORTED", "productionUseAllowed": false, "liveEtaEligible": false, "rateLimitStatus": "NOT_APPLICABLE", "coverageStatus": "NOT_PROVIDED_BY_SOURCE", "updateFrequency": "annual snapshot", "unsupportedNotes": "환승 이동경로 file은 realtime 정보를 제공하지 않는다." },
-        "facility": { "status": "CANDIDATE", "productionUseAllowed": false, "coverageStatus": "RAW_SNAPSHOT_ADMITTED", "updateFrequency": "annual snapshot", "unsupportedNotes": "raw official snapshot만 admission했으며 station-domain materialization은 AquilaXk/easysubway-data#8 범위다." }
+        "facility": { "status": "CANDIDATE", "productionUseAllowed": false, "coverageStatus": "RAW_SNAPSHOT_ADMITTED", "updateFrequency": "annual snapshot", "unsupportedNotes": "raw official snapshot만 admission했으며 station-domain materialization은 #2610 범위다." }
       },
       "rawSnapshotAdmission": { "snapshotId": "molit-railway-transfer-movement-20250811", "metadataPath": "tools/datapack/sources/molit-railway-transfer-movement-20250811.csv.gz.json", "metadataFileSha256": "f75e3ec2a2270cdd8d3b2303f12db0167cf0b5f5525115f6c980680468faa284", "rawSha256": "3a45dc1d82f81666c48eeef81fdc35b0e4a0c59312e4b26907f644c45b518ce3", "gzipSha256": "94e712d32860a7a6e4b4c1f1d9651dc25823305f537e50370142009c1ca66d28", "rowCount": 8054, "status": "LOCKED" }
     }
