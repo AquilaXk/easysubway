@@ -747,6 +747,9 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
 
 test("CD는 exact Release Artifacts run의 backend digest만 배포한다", async () => {
   const workflow = read(".github/workflows/cd.yml");
+  const pullStep = workflow.match(
+    /- name: CD Deploy \/ Pull backend image by digest[\s\S]*?(?=\n      - name:)/,
+  )?.[0] ?? "";
   const validator = workflow.match(
     /node --input-type=module - <<'NODE' >> "\$\{GITHUB_OUTPUT\}"\n([\s\S]*?)\n {10}NODE/,
   )?.[1]?.replace(/^ {10}/gm, "");
@@ -791,7 +794,19 @@ test("CD는 exact Release Artifacts run의 backend digest만 배포한다", asyn
   assert.match(workflow, /workflow_run\.id/);
   assert.match(workflow, /workflow_run\.head_sha/);
   assert.match(workflow, /producer_run_id: \$\{\{ steps\.target\.outputs\.producer_run_id \}\}/);
-  assert.match(workflow, /image_digest: \$\{\{ steps\.manifest\.outputs\.image_digest \}\}/);
+  assert.match(workflow, /rollback_image_digest:/);
+  assert.match(
+    workflow,
+    /image_digest: \$\{\{ steps\.manifest\.outputs\.image_digest \|\| steps\.target\.outputs\.rollback_image_digest \}\}/,
+  );
+  assert.match(
+    workflow,
+    /if \[\[ -z "\$\{producer_run_id\}" \]\]; then[\s\S]*?\[\[ ! "\$\{rollback_image_digest\}" =~ \^sha256:\[a-f0-9\]\{64\}\$ \]\]/,
+  );
+  assert.match(
+    workflow,
+    /steps\.changes\.outputs\.deploy == 'true' && steps\.target\.outputs\.rollback_image_digest == ''/,
+  );
   assert.match(workflow, /require-successful-workflow-run\.mjs/);
   assert.match(workflow, /Release Artifacts/);
   assert.match(workflow, /easysubway-backend-release-\$\{\{ steps\.target\.outputs\.sha \}\}/);
@@ -806,6 +821,8 @@ test("CD는 exact Release Artifacts run의 backend digest만 배포한다", asyn
   assert.match(workflow, /evidenceSha256/);
   assert.match(workflow, /needs\.plan\.outputs\.image_digest/);
   assert.match(workflow, /docker pull "\$\{IMAGE\}@\$\{DEPLOY_IMAGE_DIGEST\}"/);
+  assert.match(pullStep, /docker image inspect "easysubway-backend:\$\{DEPLOY_SHA\}"/);
+  assert.match(pullStep, /\[\[ "\$\{image_revision\}" != "\$\{DEPLOY_SHA\}" \]\]/);
   assert.doesNotMatch(workflow, /^  build-image:/m);
   assert.doesNotMatch(workflow, /working-directory: backend/);
   assert.doesNotMatch(workflow, /gradlew bootJar/);

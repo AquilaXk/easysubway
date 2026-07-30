@@ -22,6 +22,10 @@ on:
         description: "배포할 main 커밋 SHA. 비우면 현재 workflow SHA를 사용합니다."
         required: false
         type: string
+      rollback_image_digest:
+        description: "exact release artifact가 없는 긴급 rollback용 immutable sha256 digest"
+        required: false
+        type: string
 
 jobs:
   plan:
@@ -34,7 +38,7 @@ jobs:
       deploy_target_relevant: ${{ steps.changes.outputs.deploy }}
       sha: ${{ steps.target.outputs.sha }}
       producer_run_id: ${{ steps.target.outputs.producer_run_id }}
-      image_digest: ${{ steps.manifest.outputs.image_digest }}
+      image_digest: ${{ steps.manifest.outputs.image_digest || steps.target.outputs.rollback_image_digest }}
     if: ${{ github.event_name == 'workflow_dispatch' || (github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'push' && github.event.workflow_run.head_branch == 'main' && github.event.workflow_run.head_repository.full_name == github.repository) }}
 
     steps:
@@ -53,10 +57,12 @@ jobs:
           WORKFLOW_RUN_ID: ${{ github.event.workflow_run.id }}
           DISPATCH_SHA: ${{ inputs.deploy_sha }}
           DISPATCH_MODE: ${{ inputs.mode }}
+          ROLLBACK_IMAGE_DIGEST: ${{ inputs.rollback_image_digest }}
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
 
+          rollback_image_digest=""
           if [[ "${EVENT_NAME}" == "workflow_run" ]]; then
             deploy_sha="${WORKFLOW_RUN_SHA}"
             producer_run_id="${WORKFLOW_RUN_ID}"
@@ -76,12 +82,17 @@ jobs:
               -H "X-GitHub-Api-Version: 2022-11-28" \
               --output "${producer_runs}" \
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/release-artifacts.yml/runs?head_sha=${deploy_sha}&branch=main&event=push&status=success&per_page=20"
-            producer_run_id="$(node tools/ci/require-successful-workflow-run.mjs \
-              "${producer_runs}" "${deploy_sha}" "Release Artifacts" "push" main 1209600 \
-              | sed -nE 's/^validated_workflow_run_id=([0-9]+)$/\1/p')"
+            producer_run_id=""
+            if validated_run="$(node tools/ci/require-successful-workflow-run.mjs \
+              "${producer_runs}" "${deploy_sha}" "Release Artifacts" "push" main 1209600 2>/dev/null)"; then
+              producer_run_id="${validated_run#validated_workflow_run_id=}"
+            fi
             if [[ -z "${producer_run_id}" ]]; then
-              echo "manual deployment requires an exact successful Release Artifacts push run" >&2
-              exit 1
+              rollback_image_digest="${ROLLBACK_IMAGE_DIGEST}"
+              if [[ ! "${rollback_image_digest}" =~ ^sha256:[a-f0-9]{64}$ ]]; then
+                echo "manual rollback without an exact Release Artifacts run requires rollback_image_digest" >&2
+                exit 1
+              fi
             fi
             mode="${DISPATCH_MODE:-deploy}"
           fi
@@ -99,6 +110,7 @@ jobs:
 
           echo "sha=${deploy_sha}" >> "${GITHUB_OUTPUT}"
           echo "producer_run_id=${producer_run_id}" >> "${GITHUB_OUTPUT}"
+          echo "rollback_image_digest=${rollback_image_digest}" >> "${GITHUB_OUTPUT}"
           echo "mode=${mode}" >> "${GITHUB_OUTPUT}"
 
       - name: CD Plan / Detect deployment changes
@@ -124,7 +136,7 @@ jobs:
           bash tools/ci/detect-changed-paths.sh changed-files.txt
 
       - name: CD Plan / Download exact backend release artifact
-        if: ${{ steps.changes.outputs.deploy == 'true' }}
+        if: ${{ steps.changes.outputs.deploy == 'true' && steps.target.outputs.rollback_image_digest == '' }}
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: easysubway-backend-release-${{ steps.target.outputs.sha }}
@@ -134,7 +146,7 @@ jobs:
 
       - name: CD Plan / Validate backend component manifest
         id: manifest
-        if: ${{ steps.changes.outputs.deploy == 'true' }}
+        if: ${{ steps.changes.outputs.deploy == 'true' && steps.target.outputs.rollback_image_digest == '' }}
         shell: bash
         env:
           DEPLOY_SHA: ${{ steps.target.outputs.sha }}
@@ -611,6 +623,11 @@ jobs:
           # so their --no-build and image-drift contracts are unchanged (#1686).
           docker pull "${IMAGE}@${DEPLOY_IMAGE_DIGEST}"
           docker tag "${IMAGE}@${DEPLOY_IMAGE_DIGEST}" "easysubway-backend:${DEPLOY_SHA}"
+          image_revision="$(docker image inspect "easysubway-backend:${DEPLOY_SHA}" --format '{{index .Config.Labels "org.opencontainers.image.revision"}}')"
+          if [[ "${image_revision}" != "${DEPLOY_SHA}" ]]; then
+            echo "backend image revision does not match deploy SHA" >&2
+            exit 1
+          fi
           echo "DEPLOY_IMAGE_DIGEST=${DEPLOY_IMAGE_DIGEST}" >> "${GITHUB_ENV}"
 
       - name: CD Deploy / Rehearse PR1 image rollback after V51
