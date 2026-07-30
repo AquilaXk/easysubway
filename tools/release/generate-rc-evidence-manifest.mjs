@@ -130,9 +130,11 @@ const gitSha = suppliedGitSha ?? process.env.GITHUB_SHA ?? checkoutGitSha;
 if (!/^[a-f0-9]{40}$/.test(gitSha) || gitSha !== checkoutGitSha) {
   fail("--git-sha must match the current checkout HEAD");
 }
-const rcEvidenceContract = projectRcEvidenceContract(readJsonIfExists(
-  path.join(appRoot, "release/rc-evidence-manifest-contract.json"),
-));
+const rcEvidenceContractPath = resolvePath(
+  arg("rcEvidenceContract", "rc-evidence-contract")
+    ?? path.join(repoRoot, "release/product-gates/rc-evidence-manifest-contract.json"),
+);
+const rcEvidenceContract = projectRcEvidenceContract(readJsonIfExists(rcEvidenceContractPath));
 if (!Array.isArray(rcEvidenceContract?.requiredEvidenceEntries)) {
   fail("RC evidence manifest contract with requiredEvidenceEntries is required");
 }

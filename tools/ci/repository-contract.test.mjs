@@ -3544,6 +3544,7 @@ test("[release-v2] RC evidence contract uses repository-qualified issue referenc
           "tools/release/generate-rc-evidence-manifest.mjs",
           "--repo-root", root,
           "--app-root", tempApp,
+          "--rc-evidence-contract", path.join(tempApp, "release/rc-evidence-manifest-contract.json"),
           "--git-sha", currentGitSha,
           "--phase", "CANDIDATE",
           "--output", path.join(tempApp, "candidate-context.json"),
@@ -3962,11 +3963,39 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     ],
   );
   const supersededFinalRcBindings = new Map([
+    [
+      "release/product-gates/operations-observability-gate.json",
+      "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe",
+    ],
+    [
+      "tools/ops/generate-operations-phase-a-summary.mjs",
+      "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d",
+    ],
+    [
+      "tools/ops/validate-operations-release-summary.mjs",
+      "474095e635706a442d79e9c21e274e0aa6eb9e992f480783dbc7d16c66a0fc7e",
+    ],
+    [
+      "release/product-gates/support-incident-response-gate.json",
+      "2b1942f223b63aa18cae0481649d46fa41a671ddae4dccab041098ca3e2d6903",
+    ],
+    [
+      "apps/mobile/release/signed-release-artifact-gate.json",
+      "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67",
+    ],
     ["apps/mobile/pubspec.yaml", "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42"],
     ["apps/mobile/lib/main.dart", "e03403afc1d3370905ef0c3f90533c67dc7fa37eb95c3d8743b7cbd52d2ab9b0"],
     [
       ".github/workflows/release-artifacts.yml",
       "7a40f47727818e79abe1156eee2dd105a0c499eda087708f419993759d404245",
+    ],
+    [
+      ".github/workflows/datapack-release.yml",
+      "928e8222edf41065a4ec9db11cda9821eaf53b153efc30d553b53bd96c599212",
+    ],
+    [
+      "backend/build.gradle",
+      "cfefe1f4884d0f4b44f2875dc4e1bedabad358a7c9aab030c6504c87d8f21f2d",
     ],
     [
       "tools/ci/validate-store-privacy-env.mjs",
@@ -4868,7 +4897,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /failedRcVersionCodeReusePolicy=forbidden_without_1020_waiver/);
   assert.match(
     workflow,
-    /Android Production RC Artifact \/ Collect production metadata[\s\S]*cp release\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json[\s\S]*cp release\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json[\s\S]*cp release\/operations-observability-gate\.json release-artifacts\/android\/operations-observability-gate\.json[\s\S]*Android Production RC Artifact \/ Upload app bundle/,
+    /Android Production RC Artifact \/ Collect production metadata[\s\S]*cp \.\.\/\.\.\/release\/product-gates\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json[\s\S]*cp \.\.\/\.\.\/release\/product-gates\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json[\s\S]*cp \.\.\/\.\.\/release\/product-gates\/operations-observability-gate\.json release-artifacts\/android\/operations-observability-gate\.json[\s\S]*Android Production RC Artifact \/ Upload app bundle/,
   );
   for (const key of gate.artifacts.android.productionRcRequiredMetadata) {
     assert.match(workflow, new RegExp(`${key}=`), `${key} must be emitted in production RC metadata`);
@@ -4880,10 +4909,10 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /cp release\/play-production-access-gate\.json release-artifacts\/android\/play-production-access-gate\.json/);
   assert.match(workflow, /cp release\/play-store-submission-content\.json release-artifacts\/android\/play-store-submission-content\.json/);
   assert.match(workflow, /cp release\/play-generated-apk-device-matrix-gate\.json release-artifacts\/android\/play-generated-apk-device-matrix-gate\.json/);
-  assert.match(workflow, /cp release\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json/);
-  assert.match(workflow, /cp release\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json/);
-  assert.match(workflow, /cp release\/abuse-penetration-rehearsal-gate\.json release-artifacts\/android\/abuse-penetration-rehearsal-gate\.json/);
-  assert.match(workflow, /cp release\/rc-evidence-manifest-contract\.json release-artifacts\/android\/rc-evidence-manifest-contract\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/abuse-penetration-rehearsal-gate\.json release-artifacts\/android\/abuse-penetration-rehearsal-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/rc-evidence-manifest-contract\.json release-artifacts\/android\/rc-evidence-manifest-contract\.json/);
   assert.match(workflow, /rc-evidence-manifest:/);
   assert.match(workflow, /name: RC Evidence Manifest/);
   const rcEvidenceManifestJob = workflow.slice(
@@ -4952,9 +4981,13 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /--gate-status "postLaunchOperations=\$\{operations_status\}"/);
   assert.match(workflow, /--evidence-status "post_launch_operations=\$\{operations_status\}"/);
   assert.match(workflow, /--evidence-path post_launch_operations=release-artifacts\/rc\/operations-phase-a-summary\.json/);
-  assert.match(workflow, /cp apps\/mobile\/release\/post-launch-operations-review-gate\.json release-artifacts\/rc\/post-launch-operations-review-gate\.json/);
-  assert.match(workflow, /cp apps\/mobile\/release\/support-incident-response-gate\.json release-artifacts\/rc\/support-incident-response-gate\.json/);
-  assert.match(workflow, /cp apps\/mobile\/release\/operations-observability-gate\.json release-artifacts\/rc\/operations-observability-gate\.json/);
+  assert.match(workflow, /cp release\/product-gates\/post-launch-operations-review-gate\.json release-artifacts\/rc\/post-launch-operations-review-gate\.json/);
+  assert.match(workflow, /cp release\/product-gates\/support-incident-response-gate\.json release-artifacts\/rc\/support-incident-response-gate\.json/);
+  assert.match(workflow, /cp release\/product-gates\/operations-observability-gate\.json release-artifacts\/rc\/operations-observability-gate\.json/);
+  assert.match(workflow, /--rc-evidence-contract release\/product-gates\/rc-evidence-manifest-contract\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/operations-observability-gate\.json release-artifacts\/android\/operations-observability-gate\.json/);
   assert.match(workflow, /"\$\{operations_evidence_args\[@\]\}"/);
   assert.match(workflow, /--evidence-root "\.codex\/evidence\/release\/rc-evidence-manifest\/\$\{GITHUB_SHA\}\/"/);
   assert.match(workflow, /android_artifact_source="none"/);
@@ -5708,7 +5741,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   );
 
   const incompleteRepo = path.join(tempDir, "incomplete-scope-repo");
-  await mkdir(path.join(incompleteRepo, "apps/mobile/release"), { recursive: true });
+  await mkdir(path.join(incompleteRepo, "release/product-gates"), { recursive: true });
   const incompleteScope = structuredClone(launchScope);
   delete incompleteScope.nationwideRoadmapScope;
   await writeFile(
@@ -5720,6 +5753,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", incompleteRepo,
+      "--rc-evidence-contract", "release/product-gates/rc-evidence-manifest-contract.json",
       "--app-root", path.join(root, "apps/mobile"),
       "--git-sha", incompleteRepoGitSha,
       "--aab", aabPath,
@@ -6112,10 +6146,11 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
 
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-"));
   const validationRepo = path.join(tempDir, "validation-repo");
-  for (const directory of ["apps/mobile/release", "contracts/release", "tools/release", "tools/ops", "tools/security"]) {
+  for (const directory of ["apps/mobile/release", "release/product-gates", "contracts/release", "tools/release", "tools/ops", "tools/security"]) {
     await mkdir(path.join(validationRepo, directory), { recursive: true });
   }
   await symlink(path.join(root, "release/product-gates/production-datapack-scope.json"), path.join(validationRepo, "release/product-gates/production-datapack-scope.json"));
+  await symlink(path.join(root, "release/product-gates/rc-evidence-manifest-contract.json"), path.join(validationRepo, "release/product-gates/rc-evidence-manifest-contract.json"));
   for (const schema of ["component-manifest.schema.json", "system-release-manifest.schema.json", "issue-ref.schema.json"]) {
     await symlink(path.join(root, "contracts/release", schema), path.join(validationRepo, "contracts/release", schema));
   }
@@ -6801,7 +6836,11 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     await writeFile(path.join(app, "release/rc-evidence-manifest-contract.json"), JSON.stringify(contract));
     const result = [...baseArgs];
     result[result.indexOf("--app-root") + 1] = app;
-    return [...result, "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json")];
+    return [
+      ...result,
+      "--rc-evidence-contract", path.join(app, "release/rc-evidence-manifest-contract.json"),
+      "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
+    ];
   };
 
   await runFinalGenerator(baseArgs);
@@ -8856,7 +8895,7 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
 
   assert.match(workflow, /mode:[\s\S]*options:\s*\[exploratory, release-candidate, production-publish/);
   assert.match(workflow, /schedule:[\s\S]*cron: "17 18 \* \* \*"/);
-  assert.match(workflow, /apps\/mobile\/release\/datapack-freshness-sla\.json/);
+  assert.match(workflow, /release\/product-gates\/datapack-freshness-sla\.json/);
   // 입력 표면은 modeArgs 단일 JSON으로 통합됨(#1694 C0). 게이트 관련 인자는 parse 스텝(id: args)이 outputs로 펼친다.
   assert.match(workflow, /modeArgs:[\s\S]*required: true/);
   assert.match(workflow, /steps\.args\.outputs\.buildSpecPath/);
