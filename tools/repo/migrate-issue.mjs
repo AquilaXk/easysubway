@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
+import { validateLedger } from "./issue-migration-ledger.mjs";
 
 const SOURCE_REPOSITORY = "AquilaXk/easysubway";
 const APPROVED_TARGETS = new Set([
@@ -15,36 +16,47 @@ const ISSUE_METADATA_QUERY = [
   "  repository(owner: $owner, name: $name) {",
   "    issue(number: $number) {",
   "      number url title state",
+  "      repository { nameWithOwner }",
   "      labels(first: 100) { totalCount nodes { name } }",
-  "      milestone { title }",
+  "      milestone { title dueOn }",
+  "      assignees(first: 100) { totalCount nodes { id login } }",
   "      comments { totalCount }",
+  "      projectItems(first: 100) { totalCount nodes { id project { id number title url } } }",
+  "      parent { id number url repository { nameWithOwner } }",
+  "      subIssues(first: 100) { totalCount nodes { id number url repository { nameWithOwner } } }",
+  "      blocking(first: 100) { totalCount nodes { id number url repository { nameWithOwner } } }",
+  "      blockedBy(first: 100) { totalCount nodes { id number url repository { nameWithOwner } } }",
+  "      closedByPullRequestsReferences(first: 100, includeClosedPrs: false) { totalCount nodes { id number url state repository { nameWithOwner } } }",
   "    }",
   "  }",
   "}",
 ].join("\n");
 
 export function parseArguments(argv) {
-  const values = { sourceIssues: [] };
+  const values = {};
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
-    if (argument === "--ledger") values.ledgerPath = argv[++index];
-    else if (argument === "--source-issue") values.sourceIssues.push(argv[++index]);
+    if (["--ledger", "--source-issue", "--confirm-source", "--confirm-target"].includes(argument)) {
+      const key = { "--ledger": "ledgerPath", "--source-issue": "sourceIssue", "--confirm-source": "confirmSource", "--confirm-target": "confirmTarget" }[argument];
+      const value = argv[++index];
+      if (values[key] !== undefined || value === undefined || value.startsWith("--")) throw new Error(argument === "--source-issue" ? "exactly one --source-issue is required" : `${argument} must appear exactly once with a value`);
+      values[key] = value;
+    }
     else if (argument === "--dry-run" || argument === "--execute") {
       if (values.mode) throw new Error("choose exactly one execution mode");
       values.mode = argument.slice(2);
-    } else if (argument === "--confirm-source") values.confirmSource = argv[++index];
-    else if (argument === "--confirm-target") values.confirmTarget = argv[++index];
+    }
     else throw new Error("unsupported argument");
   }
   if (!values.ledgerPath) throw new Error("--ledger is required");
-  if (values.sourceIssues.length !== 1 || !/^\d+$/.test(values.sourceIssues[0] ?? "")) {
+  if (!/^\d+$/.test(values.sourceIssue ?? "")) {
     throw new Error("exactly one --source-issue is required");
   }
   if (!values.mode) throw new Error("choose exactly one execution mode");
   if (values.mode === "execute" && (!values.confirmSource || !values.confirmTarget)) {
     throw new Error("--execute requires both confirmations");
   }
-  return { ledgerPath: values.ledgerPath, sourceIssue: Number(values.sourceIssues[0]), mode: values.mode };
+  return { ledgerPath: values.ledgerPath, sourceIssue: Number(values.sourceIssue), mode: values.mode, confirmations: { source: values.confirmSource, target: values.confirmTarget } };
 }
 
 export async function preflightIssueTransfer({ entry, execGh }) {
@@ -60,10 +72,10 @@ export async function executeIssueTransfer({ entry, confirmations, execGh }) {
 }
 
 export async function verifyTransferredIssue({ entry, transferResult, execGh }) {
-  const redirectHeaders = await execGh([
-    "api", "--include", "--method", "HEAD", `/repos/${SOURCE_REPOSITORY}/issues/${entry.sourceIssue}`,
-  ]);
-  const targetUrl = redirectLocation(redirectHeaders, entry.targetRepository);
+  const representation = JSON.parse(await execGh([
+    "api", "-H", "X-GitHub-Api-Version: 2022-11-28", `/repos/${SOURCE_REPOSITORY}/issues/${entry.sourceIssue}`,
+  ]));
+  const targetUrl = redirectRepresentation(representation, entry.targetRepository);
   const target = await readIssueMetadata(targetUrl.repository, targetUrl.number, execGh);
   const expected = transferResult?.expectedMetadata;
   if (target.number !== targetUrl.number || target.url !== `https://github.com/${targetUrl.repository}/issues/${targetUrl.number}`) {
@@ -77,26 +89,25 @@ export async function verifyTransferredIssue({ entry, transferResult, execGh }) 
     title: target.title,
     state: target.state,
     labelCount: target.labels.length,
-    milestone: target.milestone,
+    milestone: target.milestone?.title ?? null,
     commentCount: target.commentCount,
   };
 }
 
 async function preflightDetails({ entry, execGh }) {
   validateEntry(entry);
-  const [targetExists, source, linkedPullRequests, targetLabels, targetMilestones] = await Promise.all([
+  const [targetExists, source, targetLabels, targetMilestones] = await Promise.all([
     targetRepositoryExists(entry.targetRepository, execGh),
     readIssueMetadata(SOURCE_REPOSITORY, entry.sourceIssue, execGh),
-    readLinkedPullRequests(entry.sourceIssue, execGh),
     readTargetLabels(entry.targetRepository, execGh),
     readTargetMilestones(entry.targetRepository, execGh),
   ]);
   if (!targetExists) throw new Error("target repository does not exist");
   if (source.url !== entry.sourceUrl || source.number !== entry.sourceIssue) throw new Error("source issue URL is stale");
   if (source.title !== entry.title || source.state !== "OPEN") throw new Error("source issue title or state is stale");
-  if (linkedPullRequests !== 0) throw new Error("source issue has an open linked pull request");
+  if (source.closingPullRequests.some(({ state }) => state === "OPEN")) throw new Error("source issue has an open linked pull request");
   if (!source.labels.every((label) => targetLabels.has(label))) throw new Error("target repository labels do not match source");
-  if (source.milestone !== null && !targetMilestones.has(source.milestone)) {
+  if (source.milestone !== null && !targetMilestones.has(source.milestone.title)) {
     throw new Error("target repository milestone does not match source");
   }
   return { source, targetLabels, targetMilestones };
@@ -104,7 +115,9 @@ async function preflightDetails({ entry, execGh }) {
 
 function validateEntry(entry) {
   if (entry?.disposition !== "TRANSFER") throw new Error("entry disposition must be TRANSFER");
-  if (entry?.executionApproval === null || typeof entry?.executionApproval !== "string") {
+  if (typeof entry?.executionApproval !== "string"
+    || !/^https:\/\/github\.com\/AquilaXk\/easysubway\/issues\/\d+#issuecomment-\d+$/.test(entry.executionApproval)
+    || entry.targetUrl !== null || entry.transferredAt !== null) {
     throw new Error("entry requires execution approval");
   }
   if (!APPROVED_TARGETS.has(entry?.targetRepository)) throw new Error("entry target is not approved");
@@ -128,19 +141,9 @@ async function targetRepositoryExists(repository, execGh) {
   }
 }
 
-async function readLinkedPullRequests(sourceIssue, execGh) {
-  const output = await execGh([
-    "pr", "list", "--repo", SOURCE_REPOSITORY, "--state", "open",
-    "--search", `linked:issue ${sourceIssue}`, "--json", "number",
-  ]);
-  const pullRequests = JSON.parse(output);
-  if (!Array.isArray(pullRequests)) throw new Error("linked pull request metadata is invalid");
-  return pullRequests.length;
-}
-
 async function readTargetLabels(repository, execGh) {
-  const output = await execGh(["label", "list", "--repo", repository, "--limit", "100", "--json", "name"]);
-  const labels = JSON.parse(output);
+  const output = await execGh(["api", "--paginate", "--slurp", "-H", "X-GitHub-Api-Version: 2022-11-28", `repos/${repository}/labels?per_page=100`]);
+  const labels = JSON.parse(output).flat();
   if (!Array.isArray(labels) || !labels.every(({ name }) => typeof name === "string")) {
     throw new Error("target label metadata is invalid");
   }
@@ -148,8 +151,8 @@ async function readTargetLabels(repository, execGh) {
 }
 
 async function readTargetMilestones(repository, execGh) {
-  const output = await execGh(["api", `repos/${repository}/milestones?state=all&per_page=100`]);
-  const milestones = JSON.parse(output);
+  const output = await execGh(["api", "--paginate", "--slurp", "-H", "X-GitHub-Api-Version: 2022-11-28", `repos/${repository}/milestones?state=all&per_page=100`]);
+  const milestones = JSON.parse(output).flat();
   if (!Array.isArray(milestones) || !milestones.every(({ title }) => typeof title === "string")) {
     throw new Error("target milestone metadata is invalid");
   }
@@ -163,34 +166,59 @@ async function readIssueMetadata(repository, number, execGh) {
     "-F", `owner=${owner}`, "-F", `name=${name}`, "-F", `number=${number}`,
   ]);
   const issue = JSON.parse(output)?.data?.repository?.issue;
-  if (!issue || !Array.isArray(issue.labels?.nodes) || typeof issue.comments?.totalCount !== "number") {
+  if (!issue || issue.repository?.nameWithOwner !== repository || typeof issue.comments?.totalCount !== "number") {
     throw new Error("issue metadata is invalid");
   }
+  const connection = (value, name) => {
+    if (!value || !Array.isArray(value.nodes) || value.totalCount !== value.nodes.length) throw new Error(`${name} metadata is incomplete`);
+    return value.nodes;
+  };
   return {
     number: issue.number,
     url: issue.url,
     title: issue.title,
     state: issue.state,
-    labels: issue.labels.nodes.map(({ name }) => name),
-    milestone: issue.milestone?.title ?? null,
+    labels: connection(issue.labels, "labels").map(({ name }) => name).sort(),
+    milestone: issue.milestone === null ? null : { title: issue.milestone.title, dueOn: issue.milestone.dueOn },
     commentCount: issue.comments.totalCount,
+    assignees: connection(issue.assignees, "assignees").map(({ id, login }) => ({ id, login })).sort(compareIdentity),
+    projectItems: connection(issue.projectItems, "project items").map(({ id, project }) => ({ id, project: { id: project.id, number: project.number, title: project.title, url: project.url } })).sort(compareIdentity),
+    parent: issue.parent === null ? null : issueIdentity(issue.parent),
+    subIssues: connection(issue.subIssues, "sub issues").map(issueIdentity).sort(compareIdentity),
+    blocking: connection(issue.blocking, "blocking issues").map(issueIdentity).sort(compareIdentity),
+    blockedBy: connection(issue.blockedBy, "blocked-by issues").map(issueIdentity).sort(compareIdentity),
+    closingPullRequests: connection(issue.closedByPullRequestsReferences, "linked pull requests").map((item) => ({ ...issueIdentity(item), state: item.state })).sort(compareIdentity),
   };
 }
 
-function redirectLocation(headers, targetRepository) {
-  const location = /^location:\s*(https:\/\/github\.com\/[^\s]+)$/im.exec(headers)?.[1];
-  const match = location && new RegExp(`^https://github\\.com/${escapeRegExp(targetRepository)}/issues/(\\d+)$`).exec(location);
-  if (!match) throw new Error("source issue redirect is missing or invalid");
+function issueIdentity(issue) {
+  if (!issue?.id || !issue?.number || !issue?.url || !issue.repository?.nameWithOwner) throw new Error("issue relation metadata is invalid");
+  return { id: issue.id, number: issue.number, url: issue.url, repository: issue.repository.nameWithOwner };
+}
+
+function compareIdentity(left, right) { return left.id < right.id ? -1 : left.id > right.id ? 1 : 0; }
+
+function redirectRepresentation(representation, targetRepository) {
+  const match = typeof representation?.html_url === "string" && new RegExp(`^https://github\\.com/${escapeRegExp(targetRepository)}/issues/(\\d+)$`).exec(representation.html_url);
+  if (!match || representation.number !== Number(match[1]) || representation.repository_url !== `https://api.github.com/repos/${targetRepository}`) {
+    throw new Error("source issue redirect is missing or invalid");
+  }
   return { repository: targetRepository, number: Number(match[1]) };
 }
 
 function sameMetadata(left, right) {
   return left.title === right.title
     && left.state === right.state
-    && left.milestone === right.milestone
+    && JSON.stringify(left.milestone) === JSON.stringify(right.milestone)
     && left.commentCount === right.commentCount
     && left.labels.length === right.labels.length
-    && left.labels.every((label) => right.labels.includes(label));
+    && left.labels.every((label) => right.labels.includes(label))
+    && JSON.stringify(left.assignees) === JSON.stringify(right.assignees)
+    && JSON.stringify(left.projectItems) === JSON.stringify(right.projectItems)
+    && JSON.stringify(left.parent) === JSON.stringify(right.parent)
+    && JSON.stringify(left.subIssues) === JSON.stringify(right.subIssues)
+    && JSON.stringify(left.blocking) === JSON.stringify(right.blocking)
+    && JSON.stringify(left.blockedBy) === JSON.stringify(right.blockedBy);
 }
 
 function reportForPreflight(entry, details) {
@@ -202,10 +230,10 @@ function reportForPreflight(entry, details) {
       title: source.title,
       state: source.state,
       labelCount: source.labels.length,
-      milestone: source.milestone,
+      milestone: source.milestone?.title ?? null,
       commentCount: source.commentCount,
     },
-    target: { repository: entry.targetRepository, exists: true, labelCount: details.targetLabels.size, milestone: source.milestone },
+    target: { repository: entry.targetRepository, exists: true, labelCount: details.targetLabels.size, milestone: source.milestone?.title ?? null },
   };
 }
 
@@ -222,6 +250,7 @@ async function main() {
   try {
     const arguments_ = parseArguments(process.argv.slice(2));
     const ledger = JSON.parse(await readFile(arguments_.ledgerPath, "utf8"));
+    if (validateLedger(ledger).length !== 0) throw new Error("ledger validation failed");
     const entry = ledger?.issues?.find(({ sourceIssue }) => sourceIssue === arguments_.sourceIssue);
     if (!entry) throw new Error("source issue is not in the ledger");
     if (arguments_.mode === "dry-run") {
@@ -230,7 +259,7 @@ async function main() {
     }
     const transferResult = await executeIssueTransfer({
       entry,
-      confirmations: { source: process.argv[process.argv.indexOf("--confirm-source") + 1], target: process.argv[process.argv.indexOf("--confirm-target") + 1] },
+      confirmations: arguments_.confirmations,
       execGh,
     });
     console.log(JSON.stringify(await verifyTransferredIssue({ entry, transferResult, execGh })));

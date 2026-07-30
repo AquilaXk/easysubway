@@ -27,8 +27,10 @@ function transferEntry(overrides = {}) {
   };
 }
 
-function metadata({ url = SOURCE_URL, number = SOURCE_ISSUE, title, state = "OPEN", labels = ["release-blocker"], milestone = "P0", commentCount = 1 } = {}) {
-  return { url, number, title: title ?? transferEntry().title, state, labels: { totalCount: labels.length, nodes: labels.map((name) => ({ name })) }, milestone: milestone === null ? null : { title: milestone }, comments: { totalCount: commentCount } };
+function metadata({ url = SOURCE_URL, number = SOURCE_ISSUE, title, state = "OPEN", labels = ["release-blocker"], milestone = "P0", commentCount = 1, closingPullRequests = [] } = {}) {
+  const repo = url.split("/issues/")[0].replace("https://github.com/", "");
+  const connection = (nodes) => ({ totalCount: nodes.length, nodes });
+  return { id: `I_${number}`, url, number, title: title ?? transferEntry().title, state, repository: { nameWithOwner: repo }, labels: connection(labels.map((name) => ({ name }))), milestone: milestone === null ? null : { title: milestone, dueOn: null }, comments: { totalCount: commentCount }, assignees: connection([]), projectItems: connection([]), parent: null, subIssues: connection([]), blocking: connection([]), blockedBy: connection([]), closedByPullRequestsReferences: connection(closingPullRequests) };
 }
 
 function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, number: 7 }), targetExists = true, linkedPullRequests = [] } = {}) {
@@ -40,22 +42,20 @@ function fakeGh({ source = metadata(), target = metadata({ url: TARGET_URL, numb
       if (!targetExists) throw new Error("target repository not found");
       return JSON.stringify({ nameWithOwner: TARGET_REPOSITORY });
     }
-    if (args[0] === "pr" && args[1] === "list") return JSON.stringify(linkedPullRequests);
-    if (args[0] === "label" && args[1] === "list") return JSON.stringify(target.labels.nodes);
     if (args[0] === "issue" && args[1] === "transfer") {
       transferred = true;
       return "";
     }
-    if (args[0] === "api" && args.includes("--method")) {
+    if (args[0] === "api" && args.includes("--paginate")) {
+      return JSON.stringify([args.at(-1).includes("labels") ? target.labels.nodes : (target.milestone === null ? [] : [target.milestone])]);
+    }
+    if (args[0] === "api" && args.at(-1) === `/repos/${SOURCE_REPOSITORY}/issues/${SOURCE_ISSUE}`) {
       if (!transferred) throw new Error("redirect requested before transfer");
-      return `HTTP/2.0 301 Moved Permanently\nlocation: ${TARGET_URL}\n`;
+      return JSON.stringify({ html_url: TARGET_URL, number: 7, repository_url: `https://api.github.com/repos/${TARGET_REPOSITORY}` });
     }
     if (args[0] === "api" && args[1] === "graphql") {
       const issue = args.includes(`name=${TARGET_REPOSITORY.split("/")[1]}`) ? target : source;
       return JSON.stringify({ data: { repository: { issue } } });
-    }
-    if (args[0] === "api" && args[1].endsWith("/milestones?state=all&per_page=100")) {
-      return JSON.stringify(target.milestone === null ? [] : [target.milestone]);
     }
     throw new Error(`unexpected gh invocation: ${args.join(" ")}`);
   };
@@ -69,7 +69,7 @@ function transferCalls(calls) {
 test("argument parser accepts exactly one source issue and one mode", () => {
   assert.deepEqual(
     parseArguments(["--ledger", "ledger.json", "--source-issue", "2684", "--dry-run"]),
-    { ledgerPath: "ledger.json", sourceIssue: 2684, mode: "dry-run" },
+    { ledgerPath: "ledger.json", sourceIssue: 2684, mode: "dry-run", confirmations: { source: undefined, target: undefined } },
   );
   assert.throws(
     () => parseArguments(["--ledger", "ledger.json", "--source-issue", "2684", "--source-issue", "2685", "--dry-run"]),
@@ -85,7 +85,7 @@ test("preflight fails closed before transfer for unsafe ledger and GitHub metada
     ["missing target repository", transferEntry(), { targetExists: false }],
     ["stale source title", transferEntry(), { source: metadata({ title: "changed" }) }],
     ["closed source issue", transferEntry(), { source: metadata({ state: "CLOSED" }) }],
-    ["open linked pull request", transferEntry(), { linkedPullRequests: [{ number: 9 }] }],
+    ["open linked pull request", transferEntry(), { source: metadata({ closingPullRequests: [{ id: "PR_9", number: 9, url: "https://github.com/AquilaXk/easysubway/pull/9", state: "OPEN", repository: { nameWithOwner: SOURCE_REPOSITORY } }] }) }],
     ["label mismatch", transferEntry(), { target: metadata({ labels: ["different"] }) }],
     ["milestone mismatch", transferEntry(), { target: metadata({ milestone: "P1" }) }],
   ];
