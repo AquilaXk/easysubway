@@ -5928,6 +5928,16 @@ test("[system-release-generator] FINAL은 component manifest에서 검증된 sys
     assert.deepEqual(system.platform.artifactIdentity, components.platform.artifactIdentity);
     assert.equal(Object.hasOwn(legacy, "mobile"), false);
     await execFileAsync(process.execPath, ["tools/release/validate-system-release-manifest.mjs", "--manifest", systemOutputPath], { cwd: root });
+    const legacyBeforeInvalidSemVer = await readFile(outputPath);
+    const systemBeforeInvalidSemVer = await readFile(systemOutputPath);
+    const invalidSemVerContractsPath = path.join(tempDir, "invalid-semver-contracts.json");
+    await writeFile(invalidSemVerContractsPath, JSON.stringify({ version: `1.2.3-${"a.".repeat(150)}a`, sha256: "f".repeat(64) }));
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ contractsPath: invalidSemVerContractsPath }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /contracts identity must be exactly \{version,sha256\}/,
+    );
+    assert.deepEqual(await readFile(outputPath), legacyBeforeInvalidSemVer);
+    assert.deepEqual(await readFile(systemOutputPath), systemBeforeInvalidSemVer);
     const semanticSchemas = {
       componentSchema: JSON.parse(read("contracts/release/component-manifest.schema.json")),
       systemSchema: JSON.parse(read("contracts/release/system-release-manifest.schema.json")),

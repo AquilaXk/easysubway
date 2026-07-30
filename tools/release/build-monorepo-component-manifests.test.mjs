@@ -170,6 +170,9 @@ test("preserves an existing output directory and rejects required CLI boundaries
     assert.notEqual(run(files).status, 0);
     assert.equal(readFileSync(sentinel, "utf8"), "preserve me");
     assert.equal(readdirSync(files.directory).some((name) => name.startsWith(".output.tmp-")), false);
+    const validSemVerOutput = path.join(files.directory, "valid-semver");
+    assert.equal(run(files, { "--contracts-version": "1.2.3-alpha.1+build.007", "--output-dir": validSemVerOutput }).status, 0);
+    assert.equal(json(validSemVerOutput, "contracts-identity.json").version, "1.2.3-alpha.1+build.007");
     const base = args(files, { "--output-dir": path.join(files.directory, "boundary-output") });
     const without = (option) => {
       const index = base.indexOf(option);
@@ -182,6 +185,7 @@ test("preserves an existing output directory and rejects required CLI boundaries
       ["git SHA", args(files, { "--git-sha": "A".repeat(40), "--output-dir": path.join(files.directory, "git") })],
       ["platform environment", args(files, { "--platform-environment": "dev", "--output-dir": path.join(files.directory, "environment") })],
       ["SemVer", args(files, { "--contracts-version": "1.2", "--output-dir": path.join(files.directory, "semver") })],
+      ["long SemVer", args(files, { "--contracts-version": `1.2.3-${"a.".repeat(150)}a`, "--output-dir": path.join(files.directory, "long-semver") })],
       ["issueRef", args(files, { "--issue-ref": "2693", "--output-dir": path.join(files.directory, "issue") })],
     ]) assert.notEqual(runArguments(arguments_).status, 0, name);
   } finally {

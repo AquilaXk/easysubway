@@ -13,10 +13,40 @@ const outputFiles = [
   "contracts-identity.json",
 ];
 const issueRefPattern = /^AquilaXk\/(easysubway|easysubway-data|easysubway-platform|easysubway-backend|easysubway-mobile)#[1-9][0-9]*$/;
-const semverPattern = /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/;
 
 function fail(message) {
   throw new Error(message);
+}
+
+function isDigits(value) {
+  return value.length > 0 && [...value].every((character) => character >= "0" && character <= "9");
+}
+
+function isSemVerIdentifier(value, rejectNumericLeadingZero) {
+  return value.length > 0
+    && [...value].every((character) => (
+      (character >= "0" && character <= "9")
+      || (character >= "A" && character <= "Z")
+      || (character >= "a" && character <= "z")
+      || character === "-"
+    ))
+    && (!rejectNumericLeadingZero || !isDigits(value) || value === "0" || value[0] !== "0");
+}
+
+function isSemVer(value) {
+  if (typeof value !== "string" || value.length === 0 || value.length > 255) return false;
+  const buildParts = value.split("+");
+  if (buildParts.length > 2) return false;
+  const [version, build] = buildParts;
+  if (build !== undefined && !build.split(".").every((identifier) => isSemVerIdentifier(identifier, false))) return false;
+
+  const prereleaseSeparator = version.indexOf("-");
+  const core = prereleaseSeparator === -1 ? version : version.slice(0, prereleaseSeparator);
+  const prerelease = prereleaseSeparator === -1 ? undefined : version.slice(prereleaseSeparator + 1);
+  if (prerelease !== undefined && !prerelease.split(".").every((identifier) => isSemVerIdentifier(identifier, true))) return false;
+  const coreIdentifiers = core.split(".");
+  return coreIdentifiers.length === 3
+    && coreIdentifiers.every((identifier) => isDigits(identifier) && (identifier === "0" || identifier[0] !== "0"));
 }
 
 function parseArgs(args) {
@@ -115,7 +145,7 @@ function main() {
   if (!/^[a-f0-9]{40}$/.test(args["--git-sha"])) fail("git sha must be 40 lowercase hex characters");
   if (!args["--mobile-version-name"]) fail("mobile version name is required");
   if (!args["--data-version"]) fail("data version is required");
-  if (!semverPattern.test(args["--contracts-version"])) fail("contracts version must be SemVer");
+  if (!isSemVer(args["--contracts-version"])) fail("contracts version must be SemVer");
   if (!issueRefPattern.test(args["--issue-ref"])) fail("issue ref is invalid");
   if (!["ci", "staging", "production"].includes(args["--platform-environment"])) fail("platform environment is invalid");
 

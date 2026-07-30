@@ -485,7 +485,34 @@ function readRequiredJson(filePath, label) {
 }
 
 function isSemVer(value) {
-  return typeof value === "string" && /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(value);
+  if (typeof value !== "string" || value.length === 0 || value.length > 255) return false;
+  const buildParts = value.split("+");
+  if (buildParts.length > 2) return false;
+  const [version, build] = buildParts;
+  if (build !== undefined && !build.split(".").every((identifier) => isSemVerIdentifier(identifier, false))) return false;
+
+  const prereleaseSeparator = version.indexOf("-");
+  const core = prereleaseSeparator === -1 ? version : version.slice(0, prereleaseSeparator);
+  const prerelease = prereleaseSeparator === -1 ? undefined : version.slice(prereleaseSeparator + 1);
+  if (prerelease !== undefined && !prerelease.split(".").every((identifier) => isSemVerIdentifier(identifier, true))) return false;
+  const coreIdentifiers = core.split(".");
+  return coreIdentifiers.length === 3
+    && coreIdentifiers.every((identifier) => isDigits(identifier) && (identifier === "0" || identifier[0] !== "0"));
+}
+
+function isDigits(value) {
+  return value.length > 0 && [...value].every((character) => character >= "0" && character <= "9");
+}
+
+function isSemVerIdentifier(value, rejectNumericLeadingZero) {
+  return value.length > 0
+    && [...value].every((character) => (
+      (character >= "0" && character <= "9")
+      || (character >= "A" && character <= "Z")
+      || (character >= "a" && character <= "z")
+      || character === "-"
+    ))
+    && (!rejectNumericLeadingZero || !isDigits(value) || value === "0" || value[0] !== "0");
 }
 
 function projectRcEvidenceContract(contract) {
