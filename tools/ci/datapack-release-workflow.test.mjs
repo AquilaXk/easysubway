@@ -620,3 +620,17 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.doesNotMatch(promotion, /EASYSUBWAY_DATA_PACK/);
   assert.doesNotMatch(promotion, /OBJECT_STORAGE/);
 });
+
+test("production-publish는 attested candidate를 no-rebuild로 소비한다", () => {
+  assert.match(yml, /candidateRunId/);
+  assert.match(yml, /promotionRunId/);
+  assert.match(yml, /easysubway-datapack-candidate-\$\{EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID\}/);
+  assert.match(yml, /easysubway-datapack-promotion-\$\{EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID\}/);
+  assert.match(yml, /gh attestation verify[\s\S]*?--repo "\$\{GITHUB_REPOSITORY\}"[\s\S]*?--signer-workflow "AquilaXk\/easysubway\/\.github\/workflows\/datapack-promotion\.yml"[\s\S]*?--source-ref refs\/heads\/main[\s\S]*?--deny-self-hosted-runners/);
+  assert.match(yml, /validate-promotion-request\.mjs/);
+  assert.match(yml, /--workflow-run-id "\$\{EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID\}"/);
+  assert.match(yml, /build-data-component-manifest\.mjs/);
+  assert.match(yml, /cmp -s "\$\{component_manifest\}" "\$\{original_component_manifest\}"/);
+  assert.match(yml, /Data Pack Release \/ Stage verified candidate artifact/);
+  assert.doesNotMatch(yml, /apps\/mobile/);
+});

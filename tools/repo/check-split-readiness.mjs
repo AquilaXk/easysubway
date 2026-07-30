@@ -24,8 +24,14 @@ function datapackChecks() {
     check("datapack.compatibility-matrix", errors.every((error) => !error.includes("compatibility-matrix"))),
     check("datapack.release-workflow-no-flutter", datapackReleaseWorkflow !== null && !datapackReleaseWorkflow.includes("flutter")),
     check("datapack.env-scope-isolated", scopesDisjoint("datapack-release", "store-release")),
-    check("datapack.no-mobile-release-paths", datapackReleaseWorkflow !== null && !datapackReleaseWorkflow.includes("apps/mobile/release/")),
-    check("datapack.candidate-promotion-separated", datapackReleaseWorkflow !== null && !datapackReleaseWorkflow.includes("production-publish")),
+    check("datapack.no-mobile-release-paths", datapackReleaseWorkflow !== null && !datapackReleaseWorkflow.includes("apps/mobile")),
+    check(
+      "datapack.production-publish-no-rebuild",
+      datapackReleaseWorkflow !== null
+        && datapackReleaseWorkflow.includes("Data Pack Release / Stage verified candidate artifact")
+        && datapackReleaseWorkflow.includes("gh attestation verify")
+        && datapackReleaseWorkflow.includes("steps.release-mode.outputs.mode != 'production-publish'"),
+    ),
     componentManifestCheck("datapack"),
     ...sharedChecks(),
   ];

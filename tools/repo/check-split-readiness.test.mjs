@@ -14,7 +14,7 @@ test("datapack split readiness checks id와 상태를 고정한다", () => {
     "datapack.release-workflow-no-flutter",
     "datapack.env-scope-isolated",
     "datapack.no-mobile-release-paths",
-    "datapack.candidate-promotion-separated",
+    "datapack.production-publish-no-rebuild",
     "datapack.component-manifest",
     "release.system-manifest-v2",
     "contracts.explicit-workspace",
