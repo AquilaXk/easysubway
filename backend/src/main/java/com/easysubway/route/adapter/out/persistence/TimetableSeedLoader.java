@@ -434,7 +434,8 @@ public class TimetableSeedLoader implements ApplicationRunner {
 
 	private static String accessibilitySqlSha256(byte[] sqlBytes) {
 		String sql = new String(sqlBytes, StandardCharsets.UTF_8);
-		int offset = sql.indexOf("INSERT INTO data_source_snapshots ");
+		int updateOffset = sql.indexOf("UPDATE data_source_snapshots SET ");
+		int offset = updateOffset >= 0 ? updateOffset : sql.indexOf("INSERT INTO data_source_snapshots ");
 		if (offset < 0) {
 			throw new IllegalStateException("timetable snapshot accessibility SQL is missing");
 		}

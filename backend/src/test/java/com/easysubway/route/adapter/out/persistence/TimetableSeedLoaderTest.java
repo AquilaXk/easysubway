@@ -235,6 +235,11 @@ class TimetableSeedLoaderTest {
 	void trackedSnapshotReusesExistingSourceRowWhenOnlyGovernanceBindingChanged() {
 		trackedLoader().run(null);
 		String snapshotId = "seoul-metro-accessibility-capital-admission-20260712";
+		String currentPolicySha = jdbc.queryForObject(
+			"SELECT governance_policy_sha256 FROM data_source_snapshots WHERE snapshot_id = ?",
+			String.class,
+			snapshotId
+		);
 		String priorPolicySha = "e".repeat(64);
 		jdbc.update(
 			"UPDATE data_source_snapshots SET governance_policy_sha256 = ? WHERE snapshot_id = ?",
@@ -249,7 +254,7 @@ class TimetableSeedLoaderTest {
 			"SELECT governance_policy_sha256 FROM data_source_snapshots WHERE snapshot_id = ?",
 			String.class,
 			snapshotId
-		)).isEqualTo(priorPolicySha);
+		)).isEqualTo(currentPolicySha);
 		assertThat(jdbc.queryForObject(
 			"SELECT COUNT(*) FROM data_source_snapshots WHERE snapshot_id = ?",
 			Integer.class,

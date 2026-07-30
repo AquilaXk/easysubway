@@ -204,6 +204,9 @@ test("접근성 source snapshot의 lineage와 governance 값을 그대로 materi
   const parentOffset = result.sql.indexOf(`SELECT '${parent.snapshotId}'`);
   const childStatement = result.sql.split("\n")
     .find((line) => line.includes(`SELECT '${child.snapshotId}'`));
+  const childGovernanceUpdate = result.sql.split("\n")
+    .find((line) => line.startsWith("UPDATE data_source_snapshots SET ")
+      && line.includes(`snapshot_id IS NOT DISTINCT FROM '${child.snapshotId}'`));
 
   assert.ok(parentOffset >= 0);
   assert.ok(childStatement);
@@ -212,6 +215,8 @@ test("접근성 source snapshot의 lineage와 governance 값을 그대로 materi
   assert.match(childStatement, new RegExp(`, '${parent.snapshotId}', 'CHANGED', `));
   assert.match(childStatement, /'\{"status":"CHANGED","rowDelta":8,"coverageDelta":1\}'/);
   assert.match(childStatement, /, '2026-07-15', 'a{64}' WHERE/);
+  assert.ok(childGovernanceUpdate);
+  assert.match(childGovernanceUpdate, /SET governance_policy_version = '2026-07-15', governance_policy_sha256 = 'a{64}' WHERE/);
   const existingRowPredicate = childStatement.slice(childStatement.indexOf("WHERE NOT EXISTS"));
   const insertColumns = childStatement.match(/data_source_snapshots \(([^)]+)\)/)[1].split(", ");
   assert.doesNotMatch(existingRowPredicate, /governance_policy_(version|sha256)/);
@@ -219,6 +224,7 @@ test("접근성 source snapshot의 lineage와 governance 값을 그대로 materi
     (column) => !["governance_policy_version", "governance_policy_sha256"].includes(column),
   )) {
     assert.match(existingRowPredicate, new RegExp(`${column} IS NOT DISTINCT FROM`));
+    assert.match(childGovernanceUpdate, new RegExp(`${column} IS NOT DISTINCT FROM`));
   }
   const parentStatement = result.sql.split("\n")
     .find((line) => line.includes(`SELECT '${parent.snapshotId}'`));
