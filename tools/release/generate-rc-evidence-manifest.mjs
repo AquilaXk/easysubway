@@ -421,7 +421,6 @@ function assertComponentCandidateIdentity(components, candidate) {
     ["platform", "backendImageDigest", components.platform?.artifactIdentity?.deployedImageDigest],
   ];
   for (const [component, field, value] of comparisons) {
-    if (candidate?.[field] == null) continue;
     if (String(candidate?.[field]) !== String(value)) fail(`${component} component manifest drifts from candidate context`);
   }
 }

@@ -45,12 +45,69 @@ async function initializeFixtureGitRepo(repoPath) {
   return execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoPath, encoding: "utf8" }).trim();
 }
 
+function optionValue(args, option) {
+  const index = args.indexOf(option);
+  return index === -1 ? null : args[index + 1];
+}
+
+function withOption(args, option, value) {
+  const next = [...args];
+  const index = next.indexOf(option);
+  if (index === -1) next.push(option, value);
+  else next[index + 1] = value;
+  return next;
+}
+
+async function completeCandidateGeneratorArgs(generatorArgs, finalOutputPath) {
+  let args = [...generatorArgs];
+  if (!optionValue(args, "--aab")) {
+    const aabPath = `${finalOutputPath}.candidate.aab`;
+    await writeFile(aabPath, "candidate-aab");
+    args = withOption(args, "--aab", aabPath);
+  }
+  if (!optionValue(args, "--backend-image-digest") && !optionValue(args, "--backend-artifact") && !optionValue(args, "--backend-image-inspect")) {
+    args = withOption(args, "--backend-image-digest", `sha256:${"a".repeat(64)}`);
+  }
+  if (!optionValue(args, "--data-pack-release-decision") && !optionValue(args, "--data-pack-rehearsal-binding")) {
+    const appRoot = path.resolve(root, optionValue(args, "--app-root") ?? "apps/mobile");
+    const selectedManifestPath = path.resolve(root, optionValue(args, "--data-pack-manifest")
+      ?? path.join(appRoot, "assets/datapacks/metro_map_pack/manifest.json"));
+    const selectedManifest = JSON.parse(await readFile(selectedManifestPath, "utf8"));
+    const manifestPath = `${finalOutputPath}.candidate-data-manifest.json`;
+    const manifest = { ...selectedManifest, releaseSequence: selectedManifest.releaseSequence ?? 1 };
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    args = withOption(args, "--data-pack-manifest", manifestPath);
+    let artifactPath = optionValue(args, "--data-pack-artifact");
+    if (!artifactPath) {
+      artifactPath = `${finalOutputPath}.candidate-data-artifact`;
+      await writeFile(artifactPath, "candidate-data-artifact");
+      args = withOption(args, "--data-pack-artifact", artifactPath);
+    }
+    const manifestBytes = await readFile(manifestPath);
+    const artifactBytes = await readFile(path.resolve(root, artifactPath));
+    const bindingPath = `${finalOutputPath}.candidate-rehearsal-binding.json`;
+    await writeFile(bindingPath, JSON.stringify({
+      schemaVersion: 1, artifactKind: "datapack-prelaunch-rehearsal-binding",
+      executionEnvironment: "ISOLATED_PRELAUNCH", productionExecuted: false,
+      sourceSnapshotSetHash: "c".repeat(64),
+      selectedManifestSha256: createHash("sha256").update(manifestBytes).digest("hex"),
+      selectedArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
+      selectedReleaseSequence: manifest.releaseSequence,
+    }));
+    args = withOption(args, "--data-pack-rehearsal-binding", bindingPath);
+  }
+  return args;
+}
+
 async function writeFinalSystemReleaseArgs(candidatePath, finalOutputPath) {
   const candidate = JSON.parse(await readFile(candidatePath, "utf8"));
   const identity = candidate.releaseCandidateIdentity;
-  const fallbackDigest = `sha256:${"a".repeat(64)}`;
   const fallbackHash = "b".repeat(64);
-  const value = (field, fallback) => identity[field] ?? fallback;
+  const required = (field) => {
+    assert.notEqual(identity[field], null, `candidate identity requires ${field}`);
+    assert.notEqual(identity[field], undefined, `candidate identity requires ${field}`);
+    return identity[field];
+  };
   const componentPaths = Object.fromEntries(["mobile", "backend", "data", "platform"].map(
     (component) => [component, `${finalOutputPath}.${component}-component.json`],
   ));
@@ -62,24 +119,24 @@ async function writeFinalSystemReleaseArgs(candidatePath, finalOutputPath) {
     mobile: {
       ...common, component: "mobile", issueRefs: ["AquilaXk/easysubway#2693"],
       artifactIdentity: {
-        versionName: value("appVersionName", "1.0.0"), versionCode: Number(value("versionCode", 1)),
-        aabSha256: value("aabSha256", fallbackHash), bundledDataManifestSha256: value("dataPackManifestSha256", fallbackHash),
+        versionName: required("appVersionName"), versionCode: Number(required("versionCode")),
+        aabSha256: required("aabSha256"), bundledDataManifestSha256: required("dataPackManifestSha256"),
       },
     },
     backend: {
       ...common, component: "backend", issueRefs: ["AquilaXk/easysubway#2693"],
-      artifactIdentity: { imageDigest: value("backendImageDigest", fallbackDigest), apiContractVersion: "1.0.0" },
+      artifactIdentity: { imageDigest: required("backendImageDigest"), apiContractVersion: "1.0.0" },
     },
     data: {
       ...common, component: "data", issueRefs: ["AquilaXk/easysubway#2693"],
       artifactIdentity: {
-        dataVersion: "1.0.0", releaseSequence: Number(value("releaseSequence", 0)),
-        manifestSha256: value("dataPackManifestSha256", fallbackHash), sourceSnapshotSetHash: value("sourceSnapshotSetHash", fallbackHash),
+        dataVersion: "1.0.0", releaseSequence: Number(required("releaseSequence")),
+        manifestSha256: required("dataPackManifestSha256"), sourceSnapshotSetHash: required("sourceSnapshotSetHash"),
       },
     },
     platform: {
       ...common, component: "platform", issueRefs: ["AquilaXk/easysubway#2693"],
-      artifactIdentity: { environment: "ci", deployedImageDigest: value("backendImageDigest", fallbackDigest), deploymentEvidenceSha256: fallbackHash },
+      artifactIdentity: { environment: "ci", deployedImageDigest: required("backendImageDigest"), deploymentEvidenceSha256: fallbackHash },
     },
   };
   for (const [component, document] of Object.entries(components)) await writeFile(componentPaths[component], JSON.stringify(document));
@@ -5259,12 +5316,13 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     const finalOutput = generatorArgs[outputIndex + 1];
     const withoutOutput = generatorArgs.filter((_, index) => index !== outputIndex && index !== outputIndex + 1);
     const candidateOutput = `${finalOutput}.candidate-context.json`;
+    const completeArgs = await completeCandidateGeneratorArgs(withoutOutput, finalOutput);
     await execFileAsync(process.execPath, [
-      ...withoutOutput, "--phase", "CANDIDATE", "--output", candidateOutput,
+      ...completeArgs, "--phase", "CANDIDATE", "--output", candidateOutput,
     ], options);
     const systemReleaseArgs = await writeFinalSystemReleaseArgs(candidateOutput, finalOutput);
     return execFileAsync(process.execPath, [
-      ...withoutOutput, ...systemReleaseArgs, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
+      ...completeArgs, ...systemReleaseArgs, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
     ], options);
   };
   const appVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
@@ -5651,7 +5709,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const metadataOnlyInspect = JSON.stringify([{ RepoDigests: [], Size: 367184804 }]);
   const metadataOnlyInspectSha256 = createHash("sha256").update(metadataOnlyInspect).digest("hex");
   await writeFile(metadataOnlyInspectPath, metadataOnlyInspect);
-  await runFinalGenerator([
+  await execFileAsync(process.execPath, [
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root",
     ".",
@@ -5667,6 +5725,8 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
     "--output",
     metadataOnlyManifestPath,
+    "--phase",
+    "CANDIDATE",
     "--tested-at",
     "2026-06-26T00:00:00.000Z",
   ], { cwd: root });
@@ -5910,12 +5970,11 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z",
   }));
   const aabPayloadPath = path.join(tempDir, "payload.bin"), aabPath = path.join(tempDir, "app-release.aab");
-  const backendArtifactPath = path.join(tempDir, "backend.jar"), dataPackManifestPath = path.join(tempDir, "current.json");
+  const dataPackManifestPath = path.join(tempDir, "current.json");
   const dataPackArtifactPath = path.join(tempDir, "capital.sqlite.gz");
   const dataPackReleaseDecisionPath = path.join(tempDir, "final-release-decision.json");
   await writeFile(aabPayloadPath, "datapack-readiness-aab");
   await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
-  await writeFile(backendArtifactPath, "datapack-readiness-backend");
   const dataPackArtifactContents = Buffer.from("datapack-readiness-pack");
   const compressedDataPackArtifact = gzipSync(dataPackArtifactContents);
   const dataPackArtifactBytes = compressedDataPackArtifact.length;
@@ -5977,7 +6036,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const args = [
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root", validationRepo, "--app-root", "apps/mobile", "--git-sha", gitSha, "--now", now,
-    "--aab", aabPath, "--backend-artifact", backendArtifactPath,
+    "--aab", aabPath, "--backend-image-digest", `sha256:${"a".repeat(64)}`,
     "--data-pack-manifest", dataPackManifestPath, "--data-pack-artifact", dataPackArtifactPath,
     "--data-pack-release-decision", dataPackReleaseDecisionPath,
     "--require-production-data-pack-binding", "true",
@@ -6274,7 +6333,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
           androidApplicationId: "com.easysubway.app",
           dataPackManifestSha256: evidenceRcIdentity.dataPackManifestSha256,
           aabSha256: evidenceRcIdentity.aabSha256,
-          backendArtifactSha256: evidenceRcIdentity.backendArtifactSha256,
+          backendImageDigest: evidenceRcIdentity.backendImageDigest,
         },
       })}\n`);
       evidence.canonicalSummaryPath = abuseSummaryPath;
@@ -6550,12 +6609,13 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     const finalOutput = generatorArgs[outputIndex + 1];
     const withoutOutput = generatorArgs.filter((_, index) => index !== outputIndex && index !== outputIndex + 1);
     const candidateOutput = `${finalOutput}.candidate-context.json`;
+    const completeArgs = await completeCandidateGeneratorArgs(withoutOutput, finalOutput);
     await execFileAsync(process.execPath, [
-      ...withoutOutput, "--phase", "CANDIDATE", "--output", candidateOutput,
+      ...completeArgs, "--phase", "CANDIDATE", "--output", candidateOutput,
     ], options);
     const systemReleaseArgs = await writeFinalSystemReleaseArgs(candidateOutput, finalOutput);
     return execFileAsync(process.execPath, [
-      ...withoutOutput, ...systemReleaseArgs, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
+      ...completeArgs, ...systemReleaseArgs, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
     ], options);
   };
   const rejects = (extraArgs, expected) => assert.rejects(
