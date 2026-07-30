@@ -72,17 +72,22 @@ function imageDigest(inspectPath) {
   fail("backend image inspect lacks an immutable digest");
 }
 
-function sourceSnapshotSetHash(evidencePath) {
+function sourceSnapshotEvidence(evidencePath) {
+  let evidenceBytes;
   let evidence;
   try {
-    evidence = JSON.parse(readFileSync(evidencePath, "utf8"));
+    evidenceBytes = readFileSync(evidencePath);
+    evidence = JSON.parse(evidenceBytes.toString("utf8"));
   } catch {
     fail("source snapshot evidence is unreadable or invalid JSON");
   }
   if (!evidence || typeof evidence !== "object" || Array.isArray(evidence) || !/^[a-f0-9]{64}$/.test(evidence.sourceSnapshotSetHash)) {
     fail("source snapshot evidence has an invalid sourceSnapshotSetHash");
   }
-  return evidence.sourceSnapshotSetHash;
+  return {
+    evidenceSha256: createHash("sha256").update(evidenceBytes).digest("hex"),
+    sourceSnapshotSetHash: evidence.sourceSnapshotSetHash,
+  };
 }
 
 function validateComponent(component, schema) {
@@ -121,8 +126,7 @@ function main() {
   const dataManifestSha256 = sha256File(args["--data-manifest"], "data manifest");
   if (bundledDataManifestSha256 !== dataManifestSha256) fail("bundled data manifest hash mismatch");
   const backendEvidenceSha256 = sha256File(args["--backend-evidence"], "backend evidence");
-  const sourceEvidenceSha256 = sha256File(args["--source-snapshot-evidence"], "source snapshot evidence");
-  const declaredSourceSnapshotSetHash = sourceSnapshotSetHash(args["--source-snapshot-evidence"]);
+  const sourceEvidence = sourceSnapshotEvidence(args["--source-snapshot-evidence"]);
   const platformEvidenceSha256 = sha256File(args["--platform-evidence"], "platform evidence");
   const contractsSha256 = sha256File(args["--contracts-bundle"], "contracts bundle");
   const digest = imageDigest(args["--backend-image-inspect"]);
@@ -139,8 +143,8 @@ function main() {
   };
   const data = {
     ...common, component: "data",
-    artifactIdentity: { dataVersion: args["--data-version"], releaseSequence, manifestSha256: dataManifestSha256, sourceSnapshotSetHash: declaredSourceSnapshotSetHash },
-    evidenceSha256: sourceEvidenceSha256,
+    artifactIdentity: { dataVersion: args["--data-version"], releaseSequence, manifestSha256: dataManifestSha256, sourceSnapshotSetHash: sourceEvidence.sourceSnapshotSetHash },
+    evidenceSha256: sourceEvidence.evidenceSha256,
   };
   const platform = {
     ...common, component: "platform",
