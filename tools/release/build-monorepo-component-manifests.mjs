@@ -79,15 +79,19 @@ function validateComponent(component, schema) {
 
 function writeOutput(outputDir, documents) {
   const parent = path.dirname(outputDir);
-  if (existsSync(outputDir)) fail("output directory already exists");
   if (!existsSync(parent)) fail("output parent directory does not exist");
   const temporary = mkdtempSync(path.join(parent, `.${path.basename(outputDir)}.tmp-`));
+  let claimedOutput = false;
   try {
     for (const [name, document] of documents) writeFileSync(path.join(temporary, name), `${JSON.stringify(document, null, 2)}\n`);
     if (outputFiles.some((name) => !existsSync(path.join(temporary, name)))) fail("output write failed");
-    renameSync(temporary, outputDir);
+    mkdirSync(outputDir);
+    claimedOutput = true;
+    for (const name of outputFiles) renameSync(path.join(temporary, name), path.join(outputDir, name));
+    rmSync(temporary, { recursive: true, force: true });
   } catch (error) {
     rmSync(temporary, { recursive: true, force: true });
+    if (claimedOutput) rmSync(outputDir, { recursive: true, force: true });
     throw error;
   }
 }

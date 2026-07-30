@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -56,8 +56,12 @@ function args(files, overrides = {}) {
   return Object.entries(values).flat();
 }
 
-function run(files, overrides) {
-  return spawnSync(process.execPath, [script, ...args(files, overrides)], { encoding: "utf8" });
+function runArguments(arguments_) {
+  return spawnSync(process.execPath, [script, ...arguments_], { encoding: "utf8" });
+}
+
+function run(files, overrides, extra = []) {
+  return runArguments([...args(files, overrides), ...extra]);
 }
 
 test("builds deterministic truthful monorepo component manifests", () => {
@@ -90,19 +94,37 @@ test("builds deterministic truthful monorepo component manifests", () => {
     assert.equal(platform.evidenceSha256, sha256("platform evidence"));
     assert.deepEqual(json(files.output, "contracts-identity.json"), { version: "1.2.3", sha256: sha256("contracts bundle") });
     for (const name of requireFiles(files.output)) assert.match(readFileSync(path.join(files.output, name), "utf8"), /\n$/);
+    const secondOutput = path.join(files.directory, "output-second");
+    assert.equal(run(files, { "--output-dir": secondOutput }).status, 0);
+    for (const name of requireFiles(files.output)) {
+      assert.deepEqual(readFileSync(path.join(files.output, name)), readFileSync(path.join(secondOutput, name)), name);
+    }
   } finally {
     rmSync(files.directory, { recursive: true, force: true });
   }
 });
 
-test("rejects missing inputs and mutable Docker identities without publishing output", () => {
+test("accepts object-form immutable Id fallback and rejects mutable Docker identity", () => {
   const files = fixture();
   try {
-    assert.notEqual(run(files, { "--aab": path.join(files.directory, "missing.aab") }).status, 0);
-    writeFileSync(files.backendInspect, JSON.stringify([{ RepoDigests: [], Id: "sha256:latest" }]));
-    const result = run(files);
-    assert.notEqual(result.status, 0);
-    assert.equal(requireFiles(files.output), null);
+    writeFileSync(files.backendInspect, JSON.stringify({ RepoDigests: ["registry.example/easysubway:latest"], Id: imageDigest }));
+    assert.equal(run(files).status, 0);
+    assert.equal(json(files.output, "backend-component-manifest.json").artifactIdentity.imageDigest, imageDigest);
+    const absent = fixture();
+    try {
+      writeFileSync(absent.backendInspect, JSON.stringify({ Id: imageDigest }));
+      assert.equal(run(absent).status, 0);
+    } finally {
+      rmSync(absent.directory, { recursive: true, force: true });
+    }
+    const mutable = fixture();
+    try {
+      writeFileSync(mutable.backendInspect, JSON.stringify({ RepoDigests: ["registry.example/easysubway:latest"], Id: "sha256:latest" }));
+      assert.notEqual(run(mutable).status, 0);
+      assert.equal(requireFiles(mutable.output), null);
+    } finally {
+      rmSync(mutable.directory, { recursive: true, force: true });
+    }
   } finally {
     rmSync(files.directory, { recursive: true, force: true });
   }
@@ -117,6 +139,33 @@ test("rejects version bounds and mismatched bundled data manifests", () => {
     writeFileSync(otherManifest, "different manifest");
     assert.notEqual(run(files, { "--bundled-data-manifest": otherManifest }).status, 0);
     assert.equal(requireFiles(files.output), null);
+  } finally {
+    rmSync(files.directory, { recursive: true, force: true });
+  }
+});
+
+test("preserves an existing output directory and rejects required CLI boundaries", () => {
+  const files = fixture();
+  try {
+    mkdirSync(files.output);
+    const sentinel = path.join(files.output, "sentinel");
+    writeFileSync(sentinel, "preserve me");
+    assert.notEqual(run(files).status, 0);
+    assert.equal(readFileSync(sentinel, "utf8"), "preserve me");
+    const base = args(files, { "--output-dir": path.join(files.directory, "boundary-output") });
+    const without = (option) => {
+      const index = base.indexOf(option);
+      return [...base.slice(0, index), ...base.slice(index + 2)];
+    };
+    for (const [name, arguments_] of [
+      ["missing option", without("--aab")],
+      ["extraneous option", [...base, "--extra", "x"]],
+      ["repository", args(files, { "--repository": "AquilaXk/other", "--output-dir": path.join(files.directory, "repository") })],
+      ["git SHA", args(files, { "--git-sha": "A".repeat(40), "--output-dir": path.join(files.directory, "git") })],
+      ["platform environment", args(files, { "--platform-environment": "dev", "--output-dir": path.join(files.directory, "environment") })],
+      ["SemVer", args(files, { "--contracts-version": "1.2", "--output-dir": path.join(files.directory, "semver") })],
+      ["issueRef", args(files, { "--issue-ref": "2693", "--output-dir": path.join(files.directory, "issue") })],
+    ]) assert.notEqual(runArguments(arguments_).status, 0, name);
   } finally {
     rmSync(files.directory, { recursive: true, force: true });
   }
