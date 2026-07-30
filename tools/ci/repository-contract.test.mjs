@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign as signBytes } from "node:crypto";
-import { lstat as fsLstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
+import { link, lstat as fsLstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -20,6 +20,7 @@ import {
 } from "../release/generate-route-integration-verdict.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { validateLineage } from "../datapack/source-snapshot-policy.mjs";
+import { selectSystemReleaseDecision } from "../release/validate-system-release-manifest.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -42,6 +43,114 @@ async function initializeFixtureGitRepo(repoPath) {
     "commit", "-q", "-m", "fixture",
   ], { cwd: repoPath });
   return execFileSync("git", ["rev-parse", "HEAD"], { cwd: repoPath, encoding: "utf8" }).trim();
+}
+
+function optionValue(args, option) {
+  const index = args.indexOf(option);
+  return index === -1 ? null : args[index + 1];
+}
+
+function withOption(args, option, value) {
+  const next = [...args];
+  const index = next.indexOf(option);
+  if (index === -1) next.push(option, value);
+  else next[index + 1] = value;
+  return next;
+}
+
+async function completeCandidateGeneratorArgs(generatorArgs, finalOutputPath) {
+  let args = [...generatorArgs];
+  if (!optionValue(args, "--aab")) {
+    const aabPath = `${finalOutputPath}.candidate.aab`;
+    await writeFile(aabPath, "candidate-aab");
+    args = withOption(args, "--aab", aabPath);
+  }
+  if (!optionValue(args, "--backend-image-digest") && !optionValue(args, "--backend-artifact") && !optionValue(args, "--backend-image-inspect")) {
+    args = withOption(args, "--backend-image-digest", `sha256:${"a".repeat(64)}`);
+  }
+  if (!optionValue(args, "--data-pack-release-decision") && !optionValue(args, "--data-pack-rehearsal-binding")) {
+    const appRoot = path.resolve(root, optionValue(args, "--app-root") ?? "apps/mobile");
+    const selectedManifestPath = path.resolve(root, optionValue(args, "--data-pack-manifest")
+      ?? path.join(appRoot, "assets/datapacks/metro_map_pack/manifest.json"));
+    const selectedManifest = JSON.parse(await readFile(selectedManifestPath, "utf8"));
+    const manifestPath = `${finalOutputPath}.candidate-data-manifest.json`;
+    const manifest = { ...selectedManifest, releaseSequence: selectedManifest.releaseSequence ?? 1 };
+    await writeFile(manifestPath, JSON.stringify(manifest));
+    args = withOption(args, "--data-pack-manifest", manifestPath);
+    let artifactPath = optionValue(args, "--data-pack-artifact");
+    if (!artifactPath) {
+      artifactPath = `${finalOutputPath}.candidate-data-artifact`;
+      await writeFile(artifactPath, "candidate-data-artifact");
+      args = withOption(args, "--data-pack-artifact", artifactPath);
+    }
+    const manifestBytes = await readFile(manifestPath);
+    const artifactBytes = await readFile(path.resolve(root, artifactPath));
+    const bindingPath = `${finalOutputPath}.candidate-rehearsal-binding.json`;
+    await writeFile(bindingPath, JSON.stringify({
+      schemaVersion: 1, artifactKind: "datapack-prelaunch-rehearsal-binding",
+      executionEnvironment: "ISOLATED_PRELAUNCH", productionExecuted: false,
+      sourceSnapshotSetHash: "c".repeat(64),
+      selectedManifestSha256: createHash("sha256").update(manifestBytes).digest("hex"),
+      selectedArtifactSha256: createHash("sha256").update(artifactBytes).digest("hex"),
+      selectedReleaseSequence: manifest.releaseSequence,
+    }));
+    args = withOption(args, "--data-pack-rehearsal-binding", bindingPath);
+  }
+  return args;
+}
+
+async function writeFinalSystemReleaseArgs(candidatePath, finalOutputPath) {
+  const candidate = JSON.parse(await readFile(candidatePath, "utf8"));
+  const identity = candidate.releaseCandidateIdentity;
+  const fallbackHash = "b".repeat(64);
+  const required = (field) => {
+    assert.notEqual(identity[field], null, `candidate identity requires ${field}`);
+    assert.notEqual(identity[field], undefined, `candidate identity requires ${field}`);
+    return identity[field];
+  };
+  const componentPaths = Object.fromEntries(["mobile", "backend", "data", "platform"].map(
+    (component) => [component, `${finalOutputPath}.${component}-component.json`],
+  ));
+  const common = {
+    schemaVersion: 1, repository: "AquilaXk/easysubway", gitSha: currentGitSha,
+    contractVersion: "1.0.0", evidenceSha256: fallbackHash,
+  };
+  const components = {
+    mobile: {
+      ...common, component: "mobile", issueRefs: ["AquilaXk/easysubway#2693"],
+      artifactIdentity: {
+        versionName: required("appVersionName"), versionCode: Number(required("versionCode")),
+        aabSha256: required("aabSha256"), bundledDataManifestSha256: required("dataPackManifestSha256"),
+      },
+    },
+    backend: {
+      ...common, component: "backend", issueRefs: ["AquilaXk/easysubway#2693"],
+      artifactIdentity: { imageDigest: required("backendImageDigest"), apiContractVersion: "1.0.0" },
+    },
+    data: {
+      ...common, component: "data", issueRefs: ["AquilaXk/easysubway#2693"],
+      artifactIdentity: {
+        dataVersion: "1.0.0", releaseSequence: Number(required("releaseSequence")),
+        manifestSha256: required("dataPackManifestSha256"), sourceSnapshotSetHash: required("sourceSnapshotSetHash"),
+      },
+    },
+    platform: {
+      ...common, component: "platform", issueRefs: ["AquilaXk/easysubway#2693"],
+      artifactIdentity: { environment: "ci", deployedImageDigest: required("backendImageDigest"), deploymentEvidenceSha256: fallbackHash },
+    },
+  };
+  for (const [component, document] of Object.entries(components)) await writeFile(componentPaths[component], JSON.stringify(document));
+  const contractsPath = `${finalOutputPath}.contracts-identity.json`;
+  await writeFile(contractsPath, JSON.stringify({ version: "1.0.0", sha256: fallbackHash }));
+  return [
+    "--mobile-component-manifest", componentPaths.mobile,
+    "--backend-component-manifest", componentPaths.backend,
+    "--data-component-manifest", componentPaths.data,
+    "--platform-component-manifest", componentPaths.platform,
+    "--contracts-identity", contractsPath,
+    "--system-release-output", `${finalOutputPath}.system-release.json`,
+    "--product-release-id", "easysubway-test-2693",
+  ];
 }
 
 function mobileProductionDartFiles() {
@@ -3397,6 +3506,119 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
 });
 
+test("[release-v2] RC evidence contract uses repository-qualified issue references", async () => {
+  const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
+  const issueRefSchema = readJson("contracts/release/issue-ref.schema.json");
+  const issueRefPattern = new RegExp(issueRefSchema.pattern);
+  const issueRefs = [
+    contract.issueRef,
+    ...contract.parentIssueRefs,
+    ...contract.linkedEvidenceIssueRefs,
+    ...Object.values(contract.phaseConsumers).flat(),
+    ...contract.requiredFinalFragmentIssueRefs,
+    ...contract.activeBlockerIssueRefs,
+    ...contract.requiredEvidenceEntries.map(({ issueRef }) => issueRef),
+    ...contract.requiredDatapackGates.map(({ issueRef }) => issueRef),
+  ];
+
+  assert.equal(contract.schemaVersion, 2);
+  assert.equal(Object.hasOwn(contract, "issue"), false);
+  assert.equal(Object.hasOwn(contract, "parentIssues"), false);
+  assert.equal(Object.hasOwn(contract, "linkedEvidenceIssues"), false);
+  assert.equal(Object.hasOwn(contract, "requiredFinalFragmentIssues"), false);
+  assert.equal(Object.hasOwn(contract, "activeBlockerIssues"), false);
+  assert.ok(contract.requiredEvidenceEntryFields.includes("issueRef"));
+  assert.ok(!contract.requiredEvidenceEntryFields.includes("sourceIssue"));
+  assert.ok(issueRefs.every((issueRef) => issueRefPattern.test(issueRef)));
+
+  const tempApp = await mkdtemp(path.join(tmpdir(), "release-v2-contract-"));
+  try {
+    await mkdir(path.join(tempApp, "release"), { recursive: true });
+    await writeFile(path.join(tempApp, "pubspec.yaml"), read("apps/mobile/pubspec.yaml"));
+    for (const issueRef of ["AquilaXk/easysubway-data#2133", "AquilaXk/easysubway#0"]) {
+      await writeFile(path.join(tempApp, "release/rc-evidence-manifest-contract.json"), JSON.stringify({
+        ...contract, issueRef,
+      }));
+      await assert.rejects(
+        execFileAsync(process.execPath, [
+          "tools/release/generate-rc-evidence-manifest.mjs",
+          "--repo-root", root,
+          "--app-root", tempApp,
+          "--git-sha", currentGitSha,
+          "--phase", "CANDIDATE",
+          "--output", path.join(tempApp, "candidate-context.json"),
+          "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
+        ], { cwd: root }),
+        new RegExp(`Invalid EasySubway issue reference: ${issueRef}`),
+      );
+    }
+  } finally {
+    await rm(tempApp, { recursive: true, force: true });
+  }
+});
+
+test("[release-v2-workflow] release workflow assembles v2 and gates Play on GO", () => {
+  const workflow = read(".github/workflows/release-artifacts.yml");
+  const generator = read("tools/release/generate-rc-evidence-manifest.mjs");
+  const validator = read("tools/release/validate-system-release-manifest.mjs");
+  const backendJob = jobBlock(workflow, "backend-release", "rc-evidence-manifest");
+  const rcJob = jobBlock(workflow, "rc-evidence-manifest", "notify-slack-release-result");
+  const playJob = jobBlock(workflow, "play-internal-upload", "backend-release");
+
+  assert.match(backendJob, /needs\.changes\.outputs\.android == 'true'/);
+  assert.match(backendJob, /needs\.changes\.outputs\.mobile == 'true'/);
+  assert.match(backendJob, /github\.event_name == 'workflow_dispatch'/);
+  assert.equal(
+    (backendJob.match(/EASYSUBWAY_BACKEND_IMAGE_TAG="\$\{GITHUB_SHA\}" docker compose/g) ?? []).length,
+    2,
+  );
+  assert.match(backendJob, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
+  assert.match(backendJob, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config > release-artifacts\/backend\/rendered-compose\.yml/);
+  assert.match(backendJob, /test -f release-artifacts\/backend\/rendered-compose\.yml/);
+  assert.match(backendJob, /test ! -L release-artifacts\/backend\/rendered-compose\.yml/);
+  assert.match(backendJob, /grep -Fq "image: easysubway-backend:\$\{GITHUB_SHA\}" release-artifacts\/backend\/rendered-compose\.yml/);
+  assert.match(backendJob, /path: release-artifacts\/backend/);
+
+  assert.match(rcJob, /needs\.backend-release\.result == 'success'/);
+  assert.match(rcJob, /needs\.android-release\.outputs\.artifact_available == 'true'/);
+  assert.match(rcJob, /needs\.android-production-rc-release\.result == 'success'/);
+  assert.match(rcJob, /bundled_data_manifest=apps\/mobile\/assets\/datapacks\/index\.json/);
+  assert.match(rcJob, /data_pack_manifest=apps\/mobile\/assets\/datapacks\/index\.json/);
+  assert.doesNotMatch(rcJob, /bundled_data_manifest=release-artifacts\/downloaded\/datapack-selected\/current\.json/);
+  assert.match(rcJob, /data_pack_artifact=apps\/mobile\/assets\/datapacks\/capital\.sqlite\.gz/);
+  assert.match(rcJob, /source_snapshot_evidence="\$\{data_pack_manifest\}"/);
+  assert.match(rcJob, /release_sequence=0/);
+  assert.match(rcJob, /--release-sequence "\$\{release_sequence\}"/);
+  assert.match(rcJob, /git archive --format=tar HEAD contracts > "\$\{RUNNER_TEMP\}\/contracts\.tar"/);
+  assert.match(rcJob, /node tools\/release\/build-monorepo-component-manifests\.mjs/);
+  assert.match(rcJob, /--output-dir "\$\{component_output\}"/);
+  assert.match(rcJob, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
+  assert.match(rcJob, /--bundled-data-manifest "\$\{bundled_data_manifest\}"/);
+  assert.match(rcJob, /--data-manifest "\$\{data_pack_manifest\}"/);
+  assert.match(rcJob, /--source-snapshot-evidence "\$\{source_snapshot_evidence\}"/);
+  assert.doesNotMatch(rcJob, /--backend-artifact/);
+  for (const component of ["mobile", "backend", "data", "platform"]) {
+    assert.match(rcJob, new RegExp(`--${component}-component-manifest release-artifacts/rc/${component}-component-manifest\\.json`));
+    assert.match(rcJob, new RegExp(`cp "\\$\\{component_output\\}/${component}-component-manifest\\.json" release-artifacts/rc/${component}-component-manifest\\.json`));
+  }
+  assert.match(rcJob, /--contracts-identity release-artifacts\/rc\/contracts-identity\.json/);
+  assert.match(rcJob, /--output release-artifacts\/rc\/final-readiness\.json/);
+  assert.match(rcJob, /--system-release-output release-artifacts\/rc\/system-release-manifest\.json/);
+  assert.match(rcJob, /--product-release-id "android-v\$\{version_name\}\+\$\{version_code\}"/);
+  assert.match(rcJob, /node tools\/release\/validate-system-release-manifest\.mjs[\s\S]*--manifest release-artifacts\/rc\/system-release-manifest\.json/);
+  assert.ok(rcJob.indexOf("--system-release-output") < rcJob.indexOf("validate-system-release-manifest.mjs"));
+  assert.match(rcJob, /name: easysubway-rc-evidence-manifest-\$\{\{ github\.sha \}\}[\s\S]*path: release-artifacts\/rc/);
+
+  assert.match(playJob, /name: easysubway-rc-evidence-manifest-\$\{\{ github\.sha \}\}/);
+  assert.match(playJob, /--manifest release-artifacts\/downloaded\/rc\/system-release-manifest\.json[\s\S]*--require-decision GO/);
+  assert.ok(playJob.indexOf("--require-decision GO") < playJob.indexOf("Play internal upload / Restore release environment"));
+  assert.match(generator, /assets\/datapacks\/index\.json/);
+  assert.match(generator, /dataPackManifest\?\.sourceSnapshotSetHash/);
+  assert.match(generator, /!Number\.isSafeInteger\(parsed\) \|\| parsed < 0/);
+  assert.match(validator, /requireDecision/);
+  assert.match(validator, /manifest\.decision !== options\.requireDecision/);
+});
+
 test("모바일 signed release artifact gate와 광고 counter는 CI 산출물과 스토어 제출 준비 상태를 분리한다", () => {
   const gatePath = "apps/mobile/release/signed-release-artifact-gate.json";
 
@@ -3750,6 +3972,14 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "tools/ci/validate-store-privacy-env.mjs",
       "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a",
     ],
+    [
+      "apps/mobile/release/rc-evidence-manifest-contract.json",
+      "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41",
+    ],
+    [
+      "tools/release/generate-rc-evidence-manifest.mjs",
+      "18becb8c1ae390c89cbf303c2e4f2ee83ba3c00d6290f7ea42869fef90c212cf",
+    ],
   ]);
   for (const binding of refreshBindings) {
     assert.ok(binding.files.length > 0, `${binding.refreshOn} must bind at least one file`);
@@ -3757,7 +3987,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       const liveSha256 = createHash("sha256").update(read(file.path)).digest("hex");
       const supersededSha256 = supersededFinalRcBindings.get(file.path);
       if (supersededSha256 != null) {
-        // #2068과 #2655가 고정 RC 입력을 변경해 기존 evidence를 중단(superseded)했다.
+        // #2068, #2655, #2693이 고정 RC 입력을 변경해 기존 evidence를 중단(superseded)했다.
         // 마지막 RC 기록값은 보존하고 live hash 불일치로 재사용 불가를 증명한다.
         // #1016(final RC) 재개 시 전체 identity와 함께 재바인딩한다.
         assert.equal(
@@ -4514,18 +4744,18 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.ok(androidRcEvidence.requiredEvidence.postReleaseReadiness.includes("retention-duplicate-override-recovery-policy"));
   assert.ok(androidRcEvidence.evidencePolicy.localOnlyEvidenceRoot.startsWith(".codex/evidence/"));
   assert.equal(rcEvidenceManifestContract.releaseGate, "rc-evidence-manifest");
-  assert.equal(rcEvidenceManifestContract.issue, 1020);
-  assert.deepEqual(rcEvidenceManifestContract.parentIssues, [1014, 1020]);
+  assert.equal(rcEvidenceManifestContract.issueRef, "AquilaXk/easysubway#1020");
+  assert.deepEqual(rcEvidenceManifestContract.parentIssueRefs, ["AquilaXk/easysubway#1014", "AquilaXk/easysubway#1020"]);
   assert.deepEqual(
-    rcEvidenceManifestContract.linkedEvidenceIssues,
-    [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1393, 1914, 2051, 2054, 2055, 2056, 2057, 2058, 2133],
+    rcEvidenceManifestContract.linkedEvidenceIssueRefs,
+    [547, 571, 1015, 1016, 1017, 1018, 1019, 1021, 1022, 1393, 1914, 2051, 2054, 2055, 2056, 2057, 2058, 2133].map((issue) => `AquilaXk/easysubway#${issue}`),
   );
   assert.deepEqual(rcEvidenceManifestContract.phaseConsumers, {
-    CANDIDATE: [2058, 1393],
-    FINAL: [1020],
+    CANDIDATE: ["AquilaXk/easysubway#2058", "AquilaXk/easysubway#1393"],
+    FINAL: ["AquilaXk/easysubway#1020"],
   });
-  assert.deepEqual(rcEvidenceManifestContract.requiredFinalFragmentIssues, [2058, 1393]);
-  assert.deepEqual(rcEvidenceManifestContract.activeBlockerIssues, []);
+  assert.deepEqual(rcEvidenceManifestContract.requiredFinalFragmentIssueRefs, ["AquilaXk/easysubway#2058", "AquilaXk/easysubway#1393"]);
+  assert.deepEqual(rcEvidenceManifestContract.activeBlockerIssueRefs, []);
   assert.equal(rcEvidenceManifestContract.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(rcEvidenceManifestContract.signedReleaseArtifactGate, gatePath);
   assert.equal(rcEvidenceManifestContract.releaseGovernanceGate, "apps/mobile/release/release-governance-gate.json");
@@ -4550,24 +4780,24 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     assert.ok(rcEvidenceManifestContract.requiredRcIdentityFields.includes(field), `${field} must be required`);
   }
   assert.deepEqual(rcEvidenceManifestContract.backendIdentityFieldsAnyOf, ["backendImageDigest", "backendArtifactSha256"]);
-  for (const field of ["device", "androidVersion", "testedAt", "evidencePaths", "expiresWhen"]) {
+  for (const field of ["issueRef", "device", "androidVersion", "testedAt", "evidencePaths", "expiresWhen"]) {
     assert.ok(rcEvidenceManifestContract.requiredEvidenceEntryFields.includes(field), `${field} must be required`);
   }
   assert.deepEqual(
-    rcEvidenceManifestContract.requiredEvidenceEntries.map(({ id, sourceIssue }) => ({ id, sourceIssue })),
+    rcEvidenceManifestContract.requiredEvidenceEntries.map(({ id, issueRef }) => ({ id, issueRef })),
     [
-      { id: "rc_device_qa", sourceIssue: 571 },
-      { id: "production_datapack", sourceIssue: 547 },
-      { id: "signed_rc_store_submission", sourceIssue: 1015 },
-      { id: "play_generated_install", sourceIssue: 1016 },
-      { id: "store_privacy_submission", sourceIssue: 1018 },
-      { id: "backend_operations", sourceIssue: 1017 },
-      { id: "post_launch_operations", sourceIssue: 1019 },
-      { id: "android_release_quality", sourceIssue: 1021 },
-      { id: "abuse_penetration_rehearsal", sourceIssue: 1022 },
-      { id: "container_hardening", sourceIssue: 1914 },
-      { id: "production_equivalent_rehearsal", sourceIssue: 2058 },
-      { id: "production_artifact_android_integration", sourceIssue: 1393 },
+      { id: "rc_device_qa", issueRef: "AquilaXk/easysubway#571" },
+      { id: "production_datapack", issueRef: "AquilaXk/easysubway#547" },
+      { id: "signed_rc_store_submission", issueRef: "AquilaXk/easysubway#1015" },
+      { id: "play_generated_install", issueRef: "AquilaXk/easysubway#1016" },
+      { id: "store_privacy_submission", issueRef: "AquilaXk/easysubway#1018" },
+      { id: "backend_operations", issueRef: "AquilaXk/easysubway#1017" },
+      { id: "post_launch_operations", issueRef: "AquilaXk/easysubway#1019" },
+      { id: "android_release_quality", issueRef: "AquilaXk/easysubway#1021" },
+      { id: "abuse_penetration_rehearsal", issueRef: "AquilaXk/easysubway#1022" },
+      { id: "container_hardening", issueRef: "AquilaXk/easysubway#1914" },
+      { id: "production_equivalent_rehearsal", issueRef: "AquilaXk/easysubway#2058" },
+      { id: "production_artifact_android_integration", issueRef: "AquilaXk/easysubway#1393" },
     ],
   );
   assert.equal(rcEvidenceManifestContract.readinessPolicy.openAndroidP0BlocksGo, true);
@@ -4695,7 +4925,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /--gate-status productionDatapack=BLOCKED_EXTERNAL/);
   assert.match(workflow, /--backend-image-inspect release-artifacts\/downloaded\/backend\/image-inspect\.json/);
   assert.match(workflow, /cp "\$\{boot_jar\[0\]\}" release-artifacts\/backend\/backend-boot\.jar/);
-  assert.match(workflow, /--backend-artifact release-artifacts\/downloaded\/backend\/backend-boot\.jar/);
+  assert.doesNotMatch(workflow, /--backend-artifact release-artifacts\/downloaded\/backend\/backend-boot\.jar/);
   assert.match(backendBuild, /preserveFileTimestamps\s*=\s*false/);
   assert.match(backendBuild, /reproducibleFileOrder\s*=\s*true/);
   assert.match(workflow, /--gate-status backendOperations=BLOCKED_EXTERNAL/);
@@ -5148,11 +5378,13 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     const finalOutput = generatorArgs[outputIndex + 1];
     const withoutOutput = generatorArgs.filter((_, index) => index !== outputIndex && index !== outputIndex + 1);
     const candidateOutput = `${finalOutput}.candidate-context.json`;
+    const completeArgs = await completeCandidateGeneratorArgs(withoutOutput, finalOutput);
     await execFileAsync(process.execPath, [
-      ...withoutOutput, "--phase", "CANDIDATE", "--output", candidateOutput,
+      ...completeArgs, "--phase", "CANDIDATE", "--output", candidateOutput,
     ], options);
+    const systemReleaseArgs = await writeFinalSystemReleaseArgs(candidateOutput, finalOutput);
     return execFileAsync(process.execPath, [
-      ...withoutOutput, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
+      ...completeArgs, ...systemReleaseArgs, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
     ], options);
   };
   const appVersion = read("apps/mobile/pubspec.yaml").match(/^version:\s*([^+\s]+)\+([0-9]+)\s*$/m);
@@ -5175,7 +5407,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   }));
   await writeFile(
     backendInspectPath,
-    JSON.stringify([{ RepoDigests: ["ghcr.io/aquilaxk/easysubway-backend@sha256:abcdef"] }]),
+    JSON.stringify([{ RepoDigests: [`ghcr.io/aquilaxk/easysubway-backend@sha256:${"a".repeat(64)}`] }]),
   );
 
   await runFinalGenerator([
@@ -5222,7 +5454,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(
     manifest.readiness.blockers.some((blocker) => blocker.id === "mismatch_android_release_metadata_aabPayloadSha256"),
   );
-  assert.equal(manifest.backendImageDigest, "sha256:abcdef");
+  assert.equal(manifest.backendImageDigest, `sha256:${"a".repeat(64)}`);
   assert.equal(manifest.backendArtifactSha256, null);
   assert.match(manifest.dataPackManifestSha256, /^[a-f0-9]{64}$/);
   assert.equal(manifest.routeContractVersion, "route-map-contract-v1");
@@ -5539,7 +5771,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   const metadataOnlyInspect = JSON.stringify([{ RepoDigests: [], Size: 367184804 }]);
   const metadataOnlyInspectSha256 = createHash("sha256").update(metadataOnlyInspect).digest("hex");
   await writeFile(metadataOnlyInspectPath, metadataOnlyInspect);
-  await runFinalGenerator([
+  await execFileAsync(process.execPath, [
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root",
     ".",
@@ -5555,15 +5787,15 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
     "--output",
     metadataOnlyManifestPath,
+    "--phase",
+    "CANDIDATE",
     "--tested-at",
     "2026-06-26T00:00:00.000Z",
   ], { cwd: root });
   const metadataOnlyManifest = JSON.parse(readFileSync(metadataOnlyManifestPath, "utf8"));
-  assert.equal(metadataOnlyManifest.backendImageDigest, null);
-  assert.equal(metadataOnlyManifest.backendArtifactSha256, metadataOnlyInspectSha256);
-  assert.ok(
-    !metadataOnlyManifest.readiness.blockers.map((blocker) => blocker.id).includes("missing_backend_identity"),
-  );
+  assert.equal(metadataOnlyManifest.releaseCandidateIdentity.backendImageDigest, null);
+  assert.equal(metadataOnlyManifest.releaseCandidateIdentity.backendArtifactSha256, metadataOnlyInspectSha256);
+  assert.equal(Object.hasOwn(metadataOnlyManifest, "readiness"), false);
 
   await assert.rejects(
     runFinalGenerator([
@@ -5608,6 +5840,251 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(corruptManifest.readiness.blockers.some((blocker) => blocker.id === "missing_aabPayloadSha256"));
 });
 
+test("[system-release-generator] FINAL은 component manifest에서 검증된 system release v2를 별도로 생성한다", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-system-release-"));
+  const candidatePath = path.join(tempDir, "candidate.json");
+  const outputPath = path.join(tempDir, "legacy-final.json");
+  const systemOutputPath = path.join(tempDir, "system-release.json");
+  const aabPayloadPath = path.join(tempDir, "payload.bin");
+  const aabPath = path.join(tempDir, "app.aab");
+  const dataManifestPath = path.join(tempDir, "data-manifest.json");
+  const dataArtifactPath = path.join(tempDir, "data.sqlite.gz");
+  const rehearsalBindingPath = path.join(tempDir, "rehearsal-binding.json");
+  const backendInspectPath = path.join(tempDir, "backend-inspect.json");
+  const componentPaths = Object.fromEntries(["mobile", "backend", "data", "platform"].map(
+    (component) => [component, path.join(tempDir, `${component}.json`)],
+  ));
+  const contractsPath = path.join(tempDir, "contracts.json");
+  const dataManifest = { releaseSequence: 1 };
+  const dataArtifact = "data-artifact";
+  const digest = (value) => createHash("sha256").update(value).digest("hex");
+  const systemArgs = (overrides = {}) => [
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root", ".", "--app-root", "apps/mobile", "--git-sha", currentGitSha,
+    "--now", "2026-07-30T00:00:00.000Z", "--aab", aabPath,
+    "--backend-image-inspect", backendInspectPath,
+    "--data-pack-manifest", dataManifestPath, "--data-pack-artifact", dataArtifactPath,
+    "--data-pack-rehearsal-binding", rehearsalBindingPath,
+    "--output", overrides.outputPath ?? outputPath,
+    "--mobile-component-manifest", overrides.mobilePath ?? componentPaths.mobile,
+    "--backend-component-manifest", overrides.backendPath ?? componentPaths.backend,
+    "--data-component-manifest", overrides.dataPath ?? componentPaths.data,
+    "--platform-component-manifest", overrides.platformPath ?? componentPaths.platform,
+    "--contracts-identity", overrides.contractsPath ?? contractsPath,
+    "--system-release-output", overrides.systemOutputPath ?? systemOutputPath,
+    "--product-release-id", "easysubway-2026.07.30.2693",
+  ];
+  try {
+    await writeFile(aabPayloadPath, "system-release-aab");
+    await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
+    await writeFile(dataManifestPath, JSON.stringify(dataManifest));
+    await writeFile(dataArtifactPath, dataArtifact);
+    await writeFile(rehearsalBindingPath, JSON.stringify({
+      schemaVersion: 1, artifactKind: "datapack-prelaunch-rehearsal-binding",
+      executionEnvironment: "ISOLATED_PRELAUNCH", productionExecuted: false,
+      sourceSnapshotSetHash: "c".repeat(64),
+      selectedManifestSha256: digest(JSON.stringify(dataManifest)),
+      selectedArtifactSha256: digest(dataArtifact), selectedReleaseSequence: 1,
+    }));
+    await writeFile(backendInspectPath, JSON.stringify([
+      { RepoDigests: [`ghcr.io/aquilaxk/easysubway-backend@sha256:${"b".repeat(64)}`] },
+    ]));
+
+    const candidateArgs = systemArgs().filter((value, index, values) => {
+      const componentOptions = new Set([
+        "--mobile-component-manifest", "--backend-component-manifest", "--data-component-manifest",
+        "--platform-component-manifest", "--contracts-identity", "--system-release-output", "--product-release-id",
+      ]);
+      return !componentOptions.has(value) && !componentOptions.has(values[index - 1]);
+    });
+    candidateArgs[candidateArgs.indexOf("--output") + 1] = candidatePath;
+    await execFileAsync(process.execPath, [...candidateArgs, "--phase", "CANDIDATE"], { cwd: root });
+    const candidate = JSON.parse(await readFile(candidatePath, "utf8"));
+    const identity = candidate.releaseCandidateIdentity;
+    const legacyOnlyOutput = path.join(tempDir, "legacy-only-final.json");
+    const legacyOnlyArgs = [...candidateArgs];
+    legacyOnlyArgs[legacyOnlyArgs.indexOf("--output") + 1] = legacyOnlyOutput;
+    await execFileAsync(process.execPath, [
+      ...legacyOnlyArgs, "--phase", "FINAL", "--candidate-context", candidatePath,
+    ], { cwd: root });
+    assert.equal(JSON.parse(await readFile(legacyOnlyOutput, "utf8")).schemaVersion, 1);
+    const issueRefs = ["AquilaXk/easysubway-mobile#2693", "AquilaXk/easysubway-backend#2694", "AquilaXk/easysubway-data#2695", "AquilaXk/easysubway-platform#2696"];
+    const common = { schemaVersion: 1, repository: "AquilaXk/easysubway", gitSha: currentGitSha, contractVersion: "1.2.3", evidenceSha256: "d".repeat(64) };
+    const components = {
+      mobile: { ...common, component: "mobile", issueRefs: [issueRefs[0]], artifactIdentity: { versionName: identity.appVersionName, versionCode: Number(identity.versionCode), aabSha256: identity.aabSha256, bundledDataManifestSha256: identity.dataPackManifestSha256 } },
+      backend: { ...common, component: "backend", issueRefs: [issueRefs[1]], artifactIdentity: { imageDigest: identity.backendImageDigest, apiContractVersion: "1.2.3" } },
+      data: { ...common, component: "data", issueRefs: [issueRefs[2]], artifactIdentity: { dataVersion: "2026.07.30", releaseSequence: identity.releaseSequence, manifestSha256: identity.dataPackManifestSha256, sourceSnapshotSetHash: identity.sourceSnapshotSetHash } },
+      platform: { ...common, component: "platform", issueRefs: [issueRefs[3]], artifactIdentity: { environment: "ci", deployedImageDigest: identity.backendImageDigest, deploymentEvidenceSha256: "e".repeat(64) } },
+    };
+    for (const [component, document] of Object.entries(components)) await writeFile(componentPaths[component], JSON.stringify(document));
+    await writeFile(contractsPath, JSON.stringify({ version: "1.2.3", sha256: "f".repeat(64) }));
+
+    await execFileAsync(process.execPath, [
+      ...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath,
+    ], { cwd: root });
+    const legacy = JSON.parse(await readFile(outputPath, "utf8"));
+    const system = JSON.parse(await readFile(systemOutputPath, "utf8"));
+    assert.equal(Object.hasOwn(system, "gitSha"), false);
+    assert.equal(system.schemaVersion, 2);
+    assert.equal(system.phase, "FINAL");
+    assert.equal(system.decision, "NO_GO");
+    assert.deepEqual(system.issueRefs, issueRefs);
+    assert.deepEqual(system.mobile.artifactIdentity, components.mobile.artifactIdentity);
+    assert.deepEqual(system.backend.artifactIdentity, components.backend.artifactIdentity);
+    assert.deepEqual(system.data.artifactIdentity, components.data.artifactIdentity);
+    assert.deepEqual(system.platform.artifactIdentity, components.platform.artifactIdentity);
+    assert.equal(Object.hasOwn(legacy, "mobile"), false);
+    await execFileAsync(process.execPath, ["tools/release/validate-system-release-manifest.mjs", "--manifest", systemOutputPath], { cwd: root });
+    const legacyBeforeInvalidSemVer = await readFile(outputPath);
+    const systemBeforeInvalidSemVer = await readFile(systemOutputPath);
+    const invalidSemVerContractsPath = path.join(tempDir, "invalid-semver-contracts.json");
+    await writeFile(invalidSemVerContractsPath, JSON.stringify({ version: `1.2.3-${"a.".repeat(150)}a`, sha256: "f".repeat(64) }));
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ contractsPath: invalidSemVerContractsPath }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /contracts identity must be exactly \{version,sha256\}/,
+    );
+    assert.deepEqual(await readFile(outputPath), legacyBeforeInvalidSemVer);
+    assert.deepEqual(await readFile(systemOutputPath), systemBeforeInvalidSemVer);
+    const missingIdentityMobile = structuredClone(components.mobile);
+    delete missingIdentityMobile.artifactIdentity.aabSha256;
+    await writeFile(componentPaths.mobile, JSON.stringify(missingIdentityMobile));
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest drifts from candidate context/,
+    );
+    assert.deepEqual(await readFile(outputPath), legacyBeforeInvalidSemVer);
+    assert.deepEqual(await readFile(systemOutputPath), systemBeforeInvalidSemVer);
+
+    const stringVersionCodeMobile = structuredClone(components.mobile);
+    stringVersionCodeMobile.artifactIdentity.versionCode = String(stringVersionCodeMobile.artifactIdentity.versionCode);
+    await writeFile(componentPaths.mobile, JSON.stringify(stringVersionCodeMobile));
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest drifts from candidate context/,
+    );
+    assert.deepEqual(await readFile(outputPath), legacyBeforeInvalidSemVer);
+    assert.deepEqual(await readFile(systemOutputPath), systemBeforeInvalidSemVer);
+    await writeFile(componentPaths.mobile, JSON.stringify(components.mobile));
+    const semanticSchemas = {
+      componentSchema: JSON.parse(read("contracts/release/component-manifest.schema.json")),
+      systemSchema: JSON.parse(read("contracts/release/system-release-manifest.schema.json")),
+      issueRefSchema: JSON.parse(read("contracts/release/issue-ref.schema.json")),
+    };
+    const canonicalGoCandidate = structuredClone(system);
+    for (const component of ["mobile", "backend", "data", "platform"]) {
+      canonicalGoCandidate[component].repository = `AquilaXk/easysubway-${component}`;
+    }
+    canonicalGoCandidate.platform.artifactIdentity.environment = "production";
+    canonicalGoCandidate.data.artifactIdentity.releaseSequence = Math.max(1, canonicalGoCandidate.data.artifactIdentity.releaseSequence);
+    assert.equal(
+      selectSystemReleaseDecision({ legacyDecision: "GO", manifest: canonicalGoCandidate, ...semanticSchemas }),
+      "GO",
+    );
+    const ciSemanticFailure = structuredClone(canonicalGoCandidate);
+    ciSemanticFailure.platform.artifactIdentity.environment = "ci";
+    assert.equal(
+      selectSystemReleaseDecision({ legacyDecision: "GO", manifest: ciSemanticFailure, ...semanticSchemas }),
+      "NO_GO",
+    );
+    assert.equal(
+      selectSystemReleaseDecision({ legacyDecision: "NO_GO", manifest: canonicalGoCandidate, ...semanticSchemas }),
+      "NO_GO",
+    );
+
+    const candidateSymlinkTarget = path.join(tempDir, "candidate-symlink-target.json");
+    const candidateSymlinkOutput = path.join(tempDir, "candidate-symlink-output.json");
+    await writeFile(candidateSymlinkTarget, "candidate sentinel");
+    await symlink(candidateSymlinkTarget, candidateSymlinkOutput);
+    const symlinkCandidateArgs = [...candidateArgs];
+    symlinkCandidateArgs[symlinkCandidateArgs.indexOf("--output") + 1] = candidateSymlinkOutput;
+    await assert.rejects(
+      execFileAsync(process.execPath, [...symlinkCandidateArgs, "--phase", "CANDIDATE"], { cwd: root }),
+      /--output must not be a symlink/,
+    );
+    assert.equal(await readFile(candidateSymlinkTarget, "utf8"), "candidate sentinel");
+
+    const symlinkLegacyTarget = path.join(tempDir, "symlink-legacy-target.json");
+    const symlinkLegacyOutput = path.join(tempDir, "symlink-legacy-output.json");
+    const symlinkSystemOutput = path.join(tempDir, "symlink-system-output.json");
+    await writeFile(symlinkLegacyTarget, "legacy sentinel");
+    await symlink(symlinkLegacyTarget, symlinkLegacyOutput);
+    await writeFile(symlinkSystemOutput, "system sentinel");
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ outputPath: symlinkLegacyOutput, systemOutputPath: symlinkSystemOutput }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /--output must not be a symlink/,
+    );
+    assert.equal(await readFile(symlinkLegacyTarget, "utf8"), "legacy sentinel");
+    assert.equal(await readFile(symlinkSystemOutput, "utf8"), "system sentinel");
+
+    const regularLegacyOutput = path.join(tempDir, "regular-legacy-output.json");
+    const symlinkSystemTarget = path.join(tempDir, "symlink-system-target.json");
+    const symlinkSystemAlias = path.join(tempDir, "symlink-system-alias.json");
+    await writeFile(regularLegacyOutput, "legacy sentinel");
+    await writeFile(symlinkSystemTarget, "system sentinel");
+    await symlink(symlinkSystemTarget, symlinkSystemAlias);
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ outputPath: regularLegacyOutput, systemOutputPath: symlinkSystemAlias }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /--system-release-output must not be a symlink/,
+    );
+    assert.equal(await readFile(regularLegacyOutput, "utf8"), "legacy sentinel");
+    assert.equal(await readFile(symlinkSystemTarget, "utf8"), "system sentinel");
+
+    const hardlinkLegacyOutput = path.join(tempDir, "hardlink-legacy-output.json");
+    const hardlinkSystemOutput = path.join(tempDir, "hardlink-system-output.json");
+    await writeFile(hardlinkLegacyOutput, "hardlink sentinel");
+    await link(hardlinkLegacyOutput, hardlinkSystemOutput);
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ outputPath: hardlinkLegacyOutput, systemOutputPath: hardlinkSystemOutput }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /--system-release-output must not alias --output/,
+    );
+    assert.equal(await readFile(hardlinkLegacyOutput, "utf8"), "hardlink sentinel");
+    assert.equal(await readFile(hardlinkSystemOutput, "utf8"), "hardlink sentinel");
+
+    const prevalidationLegacyOutput = path.join(tempDir, "prevalidation-legacy.json");
+    const prevalidationSystemOutput = path.join(tempDir, "prevalidation-system.json");
+    const prevalidationMobilePath = path.join(tempDir, "prevalidation-mobile.json");
+    await writeFile(prevalidationLegacyOutput, "legacy sentinel");
+    await writeFile(prevalidationSystemOutput, "system sentinel");
+    await writeFile(prevalidationMobilePath, JSON.stringify({
+      ...components.mobile,
+      artifactIdentity: { ...components.mobile.artifactIdentity, versionName: "9.9.9" },
+    }));
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({
+        mobilePath: prevalidationMobilePath,
+        outputPath: prevalidationLegacyOutput,
+        systemOutputPath: prevalidationSystemOutput,
+      }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest drifts from candidate context/,
+    );
+    assert.equal(await readFile(prevalidationLegacyOutput, "utf8"), "legacy sentinel");
+    assert.equal(await readFile(prevalidationSystemOutput, "utf8"), "system sentinel");
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ systemOutputPath: outputPath }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /--system-release-output must differ from --output/,
+    );
+    const caseFoldedOutput = path.join(tempDir, "CASE-SYSTEM-RELEASE.JSON");
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({
+        outputPath: path.join(tempDir, "case-system-release.json"), systemOutputPath: caseFoldedOutput,
+      }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /--system-release-output must differ from --output/,
+    );
+    await writeFile(componentPaths.mobile, "not-json");
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest is unreadable or invalid JSON/,
+    );
+    await writeFile(componentPaths.mobile, JSON.stringify({ ...components.mobile, artifactIdentity: { ...components.mobile.artifactIdentity, versionName: "9.9.9" } }));
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest drifts from candidate context/,
+    );
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("datapack readiness producer는 required gate를 동일 final identity로 결정론적으로 결합한다", async () => {
   const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
   const requiredDatapackGates = [
@@ -5615,7 +6092,12 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
     { id: "freshness_conditional_publish", sourceIssue: 2054, expiresAfterDays: 14 }, { id: "rollback_rescue", sourceIssue: 2051, expiresAfterDays: 14 },
     { id: "device_performance", sourceIssue: 2055, expiresAfterDays: 14 }, { id: "callback_reconciliation", sourceIssue: 2057, expiresAfterDays: 14 },
   ];
-  assert.deepEqual(contract.requiredDatapackGates, requiredDatapackGates);
+  assert.deepEqual(
+    contract.requiredDatapackGates,
+    requiredDatapackGates.map(({ id, sourceIssue, expiresAfterDays }) => ({
+      id, issueRef: `AquilaXk/easysubway#${sourceIssue}`, expiresAfterDays,
+    })),
+  );
   const producerFiles = execFileSync("git", ["grep", "-l", "summaryArtifactDigest", "--", "tools", "apps", ".github"],
     { cwd: root, encoding: "utf8" }).trim().split("\n").filter((file) => !file.includes(".test."));
   assert.deepEqual(producerFiles, ["tools/release/generate-rc-evidence-manifest.mjs"]);
@@ -5630,10 +6112,13 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
 
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-"));
   const validationRepo = path.join(tempDir, "validation-repo");
-  for (const directory of ["apps/mobile/release", "tools/release", "tools/ops", "tools/security"]) {
+  for (const directory of ["apps/mobile/release", "contracts/release", "tools/release", "tools/ops", "tools/security"]) {
     await mkdir(path.join(validationRepo, directory), { recursive: true });
   }
   await symlink(path.join(root, "apps/mobile/release/production-datapack-scope.json"), path.join(validationRepo, "apps/mobile/release/production-datapack-scope.json"));
+  for (const schema of ["component-manifest.schema.json", "system-release-manifest.schema.json", "issue-ref.schema.json"]) {
+    await symlink(path.join(root, "contracts/release", schema), path.join(validationRepo, "contracts/release", schema));
+  }
   await symlink(path.join(root, "tools/release/hash-android-bundle-payload.mjs"), path.join(validationRepo, "tools/release/hash-android-bundle-payload.mjs"));
   await symlink(path.join(root, "tools/release/count-gzip-uncompressed-bytes.mjs"), path.join(validationRepo, "tools/release/count-gzip-uncompressed-bytes.mjs"));
   await writeFile(path.join(validationRepo, "tools/ops/validate-operations-release-summary.mjs"), `import { readFileSync } from "node:fs";
@@ -5656,12 +6141,11 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z",
   }));
   const aabPayloadPath = path.join(tempDir, "payload.bin"), aabPath = path.join(tempDir, "app-release.aab");
-  const backendArtifactPath = path.join(tempDir, "backend.jar"), dataPackManifestPath = path.join(tempDir, "current.json");
+  const dataPackManifestPath = path.join(tempDir, "current.json");
   const dataPackArtifactPath = path.join(tempDir, "capital.sqlite.gz");
   const dataPackReleaseDecisionPath = path.join(tempDir, "final-release-decision.json");
   await writeFile(aabPayloadPath, "datapack-readiness-aab");
   await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
-  await writeFile(backendArtifactPath, "datapack-readiness-backend");
   const dataPackArtifactContents = Buffer.from("datapack-readiness-pack");
   const compressedDataPackArtifact = gzipSync(dataPackArtifactContents);
   const dataPackArtifactBytes = compressedDataPackArtifact.length;
@@ -5723,7 +6207,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const args = [
     "tools/release/generate-rc-evidence-manifest.mjs",
     "--repo-root", validationRepo, "--app-root", "apps/mobile", "--git-sha", gitSha, "--now", now,
-    "--aab", aabPath, "--backend-artifact", backendArtifactPath,
+    "--aab", aabPath, "--backend-image-digest", `sha256:${"a".repeat(64)}`,
     "--data-pack-manifest", dataPackManifestPath, "--data-pack-artifact", dataPackArtifactPath,
     "--data-pack-release-decision", dataPackReleaseDecisionPath,
     "--require-production-data-pack-binding", "true",
@@ -5860,14 +6344,14 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   );
   await assert.rejects(execFileAsync(process.execPath, [...args, "--release-sequence", "2026.07.12",
     "--phase", "CANDIDATE", "--output", path.join(tempDir, "invalid-release-sequence.json")], generatorOptions),
-  /--release-sequence must be a positive safe integer/);
+  /--release-sequence must be a non-negative safe integer/);
   const evidenceRcIdentity = candidateManifest.releaseCandidateIdentity;
   const invalidCandidatePath = path.join(tempDir, "invalid-candidate-context.json");
   await writeFile(invalidCandidatePath, JSON.stringify({ ...candidateManifest, decision: "GO" }));
   await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "FINAL",
     "--candidate-context", invalidCandidatePath, "--output", path.join(tempDir, "invalid-final.json")], generatorOptions),
   /without readiness or decision fields/);
-  args.push("--phase", "FINAL", "--candidate-context", baselineOutput);
+  args.push(...await writeFinalSystemReleaseArgs(baselineOutput, path.join(tempDir, "final-readiness.json")), "--phase", "FINAL", "--candidate-context", baselineOutput);
   for (const invalidCount of ["1abc", "1.5", "-0.5"]) {
     await assert.rejects(execFileAsync(process.execPath, [
       ...args, "--open-android-p0-count", invalidCount,
@@ -6000,7 +6484,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
     const evidencePath = path.join(tempDir, `required-evidence-${entry.id}.json`);
     if (entry.id === "post_launch_operations") postLaunchEvidencePath = evidencePath;
     const evidence = {
-      schemaVersion: 1, evidenceId: entry.id, sourceIssue: entry.sourceIssue,
+      schemaVersion: 1, evidenceId: entry.id, sourceIssue: Number(entry.issueRef.slice(entry.issueRef.indexOf("#") + 1)),
       status: "SATISFIED", reasonCodes: [], rcIdentity: evidenceRcIdentity,
       evidenceValidity: { testedAt: now, expiresWhen: "2026-07-30T00:00:00.000Z" },
     };
@@ -6020,7 +6504,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
           androidApplicationId: "com.easysubway.app",
           dataPackManifestSha256: evidenceRcIdentity.dataPackManifestSha256,
           aabSha256: evidenceRcIdentity.aabSha256,
-          backendArtifactSha256: evidenceRcIdentity.backendArtifactSha256,
+          backendImageDigest: evidenceRcIdentity.backendImageDigest,
         },
       })}\n`);
       evidence.canonicalSummaryPath = abuseSummaryPath;
@@ -6296,11 +6780,13 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     const finalOutput = generatorArgs[outputIndex + 1];
     const withoutOutput = generatorArgs.filter((_, index) => index !== outputIndex && index !== outputIndex + 1);
     const candidateOutput = `${finalOutput}.candidate-context.json`;
+    const completeArgs = await completeCandidateGeneratorArgs(withoutOutput, finalOutput);
     await execFileAsync(process.execPath, [
-      ...withoutOutput, "--phase", "CANDIDATE", "--output", candidateOutput,
+      ...completeArgs, "--phase", "CANDIDATE", "--output", candidateOutput,
     ], options);
+    const systemReleaseArgs = await writeFinalSystemReleaseArgs(candidateOutput, finalOutput);
     return execFileAsync(process.execPath, [
-      ...withoutOutput, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
+      ...completeArgs, ...systemReleaseArgs, "--phase", "FINAL", "--candidate-context", candidateOutput, "--output", finalOutput,
     ], options);
   };
   const rejects = (extraArgs, expected) => assert.rejects(
@@ -6460,7 +6946,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
 
   const missingFinalFragmentArgs = await contractArgs("missing-final-fragment-app", (contract) => {
     contract.requiredEvidenceEntries = contract.requiredEvidenceEntries.filter(
-    ({ sourceIssue }) => sourceIssue !== 2058,
+    ({ issueRef }) => issueRef !== "AquilaXk/easysubway#2058",
     );
   });
   await assert.rejects(
@@ -6486,7 +6972,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   );
 
   const closedBlockerArgs = await contractArgs("closed-blocker-app", (contract) => {
-    contract.activeBlockerIssues = [2133];
+    contract.activeBlockerIssueRefs = ["AquilaXk/easysubway#2133"];
   });
   await runFinalGenerator([
     ...closedBlockerArgs,
@@ -6949,7 +7435,7 @@ test("릴리즈 산출물 워크플로우는 관련 변경에서만 비용 큰 �
   assert.match(androidReleaseJob, /if: \$\{\{ needs\.changes\.outputs\.android == 'true' \|\| needs\.changes\.outputs\.mobile == 'true' \}\}/);
   assert.doesNotMatch(workflow, /ios-release:/);
   assert.match(backendReleaseJob, /needs: changes/);
-  assert.match(backendReleaseJob, /if: \$\{\{ needs\.changes\.outputs\.backend == 'true' \|\| needs\.changes\.outputs\.deploy == 'true' \}\}/);
+  assert.match(backendReleaseJob, /needs\.changes\.outputs\.backend == 'true'[\s\S]*needs\.changes\.outputs\.android == 'true'[\s\S]*github\.event_name == 'workflow_dispatch'/);
   assert.match(detector, /apps\/mobile\/release\/\*\*/);
   assert.match(detector, /apps\/mobile\/android\/app\/build\.gradle\.kts/);
   assert.match(detector, /apps\/mobile\/ios\/Runner\.xcodeproj\/\*\*/);

@@ -3,13 +3,16 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
-  closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync,
+  closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, renameSync,
+  rmSync, statSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
+import { isSemVer } from "./lib/semver.mjs";
+import { selectSystemReleaseDecision, validateSystemReleaseManifest } from "./validate-system-release-manifest.mjs";
 
 const SUCCESSFUL_FRESHNESS_REASON_CODES = new Set([
   "PACK_PUBLISH_FRESHNESS_EXPIRED",
@@ -42,7 +45,7 @@ const evidenceRoot = normalizeEvidenceRoot(
 );
 const appVersion = readFlutterVersion(path.join(appRoot, "pubspec.yaml"));
 const dataPackManifestPath = resolvePath(
-  arg("dataPackManifest", "data-pack-manifest") ?? path.join(appRoot, "assets/datapacks/metro_map_pack/manifest.json"),
+  arg("dataPackManifest", "data-pack-manifest") ?? path.join(appRoot, "assets/datapacks/index.json"),
 );
 const dataPackManifest = readJsonIfExists(dataPackManifestPath);
 const dataPackArtifactArg = arg("dataPackArtifact", "data-pack-artifact");
@@ -83,8 +86,15 @@ const dataPackRehearsalBinding = readDataPackRehearsalBinding(
   dataPackManifest,
   dataPackArtifactPath,
 );
+if (
+  dataPackManifest?.sourceSnapshotSetHash !== undefined
+  && !/^[a-f0-9]{64}$/.test(dataPackManifest.sourceSnapshotSetHash)
+) {
+  fail("data pack manifest sourceSnapshotSetHash must be a SHA-256 digest");
+}
 const sourceSnapshotSetHash = dataPackReleaseDecision?.sourceSnapshotSetHash
   ?? dataPackRehearsalBinding?.sourceSnapshotSetHash
+  ?? dataPackManifest?.sourceSnapshotSetHash
   ?? null;
 if (requireProductionDataPackBinding) {
   validateProductionDataPackBinding(
@@ -120,9 +130,9 @@ const gitSha = suppliedGitSha ?? process.env.GITHUB_SHA ?? checkoutGitSha;
 if (!/^[a-f0-9]{40}$/.test(gitSha) || gitSha !== checkoutGitSha) {
   fail("--git-sha must match the current checkout HEAD");
 }
-const rcEvidenceContract = readJsonIfExists(
+const rcEvidenceContract = projectRcEvidenceContract(readJsonIfExists(
   path.join(appRoot, "release/rc-evidence-manifest-contract.json"),
-);
+));
 if (!Array.isArray(rcEvidenceContract?.requiredEvidenceEntries)) {
   fail("RC evidence manifest contract with requiredEvidenceEntries is required");
 }
@@ -228,7 +238,7 @@ const candidateContext = {
 };
 
 if (requestedPhase === "CANDIDATE") {
-  writeManifest(outputPath, candidateContext);
+  writeManifest(outputPath, candidateContext, "--output");
   process.exit(0);
 }
 
@@ -239,6 +249,9 @@ if (requestedPhase === "FINAL" && !candidateContextPath) {
 if (candidateContextPath) {
   validateCandidateContext(readJsonIfExists(resolvePath(candidateContextPath)), candidateContext);
 }
+const systemReleaseInputs = arg("systemReleaseOutput", "system-release-output")
+  ? readSystemReleaseInputs()
+  : null;
 
 const gateEntries = requiredGateEntries(
   rcEvidenceContract.requiredGateStatuses, rcEvidenceContract.requiredGateChecks,
@@ -331,15 +344,203 @@ const manifest = {
   },
 };
 
-writeManifest(outputPath, manifest);
+const systemReleaseManifest = systemReleaseInputs
+  ? buildSystemReleaseManifest(manifest, systemReleaseInputs)
+  : null;
+writeManifest(outputPath, manifest, "--output");
+if (systemReleaseInputs) {
+  writeManifest(systemReleaseInputs.outputPath, systemReleaseManifest, "--system-release-output");
+}
 
 if (failOnBlocked && blockers.length > 0) {
   fail(`RC evidence manifest is blocked: ${blockers.map((blocker) => blocker.id).join(", ")}`);
 }
 
-function writeManifest(filePath, value) {
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+function outputDestination(filePath, label) {
+  const parent = path.dirname(filePath);
+  mkdirSync(parent, { recursive: true });
+  const existing = lstatSync(filePath, { throwIfNoEntry: false });
+  if (existing?.isSymbolicLink()) fail(`${label} must not be a symlink`);
+  return { canonicalPath: path.join(realpathSync(parent), path.basename(filePath)), existing };
+}
+
+function writeManifest(filePath, value, label) {
+  outputDestination(filePath, label);
+  const parent = path.dirname(filePath);
+  let descriptor;
+  let temporaryPath;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    temporaryPath = path.join(parent, `.${path.basename(filePath)}.tmp-${process.pid}-${attempt}`);
+    try {
+      descriptor = openSync(temporaryPath, "wx", 0o600);
+      break;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    }
+  }
+  if (descriptor === undefined) fail(`${label} temporary file is unavailable`);
+  try {
+    writeFileSync(descriptor, `${JSON.stringify(value, null, 2)}\n`);
+    closeSync(descriptor);
+    descriptor = undefined;
+    renameSync(temporaryPath, filePath);
+  } catch (error) {
+    if (descriptor !== undefined) {
+      try {
+        closeSync(descriptor);
+      } catch {}
+    }
+    rmSync(temporaryPath, { force: true });
+    throw error;
+  }
+}
+
+function readSystemReleaseInputs() {
+  const required = [
+    ["mobile", "mobileComponentManifest", "mobile-component-manifest"],
+    ["backend", "backendComponentManifest", "backend-component-manifest"],
+    ["data", "dataComponentManifest", "data-component-manifest"],
+    ["platform", "platformComponentManifest", "platform-component-manifest"],
+  ];
+  const components = Object.fromEntries(required.map(([slot, camelName, kebabName]) => {
+    const rawPath = arg(camelName, kebabName);
+    if (!rawPath) fail(`FINAL phase requires --${kebabName}`);
+    return [slot, readRequiredJson(resolvePath(rawPath), `${slot} component manifest`)];
+  }));
+  const contractsPath = arg("contractsIdentity", "contracts-identity");
+  if (!contractsPath) fail("FINAL phase requires --contracts-identity");
+  const contracts = readRequiredJson(resolvePath(contractsPath), "contracts identity");
+  if (
+    !contracts || typeof contracts !== "object" || Array.isArray(contracts)
+    || Object.keys(contracts).length !== 2
+    || !Object.hasOwn(contracts, "version") || !Object.hasOwn(contracts, "sha256")
+    || !isSemVer(contracts.version) || !/^[a-f0-9]{64}$/.test(contracts.sha256)
+  ) {
+    fail("contracts identity must be exactly {version,sha256}");
+  }
+  const output = arg("systemReleaseOutput", "system-release-output");
+  if (!output) fail("FINAL phase requires --system-release-output");
+  const systemReleaseOutputPath = resolvePath(output);
+  const legacyOutput = outputDestination(outputPath, "--output");
+  const systemOutput = outputDestination(systemReleaseOutputPath, "--system-release-output");
+  if (legacyOutput.canonicalPath.toLowerCase() === systemOutput.canonicalPath.toLowerCase()) {
+    fail("--system-release-output must differ from --output");
+  }
+  if (
+    legacyOutput.existing?.isFile() && systemOutput.existing?.isFile()
+    && legacyOutput.existing.dev === systemOutput.existing.dev
+    && legacyOutput.existing.ino === systemOutput.existing.ino
+  ) {
+    fail("--system-release-output must not alias --output");
+  }
+  const productReleaseId = arg("productReleaseId", "product-release-id");
+  if (!productReleaseId) fail("FINAL phase requires --product-release-id");
+  const schemas = Object.fromEntries([
+    ["componentSchema", "component-manifest.schema.json"],
+    ["systemSchema", "system-release-manifest.schema.json"],
+    ["issueRefSchema", "issue-ref.schema.json"],
+  ].map(([key, file]) => [key, readRequiredJson(path.join(repoRoot, "contracts/release", file), `release contract ${file}`)]));
+  return { components, contracts, outputPath: systemReleaseOutputPath, productReleaseId, schemas };
+}
+
+function buildSystemReleaseManifest(legacyManifest, inputs) {
+  assertComponentCandidateIdentity(inputs.components, legacyManifest.releaseCandidateIdentity);
+  const issueRefs = [];
+  for (const component of [inputs.components.mobile, inputs.components.backend, inputs.components.data, inputs.components.platform]) {
+    for (const issueRef of component.issueRefs ?? []) if (!issueRefs.includes(issueRef)) issueRefs.push(issueRef);
+  }
+  const base = {
+    schemaVersion: 2,
+    productReleaseId: inputs.productReleaseId,
+    phase: "FINAL",
+    decision: "NO_GO",
+    generatedAt,
+    issueRefs,
+    contracts: inputs.contracts,
+    ...inputs.components,
+  };
+  const manifest = {
+    ...base,
+    decision: selectSystemReleaseDecision({ legacyDecision: legacyManifest.decision, manifest: base, ...inputs.schemas }),
+  };
+  const errors = validateSystemReleaseManifest({ manifest, ...inputs.schemas });
+  if (errors.length > 0) fail(`system release manifest validation failed: ${errors.join(", ")}`);
+  return manifest;
+}
+
+function assertComponentCandidateIdentity(components, candidate) {
+  const comparisons = [
+    ["mobile", "appVersionName", components.mobile?.artifactIdentity?.versionName],
+    ["mobile", "versionCode", components.mobile?.artifactIdentity?.versionCode],
+    ["mobile", "aabSha256", components.mobile?.artifactIdentity?.aabSha256],
+    ["mobile", "dataPackManifestSha256", components.mobile?.artifactIdentity?.bundledDataManifestSha256],
+    ["backend", "backendImageDigest", components.backend?.artifactIdentity?.imageDigest],
+    ["data", "dataPackManifestSha256", components.data?.artifactIdentity?.manifestSha256],
+    ["data", "sourceSnapshotSetHash", components.data?.artifactIdentity?.sourceSnapshotSetHash],
+    ["data", "releaseSequence", components.data?.artifactIdentity?.releaseSequence],
+    ["platform", "backendImageDigest", components.platform?.artifactIdentity?.deployedImageDigest],
+  ];
+  const integerFields = new Set(["versionCode", "releaseSequence"]);
+  for (const [component, field, value] of comparisons) {
+    const candidateValue = candidate?.[field];
+    const matches = integerFields.has(field)
+      ? Number.isSafeInteger(value) && value >= 0 && normalizeCandidateIdentityInteger(candidateValue) === value
+      : candidateValue === value;
+    if (
+      !candidate || typeof candidate !== "object" || Array.isArray(candidate)
+      || !Object.hasOwn(candidate, field) || candidateValue === null || value === undefined || value === null || !matches
+    ) {
+      fail(`${component} component manifest drifts from candidate context`);
+    }
+  }
+}
+
+function normalizeCandidateIdentityInteger(value) {
+  if (typeof value === "string") {
+    if (!isDigits(value) || (value !== "0" && value[0] === "0")) return null;
+    value = Number(value);
+  }
+  return Number.isSafeInteger(value) && value >= 0 ? value : null;
+}
+
+function readRequiredJson(filePath, label) {
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch {
+    fail(`${label} is unreadable or invalid JSON`);
+  }
+}
+
+function isDigits(value) {
+  return value.length > 0 && [...value].every((character) => character >= "0" && character <= "9");
+}
+
+function projectRcEvidenceContract(contract) {
+  const sourceIssue = (issueRef) => {
+    const match = typeof issueRef === "string" && issueRef.match(/^AquilaXk\/easysubway#([1-9][0-9]*)$/);
+    if (!match) fail(`Invalid EasySubway issue reference: ${issueRef}`);
+    return Number(match[1]);
+  };
+  return {
+    ...contract,
+    issue: sourceIssue(contract?.issueRef),
+    parentIssues: contract.parentIssueRefs.map(sourceIssue),
+    linkedEvidenceIssues: contract.linkedEvidenceIssueRefs.map(sourceIssue),
+    phaseConsumers: Object.fromEntries(
+      Object.entries(contract.phaseConsumers ?? {}).map(([phase, issueRefs]) => [phase, issueRefs.map(sourceIssue)]),
+    ),
+    requiredFinalFragmentIssues: contract.requiredFinalFragmentIssueRefs.map(sourceIssue),
+    activeBlockerIssues: contract.activeBlockerIssueRefs.map(sourceIssue),
+    requiredEvidenceEntryFields: contract.requiredEvidenceEntryFields.map(
+      (field) => field === "issueRef" ? "sourceIssue" : field,
+    ),
+    requiredEvidenceEntries: contract.requiredEvidenceEntries.map(({ issueRef, ...entry }) => ({
+      ...entry, sourceIssue: sourceIssue(issueRef),
+    })),
+    requiredDatapackGates: contract.requiredDatapackGates.map(({ issueRef, ...gate }) => ({
+      ...gate, sourceIssue: sourceIssue(issueRef),
+    })),
+  };
 }
 
 function validateCandidateContext(candidate, expected) {
@@ -1226,13 +1427,13 @@ function requirePositiveSafeInteger(value, name) {
 function normalizeReleaseSequence(explicitValue, manifestValue) {
   const value = explicitValue ?? manifestValue ?? null;
   if (value === null) return null;
-  const parsed = typeof value === "string" && /^[1-9]\d*$/.test(value)
+  const parsed = typeof value === "string" && /^(?:0|[1-9]\d*)$/.test(value)
     ? Number(value)
     : value;
-  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
     fail(explicitValue === undefined
-      ? "data pack manifest releaseSequence must be a positive safe integer"
-      : "--release-sequence must be a positive safe integer");
+      ? "data pack manifest releaseSequence must be a non-negative safe integer"
+      : "--release-sequence must be a non-negative safe integer");
   }
   return parsed;
 }
