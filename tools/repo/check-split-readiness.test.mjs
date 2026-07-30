@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { existsSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, rmdirSync, unlinkSync, writeFileSync } from "node:fs";
 import { evaluateReadiness } from "./check-split-readiness.mjs";
 
 test("datapack split readiness checks id와 상태를 고정한다", () => {
@@ -103,6 +103,8 @@ test("component manifest와 backend contract lock을 추가하면 해당 blocker
   const backendDirectory = "contracts/backend";
   const componentPath = `${componentDirectory}/backend.json`;
   const lockPath = `${backendDirectory}/contract-lock.json`;
+  const componentDirectoryExisted = existsSync(componentDirectory);
+  const backendDirectoryExisted = existsSync(backendDirectory);
   assert.equal(existsSync(componentPath), false);
   assert.equal(existsSync(lockPath), false);
 
@@ -115,10 +117,10 @@ test("component manifest와 backend contract lock을 추가하면 해당 blocker
     assert.equal(byId(backend, "backend.component-manifest").status, "pass");
     assert.equal(byId(backend, "backend.contract-lock").status, "pass");
   } finally {
-    rmSync(componentPath, { force: true });
-    rmSync(lockPath, { force: true });
-    rmSync(componentDirectory, { recursive: true, force: true });
-    rmSync(backendDirectory, { recursive: true, force: true });
+    unlinkSync(componentPath);
+    unlinkSync(lockPath);
+    if (!componentDirectoryExisted) rmdirSync(componentDirectory);
+    if (!backendDirectoryExisted) rmdirSync(backendDirectory);
   }
 });
 
