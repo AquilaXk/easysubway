@@ -935,6 +935,38 @@ jobs:
           NODE
           fi
 
+      - name: Data Pack Release / Build candidate promotion metadata
+        if: ${{ steps.release-mode.outputs.mode == 'release-candidate' }}
+        run: |
+          set -euo pipefail
+          cp "${EASYSUBWAY_DATAPACK_OUTPUT}/current.provenance.json" "${EASYSUBWAY_DATAPACK_STAGE}/current.provenance.json"
+          node tools/datapack/build-data-component-manifest.mjs \
+            --root "${EASYSUBWAY_DATAPACK_STAGE}" \
+            --manifest "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json" \
+            --provenance "${EASYSUBWAY_DATAPACK_STAGE}/current.provenance.json" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --git-sha "${GITHUB_SHA}" \
+            --workflow-run-id "${GITHUB_RUN_ID}" \
+            --contract-version "datapack-contract-v3" \
+            --issue-ref "AquilaXk/easysubway#2699" \
+            --inventory-output "${EASYSUBWAY_DATAPACK_STAGE}/candidate-inventory.json" \
+            --output "${EASYSUBWAY_DATAPACK_STAGE}/candidate-component.json"
+
+      - name: Data Pack Release / Upload candidate promotion artifact
+        if: ${{ steps.release-mode.outputs.mode == 'release-candidate' }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: easysubway-datapack-candidate-${{ github.run_id }}
+          path: |
+            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/candidate-component.json
+            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/candidate-inventory.json
+            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/current.provenance.json
+            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/catalog
+            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/release-decision.json
+            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/release-evidence-bundle.json
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Data Pack Release / Publish staged data packs to object storage
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' && steps.remote-publish-env.outputs.enabled == 'true' && steps.release-fixture.outputs.remote_publish_ready == 'true' && steps.release-decision.outputs.productionWriteAllowed == 'true' && github.ref == 'refs/heads/main' }}
         id: production-publish

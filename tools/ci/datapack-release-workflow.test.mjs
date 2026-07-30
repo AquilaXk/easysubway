@@ -539,3 +539,36 @@ test("expiry alert는 publish 없이 같은 decision engine을 소비한다", ()
   assert.match(expiryWorkflow, /--current-manifest/);
   assert.doesNotMatch(expiryWorkflow, /productionWriteAllowed == 'true'/);
 });
+
+test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 검증하고 request만 attest한다", () => {
+  const promotion = readFileSync(path.join(root, ".github/workflows/datapack-promotion.yml"), "utf8");
+
+  assert.match(yml, /build-data-component-manifest\.mjs/);
+  assert.match(yml, /easysubway-datapack-candidate-\$\{\{ github\.run_id \}\}/);
+  assert.match(yml, /current\.provenance\.json/);
+  assert.match(yml, /--inventory-output/);
+
+  assert.match(promotion, /candidateRunId/);
+  assert.match(promotion, /compatibilityEvidenceRunId/);
+  assert.match(promotion, /compatibilityEvidenceArtifactName/);
+  assert.match(promotion, /issueRef/);
+  assert.match(promotion, /actions\/runs\/\$\{candidate_run_id\}/);
+  assert.match(promotion, /\.github\/workflows\/datapack-release\.yml/);
+  assert.match(promotion, /head_sha/);
+  assert.match(promotion, /require-workflow-artifact\.mjs/);
+  assert.match(promotion, /compatibility-evidence\.json/);
+  assert.match(promotion, /actions\/runs\/\$\{GITHUB_RUN_ID\}\/approvals/);
+  assert.match(promotion, /build-promotion-request\.mjs/);
+  assert.match(promotion, /validate-promotion-request\.mjs/);
+  assert.match(promotion, /actions\/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d/);
+  assert.match(promotion, /subject-path:.*promotion-request\.json/);
+  assert.match(promotion, /promotion-approvals\.json/);
+  assert.match(promotion, /easysubway-datapack-promotion-\$\{\{ github\.run_id \}\}/);
+  assert.match(promotion, /environment:\s*datapack-promotion/);
+  assert.match(promotion, /contents:\s*read/);
+  assert.match(promotion, /actions:\s*read/);
+  assert.match(promotion, /id-token:\s*write/);
+  assert.match(promotion, /attestations:\s*write/);
+  assert.doesNotMatch(promotion, /EASYSUBWAY_DATA_PACK/);
+  assert.doesNotMatch(promotion, /OBJECT_STORAGE/);
+});
