@@ -20,6 +20,7 @@ test("mobile release claim scan rejects forbidden app copy", async () => {
   await mkdir(path.join(tmp, "apps/mobile"), { recursive: true });
   await cp(path.join(root, "apps/mobile/lib"), path.join(tmp, "apps/mobile/lib"), { recursive: true });
   await cp(path.join(root, "apps/mobile/release"), path.join(tmp, "apps/mobile/release"), { recursive: true });
+  await cp(path.join(root, "release/product-gates"), path.join(tmp, "release/product-gates"), { recursive: true });
   await writeFile(path.join(tmp, "apps/mobile/lib/bad_claim.dart"), "const bad = '모든 역 지원';\n");
 
   await assert.rejects(
@@ -38,6 +39,7 @@ test("mobile release claim scan rejects incomplete Play launch identities", asyn
   await mkdir(path.join(tmp, "apps/mobile"), { recursive: true });
   await cp(path.join(root, "apps/mobile/lib"), path.join(tmp, "apps/mobile/lib"), { recursive: true });
   await cp(path.join(root, "apps/mobile/release"), path.join(tmp, "apps/mobile/release"), { recursive: true });
+  await cp(path.join(root, "release/product-gates"), path.join(tmp, "release/product-gates"), { recursive: true });
   const playPath = path.join(tmp, "apps/mobile/release/play-store-submission-content.json");
   const play = JSON.parse(await readFile(playPath, "utf8"));
   for (const [field, message] of [
@@ -66,6 +68,7 @@ test("allowedPhrasesKo lets facility names pass but still blocks classification 
   await mkdir(path.join(tmp, "apps/mobile"), { recursive: true });
   await cp(path.join(root, "apps/mobile/lib"), path.join(tmp, "apps/mobile/lib"), { recursive: true });
   await cp(path.join(root, "apps/mobile/release"), path.join(tmp, "apps/mobile/release"), { recursive: true });
+  await cp(path.join(root, "release/product-gates"), path.join(tmp, "release/product-gates"), { recursive: true });
 
   // '장애인'을 임시로 금지어에 넣고, 허용 구절(시설명)은 통과, 분류맥락은 차단됨을 증명한다.
   // 스토어 카피(fullDescriptionKo)의 분류맥락 '장애인'은 이 케이스의 검증 대상이 아니므로
@@ -74,7 +77,7 @@ test("allowedPhrasesKo lets facility names pass but still blocks classification 
   await mkdir(facilityDir, { recursive: true });
   const facilityFile = path.join(facilityDir, "facility_name.dart");
 
-  const configPath = path.join(tmp, "apps/mobile/release/forbidden-release-claims.json");
+  const configPath = path.join(tmp, "release/product-gates/forbidden-release-claims.json");
   const config = JSON.parse(await readFile(configPath, "utf8"));
   config.forbiddenClaimsKo = [...(config.forbiddenClaimsKo ?? []), "장애인"];
   config.allowedPhrasesKo = ["장애인 화장실"];

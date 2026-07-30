@@ -136,6 +136,11 @@ while IFS= read -r file; do
       release=true
       contracts=true
       ;;
+    release/product-gates/**)
+      repository=true
+      release=true
+      contracts=true
+      ;;
     apps/mobile/android/app/build.gradle.kts)
       mobile=true
       android=true

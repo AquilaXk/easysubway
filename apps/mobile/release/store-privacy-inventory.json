@@ -849,7 +849,7 @@
       "deletionImplementation": "모바일 오류 리포터와 백엔드 공통 예외 응답은 사용자 화면과 내부 진단 정보를 분리하고, 사용자 연결 로그는 운영 보관 정책에 따라 삭제 또는 익명화한다.",
       "evidence": [
         "apps/mobile/lib/mobile_error_reporter.dart",
-        "apps/mobile/release/release-security-gate.json",
+        "release/product-gates/release-security-gate.json",
         "backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java"
       ],
       "lastVerifiedAt": "2026-06-19",
@@ -887,7 +887,7 @@
       "deletionImplementation": "운영 지표와 로그는 사용자 식별자 연결을 최소화하고, 삭제 요청 시 사용자 연결 값을 삭제 또는 익명화한다.",
       "evidence": [
         "apps/mobile/lib/mobile_error_reporter.dart",
-        "apps/mobile/release/release-security-gate.json",
+        "release/product-gates/release-security-gate.json",
         "backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java",
         "backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityTrackingFilter.java",
         "backend/src/main/java/com/easysubway/usage/adapter/out/persistence/JdbcUserActivityRepository.java",

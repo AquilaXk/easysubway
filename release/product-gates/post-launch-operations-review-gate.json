@@ -6,8 +6,8 @@
   "issue": 1019,
   "status": "IN_PROGRESS",
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
-  "operationsEvidenceManifest": "apps/mobile/release/operations-release-evidence.json",
-  "supportIncidentResponseGate": "apps/mobile/release/support-incident-response-gate.json",
+  "operationsEvidenceManifest": "release/product-gates/operations-release-evidence.json",
+  "supportIncidentResponseGate": "release/product-gates/support-incident-response-gate.json",
   "evidenceRoot": ".codex/evidence/release/post-launch-operations-review/<rc-or-run>/",
   "preLaunchReadiness": {
     "status": "BLOCKED_EXTERNAL",
@@ -24,7 +24,7 @@
       "incident-notice-template-approval-route"
     ],
     "finalRcBinding": {
-      "manifest": "apps/mobile/release/rc-evidence-manifest-contract.json",
+      "manifest": "release/product-gates/rc-evidence-manifest-contract.json",
       "requiredFields": ["gitSha", "versionCode", "aabSha256", "aabPayloadSha256", "dataPackManifestSha256", "supportContactSetSha256"],
       "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
       "validatedArtifactIdentity": {
@@ -34,7 +34,7 @@
       },
       "validatedArtifactIdentityEvidence": {
         "aabPayload": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260717/fixed-release-rehearsal-summary.json",
-        "backend": "apps/mobile/release/operations-release-evidence.json",
+        "backend": "release/product-gates/operations-release-evidence.json",
         "dataPackManifest": "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"
       },
       "evidenceValidity": {
@@ -53,20 +53,20 @@
         {
           "refreshOn": "operations-contract-change",
           "files": [
-            {"path": "apps/mobile/release/operations-release-evidence.json", "sha256": "5bbe9b3d3aa90f3f273ca396bcabebb48ecff9d0a3634fa1b9f86db95e4bc6cb"},
-            {"path": "apps/mobile/release/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
+            {"path": "release/product-gates/operations-release-evidence.json", "sha256": "5bbe9b3d3aa90f3f273ca396bcabebb48ecff9d0a3634fa1b9f86db95e4bc6cb"},
+            {"path": "release/product-gates/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
             {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "474095e635706a442d79e9c21e274e0aa6eb9e992f480783dbc7d16c66a0fc7e"},
             {"path": "tools/release/summary-validation-utils.mjs", "sha256": "aff1abc66a25e5310e69b8fd915026dfd5bf458f6f1977d445e5e635e10a35cc"},
             {"path": "tools/release/hash-android-bundle-payload.mjs", "sha256": "0bea0f2d7775960a4672e27622aa32a239cabadad07399cb3ee51ae524b234eb"},
             {"path": "tools/datapack/run-emergency-datapack-drill.mjs", "sha256": "c5368fbe7ac1e705145eb39e5183cb34986dea560558f2e31b4d4e6eaca3c82c"},
-            {"path": "apps/mobile/release/route-commercialization-gate.json", "sha256": "0ac7b2c2ee1e75fc556fa5418ddeac1473d329d2ccd5a1e539e8aced869cab30"}
+            {"path": "release/product-gates/route-commercialization-gate.json", "sha256": "0ac7b2c2ee1e75fc556fa5418ddeac1473d329d2ccd5a1e539e8aced869cab30"}
           ]
         },
         {
           "refreshOn": "support-contact-or-help-ui-change",
           "files": [
-            {"path": "apps/mobile/release/support-incident-response-gate.json", "sha256": "2b1942f223b63aa18cae0481649d46fa41a671ddae4dccab041098ca3e2d6903"},
+            {"path": "release/product-gates/support-incident-response-gate.json", "sha256": "2b1942f223b63aa18cae0481649d46fa41a671ddae4dccab041098ca3e2d6903"},
             {"path": "apps/mobile/lib/app/easy_subway_app.dart", "sha256": "881032641c48b30743ccb8c8b2fcb2ac01b79e0b66e5dbf0d95bee7cd3adb794"},
             {"path": "apps/mobile/lib/app/app_components.dart", "sha256": "cdbdf988d8cbd5f4d54d159b22f28599499f6eb746db11ef2bba763c9e7ebd01"},
             {"path": "apps/mobile/lib/app/accessibility_theme.dart", "sha256": "3987679f36ee1226ae75643af6f75178a3dddbb14f7f00d0ac7e0ab9ba943101"},
@@ -106,7 +106,7 @@
             {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a"},
             {"path": "backend/build.gradle", "sha256": "cfefe1f4884d0f4b44f2875dc4e1bedabad358a7c9aab030c6504c87d8f21f2d"},
             {"path": "backend/Dockerfile", "sha256": "bb190eb507645836df69934a0ca6cf4dc7499bd508ed0a485e688eede70e615a"},
-            {"path": "apps/mobile/release/rc-evidence-manifest-contract.json", "sha256": "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41"},
+            {"path": "release/product-gates/rc-evidence-manifest-contract.json", "sha256": "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41"},
             {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "9e35372f21307b9c20258fde15556ef4cfc2c28276a46435974fe30253055e81"},
             {"path": "tools/datapack/decide-datapack-release.mjs", "sha256": "19df0719c5c030db1981bd34622a42b98e610ac35851a4d0219c70c51dda675c"},
             {"path": "tools/datapack/verify-release-request-binding.mjs", "sha256": "33953a3a0432f82021f54df40e072288c3d4100d0a254317fbdeb700e8b03cb3"},
@@ -124,7 +124,7 @@
       {
         "id": "signal-owner-threshold-first-response",
         "status": "PASS",
-        "evidence": "apps/mobile/release/operations-observability-gate.json"
+        "evidence": "release/product-gates/operations-observability-gate.json"
       },
       {
         "id": "grafana-prometheus-loki-play-console-access",
@@ -144,7 +144,7 @@
       {
         "id": "backend-datapack-rollback-rehearsal",
         "status": "PASS",
-        "evidence": "apps/mobile/release/operations-release-evidence.json"
+        "evidence": "release/product-gates/operations-release-evidence.json"
       },
       {
         "id": "p0-data-error-emergency-release-rollback-rehearsal",
@@ -164,7 +164,7 @@
       {
         "id": "incident-notice-template-approval-route",
         "status": "PASS",
-        "evidence": "apps/mobile/release/support-incident-response-gate.json"
+        "evidence": "release/product-gates/support-incident-response-gate.json"
       }
     ]
   },

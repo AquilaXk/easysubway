@@ -56,8 +56,8 @@
     }
   },
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
-  "securityPrivacyEvidenceManifest": "apps/mobile/release/security-privacy-release-evidence.json",
-  "releaseSecurityGate": "apps/mobile/release/release-security-gate.json",
+  "securityPrivacyEvidenceManifest": "release/product-gates/security-privacy-release-evidence.json",
+  "releaseSecurityGate": "release/product-gates/release-security-gate.json",
   "evidenceRoot": ".codex/evidence/security/abuse-penetration-rehearsal/<git-sha>/",
   "latestQaEvidenceStatus": {
     "qaEvidenceDateKst": "2026-06-28",
@@ -644,8 +644,8 @@
     "goNoGoKo": "critical/high finding이 1건이라도 남아 있으면 release blocker이며, 예외는 #1020 waiver schema와 mitigation/follow-up issue가 있어야 한다."
   },
   "linkedReleaseGates": [
-    "apps/mobile/release/security-privacy-release-evidence.json",
-    "apps/mobile/release/release-security-gate.json",
+    "release/product-gates/security-privacy-release-evidence.json",
+    "release/product-gates/release-security-gate.json",
     "apps/mobile/release/signed-release-artifact-gate.json",
     "apps/mobile/release/android-rc-store-evidence.json"
   ],

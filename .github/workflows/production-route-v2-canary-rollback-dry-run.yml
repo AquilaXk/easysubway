@@ -74,7 +74,7 @@ jobs:
           candidate_sha="${DEPLOY_SHA_INPUT}"
           if [[ -z "${candidate_sha}" ]]; then
             candidate_sha="$(node -e "
-              const d = require('./apps/mobile/release/operations-release-evidence.json');
+              const d = require('./release/product-gates/operations-release-evidence.json');
               process.stdout.write(d.backendControlPlane.publicApiSurface.routeV2Readiness.realisticLoadEvidence.candidate.candidateGitSha);
             ")"
           fi

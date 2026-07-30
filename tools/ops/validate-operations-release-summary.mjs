@@ -550,9 +550,9 @@ async function main() {
 
   const [summary, observability, postLaunch, support, rcManifest] = await Promise.all([
     readJson(summaryPath),
-    readJson(argValue(args, "--observability-gate", "apps/mobile/release/operations-observability-gate.json")),
-    readJson(argValue(args, "--post-launch-gate", "apps/mobile/release/post-launch-operations-review-gate.json")),
-    readJson(argValue(args, "--support-gate", "apps/mobile/release/support-incident-response-gate.json")),
+    readJson(argValue(args, "--observability-gate", "release/product-gates/operations-observability-gate.json")),
+    readJson(argValue(args, "--post-launch-gate", "release/product-gates/post-launch-operations-review-gate.json")),
+    readJson(argValue(args, "--support-gate", "release/product-gates/support-incident-response-gate.json")),
     rcManifestPath ? readJson(rcManifestPath) : null,
   ]);
   if (summary.schemaVersion !== 1) throw new Error("schemaVersion must be 1");

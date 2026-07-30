@@ -44,7 +44,7 @@
       "ownerKo": "모바일/데이터 담당",
       "readyWhenKo": "manifest public keyring, signing key rotation, revocation, emergency rollback key 사용 기준과 test vector가 PR 검증 증거에 남고, private signing key는 저장소와 모바일 산출물에 포함되지 않는다.",
       "evidence": ["manifest-signature-test-vector", "key-rotation-revocation-record", "emergency-rollback-key-approval", "release-artifact-secret-scan-output"],
-      "linkedArtifacts": ["apps/mobile/release/security-privacy-release-evidence.json", "tools/datapack/schema/manifest.schema.json", "tools/datapack/datapack-tools.test.mjs", "apps/mobile/lib/core/datapack/data_pack_manifest.dart"]
+      "linkedArtifacts": ["release/product-gates/security-privacy-release-evidence.json", "tools/datapack/schema/manifest.schema.json", "tools/datapack/datapack-tools.test.mjs", "apps/mobile/lib/core/datapack/data_pack_manifest.dart"]
     },
     {
       "id": "mobile_test_credentials_absent",
@@ -64,7 +64,7 @@
       "ownerKo": "모바일/보안 담당",
       "readyWhenKo": "AAB/IPA 또는 Play-generated APK 후보에서 provider key, signing private key, upload URL, receipt token, local placeholder endpoint가 검색되지 않고, release network trace는 개인정보 인벤토리와 같은 endpoint/데이터 흐름만 보인다.",
       "evidence": ["release-artifact-secret-scan-output", "release-network-trace-review", "android-emulator-release-smoke-log"],
-      "linkedArtifacts": [".github/workflows/release-artifacts.yml", "apps/mobile/release/security-privacy-release-evidence.json", "apps/mobile/release/store-privacy-inventory.json", "apps/mobile/lib/app/app_endpoints.dart"]
+      "linkedArtifacts": [".github/workflows/release-artifacts.yml", "release/product-gates/security-privacy-release-evidence.json", "apps/mobile/release/store-privacy-inventory.json", "apps/mobile/lib/app/app_endpoints.dart"]
     },
     {
       "id": "mobile_error_stacktrace_sanitized",
@@ -174,7 +174,7 @@
       "ownerKo": "모바일/백엔드/개인정보 담당",
       "readyWhenKo": "데이터 삭제 요청은 local data, report link, photo object, notification preference/device, favorite, search history, mobility profile retention을 같은 사용자 범위로 삭제 또는 익명화하고 Android emulator UI evidence와 백엔드/모바일 자동 테스트 결과를 PR에 남긴다.",
       "evidence": ["backend-user-data-deletion-service-test", "mobile-user-data-deletion-local-test", "android-emulator-deletion-ui-evidence", "report-photo-object-delete-test", "retention-inventory-cross-check"],
-      "linkedArtifacts": ["backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java", "backend/src/test/java/com/easysubway/user/application/service/UserDataDeletionServiceTest.java", "backend/src/test/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportRepositoryTest.java", "apps/mobile/lib/user_data_deletion.dart", "apps/mobile/test/user_data_deletion_test.dart", "apps/mobile/release/security-privacy-release-evidence.json"]
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java", "backend/src/test/java/com/easysubway/user/application/service/UserDataDeletionServiceTest.java", "backend/src/test/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportRepositoryTest.java", "apps/mobile/lib/user_data_deletion.dart", "apps/mobile/test/user_data_deletion_test.dart", "release/product-gates/security-privacy-release-evidence.json"]
     },
     {
       "id": "repository_secrets_not_tracked",
@@ -214,7 +214,7 @@
       "ownerKo": "보안/릴리즈 담당",
       "readyWhenKo": "Android AAB 또는 Play-generated APK secret scan, report photo/receipt/signed URL abuse, admin/operator auth/session/CSRF, tenant authorization, distributed rate limit, object lifecycle rehearsal 결과가 있고 critical/high finding이 0이거나 #1020 waiver와 fix plan이 있다.",
       "evidence": ["abuse-penetration-rehearsal-gate-manifest", "android-artifact-secret-scan-output", "redacted-abuse-request-response-summary", "critical-high-finding-zero-or-waiver"],
-      "linkedArtifacts": ["apps/mobile/release/abuse-penetration-rehearsal-gate.json", "apps/mobile/release/security-privacy-release-evidence.json", "backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java", "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java"]
+      "linkedArtifacts": ["release/product-gates/abuse-penetration-rehearsal-gate.json", "release/product-gates/security-privacy-release-evidence.json", "backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java", "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java"]
     },
     {
       "id": "repository_codex_security_scan_before_release",

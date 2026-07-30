@@ -130,9 +130,11 @@ const gitSha = suppliedGitSha ?? process.env.GITHUB_SHA ?? checkoutGitSha;
 if (!/^[a-f0-9]{40}$/.test(gitSha) || gitSha !== checkoutGitSha) {
   fail("--git-sha must match the current checkout HEAD");
 }
-const rcEvidenceContract = projectRcEvidenceContract(readJsonIfExists(
-  path.join(appRoot, "release/rc-evidence-manifest-contract.json"),
-));
+const rcEvidenceContractPath = resolvePath(
+  arg("rcEvidenceContract", "rc-evidence-contract")
+    ?? path.join(repoRoot, "release/product-gates/rc-evidence-manifest-contract.json"),
+);
+const rcEvidenceContract = projectRcEvidenceContract(readJsonIfExists(rcEvidenceContractPath));
 if (!Array.isArray(rcEvidenceContract?.requiredEvidenceEntries)) {
   fail("RC evidence manifest contract with requiredEvidenceEntries is required");
 }
@@ -170,7 +172,7 @@ if (!Array.isArray(rcEvidenceContract.activeBlockerIssues)) {
   fail("RC evidence manifest contract with activeBlockerIssues is required");
 }
 validateIssueDag(rcEvidenceContract.activeBlockerIssues, issueStates);
-const launchScope = readJsonIfExists(path.join(repoRoot, "apps/mobile/release/production-datapack-scope.json"));
+const launchScope = readJsonIfExists(path.join(repoRoot, "release/product-gates/production-datapack-scope.json"));
 if (!launchScope?.routingLaunchScope || !launchScope?.identityMatrix) {
   fail("production routing launch scope and identity matrix are required");
 }
@@ -232,7 +234,7 @@ const candidateContext = {
   sourceManifests: {
     androidRcEvidenceManifest: "apps/mobile/release/android-rc-store-evidence.json",
     signedReleaseArtifactGate: "apps/mobile/release/signed-release-artifact-gate.json",
-    releaseGovernanceGate: "apps/mobile/release/release-governance-gate.json",
+    releaseGovernanceGate: "release/product-gates/release-governance-gate.json",
     dataPackManifest: path.relative(repoRoot, dataPackManifestPath),
   },
 };
@@ -339,7 +341,7 @@ const manifest = {
   sourceManifests: {
     androidRcEvidenceManifest: "apps/mobile/release/android-rc-store-evidence.json",
     signedReleaseArtifactGate: "apps/mobile/release/signed-release-artifact-gate.json",
-    releaseGovernanceGate: "apps/mobile/release/release-governance-gate.json",
+    releaseGovernanceGate: "release/product-gates/release-governance-gate.json",
     dataPackManifest: path.relative(repoRoot, dataPackManifestPath),
   },
 };

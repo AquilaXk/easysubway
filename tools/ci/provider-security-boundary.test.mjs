@@ -15,9 +15,9 @@ function readJson(file) {
 }
 
 test("provider credential과 release artifact security boundary regression을 고정한다", () => {
-  const releaseSecurityGate = readJson("apps/mobile/release/release-security-gate.json");
-  const securityPrivacyEvidence = readJson("apps/mobile/release/security-privacy-release-evidence.json");
-  const abuseGate = readJson("apps/mobile/release/abuse-penetration-rehearsal-gate.json");
+  const releaseSecurityGate = readJson("release/product-gates/release-security-gate.json");
+  const securityPrivacyEvidence = readJson("release/product-gates/security-privacy-release-evidence.json");
+  const abuseGate = readJson("release/product-gates/abuse-penetration-rehearsal-gate.json");
   const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
   const androidBuildGradle = read("apps/mobile/android/app/build.gradle.kts");
   const mobileTrackedSource = trackedFiles("apps/mobile").map((file) => [file, read(file)]);

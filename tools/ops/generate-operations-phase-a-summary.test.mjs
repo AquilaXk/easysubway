@@ -71,7 +71,7 @@ async function generate(output, extraArgs = []) {
   ];
   if (gateArgs.length > 0) {
     const gate = markFixedReleaseRevalidated(JSON.parse(await readFile(
-      path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"),
+      path.join(root, "release/product-gates/post-launch-operations-review-gate.json"),
       "utf8",
     )));
     await writeFile(gateArgs[1], `${JSON.stringify(gate, null, 2)}\n`);
@@ -184,7 +184,7 @@ for (const [field, value] of [
   test(`Phase A summary generator rejects an RC with an unvalidated ${field}`, async () => {
     const output = await paths();
     const gate = JSON.parse(await readFile(
-      path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"),
+      path.join(root, "release/product-gates/post-launch-operations-review-gate.json"),
       "utf8",
     ));
     markFixedReleaseRevalidated(gate);
@@ -220,7 +220,7 @@ test("Phase A summary generator binds a newly signed AAB with the validated payl
 
 test("Phase A summary generator rejects help-screen device QA from a different RC", async () => {
   const output = await paths();
-  const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/support-incident-response-gate.json"), "utf8"));
+  const gate = JSON.parse(await readFile(path.join(root, "release/product-gates/support-incident-response-gate.json"), "utf8"));
   gate.latestQaEvidenceSummary.helpScreenDeviceQa.versionCode = 10004;
   const gatePath = path.join(output.dir, "support-incident-response-gate.json");
   await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
@@ -234,7 +234,7 @@ test("Phase A summary generator rejects help-screen device QA from a different R
 
 test("Phase A summary generator rejects a contact set not verified by device QA", async () => {
   const output = await paths();
-  const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/support-incident-response-gate.json"), "utf8"));
+  const gate = JSON.parse(await readFile(path.join(root, "release/product-gates/support-incident-response-gate.json"), "utf8"));
   gate.latestQaEvidenceSummary.helpScreenDeviceQa.contactSetSha256 = "e".repeat(64);
   const gatePath = path.join(output.dir, "support-incident-response-gate.json");
   await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
@@ -252,7 +252,7 @@ for (const [label, receivedAt] of [
 ]) {
   test(`Phase A summary generator rejects support evidence ${label}`, async () => {
     const output = await paths();
-    const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/support-incident-response-gate.json"), "utf8"));
+    const gate = JSON.parse(await readFile(path.join(root, "release/product-gates/support-incident-response-gate.json"), "utf8"));
     gate.latestQaEvidenceSummary.channelEvidence[0].receivedAt = receivedAt;
     const gatePath = path.join(output.dir, "support-incident-response-gate.json");
     await writeFile(output.manifest, `${JSON.stringify(rcManifest(), null, 2)}\n`);
@@ -267,7 +267,7 @@ for (const [label, receivedAt] of [
 
 test("Phase A summary generator requires a PASS summary for every required evidence ID", async () => {
   const output = await paths();
-  const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"), "utf8"));
+  const gate = JSON.parse(await readFile(path.join(root, "release/product-gates/post-launch-operations-review-gate.json"), "utf8"));
   markFixedReleaseRevalidated(gate);
   gate.preLaunchReadiness.requiredEvidence.push("new-unproven-required-evidence");
   const gatePath = path.join(output.dir, "post-launch-operations-review-gate.json");
@@ -318,7 +318,7 @@ test("Phase A summary generator removes a stale PASS summary when a later run is
 
 test("Phase A summary generator fails closed when a refresh-bound surface changes", async () => {
   const output = await paths();
-  const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"), "utf8"));
+  const gate = JSON.parse(await readFile(path.join(root, "release/product-gates/post-launch-operations-review-gate.json"), "utf8"));
   markFixedReleaseRevalidated(gate);
   gate.preLaunchReadiness.finalRcBinding.refreshBindings[0].files[0].sha256 = "0".repeat(64);
   const gatePath = path.join(output.dir, "post-launch-operations-review-gate.json");
@@ -333,7 +333,7 @@ test("Phase A summary generator fails closed when a refresh-bound surface change
 
 test("Phase A summary generator rejects a changed gzip evidence helper", async () => {
   const output = await paths();
-  const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"), "utf8"));
+  const gate = JSON.parse(await readFile(path.join(root, "release/product-gates/post-launch-operations-review-gate.json"), "utf8"));
   markFixedReleaseRevalidated(gate);
   const fixedReleaseBinding = gate.preLaunchReadiness.finalRcBinding.refreshBindings.find(
     (binding) => binding.refreshOn === "fixed-release-procedure-change",
@@ -380,7 +380,7 @@ test("Phase A summary generator uses signal-specific validated evidence", async 
 
 test("Phase A summary generator fails closed when one signal lacks validated evidence", async () => {
   const output = await paths();
-  const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/operations-observability-gate.json"), "utf8"));
+  const gate = JSON.parse(await readFile(path.join(root, "release/product-gates/operations-observability-gate.json"), "utf8"));
   gate.phaseAValidatedEvidence = gate.phaseAValidatedEvidence.filter(
     (item) => item.signalId !== "android_mapping_retention",
   );
@@ -410,7 +410,7 @@ test("Phase A summary generator connects each support channel to its own validat
 
 test("Phase A summary generator fails closed when one support channel lacks validated evidence", async () => {
   const output = await paths();
-  const gate = JSON.parse(await readFile(path.join(root, "apps/mobile/release/support-incident-response-gate.json"), "utf8"));
+  const gate = JSON.parse(await readFile(path.join(root, "release/product-gates/support-incident-response-gate.json"), "utf8"));
   gate.latestQaEvidenceSummary.channelEvidence = gate.latestQaEvidenceSummary.channelEvidence.filter(
     (item) => item.channelId !== "security_privacy_deletion",
   );

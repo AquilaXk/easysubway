@@ -95,7 +95,7 @@ test("현재 분리 blocker를 readiness 결과에 fail로 드러낸다", () => 
   const backend = evaluateReadiness("backend");
   const mobile = evaluateReadiness("mobile");
 
-  assert.equal(byId(datapack, "datapack.no-mobile-release-paths").status, "fail");
+  assert.equal(byId(datapack, "datapack.no-mobile-release-paths").status, "pass");
   assert.equal(byId(datapack, "datapack.candidate-promotion-separated").status, "fail");
   assert.equal(byId(infra, "infra.deploy-consumes-digest-only").status, "fail");
   assert.equal(byId(infra, "infra.no-backend-build").status, "fail");

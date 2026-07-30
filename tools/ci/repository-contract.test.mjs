@@ -454,7 +454,7 @@ function readJson(relativePath) {
   return JSON.parse(read(relativePath));
 }
 
-const abusePenetrationRehearsalGate = readJson("apps/mobile/release/abuse-penetration-rehearsal-gate.json");
+const abusePenetrationRehearsalGate = readJson("release/product-gates/abuse-penetration-rehearsal-gate.json");
 
 test("route ETA accuracy evaluator report contract is machine-readable", async () => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "route-accuracy-"));
@@ -499,7 +499,7 @@ test("route ETA accuracy evaluator report contract is machine-readable", async (
 });
 
 test("route commercialization release gate blocks unsupported commercial route claims", () => {
-  const gatePath = "apps/mobile/release/route-commercialization-gate.json";
+  const gatePath = "release/product-gates/route-commercialization-gate.json";
   assert.equal(existsSync(path.join(root, gatePath)), true, "route commercialization gate must exist");
 
   const gate = readJson(gatePath);
@@ -556,12 +556,12 @@ test("route commercialization release gate blocks unsupported commercial route c
 });
 
 test("datapack release readiness gate blocks commercial datapack and realtime ETA claims", () => {
-  const gatePath = "apps/mobile/release/datapack-release-readiness-gate.json";
+  const gatePath = "release/product-gates/datapack-release-readiness-gate.json";
   assert.equal(existsSync(path.join(root, gatePath)), true, "datapack release readiness gate must exist");
 
   const gate = readJson(gatePath);
-  const governance = readJson("apps/mobile/release/release-governance-gate.json");
-  const scope = readJson("apps/mobile/release/production-datapack-scope.json");
+  const governance = readJson("release/product-gates/release-governance-gate.json");
+  const scope = readJson("release/product-gates/production-datapack-scope.json");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -605,7 +605,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
     itxCheongchunCoverageContract: "tools/datapack/itx-cheongchun-coverage-contract.json",
     qualityMetricReport: "artifacts/datapack-quality-metrics.json",
     routeGraphTopologyReport: "artifacts/route-graph-topology-report.json",
-    freshnessSlaPolicy: "apps/mobile/release/datapack-freshness-sla.json",
+    freshnessSlaPolicy: "release/product-gates/datapack-freshness-sla.json",
     androidOfflineRouteEvidence: ".codex/evidence/datapack-release-readiness/<rc-or-run>/android-offline-route-summary.md",
   });
   assert.ok(
@@ -646,7 +646,7 @@ test("datapack release readiness gate blocks commercial datapack and realtime ET
 });
 
 test("route release readiness tracker keeps issue 1414 as a release blocker", () => {
-  const trackerPath = "apps/mobile/release/route-release-readiness-tracker.json";
+  const trackerPath = "release/product-gates/route-release-readiness-tracker.json";
   assert.equal(existsSync(path.join(root, trackerPath)), true, "route release readiness tracker must exist");
 
   const tracker = readJson(trackerPath);
@@ -658,7 +658,7 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
   assert.equal(tracker.androidApplicationId, "com.easysubway.app");
   assert.equal(tracker.releaseGate, "route-release-readiness-tracker");
   assert.equal(tracker.issue, 1414);
-  assert.equal(tracker.parentGate, "apps/mobile/release/route-commercialization-gate.json");
+  assert.equal(tracker.parentGate, "release/product-gates/route-commercialization-gate.json");
   assert.equal(tracker.releaseBlockerPolicy, true);
   assert.equal(tracker.storeReadyStatus, "blocked_route_release_tracker_incomplete");
   assert.equal(tracker.releaseClaimPolicy.commercialRealtimeRouteClaimAllowed, false);
@@ -666,7 +666,7 @@ test("route release readiness tracker keeps issue 1414 as a release blocker", ()
   assert.equal(tracker.releaseClaimPolicy.untilAllCompletionCriteriaPass, true);
   assert.equal(tracker.northStar.realtimeEtaRequiresFreshProviderEvidence, true);
   assert.equal(tracker.northStar.realtimeEtaWithoutProviderObservedAtAllowed, false);
-  assert.equal(tracker.northStar.etaErrorBudgetGate, "apps/mobile/release/route-commercialization-gate.json");
+  assert.equal(tracker.northStar.etaErrorBudgetGate, "release/product-gates/route-commercialization-gate.json");
   assert.equal(tracker.northStar.unclassifiedEtaDeviationAllowed, 0);
   assert.equal(tracker.childIssueBlocksRelease, true);
   assert.equal(new Set(issueNumbers).size, issueNumbers.length);
@@ -3507,7 +3507,7 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 });
 
 test("[release-v2] RC evidence contract uses repository-qualified issue references", async () => {
-  const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
+  const contract = readJson("release/product-gates/rc-evidence-manifest-contract.json");
   const issueRefSchema = readJson("contracts/release/issue-ref.schema.json");
   const issueRefPattern = new RegExp(issueRefSchema.pattern);
   const issueRefs = [
@@ -3544,6 +3544,7 @@ test("[release-v2] RC evidence contract uses repository-qualified issue referenc
           "tools/release/generate-rc-evidence-manifest.mjs",
           "--repo-root", root,
           "--app-root", tempApp,
+          "--rc-evidence-contract", path.join(tempApp, "release/rc-evidence-manifest-contract.json"),
           "--git-sha", currentGitSha,
           "--phase", "CANDIDATE",
           "--output", path.join(tempApp, "candidate-context.json"),
@@ -3633,15 +3634,15 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   const playStoreSubmissionContent = readJson(playStoreSubmissionContentPath);
   const playGeneratedApkDeviceMatrixPath = "apps/mobile/release/play-generated-apk-device-matrix-gate.json";
   const playGeneratedApkDeviceMatrixGate = readJson(playGeneratedApkDeviceMatrixPath);
-  const postLaunchOperationsReviewPath = "apps/mobile/release/post-launch-operations-review-gate.json";
+  const postLaunchOperationsReviewPath = "release/product-gates/post-launch-operations-review-gate.json";
   const postLaunchOperationsReviewGate = readJson(postLaunchOperationsReviewPath);
-  const supportIncidentResponsePath = "apps/mobile/release/support-incident-response-gate.json";
+  const supportIncidentResponsePath = "release/product-gates/support-incident-response-gate.json";
   const supportIncidentResponseGate = readJson(supportIncidentResponsePath);
-  const abusePenetrationRehearsalPath = "apps/mobile/release/abuse-penetration-rehearsal-gate.json";
+  const abusePenetrationRehearsalPath = "release/product-gates/abuse-penetration-rehearsal-gate.json";
   const abusePenetrationRehearsalGate = readJson(abusePenetrationRehearsalPath);
-  const releaseGovernanceGate = readJson("apps/mobile/release/release-governance-gate.json");
-  const operationsEvidence = readJson("apps/mobile/release/operations-release-evidence.json");
-  const rcEvidenceManifestContractPath = "apps/mobile/release/rc-evidence-manifest-contract.json";
+  const releaseGovernanceGate = readJson("release/product-gates/release-governance-gate.json");
+  const operationsEvidence = readJson("release/product-gates/operations-release-evidence.json");
+  const rcEvidenceManifestContractPath = "release/product-gates/rc-evidence-manifest-contract.json";
   const rcEvidenceManifestContract = readJson(rcEvidenceManifestContractPath);
   const workflow = read(".github/workflows/release-artifacts.yml");
   const generator = read("tools/release/generate-rc-evidence-manifest.mjs");
@@ -3918,7 +3919,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     postLaunchOperationsReviewGate.preLaunchReadiness.finalRcBinding.validatedArtifactIdentityEvidence,
     {
       aabPayload: ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260717/fixed-release-rehearsal-summary.json",
-      backend: "apps/mobile/release/operations-release-evidence.json",
+      backend: "release/product-gates/operations-release-evidence.json",
       dataPackManifest: "apps/mobile/assets/datapacks/metro_map_pack/manifest.json",
     },
   );
@@ -3958,10 +3959,34 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "apps/mobile/lib/features/support/presentation/inquiry_screen.dart",
       "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
       "apps/mobile/lib/main.dart",
-      "apps/mobile/release/support-incident-response-gate.json",
+      "release/product-gates/support-incident-response-gate.json",
     ],
   );
   const supersededFinalRcBindings = new Map([
+    [
+      "release/product-gates/operations-observability-gate.json",
+      "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe",
+    ],
+    [
+      "release/product-gates/operations-release-evidence.json",
+      "5bbe9b3d3aa90f3f273ca396bcabebb48ecff9d0a3634fa1b9f86db95e4bc6cb",
+    ],
+    [
+      "tools/ops/generate-operations-phase-a-summary.mjs",
+      "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d",
+    ],
+    [
+      "tools/ops/validate-operations-release-summary.mjs",
+      "474095e635706a442d79e9c21e274e0aa6eb9e992f480783dbc7d16c66a0fc7e",
+    ],
+    [
+      "release/product-gates/support-incident-response-gate.json",
+      "2b1942f223b63aa18cae0481649d46fa41a671ddae4dccab041098ca3e2d6903",
+    ],
+    [
+      "apps/mobile/release/signed-release-artifact-gate.json",
+      "42c9f83dca5a1c2c24d921cf6ab748c9be5a901dd1b62212a81055098349fc67",
+    ],
     ["apps/mobile/pubspec.yaml", "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42"],
     ["apps/mobile/lib/main.dart", "e03403afc1d3370905ef0c3f90533c67dc7fa37eb95c3d8743b7cbd52d2ab9b0"],
     [
@@ -3969,11 +3994,19 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
       "7a40f47727818e79abe1156eee2dd105a0c499eda087708f419993759d404245",
     ],
     [
+      ".github/workflows/datapack-release.yml",
+      "928e8222edf41065a4ec9db11cda9821eaf53b153efc30d553b53bd96c599212",
+    ],
+    [
+      "backend/build.gradle",
+      "cfefe1f4884d0f4b44f2875dc4e1bedabad358a7c9aab030c6504c87d8f21f2d",
+    ],
+    [
       "tools/ci/validate-store-privacy-env.mjs",
       "18bb0dd8b93d6268c8f60f9cc12272d2ff31c03b60fbbafd6c1e8d16957ada2a",
     ],
     [
-      "apps/mobile/release/rc-evidence-manifest-contract.json",
+      "release/product-gates/rc-evidence-manifest-contract.json",
       "7caaa17fc34e13e5e35076be4b4f35456f4fa57add102561e31267934bd6cd41",
     ],
     [
@@ -4021,7 +4054,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "tools/release/count-gzip-uncompressed-bytes.mjs",
     "tools/datapack/run-emergency-datapack-drill.mjs",
     "tools/release/upload-play-internal.mjs",
-    "apps/mobile/release/route-commercialization-gate.json",
+    "release/product-gates/route-commercialization-gate.json",
     "apps/mobile/pubspec.yaml",
     "backend/build.gradle",
     "backend/Dockerfile",
@@ -4034,7 +4067,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     ),
   );
   assert.equal(postLaunchOperationsReviewGate.androidRcEvidenceManifest, androidRcEvidencePath);
-  assert.equal(postLaunchOperationsReviewGate.operationsEvidenceManifest, "apps/mobile/release/operations-release-evidence.json");
+  assert.equal(postLaunchOperationsReviewGate.operationsEvidenceManifest, "release/product-gates/operations-release-evidence.json");
   assert.equal(postLaunchOperationsReviewGate.supportIncidentResponseGate, supportIncidentResponsePath);
   assert.match(postLaunchOperationsReviewGate.evidenceRoot, /\.codex\/evidence\/release\/post-launch-operations-review\/<rc-or-run>/);
   assert.equal(postLaunchOperationsReviewGate.latestQaEvidenceSummary.qaEvidenceDateKst, "2026-07-15");
@@ -4293,7 +4326,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.equal(abusePenetrationRehearsalGate.issue, 1022);
   assert.equal(abusePenetrationRehearsalGate.status, "BLOCKED_EXTERNAL");
   assert.equal(abusePenetrationRehearsalGate.androidRcEvidenceManifest, androidRcEvidencePath);
-  assert.equal(abusePenetrationRehearsalGate.securityPrivacyEvidenceManifest, "apps/mobile/release/security-privacy-release-evidence.json");
+  assert.equal(abusePenetrationRehearsalGate.securityPrivacyEvidenceManifest, "release/product-gates/security-privacy-release-evidence.json");
   assert.equal(abusePenetrationRehearsalGate.evidenceRoot, ".codex/evidence/security/abuse-penetration-rehearsal/<git-sha>/");
   const adGuardrails = abusePenetrationRehearsalGate.adEventAbuseGuardrails;
   assert.equal(adGuardrails.issue, 1912);
@@ -4758,7 +4791,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.deepEqual(rcEvidenceManifestContract.activeBlockerIssueRefs, []);
   assert.equal(rcEvidenceManifestContract.androidRcEvidenceManifest, androidRcEvidencePath);
   assert.equal(rcEvidenceManifestContract.signedReleaseArtifactGate, gatePath);
-  assert.equal(rcEvidenceManifestContract.releaseGovernanceGate, "apps/mobile/release/release-governance-gate.json");
+  assert.equal(rcEvidenceManifestContract.releaseGovernanceGate, "release/product-gates/release-governance-gate.json");
   assert.equal(rcEvidenceManifestContract.generator, "tools/release/generate-rc-evidence-manifest.mjs");
   for (const field of [
     "gitSha",
@@ -4868,7 +4901,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /failedRcVersionCodeReusePolicy=forbidden_without_1020_waiver/);
   assert.match(
     workflow,
-    /Android Production RC Artifact \/ Collect production metadata[\s\S]*cp release\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json[\s\S]*cp release\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json[\s\S]*cp release\/operations-observability-gate\.json release-artifacts\/android\/operations-observability-gate\.json[\s\S]*Android Production RC Artifact \/ Upload app bundle/,
+    /Android Production RC Artifact \/ Collect production metadata[\s\S]*cp \.\.\/\.\.\/release\/product-gates\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json[\s\S]*cp \.\.\/\.\.\/release\/product-gates\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json[\s\S]*cp \.\.\/\.\.\/release\/product-gates\/operations-observability-gate\.json release-artifacts\/android\/operations-observability-gate\.json[\s\S]*Android Production RC Artifact \/ Upload app bundle/,
   );
   for (const key of gate.artifacts.android.productionRcRequiredMetadata) {
     assert.match(workflow, new RegExp(`${key}=`), `${key} must be emitted in production RC metadata`);
@@ -4880,10 +4913,10 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /cp release\/play-production-access-gate\.json release-artifacts\/android\/play-production-access-gate\.json/);
   assert.match(workflow, /cp release\/play-store-submission-content\.json release-artifacts\/android\/play-store-submission-content\.json/);
   assert.match(workflow, /cp release\/play-generated-apk-device-matrix-gate\.json release-artifacts\/android\/play-generated-apk-device-matrix-gate\.json/);
-  assert.match(workflow, /cp release\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json/);
-  assert.match(workflow, /cp release\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json/);
-  assert.match(workflow, /cp release\/abuse-penetration-rehearsal-gate\.json release-artifacts\/android\/abuse-penetration-rehearsal-gate\.json/);
-  assert.match(workflow, /cp release\/rc-evidence-manifest-contract\.json release-artifacts\/android\/rc-evidence-manifest-contract\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/abuse-penetration-rehearsal-gate\.json release-artifacts\/android\/abuse-penetration-rehearsal-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/rc-evidence-manifest-contract\.json release-artifacts\/android\/rc-evidence-manifest-contract\.json/);
   assert.match(workflow, /rc-evidence-manifest:/);
   assert.match(workflow, /name: RC Evidence Manifest/);
   const rcEvidenceManifestJob = workflow.slice(
@@ -4952,9 +4985,13 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(workflow, /--gate-status "postLaunchOperations=\$\{operations_status\}"/);
   assert.match(workflow, /--evidence-status "post_launch_operations=\$\{operations_status\}"/);
   assert.match(workflow, /--evidence-path post_launch_operations=release-artifacts\/rc\/operations-phase-a-summary\.json/);
-  assert.match(workflow, /cp apps\/mobile\/release\/post-launch-operations-review-gate\.json release-artifacts\/rc\/post-launch-operations-review-gate\.json/);
-  assert.match(workflow, /cp apps\/mobile\/release\/support-incident-response-gate\.json release-artifacts\/rc\/support-incident-response-gate\.json/);
-  assert.match(workflow, /cp apps\/mobile\/release\/operations-observability-gate\.json release-artifacts\/rc\/operations-observability-gate\.json/);
+  assert.match(workflow, /cp release\/product-gates\/post-launch-operations-review-gate\.json release-artifacts\/rc\/post-launch-operations-review-gate\.json/);
+  assert.match(workflow, /cp release\/product-gates\/support-incident-response-gate\.json release-artifacts\/rc\/support-incident-response-gate\.json/);
+  assert.match(workflow, /cp release\/product-gates\/operations-observability-gate\.json release-artifacts\/rc\/operations-observability-gate\.json/);
+  assert.match(workflow, /--rc-evidence-contract release\/product-gates\/rc-evidence-manifest-contract\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/post-launch-operations-review-gate\.json release-artifacts\/android\/post-launch-operations-review-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/support-incident-response-gate\.json release-artifacts\/android\/support-incident-response-gate\.json/);
+  assert.match(workflow, /cp \.\.\/\.\.\/release\/product-gates\/operations-observability-gate\.json release-artifacts\/android\/operations-observability-gate\.json/);
   assert.match(workflow, /"\$\{operations_evidence_args\[@\]\}"/);
   assert.match(workflow, /--evidence-root "\.codex\/evidence\/release\/rc-evidence-manifest\/\$\{GITHUB_SHA\}\/"/);
   assert.match(workflow, /android_artifact_source="none"/);
@@ -5459,7 +5496,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.match(manifest.dataPackManifestSha256, /^[a-f0-9]{64}$/);
   assert.equal(manifest.routeContractVersion, "route-map-contract-v1");
   assert.equal(manifest.realtimeContractVersion, "seoul-topis-schema-v1");
-  const launchScope = readJson("apps/mobile/release/production-datapack-scope.json");
+  const launchScope = readJson("release/product-gates/production-datapack-scope.json");
   assert.equal(manifest.launchScopeId, launchScope.routingLaunchScope.id);
   assert.equal(manifest.rcIdentity.launchScopeId, launchScope.routingLaunchScope.id);
   assert.equal(manifest.launchScopeSha256, canonicalScopeHash(launchScope.routingLaunchScope));
@@ -5708,11 +5745,11 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   );
 
   const incompleteRepo = path.join(tempDir, "incomplete-scope-repo");
-  await mkdir(path.join(incompleteRepo, "apps/mobile/release"), { recursive: true });
+  await mkdir(path.join(incompleteRepo, "release/product-gates"), { recursive: true });
   const incompleteScope = structuredClone(launchScope);
   delete incompleteScope.nationwideRoadmapScope;
   await writeFile(
-    path.join(incompleteRepo, "apps/mobile/release/production-datapack-scope.json"),
+    path.join(incompleteRepo, "release/product-gates/production-datapack-scope.json"),
     JSON.stringify(incompleteScope),
   );
   const incompleteRepoGitSha = await initializeFixtureGitRepo(incompleteRepo);
@@ -5720,6 +5757,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     runFinalGenerator([
       "tools/release/generate-rc-evidence-manifest.mjs",
       "--repo-root", incompleteRepo,
+      "--rc-evidence-contract", "release/product-gates/rc-evidence-manifest-contract.json",
       "--app-root", path.join(root, "apps/mobile"),
       "--git-sha", incompleteRepoGitSha,
       "--aab", aabPath,
@@ -6086,7 +6124,7 @@ test("[system-release-generator] FINAL은 component manifest에서 검증된 sys
 });
 
 test("datapack readiness producer는 required gate를 동일 final identity로 결정론적으로 결합한다", async () => {
-  const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
+  const contract = readJson("release/product-gates/rc-evidence-manifest-contract.json");
   const requiredDatapackGates = [
     { id: "source_admission", sourceIssue: 2133, expiresAfterDays: 14 }, { id: "source_governance", sourceIssue: 2133, expiresAfterDays: 14 },
     { id: "freshness_conditional_publish", sourceIssue: 2054, expiresAfterDays: 14 }, { id: "rollback_rescue", sourceIssue: 2051, expiresAfterDays: 14 },
@@ -6112,10 +6150,11 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
 
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-"));
   const validationRepo = path.join(tempDir, "validation-repo");
-  for (const directory of ["apps/mobile/release", "contracts/release", "tools/release", "tools/ops", "tools/security"]) {
+  for (const directory of ["apps/mobile/release", "release/product-gates", "contracts/release", "tools/release", "tools/ops", "tools/security"]) {
     await mkdir(path.join(validationRepo, directory), { recursive: true });
   }
-  await symlink(path.join(root, "apps/mobile/release/production-datapack-scope.json"), path.join(validationRepo, "apps/mobile/release/production-datapack-scope.json"));
+  await symlink(path.join(root, "release/product-gates/production-datapack-scope.json"), path.join(validationRepo, "release/product-gates/production-datapack-scope.json"));
+  await symlink(path.join(root, "release/product-gates/rc-evidence-manifest-contract.json"), path.join(validationRepo, "release/product-gates/rc-evidence-manifest-contract.json"));
   for (const schema of ["component-manifest.schema.json", "system-release-manifest.schema.json", "issue-ref.schema.json"]) {
     await symlink(path.join(root, "contracts/release", schema), path.join(validationRepo, "contracts/release", schema));
   }
@@ -6135,7 +6174,7 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   const gitSha = await initializeFixtureGitRepo(validationRepo);
   const now = "2026-07-16T00:00:00.000Z";
   const snapshotSetIdentity = "a".repeat(64);
-  const requiredSourceIds = readJson("apps/mobile/release/production-datapack-scope.json").productionSourceSet.requiredSourceIds;
+  const requiredSourceIds = readJson("release/product-gates/production-datapack-scope.json").productionSourceSet.requiredSourceIds;
   const sourceInventoryEntries = requiredSourceIds.map((sourceId, index) => ({
     sourceId, status: "APPROVED", producerVersion: 1, evidenceSha256: `${(index % 9) + 1}`.repeat(64),
     evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z",
@@ -6767,7 +6806,7 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
   const gitSha = currentGitSha;
   const now = "2026-07-16T00:00:00.000Z";
   const requiredSourceIds = readJson(
-    "apps/mobile/release/production-datapack-scope.json",
+    "release/product-gates/production-datapack-scope.json",
   ).productionSourceSet.requiredSourceIds;
   const baseArgs = [
     "tools/release/generate-rc-evidence-manifest.mjs",
@@ -6796,12 +6835,16 @@ test("datapack readiness producer는 unknown·mixed identity·expired evidence�
     const app = path.join(tempDir, name);
     await mkdir(path.join(app, "release"), { recursive: true });
     await writeFile(path.join(app, "pubspec.yaml"), read("apps/mobile/pubspec.yaml"));
-    const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
+    const contract = readJson("release/product-gates/rc-evidence-manifest-contract.json");
     mutate(contract);
     await writeFile(path.join(app, "release/rc-evidence-manifest-contract.json"), JSON.stringify(contract));
     const result = [...baseArgs];
     result[result.indexOf("--app-root") + 1] = app;
-    return [...result, "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json")];
+    return [
+      ...result,
+      "--rc-evidence-contract", path.join(app, "release/rc-evidence-manifest-contract.json"),
+      "--data-pack-manifest", path.join(root, "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"),
+    ];
   };
 
   await runFinalGenerator(baseArgs);
@@ -7084,8 +7127,8 @@ test("Android 16 KB page-size gate는 AAB alignment와 16384 runtime smoke 계�
   assert.match(runtimeScript, /summary\.txt/);
 });
 
-test("Android release 100 governance gate는 Android-only 범위와 evidence schema를 고정한다", () => {
-  const gatePath = "apps/mobile/release/release-governance-gate.json";
+test("[gate-ownership] Android release 100 governance gate는 Android-only 범위와 evidence schema를 고정한다", () => {
+  const gatePath = "release/product-gates/release-governance-gate.json";
   assert.equal(existsSync(path.join(root, gatePath)), true, "release governance gate must exist");
 
   const gate = readJson(gatePath);
@@ -7198,7 +7241,7 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.ok(gate.gates.some((item) => item.issue === 1021 && item.id === "G7_ANDROID_QUALITY"));
   assert.ok(gate.gates.some((item) => item.issue === 1018 && item.id === "G9_GOOGLE_PLAY"));
   assert.equal(gate.gates.find((item) => item.id === "G8_OPERATIONS").status, "BLOCKED_EXTERNAL");
-  const operationsGate = readJson("apps/mobile/release/post-launch-operations-review-gate.json");
+  const operationsGate = readJson("release/product-gates/post-launch-operations-review-gate.json");
   const g8 = gate.gates.find((item) => item.id === "G8_OPERATIONS");
   assert.ok(gate.latestGoNoGoStatus.blockingOpenIssues.includes(gate.latestOperationsEvidenceStatus.issue));
   assert.ok(
@@ -7376,12 +7419,12 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
       status: "IN_PROGRESS",
       owner: "route-release",
       nextAction: "길찾기 출시 readiness tracker 하위 이슈와 production route evidence 수집",
-      evidenceReference: "apps/mobile/release/route-release-readiness-tracker.json",
+      evidenceReference: "release/product-gates/route-release-readiness-tracker.json",
     },
   );
   assert.equal(
     gate.gates.find((item) => item.id === "G6_SECURITY_PRIVACY")?.status,
-    readJson("apps/mobile/release/abuse-penetration-rehearsal-gate.json").status,
+    readJson("release/product-gates/abuse-penetration-rehearsal-gate.json").status,
   );
   assert.deepEqual(
     gate.childIssueLinks,
@@ -7404,8 +7447,9 @@ test("Android release 100 governance gate는 Android-only 범위와 evidence sch
   assert.ok(gate.requiredChecks.includes("CI / Repository CI"));
   assert.ok(gate.requiredChecks.includes("CI / Release Gate Consistency"));
   assert.ok(gate.releaseImpactPaths.includes("apps/mobile/release/**"));
+  assert.ok(gate.releaseImpactPaths.includes("release/product-gates/**"));
   const allowedStatuses = new Set(gate.gateStatusEnum);
-  for (const releaseFile of execFileSync("git", ["ls-files", "apps/mobile/release/*.json"], {
+  for (const releaseFile of execFileSync("git", ["ls-files", "apps/mobile/release/*.json", "release/product-gates/*.json"], {
     cwd: root,
     encoding: "utf8",
   }).trim().split("\n").filter(Boolean)) {
@@ -7818,15 +7862,15 @@ test("경로 source contract 불변식은 접근성 안전과 metric fallback �
 });
 
 test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 보관 계약을 고정한다", () => {
-  const gatePath = "apps/mobile/release/operations-observability-gate.json";
+  const gatePath = "release/product-gates/operations-observability-gate.json";
   assert.ok(existsSync(path.join(root, gatePath)), "operations observability gate artifact must exist");
 
   const gate = readJson(gatePath);
-  const operationsEvidencePath = "apps/mobile/release/operations-release-evidence.json";
+  const operationsEvidencePath = "release/product-gates/operations-release-evidence.json";
   const productionReadinessValidatorPath = "tools/ops/validate-production-readiness-evidence.mjs";
   const operationsEvidence = readJson(operationsEvidencePath);
-  const releaseGovernanceGate = readJson("apps/mobile/release/release-governance-gate.json");
-  const backupRestoreGate = readJson("apps/mobile/release/backup-restore-rehearsal-gate.json");
+  const releaseGovernanceGate = readJson("release/product-gates/release-governance-gate.json");
+  const backupRestoreGate = readJson("release/product-gates/backup-restore-rehearsal-gate.json");
   const datapackWorkflow = read(".github/workflows/datapack-release.yml");
   const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
   const applicationProd = read("backend/src/main/resources/application-prod.yml");
@@ -8267,7 +8311,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       snapshotId: "server-timetable-snapshot-3e94b82f0330cc10",
       snapshotSha256: "3e94b82f0330cc106fba0fbd646b0660b785817229dcb234ef636e6c97b14730",
       freshUntil: "2026-08-03T00:00:00+09:00",
-      evidencePath: "tools/datapack/server-timetable-snapshot-evidence.json",
+      evidencePath: "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json",
     },
     sharedRouteResponseCacheAllowed: false,
   });
@@ -8591,7 +8635,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
 });
 
 test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정책으로 고정한다", () => {
-  const gatePath = "apps/mobile/release/server-minimized-qa-gate.json";
+  const gatePath = "release/product-gates/server-minimized-qa-gate.json";
   assert.ok(existsSync(path.join(root, gatePath)), "server minimized QA gate artifact must exist");
 
   const gate = readJson(gatePath);
@@ -8855,7 +8899,7 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
 
   assert.match(workflow, /mode:[\s\S]*options:\s*\[exploratory, release-candidate, production-publish/);
   assert.match(workflow, /schedule:[\s\S]*cron: "17 18 \* \* \*"/);
-  assert.match(workflow, /apps\/mobile\/release\/datapack-freshness-sla\.json/);
+  assert.match(workflow, /release\/product-gates\/datapack-freshness-sla\.json/);
   // 입력 표면은 modeArgs 단일 JSON으로 통합됨(#1694 C0). 게이트 관련 인자는 parse 스텝(id: args)이 outputs로 펼친다.
   assert.match(workflow, /modeArgs:[\s\S]*required: true/);
   assert.match(workflow, /steps\.args\.outputs\.buildSpecPath/);
@@ -9522,7 +9566,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
   );
   const targets = readJson("tools/datapack/nationwide-coverage-targets.json");
-  const productionScope = readJson("apps/mobile/release/production-datapack-scope.json");
+  const productionScope = readJson("release/product-gates/production-datapack-scope.json");
   const sourceCandidates = readJson("tools/datapack/source-candidates.json");
   const gapReporter = read("tools/datapack/report-coverage-gaps.mjs");
 
@@ -10049,7 +10093,7 @@ test("앱 bundled KRIC timetable 출처 표시는 bundled capital 시간표 row�
 });
 
 test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준을 고정한다", () => {
-  const scope = readJson("apps/mobile/release/production-datapack-scope.json");
+  const scope = readJson("release/product-gates/production-datapack-scope.json");
   const playStoreContent = readJson("apps/mobile/release/play-store-submission-content.json");
   const productionInput = readJson("tools/datapack/inputs/capital-pilot-production-source-input.json");
   const inventory = readJson("tools/datapack/source-inventory.json");
@@ -10263,7 +10307,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
 });
 
 test("데이터팩 freshness SLA는 source별 갱신 주기와 stale 노출 정책을 고정한다", () => {
-  const policy = readJson("apps/mobile/release/datapack-freshness-sla.json");
+  const policy = readJson("release/product-gates/datapack-freshness-sla.json");
   const classes = new Map(policy.sourceClasses.map((sourceClass) => [sourceClass.id, sourceClass]));
 
   assert.equal(policy.schemaVersion, 2);
@@ -12847,7 +12891,7 @@ test("source raw archive 도구는 공용 CSV parser와 명시적 문자열 정�
 });
 
 test("운영 백업 복구 리허설 gate는 필수 백업 대상과 dry-run 검증 명령을 고정한다", () => {
-  const gatePath = "apps/mobile/release/backup-restore-rehearsal-gate.json";
+  const gatePath = "release/product-gates/backup-restore-rehearsal-gate.json";
   const checkScriptPath = "tools/ops/backup-restore-rehearsal-check.mjs";
   const photoRestoreCheckPath = "tools/ops/facility-report-photo-restore-check.mjs";
   assert.ok(existsSync(path.join(root, gatePath)), "backup restore rehearsal gate artifact must exist");
@@ -17073,7 +17117,7 @@ test("모바일 접근성 출시 QA 기준선은 Android와 iOS 제출 전 확�
 test("Android 출시 UX 접근성 성능 gate는 local emulator evidence와 P0 blocker 기준을 고정한다", () => {
   const gate = readJson("apps/mobile/release/android-release-quality-gate.json");
   const androidRcEvidence = readJson("apps/mobile/release/android-rc-store-evidence.json");
-  const governance = readJson("apps/mobile/release/release-governance-gate.json");
+  const governance = readJson("release/product-gates/release-governance-gate.json");
   const smokeScript = read("tools/mobile/run-android-release-quality-emulator-smoke.sh");
 
   assert.equal(gate.schemaVersion, 1);
@@ -17759,7 +17803,7 @@ test("모바일 스토어 심사 정보 기준선은 제출 전 필수 항목을
 });
 
 test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", () => {
-  const gatePath = "apps/mobile/release/release-security-gate.json";
+  const gatePath = "release/product-gates/release-security-gate.json";
   assert.ok(existsSync(path.join(root, gatePath)));
 
   const gate = readJson(gatePath);
@@ -17826,8 +17870,8 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   );
   const prodConfig = read("backend/src/main/resources/application-prod.yml");
   const backendAppEnvAllowlist = read("tools/deploy/backend-app-env.allowlist");
-  const securityPrivacyEvidence = readJson("apps/mobile/release/security-privacy-release-evidence.json");
-  const abusePenetrationRehearsalGate = readJson("apps/mobile/release/abuse-penetration-rehearsal-gate.json");
+  const securityPrivacyEvidence = readJson("release/product-gates/security-privacy-release-evidence.json");
+  const abusePenetrationRehearsalGate = readJson("release/product-gates/abuse-penetration-rehearsal-gate.json");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
@@ -17894,19 +17938,19 @@ test("릴리즈 보안 기준선은 제출 전 차단 항목을 고정한다", (
   assert.match(datapackSigningGate.readyWhenKo, /public keyring|rotation|revocation|rollback/i);
   assert.ok(datapackSigningGate.evidence.includes("manifest-signature-test-vector"));
   assert.ok(datapackSigningGate.evidence.includes("key-rotation-revocation-record"));
-  assert.ok(datapackSigningGate.linkedArtifacts.includes("apps/mobile/release/security-privacy-release-evidence.json"));
+  assert.ok(datapackSigningGate.linkedArtifacts.includes("release/product-gates/security-privacy-release-evidence.json"));
   const releaseArtifactScanGate = items.get("mobile_release_artifact_secret_trace_scan");
   assert.match(releaseArtifactScanGate.readyWhenKo, /provider key|signing private key|upload URL|receipt token|placeholder endpoint/i);
   assert.ok(releaseArtifactScanGate.evidence.includes("release-artifact-secret-scan-output"));
   assert.ok(releaseArtifactScanGate.evidence.includes("release-network-trace-review"));
   assert.ok(releaseArtifactScanGate.linkedArtifacts.includes(".github/workflows/release-artifacts.yml"));
-  assert.ok(releaseArtifactScanGate.linkedArtifacts.includes("apps/mobile/release/security-privacy-release-evidence.json"));
+  assert.ok(releaseArtifactScanGate.linkedArtifacts.includes("release/product-gates/security-privacy-release-evidence.json"));
   const abuseRehearsalItem = items.get("repository_abuse_penetration_rehearsal");
   assert.match(abuseRehearsalItem.readyWhenKo, /Android AAB|Play-generated APK|receipt|signed URL|CSRF|distributed rate limit|#1020/i);
   assert.ok(abuseRehearsalItem.evidence.includes("abuse-penetration-rehearsal-gate-manifest"));
   assert.ok(abuseRehearsalItem.evidence.includes("critical-high-finding-zero-or-waiver"));
-  assert.ok(abuseRehearsalItem.linkedArtifacts.includes("apps/mobile/release/abuse-penetration-rehearsal-gate.json"));
-  assert.equal(securityPrivacyEvidence.abusePenetrationRehearsalGate, "apps/mobile/release/abuse-penetration-rehearsal-gate.json");
+  assert.ok(abuseRehearsalItem.linkedArtifacts.includes("release/product-gates/abuse-penetration-rehearsal-gate.json"));
+  assert.equal(securityPrivacyEvidence.abusePenetrationRehearsalGate, "release/product-gates/abuse-penetration-rehearsal-gate.json");
   assert.equal(securityPrivacyEvidence.abusePenetrationRehearsal.criticalHighAllowed, 0);
   assert.ok(securityPrivacyEvidence.abusePenetrationRehearsal.requiredScenarios.includes("receipt_token_replay_and_status_abuse"));
   assert.ok(securityPrivacyEvidence.abusePenetrationRehearsal.requiredScenarios.includes("distributed_rate_limit_abuse"));
@@ -19198,7 +19242,7 @@ test("경로 분류기는 README를 문서 전용 변경으로 처리한다", as
   assert.equal(outputs.deploy, "false");
 });
 
-test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경을 구분한다", async () => {
+test("[gate-ownership] 경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경을 구분한다", async () => {
   const repository = await classifyChangedFiles([".github/ISSUE_TEMPLATE/task_request.yml"]);
   assert.equal(repository.repository, "true");
   assert.equal(repository.docs_only, "false");
@@ -19338,10 +19382,12 @@ test("경로 분류기는 저장소, 백엔드, 모바일, Android, iOS 변경�
     assert.equal(mobileTool.deploy, "false", `${mobileToolFile} must not raise the deploy gate`);
   }
 
-  const releaseGate = await classifyChangedFiles(["apps/mobile/release/release-governance-gate.json"]);
+  const releaseGate = await classifyChangedFiles(["release/product-gates/release-governance-gate.json"]);
   assert.equal(releaseGate.release, "true");
   assert.equal(releaseGate.contracts, "true");
-  assert.equal(releaseGate.mobile, "true");
+  assert.equal(releaseGate.mobile, "false");
+  assert.equal(releaseGate.android, "false");
+  assert.equal(releaseGate.ios, "false");
   // #2390: release 자산 변경은 repository=true여야 claim 스캔(contract test)이 스킵되지 않는다.
   assert.equal(releaseGate.repository, "true");
 });
@@ -20051,7 +20097,7 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   );
 
   const workflow = read(".github/workflows/datapack-expiry-alert.yml");
-  const policy = readJson("apps/mobile/release/datapack-freshness-sla.json");
+  const policy = readJson("release/product-gates/datapack-freshness-sla.json");
 
   assert.match(workflow, /^name: Data Pack Expiry Alert$/m);
   assert.match(workflow, /schedule:[\s\S]*cron: "23 \*\/4 \* \* \*"/);
@@ -20099,7 +20145,7 @@ test("데이터팩 만료 감시 workflow는 SLA 임계보다 촘촘한 cron으�
   // --policy를 명시하면 freshness SLA 경로와 일치해야 하고, 미명시라면 스크립트 기본값과 일치해야 한다.
   const policyFlagMatch = workflow.match(/--policy\s+"?([^"\s]+)"?/);
   if (policyFlagMatch) {
-    assert.equal(policyFlagMatch[1], "apps/mobile/release/datapack-freshness-sla.json");
+    assert.equal(policyFlagMatch[1], "release/product-gates/datapack-freshness-sla.json");
   }
   assert.equal(policy.monitoring.alertBeforePackExpiry, "PT6H");
 
@@ -20216,7 +20262,7 @@ test("KRIC source 후보 evidence workflow는 고정 allowlist와 sanitized arti
 });
 
 test("#1702 보행 프로필 프리셋 정책 JSON은 프리셋 계수·시설 제약·유형 매핑을 고정한다", () => {
-  const policyPath = "apps/mobile/release/mobility-profile-policy.json";
+  const policyPath = "release/product-gates/mobility-profile-policy.json";
   assert.equal(existsSync(path.join(root, policyPath)), true, "mobility-profile-policy JSON must exist");
 
   const policy = readJson(policyPath);
@@ -20247,7 +20293,7 @@ test("#1702 보행 프로필 프리셋 정책 JSON은 프리셋 계수·시설 �
 });
 
 test("#1702 backend ProfileWalkTimeCalculator enum은 정책 JSON 계수·매핑과 동기화된다", () => {
-  const policy = readJson("apps/mobile/release/mobility-profile-policy.json");
+  const policy = readJson("release/product-gates/mobility-profile-policy.json");
   const source = read("backend/src/main/java/com/easysubway/route/domain/ProfileWalkTimeCalculator.java");
 
   // backend는 정수 speedFactorPercent, JSON은 소수 speedFactor. Math.round(factor*100)로 상호 고정.
@@ -20295,7 +20341,7 @@ test("#1702 backend ProfileWalkTimeCalculator enum은 정책 JSON 계수·매핑
 });
 
 test("#1702 mobile 파생 상수 Dart는 정책 JSON 계수·매핑과 동기화된다", () => {
-  const policy = readJson("apps/mobile/release/mobility-profile-policy.json");
+  const policy = readJson("release/product-gates/mobility-profile-policy.json");
   const dartPath = "apps/mobile/lib/features/mobility_profile/mobility_profile_policy.dart";
   assert.equal(existsSync(path.join(root, dartPath)), true, "mobility_profile_policy.dart must exist");
   const dart = read(dartPath);
@@ -20358,7 +20404,7 @@ test("#1702 STANDARD 환승 parity 리포트는 재현 가능하고 ±10% 이내
     "--baseline",
     "tools/datapack/reports/baseline-ingestion-gate-report.json",
     "--policy",
-    "apps/mobile/release/mobility-profile-policy.json",
+    "release/product-gates/mobility-profile-policy.json",
     "--output",
     output,
   ], { cwd: root });

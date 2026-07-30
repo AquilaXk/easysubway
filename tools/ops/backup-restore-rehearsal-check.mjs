@@ -4,7 +4,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
 const root = process.cwd();
-const gatePath = path.join(root, "apps/mobile/release/backup-restore-rehearsal-gate.json");
+const gatePath = path.join(root, "release/product-gates/backup-restore-rehearsal-gate.json");
 const gate = JSON.parse(readFileSync(gatePath, "utf8"));
 
 const requiredTargetIds = [

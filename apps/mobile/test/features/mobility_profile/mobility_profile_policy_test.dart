@@ -5,13 +5,15 @@ import 'package:easysubway_mobile/features/mobility_profile/mobility_profile_pol
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  // apps/mobile/release/mobility-profile-policy.json의 JSON 계약이 단일 진실
+  // release/product-gates/mobility-profile-policy.json의 JSON 계약이 단일 진실
   // 원본이다(node 리포 계약 테스트에서도 검증). 이 테스트는 Dart 상수를 그
   // JSON에 고정해 둘이 서로 어긋나지 않게 한다.
   test('Dart 프리셋 상수는 release policy JSON과 동기화된다', () {
     final json =
         jsonDecode(
-              File('release/mobility-profile-policy.json').readAsStringSync(),
+              File(
+                '../../release/product-gates/mobility-profile-policy.json',
+              ).readAsStringSync(),
             )
             as Map<String, dynamic>;
 
@@ -80,7 +82,9 @@ void main() {
   test('Dart 이동 유형 매핑은 release policy JSON과 동기화된다', () {
     final json =
         jsonDecode(
-              File('release/mobility-profile-policy.json').readAsStringSync(),
+              File(
+                '../../release/product-gates/mobility-profile-policy.json',
+              ).readAsStringSync(),
             )
             as Map<String, dynamic>;
     final mapping = json['mobilityTypeMapping'] as Map<String, dynamic>;

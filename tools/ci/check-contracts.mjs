@@ -1,31 +1,13 @@
 #!/usr/bin/env node
 import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join, relative, resolve } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
 import { validateLedger } from "../repo/issue-migration-ledger.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
-const DATAPACK_MANIFEST_SCHEMA_PATH = "contracts/datapack/datapack-manifest.schema.json";
-const DATAPACK_INDEX_SCHEMA_PATH = "contracts/datapack/datapack-index.schema.json";
-const DATAPACK_COMPATIBILITY_MATRIX_PATH = "contracts/datapack/compatibility-matrix.json";
-const DATAPACK_INDEX_PATH = "apps/mobile/assets/datapacks/index.json";
-const RELEASE_GATE_INDEX_PATH = "contracts/release/gate-index.json";
-const RELEASE_GATE_DIRECTORY = "apps/mobile/release";
-const SOURCE_INVENTORY_PATH = "apps/mobile/assets/datapacks/source-inventory.json";
-const SOURCE_INVENTORY_SCHEMA_PATH = "contracts/datapack/source-inventory.schema.json";
-const SOURCE_GOVERNANCE_POLICY_PATH = "tools/datapack/source-governance-policy.json";
-const CANONICAL_NUMBER_CONTRACT_SCHEMA_PATH = "contracts/datapack/canonical-number-contract.schema.json";
-const CANONICAL_NUMBER_CONTRACT_PATH = "contracts/datapack/canonical-number-contract.json";
-const FRESHNESS_POLICY_PATH = "apps/mobile/release/datapack-freshness-sla.json";
-const PACK_APP_SCHEMA_PARITY_ALLOWLIST_PATH = "contracts/datapack/pack-app-schema-parity-allowlist.json";
-const PACK_APP_SCHEMA_PARITY_ALLOWLIST_SCHEMA_PATH =
-  "contracts/datapack/pack-app-schema-parity-allowlist.schema.json";
-const CATALOG_RAW_SQL_TABLES_PATH = "contracts/datapack/catalog-raw-sql-tables.json";
-const CATALOG_RAW_SQL_TABLES_SCHEMA_PATH = "contracts/datapack/catalog-raw-sql-tables.schema.json";
-const REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH = "contracts/repository-split-issues.schema.json";
-const REPOSITORY_SPLIT_ISSUES_PATH = "release/migrations/repository-split-issues.json";
+const DEFAULT_WORKSPACE_PATH = "contracts/workspaces/hub.json";
 const EXTRACTION_REPOSITORIES = {
   data: "AquilaXk/easysubway-data",
   platform: "AquilaXk/easysubway-platform",
@@ -37,53 +19,106 @@ export function loadJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
 }
 
-export function collectContractErrors() {
+export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
+  const absoluteWorkspacePath = resolve(workspacePath);
+  if (!existsSync(absoluteWorkspacePath)) throw new Error(`${workspacePath}: workspace 누락`);
+  let workspace;
+  try {
+    workspace = loadJson(absoluteWorkspacePath);
+  } catch {
+    throw new Error(`${workspacePath}: 유효한 JSON이 필요하다`);
+  }
+  if (workspace == null || typeof workspace !== "object" || Array.isArray(workspace)) {
+    throw new Error(`${workspacePath}: 객체가 필요하다`);
+  }
+  const required = ["contracts", "gateDirectories", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy"];
+  for (const field of required) {
+    if (!Object.hasOwn(workspace, field)) throw new Error(`${workspacePath}: ${field} 필수`);
+  }
+  if (workspace.gateDirectories == null || typeof workspace.gateDirectories !== "object" || Array.isArray(workspace.gateDirectories)) {
+    throw new Error(`${workspacePath}: gateDirectories 객체가 필요하다`);
+  }
+  for (const ownerComponent of ["hub", "mobile"]) {
+    if (typeof workspace.gateDirectories[ownerComponent] !== "string" || workspace.gateDirectories[ownerComponent].trim() === "") {
+      throw new Error(`${workspacePath}: gateDirectories.${ownerComponent} 필수`);
+    }
+  }
+  for (const field of ["contracts", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy"]) {
+    if (typeof workspace[field] !== "string" || workspace[field].trim() === "") {
+      throw new Error(`${workspacePath}: ${field}은 비어 있지 않은 경로가 필요하다`);
+    }
+  }
+  const workspaceDirectory = dirname(absoluteWorkspacePath);
+  const resolveWorkspacePath = (value) => relative(process.cwd(), resolve(workspaceDirectory, value)) || ".";
+  return {
+    contracts: resolveWorkspacePath(workspace.contracts),
+    gateDirectories: Object.fromEntries(Object.entries(workspace.gateDirectories).map(
+      ([ownerComponent, directory]) => [ownerComponent, resolveWorkspacePath(directory)],
+    )),
+    datapackIndex: resolveWorkspacePath(workspace.datapackIndex),
+    sourceInventory: resolveWorkspacePath(workspace.sourceInventory),
+    governancePolicy: resolveWorkspacePath(workspace.governancePolicy),
+    freshnessPolicy: resolveWorkspacePath(workspace.freshnessPolicy),
+  };
+}
+
+export function collectContractErrors(workspacePath = DEFAULT_WORKSPACE_PATH) {
   const errors = [];
-  validateJson("contracts/datapack/datapack-index.schema.json", "apps/mobile/assets/datapacks/index.json", errors);
+  let workspace;
+  try {
+    workspace = loadWorkspace(workspacePath);
+  } catch (error) {
+    errors.push(error instanceof Error ? error.message : String(error));
+    return errors;
+  }
+  const contract = (path) => join(workspace.contracts, path);
+  const repositoryRoot = dirname(workspace.contracts);
+  validateJson(contract("datapack/datapack-index.schema.json"), workspace.datapackIndex, errors);
   validateJson(
-    "contracts/datapack/source-inventory.schema.json",
-    SOURCE_INVENTORY_PATH,
+    contract("datapack/source-inventory.schema.json"),
+    workspace.sourceInventory,
     errors,
   );
   validateJson(
-    "contracts/datapack/source-governance-policy.schema.json",
-    SOURCE_GOVERNANCE_POLICY_PATH,
+    contract("datapack/source-governance-policy.schema.json"),
+    workspace.governancePolicy,
     errors,
   );
   validateJson(
-    CANONICAL_NUMBER_CONTRACT_SCHEMA_PATH,
-    CANONICAL_NUMBER_CONTRACT_PATH,
+    contract("datapack/canonical-number-contract.schema.json"),
+    contract("datapack/canonical-number-contract.json"),
     errors,
   );
   validateJson(
-    PACK_APP_SCHEMA_PARITY_ALLOWLIST_SCHEMA_PATH,
-    PACK_APP_SCHEMA_PARITY_ALLOWLIST_PATH,
+    contract("datapack/pack-app-schema-parity-allowlist.schema.json"),
+    contract("datapack/pack-app-schema-parity-allowlist.json"),
     errors,
   );
-  validateJson(CATALOG_RAW_SQL_TABLES_SCHEMA_PATH, CATALOG_RAW_SQL_TABLES_PATH, errors);
+  validateJson(contract("datapack/catalog-raw-sql-tables.schema.json"), contract("datapack/catalog-raw-sql-tables.json"), errors);
   const repositorySplitIssueLedgerValid = validateJson(
-    REPOSITORY_SPLIT_ISSUES_SCHEMA_PATH,
-    REPOSITORY_SPLIT_ISSUES_PATH,
+    contract("repository-split-issues.schema.json"),
+    join(repositoryRoot, "release/migrations/repository-split-issues.json"),
     errors,
   );
   if (repositorySplitIssueLedgerValid) {
-    errors.push(...validateRepositorySplitIssueLedger(loadJson(REPOSITORY_SPLIT_ISSUES_PATH)).map(
-      (error) => `${REPOSITORY_SPLIT_ISSUES_PATH}: ${error}`,
+    const repositorySplitIssuesPath = join(repositoryRoot, "release/migrations/repository-split-issues.json");
+    errors.push(...validateRepositorySplitIssueLedger(loadJson(repositorySplitIssuesPath)).map(
+      (error) => `${repositorySplitIssuesPath}: ${error}`,
     ));
   }
-  if (!existsSync(FRESHNESS_POLICY_PATH)) errors.push(`${FRESHNESS_POLICY_PATH} 누락`);
-  if ([SOURCE_INVENTORY_PATH, SOURCE_GOVERNANCE_POLICY_PATH, FRESHNESS_POLICY_PATH].every(existsSync)) {
+  if (!existsSync(workspace.freshnessPolicy)) errors.push(`${workspace.freshnessPolicy} 누락`);
+  if ([workspace.sourceInventory, workspace.governancePolicy, workspace.freshnessPolicy].every(existsSync)) {
     validateSourceGovernanceContracts({
-      inventory: loadJson(SOURCE_INVENTORY_PATH),
-      governancePolicy: loadJson(SOURCE_GOVERNANCE_POLICY_PATH),
-      freshnessPolicy: loadJson(FRESHNESS_POLICY_PATH),
+      inventory: loadJson(workspace.sourceInventory),
+      governancePolicy: loadJson(workspace.governancePolicy),
+      freshnessPolicy: loadJson(workspace.freshnessPolicy),
     }, errors);
   }
-  validateBoundaries(errors);
-  validateOpenApiFixtures(errors);
-  validateCompatibilityMatrix(errors);
-  validateGateIndex(errors);
-  validateEnvScopeMap(errors);
+  validateBoundaries(errors, contract("boundaries.json"));
+  validateOpenApiFixtures(errors, workspace.contracts);
+  validateCompatibilityMatrix(errors, contract("datapack/compatibility-matrix.json"), workspace.datapackIndex);
+  validateGateIndex(errors, contract("release/gate-index.json"), workspace.gateDirectories);
+  validateEnvScopeMap(errors, join(workspace.contracts, "env/env-scope-map.json"), join(repositoryRoot, ".env.example"));
   return errors;
 }
 
@@ -129,9 +164,19 @@ export function validateJson(schemaPath, valuePath, errors) {
   }
   const result = validateSchema(schema, value);
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
-  if (schemaPath === DATAPACK_MANIFEST_SCHEMA_PATH) validateDatapackManifest(value, valuePath, errors);
-  if (schemaPath === DATAPACK_INDEX_SCHEMA_PATH) validateDatapackIndex(value, valuePath, errors);
-  if (schemaPath === SOURCE_INVENTORY_SCHEMA_PATH) validateSourceInventory(value, valuePath, errors);
+  switch (basename(schemaPath)) {
+    case "datapack-manifest.schema.json":
+      validateDatapackManifest(value, valuePath, errors);
+      break;
+    case "datapack-index.schema.json":
+      validateDatapackIndex(value, valuePath, errors);
+      break;
+    case "source-inventory.schema.json":
+      validateSourceInventory(value, valuePath, errors);
+      break;
+    default:
+      break;
+  }
   return result.errors.length === 0;
 }
 
@@ -230,9 +275,9 @@ export function validateDatapackManifest(manifest, valuePath, errors) {
   }
 }
 
-function validateBoundaries(errors) {
-  if (!existsSync("contracts/boundaries.json")) return;
-  errors.push(...validateBoundariesPayload(loadJson("contracts/boundaries.json")));
+function validateBoundaries(errors, boundariesPath) {
+  if (!existsSync(boundariesPath)) return;
+  errors.push(...validateBoundariesPayload(loadJson(boundariesPath)));
 }
 
 export function validateBoundariesPayload(boundaries) {
@@ -315,8 +360,9 @@ function requiredStringArray(targetName, target, field, errors) {
   return value;
 }
 
-function validateOpenApiFixtures(errors) {
-  if (!existsSync("contracts/api")) return;
+function validateOpenApiFixtures(errors, contractsDirectory) {
+  const apiDirectory = join(contractsDirectory, "api");
+  if (!existsSync(apiDirectory)) return;
   const fixtures = [
     "report-upload-intent.created.json",
     "report-create.created.json",
@@ -326,13 +372,14 @@ function validateOpenApiFixtures(errors) {
     "realtime-train-positions.ok.json",
   ];
   for (const fixture of fixtures) {
-    if (!existsSync(join("contracts/api/fixtures", fixture))) errors.push(`contracts/api/fixtures/${fixture} 누락`);
+    if (!existsSync(join(apiDirectory, "fixtures", fixture))) errors.push(`${join(apiDirectory, "fixtures", fixture)} 누락`);
   }
-  for (const [docPath, paths] of Object.entries({
-    "contracts/api/report-api.openapi.yaml": ["/api/v1/report-uploads", "/api/v1/reports", "/api/v1/reports/{reportId}"],
-    "contracts/api/realtime-api.openapi.yaml": ["/api/v1/realtime/arrivals", "/api/v1/realtime/train-positions"],
-    "contracts/api/train-api.openapi.yaml": ["/api/v1/trains/stations", "/api/v1/trains/search"],
+  for (const [file, paths] of Object.entries({
+    "report-api.openapi.yaml": ["/api/v1/report-uploads", "/api/v1/reports", "/api/v1/reports/{reportId}"],
+    "realtime-api.openapi.yaml": ["/api/v1/realtime/arrivals", "/api/v1/realtime/train-positions"],
+    "train-api.openapi.yaml": ["/api/v1/trains/stations", "/api/v1/trains/search"],
   })) {
+    const docPath = join(apiDirectory, file);
     if (!existsSync(docPath)) {
       errors.push(`${docPath} 누락`);
       continue;
@@ -344,14 +391,14 @@ function validateOpenApiFixtures(errors) {
   }
 }
 
-function validateCompatibilityMatrix(errors) {
-  if (!existsSync(DATAPACK_COMPATIBILITY_MATRIX_PATH)) return;
-  if (!existsSync(DATAPACK_INDEX_PATH)) {
-    errors.push(`${DATAPACK_INDEX_PATH} 누락`);
+function validateCompatibilityMatrix(errors, matrixPath, indexPath) {
+  if (!existsSync(matrixPath)) return;
+  if (!existsSync(indexPath)) {
+    errors.push(`${indexPath} 누락`);
     return;
   }
-  const matrix = loadJson(DATAPACK_COMPATIBILITY_MATRIX_PATH);
-  const index = loadJson(DATAPACK_INDEX_PATH);
+  const matrix = loadJson(matrixPath);
+  const index = loadJson(indexPath);
   validateCompatibilityMatrixPayload(matrix, index, errors);
 }
 
@@ -361,36 +408,51 @@ export function validateCompatibilityMatrixPayload(matrix, index, errors) {
   }
 }
 
-function validateGateIndex(errors) {
-  if (!existsSync(RELEASE_GATE_INDEX_PATH)) return;
-  if (!existsSync(RELEASE_GATE_DIRECTORY)) {
-    errors.push(`${RELEASE_GATE_DIRECTORY} 디렉터리 누락`);
+export function validateGateIndex(errors, indexPath, gateDirectories) {
+  if (!existsSync(indexPath)) {
+    errors.push(`${indexPath} 누락`);
     return;
   }
-  const index = loadJson(RELEASE_GATE_INDEX_PATH);
-  const actual = readdirSync(RELEASE_GATE_DIRECTORY).filter((file) => file.endsWith(".json")).sort(compareText);
-  const indexed = (index.gates ?? []).map((gate) => gate.file).sort(compareText);
-  if (JSON.stringify(actual) !== JSON.stringify(indexed)) {
-    errors.push("contracts/release/gate-index.json: apps/mobile/release 실물과 1:1 대응하지 않는다");
-  }
+  const index = loadJson(indexPath);
+  const ownerComponents = { product: "hub", mobile: "mobile" };
+  const files = new Set();
   for (const gate of index.gates ?? []) {
-    if (!["mobile", "product"].includes(gate.scope)) {
-      errors.push(`contracts/release/gate-index.json: ${gate.file} scope 불량`);
+    if (files.has(gate.file)) errors.push(`${indexPath}: ${gate.file} gate.file 중복`);
+    files.add(gate.file);
+    const ownerComponent = ownerComponents[gate.scope];
+    if (ownerComponent === undefined) {
+      errors.push(`${indexPath}: ${gate.file} scope 불량`);
+    } else if (gate.ownerComponent !== ownerComponent) {
+      errors.push(`${indexPath}: ${gate.file} ownerComponent 불량`);
+    }
+  }
+  for (const [ownerComponent, directory] of Object.entries(gateDirectories)) {
+    if (!existsSync(directory)) {
+      errors.push(`${directory} 디렉터리 누락`);
+      continue;
+    }
+    const actual = readdirSync(directory).filter((file) => file.endsWith(".json")).sort(compareText);
+    const indexed = (index.gates ?? [])
+      .filter((gate) => gate.ownerComponent === ownerComponent)
+      .map((gate) => gate.file)
+      .sort(compareText);
+    if (JSON.stringify(actual) !== JSON.stringify(indexed)) {
+      errors.push(`${indexPath}: ${ownerComponent} gate 디렉터리 실물과 1:1 대응하지 않는다`);
     }
   }
 }
 
-function validateEnvScopeMap(errors) {
-  if (!existsSync("contracts/env/env-scope-map.json") || !existsSync(".env.example")) return;
-  const map = loadJson("contracts/env/env-scope-map.json");
-  const envKeys = readFileSync(".env.example", "utf8")
+function validateEnvScopeMap(errors, mapPath, envExamplePath) {
+  if (!existsSync(mapPath) || !existsSync(envExamplePath)) return;
+  const map = loadJson(mapPath);
+  const envKeys = readFileSync(envExamplePath, "utf8")
     .split(/\r?\n/)
     .filter((line) => line && !line.startsWith("#"))
     .map((line) => line.split("=", 1)[0])
     .sort(compareText);
   const mapped = Object.keys(map.keys ?? {}).sort(compareText);
   if (JSON.stringify(envKeys) !== JSON.stringify(mapped)) {
-    errors.push("contracts/env/env-scope-map.json: .env.example 키 집합과 다르다");
+    errors.push(`${mapPath}: .env.example 키 집합과 다르다`);
   }
 }
 
@@ -399,7 +461,12 @@ function compareText(left, right) {
 }
 
 if (isMainModule(import.meta.url)) {
-  const errors = collectContractErrors();
+  const args = process.argv.slice(2);
+  if (args.length !== 2 || args[0] !== "--workspace" || args[1].trim() === "") {
+    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json>");
+    process.exit(1);
+  }
+  const errors = collectContractErrors(args[1]);
   if (errors.length) {
     console.error(errors.map((error) => `- ${error}`).join("\n"));
     process.exit(1);

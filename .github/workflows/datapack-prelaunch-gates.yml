@@ -92,7 +92,7 @@ jobs:
           node tools/datapack/validate-source-snapshot-freshness.mjs \
             --build-spec tools/datapack/release/candidate-build-spec.json \
             --inventory tools/datapack/source-inventory.json \
-            --policy apps/mobile/release/datapack-freshness-sla.json \
+            --policy release/product-gates/datapack-freshness-sla.json \
             --governance-policy tools/datapack/source-governance-policy.json \
             --evaluation-at "${EVALUATED_AT}" \
             > "${EVIDENCE_DIR}/source-validation.json"

@@ -33,10 +33,10 @@ function execFileAsync(file, args, options) {
   return rawExecFileAsync(file, resolvedArgs, options);
 }
 const observabilityGate = JSON.parse(
-  readFileSync(path.join(root, "apps/mobile/release/operations-observability-gate.json"), "utf8"),
+  readFileSync(path.join(root, "release/product-gates/operations-observability-gate.json"), "utf8"),
 );
 const postLaunchGate = JSON.parse(
-  readFileSync(path.join(root, "apps/mobile/release/post-launch-operations-review-gate.json"), "utf8"),
+  readFileSync(path.join(root, "release/product-gates/post-launch-operations-review-gate.json"), "utf8"),
 );
 // Validator unit cases exercise a hypothetical gate after the required fixed-release rehearsal.
 postLaunchGate.preLaunchReadiness.status = "PASS";
@@ -62,7 +62,7 @@ validatorPostLaunchGatePath = path.join(
 );
 writeFileSync(validatorPostLaunchGatePath, `${JSON.stringify(postLaunchGate, null, 2)}\n`);
 const supportGate = JSON.parse(
-  readFileSync(path.join(root, "apps/mobile/release/support-incident-response-gate.json"), "utf8"),
+  readFileSync(path.join(root, "release/product-gates/support-incident-response-gate.json"), "utf8"),
 );
 
 const artifactIdentity = {

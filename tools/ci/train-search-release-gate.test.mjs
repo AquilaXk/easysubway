@@ -918,7 +918,7 @@ test("capacity 응답 계약은 실제 OD·날짜·열차종·운임을 검증�
 });
 
 test("capacity validator는 OD·날짜와 required CI를 fail-closed로 검증한다", () => {
-  const runtime = readJson("apps/mobile/release/train-search-itx-exclusion-gate.json").issue2094RuntimeEvidence;
+  const runtime = readJson("release/product-gates/train-search-itx-exclusion-gate.json").issue2094RuntimeEvidence;
   const directory = mkdtempSync(path.join(tmpdir(), "train-capacity-validator-"));
   const candidateGitSha = runtime.candidateGitSha;
   const args = [
@@ -993,7 +993,7 @@ test("capacity validator는 OD·날짜와 required CI를 fail-closed로 검증�
 });
 
 test("#2094 release artifact는 동일 candidate와 모든 완료 증거를 요구한다", () => {
-  const gate = readJson("apps/mobile/release/train-search-itx-exclusion-gate.json");
+  const gate = readJson("release/product-gates/train-search-itx-exclusion-gate.json");
   const runtime = gate.issue2094RuntimeEvidence;
   const { liveEvidenceSha256, ...unsignedRuntime } = runtime;
 
