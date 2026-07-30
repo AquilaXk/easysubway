@@ -11,8 +11,9 @@ void main() {
   test('Dart 프리셋 상수는 release policy JSON과 동기화된다', () {
     final json =
         jsonDecode(
-              File('../../release/product-gates/mobility-profile-policy.json')
-                  .readAsStringSync(),
+              File(
+                '../../release/product-gates/mobility-profile-policy.json',
+              ).readAsStringSync(),
             )
             as Map<String, dynamic>;
 
@@ -81,8 +82,9 @@ void main() {
   test('Dart 이동 유형 매핑은 release policy JSON과 동기화된다', () {
     final json =
         jsonDecode(
-              File('../../release/product-gates/mobility-profile-policy.json')
-                  .readAsStringSync(),
+              File(
+                '../../release/product-gates/mobility-profile-policy.json',
+              ).readAsStringSync(),
             )
             as Map<String, dynamic>;
     final mapping = json['mobilityTypeMapping'] as Map<String, dynamic>;
