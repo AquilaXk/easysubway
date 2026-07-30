@@ -1,5 +1,5 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "areas": {
     "mobile": { "roots": ["apps/mobile"] },
     "backend": { "roots": ["backend"] },
@@ -13,7 +13,33 @@
     "ci": { "roots": [".github/workflows", "tools/ci", "tools/repo"] },
     "contracts": { "roots": ["contracts"] }
   },
-  "splitOrder": ["datapack", "infra", "backend", "mobile"],
+  "extractionTargets": {
+    "data": {
+      "repository": "AquilaXk/easysubway-data",
+      "sourceAreas": ["datapack"],
+      "ownedRoots": ["tools/route-map"],
+      "partialRoots": ["tools/routes"]
+    },
+    "platform": {
+      "repository": "AquilaXk/easysubway-platform",
+      "sourceAreas": ["infra"],
+      "ownedRoots": ["tools/deploy"],
+      "partialRoots": ["tools/ops"]
+    },
+    "backend": {
+      "repository": "AquilaXk/easysubway-backend",
+      "sourceAreas": ["backend"],
+      "ownedRoots": ["tools/qa"],
+      "partialRoots": ["tools/routes", "tools/realtime", "tools/security"]
+    },
+    "mobile": {
+      "repository": "AquilaXk/easysubway-mobile",
+      "sourceAreas": ["mobile"],
+      "ownedRoots": ["tools/mobile"],
+      "partialRoots": ["tools/release", "tools/security"]
+    }
+  },
+  "splitOrder": ["data", "platform", "backend", "mobile"],
   "forbiddenReferences": [
     {
       "from": "apps/mobile/lib",

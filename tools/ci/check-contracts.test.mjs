@@ -331,9 +331,13 @@ test("route map admission evidence는 승인 필드 외 값을 거부한다", ()
 test("boundaries.json이 스스로 정합하다", () => {
   const boundaries = loadJson("contracts/boundaries.json");
 
-  assert.equal(boundaries.schemaVersion, 1);
-  for (const area of boundaries.splitOrder) {
-    assert.ok(area in boundaries.areas, `splitOrder의 ${area}가 areas에 없다`);
+  assert.equal(boundaries.schemaVersion, 2);
+  for (const targetName of boundaries.splitOrder) {
+    const target = boundaries.extractionTargets[targetName];
+    assert.ok(target, `splitOrder의 ${targetName} extraction target이 없다`);
+    for (const area of target.sourceAreas) {
+      assert.ok(area in boundaries.areas, `${targetName}의 ${area} area가 없다`);
+    }
   }
 });
 
