@@ -84,8 +84,15 @@ jobs:
               "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/release-artifacts.yml/runs?head_sha=${deploy_sha}&branch=main&event=push&status=success&per_page=20"
             producer_run_id=""
             if validated_run="$(node tools/ci/require-successful-workflow-run.mjs \
-              "${producer_runs}" "${deploy_sha}" "Release Artifacts" "push" main 1209600 2>/dev/null)"; then
+              "${producer_runs}" "${deploy_sha}" "Release Artifacts" "push" main 1209600)"; then
               producer_run_id="${validated_run#validated_workflow_run_id=}"
+            else
+              run_status="$?"
+              if (( run_status == 3 )); then
+                :
+              else
+                exit "${run_status}"
+              fi
             fi
             if [[ -n "${producer_run_id}" ]]; then
               artifact_name="easysubway-backend-release-${deploy_sha}"

@@ -26,10 +26,10 @@ function successfulRun(overrides = {}) {
   };
 }
 
-async function invoke(workflowRuns) {
+async function invoke(workflowRuns, totalCount = Array.isArray(workflowRuns) ? workflowRuns.length : 0) {
   const dir = await mkdtemp(path.join(tmpdir(), "easysubway-workflow-run-"));
   const responsePath = path.join(dir, "response.json");
-  await writeFile(responsePath, JSON.stringify({ workflow_runs: workflowRuns }));
+  await writeFile(responsePath, JSON.stringify({ total_count: totalCount, workflow_runs: workflowRuns }));
   try {
     return await execFileAsync(
       "node",
@@ -59,7 +59,20 @@ test("exact SHA의 completed/success workflow run만 승인한다", async () => 
   assert.equal(dispatchResult.stderr, "");
 });
 
-test("workflow identity나 성공 상태가 다르면 fail closed한다", async () => {
+test("workflow run이 없거나 유효 기간이 지났을 때만 unavailable로 구분한다", async () => {
+  for (const workflowRuns of [
+    [],
+    [successfulRun({ updated_at: new Date(Date.now() - 3_601_000).toISOString() })],
+  ]) {
+    await assert.rejects(invoke(workflowRuns), (error) => {
+      assert.equal(error.code, 3);
+      assert.match(error.stderr, /required successful workflow run is unavailable/);
+      return true;
+    });
+  }
+});
+
+test("workflow run evidence가 malformed 또는 identity 불일치면 trust failure로 중단한다", async () => {
   for (const mismatch of [
     { head_sha: "b".repeat(40) },
     { name: "CI" },
@@ -67,12 +80,21 @@ test("workflow identity나 성공 상태가 다르면 fail closed한다", async 
     { event: "pull_request" },
     { status: "in_progress" },
     { conclusion: "failure" },
-    { updated_at: new Date(Date.now() - 3_601_000).toISOString() },
+    { id: "123456" },
     { updated_at: "not-a-timestamp" },
   ]) {
-    await assert.rejects(
-      invoke([successfulRun(mismatch)]),
-      /required successful workflow run was not found/,
-    );
+    await assert.rejects(invoke([successfulRun(mismatch)]), (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /workflow runs response is inconsistent/);
+      return true;
+    });
+  }
+
+  for (const args of [[null], [[successfulRun()], 2]]) {
+    await assert.rejects(invoke(...args), (error) => {
+      assert.equal(error.code, 1);
+      assert.match(error.stderr, /workflow runs response is inconsistent/);
+      return true;
+    });
   }
 });

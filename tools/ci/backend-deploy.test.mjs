@@ -808,6 +808,8 @@ test("CD는 exact Release Artifacts run의 backend digest만 배포한다", asyn
     /steps\.changes\.outputs\.deploy == 'true' && steps\.target\.outputs\.rollback_image_digest == ''/,
   );
   assert.match(workflow, /require-successful-workflow-run\.mjs/);
+  assert.match(workflow, /run_status == 3/);
+  assert.match(workflow, /exit "\$\{run_status\}"/);
   assert.match(workflow, /actions\/runs\/\$\{producer_run_id\}\/artifacts\?name=\$\{artifact_name\}&per_page=100/);
   assert.match(workflow, /require-workflow-artifact\.mjs/);
   assert.match(workflow, /artifact_status == 3/);
