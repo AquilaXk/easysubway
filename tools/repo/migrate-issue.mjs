@@ -46,14 +46,6 @@ export function parseArguments(argv) {
       if (values[key] !== undefined || value === undefined || value.startsWith("--")) throw new Error(argument === "--source-issue" ? "exactly one --source-issue is required" : `${argument} must appear exactly once with a value`);
       values[key] = value;
     }
-    else if (argument === "--verify-transfer") {
-      const value = argv[++index];
-      if (values.mode || value === undefined || value.startsWith("--")) {
-        throw new Error("choose exactly one execution mode");
-      }
-      values.mode = "verify-transfer";
-      values.targetUrl = value;
-    }
     else if (argument === "--dry-run" || argument === "--execute") {
       if (values.mode) throw new Error("choose exactly one execution mode");
       values.mode = argument.slice(2);
@@ -68,13 +60,7 @@ export function parseArguments(argv) {
   if (values.mode === "execute" && (!values.confirmSource || !values.confirmTarget)) {
     throw new Error("--execute requires both confirmations");
   }
-  return {
-    ledgerPath: values.ledgerPath,
-    sourceIssue: Number(values.sourceIssue),
-    mode: values.mode,
-    ...(values.targetUrl === undefined ? {} : { targetUrl: values.targetUrl }),
-    confirmations: { source: values.confirmSource, target: values.confirmTarget },
-  };
+  return { ledgerPath: values.ledgerPath, sourceIssue: Number(values.sourceIssue), mode: values.mode, confirmations: { source: values.confirmSource, target: values.confirmTarget } };
 }
 
 export function validateMigrationLedger({ ledger, schema }) {
@@ -87,18 +73,6 @@ export async function runMigration({ arguments_, ledger, schema, execGh }) {
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === arguments_.sourceIssue);
   if (!entry) throw new Error("source issue is not in the ledger");
   if (arguments_.mode === "dry-run") return preflightIssueTransfer({ entry, execGh });
-  if (arguments_.mode === "verify-transfer") {
-    const details = await preflightDetails({ entry, execGh });
-    return verifyTransferredIssue({
-      entry,
-      transferResult: {
-        sourceUrl: entry.sourceUrl,
-        expectedMetadata: details.source,
-        redirectedIssue: transferredIssueFromUrl(arguments_.targetUrl, entry.targetRepository),
-      },
-      execGh,
-    });
-  }
   const transferResult = await executeIssueTransfer({
     entry,
     confirmations: arguments_.confirmations,
@@ -131,7 +105,7 @@ export async function executeIssueTransfer({ entry, confirmations, execGh }) {
       redirectedIssue: transferredIssueFromUrl(output.trim(), entry.targetRepository),
     };
   } catch {
-    const indeterminate = new Error("issue transfer response is indeterminate; use --verify-transfer with the exact target URL before retrying");
+    const indeterminate = new Error("issue transfer response is indeterminate; do not retry without confirming the exact target issue");
     indeterminate.transferIndeterminate = true;
     throw indeterminate;
   }

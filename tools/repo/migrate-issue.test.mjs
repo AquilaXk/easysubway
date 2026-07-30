@@ -85,10 +85,6 @@ test("argument parser accepts exactly one source issue and one mode", () => {
     () => parseArguments(["--ledger", "ledger.json", "--source-issue", "2684", "--source-issue", "2685", "--dry-run"]),
     /exactly one --source-issue/,
   );
-  assert.deepEqual(
-    parseArguments(["--ledger", "ledger.json", "--source-issue", "2684", "--verify-transfer", TARGET_URL]),
-    { ledgerPath: "ledger.json", sourceIssue: 2684, mode: "verify-transfer", targetUrl: TARGET_URL, confirmations: { source: undefined, target: undefined } },
-  );
 });
 
 test("preflight fails closed before transfer for unsafe ledger and GitHub metadata", async (t) => {
@@ -228,23 +224,6 @@ test("completed transfer with failed verification reports a partial-success erro
       && error.transferCompleted === true,
   );
   assert.equal(transferCalls(fake.calls).length, 1);
-});
-
-test("an already transferred issue can be recovery-verified without another transfer", async () => {
-  const { ledger, schema } = migrationContract();
-  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
-  entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
-  const fake = fakeGh();
-
-  const verified = await runMigration({
-    arguments_: { sourceIssue: SOURCE_ISSUE, mode: "verify-transfer", targetUrl: TARGET_URL, confirmations: { source: undefined, target: undefined } },
-    ledger,
-    schema,
-    execGh: fake.execGh,
-  });
-
-  assert.equal(verified.targetUrl, TARGET_URL);
-  assert.equal(transferCalls(fake.calls).length, 0);
 });
 
 test("unconfirmed transfer response reports an indeterminate result", async () => {
