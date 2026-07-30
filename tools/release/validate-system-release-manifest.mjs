@@ -32,6 +32,8 @@ export function validateSystemReleaseManifest({ manifest, componentSchema, syste
   }
 
   const components = slots.map((slot) => manifest[slot]).filter(Boolean);
+  if (!Number.isSafeInteger(manifest.mobile?.artifactIdentity?.versionCode)) errors.push("mobile: versionCode must be a safe integer");
+  if (!Number.isSafeInteger(manifest.data?.artifactIdentity?.releaseSequence)) errors.push("data: releaseSequence must be a safe integer");
   if (new Set(components.map((component) => component.component)).size !== components.length) errors.push("system: duplicate component name");
   if (manifest.mobile?.artifactIdentity?.bundledDataManifestSha256 !== manifest.data?.artifactIdentity?.manifestSha256) errors.push("system: mobile/data manifest hash mismatch");
   if (manifest.backend?.artifactIdentity?.imageDigest !== manifest.platform?.artifactIdentity?.deployedImageDigest) errors.push("system: backend/platform image digest mismatch");

@@ -3,7 +3,8 @@
 import { createHash } from "node:crypto";
 import { execFileSync } from "node:child_process";
 import {
-  closeSync, existsSync, mkdirSync, mkdtempSync, openSync, readFileSync, rmSync, statSync, writeFileSync,
+  closeSync, existsSync, lstatSync, mkdirSync, mkdtempSync, openSync, readFileSync, realpathSync, renameSync,
+  rmSync, statSync, writeFileSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -236,7 +237,7 @@ const candidateContext = {
 };
 
 if (requestedPhase === "CANDIDATE") {
-  writeManifest(outputPath, candidateContext);
+  writeManifest(outputPath, candidateContext, "--output");
   process.exit(0);
 }
 
@@ -341,16 +342,50 @@ const manifest = {
 };
 
 const systemReleaseManifest = buildSystemReleaseManifest(manifest, systemReleaseInputs);
-writeManifest(outputPath, manifest);
-writeManifest(systemReleaseInputs.outputPath, systemReleaseManifest);
+writeManifest(outputPath, manifest, "--output");
+writeManifest(systemReleaseInputs.outputPath, systemReleaseManifest, "--system-release-output");
 
 if (failOnBlocked && blockers.length > 0) {
   fail(`RC evidence manifest is blocked: ${blockers.map((blocker) => blocker.id).join(", ")}`);
 }
 
-function writeManifest(filePath, value) {
-  mkdirSync(path.dirname(filePath), { recursive: true });
-  writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+function outputDestination(filePath, label) {
+  const parent = path.dirname(filePath);
+  mkdirSync(parent, { recursive: true });
+  const existing = lstatSync(filePath, { throwIfNoEntry: false });
+  if (existing?.isSymbolicLink()) fail(`${label} must not be a symlink`);
+  return { canonicalPath: path.join(realpathSync(parent), path.basename(filePath)), existing };
+}
+
+function writeManifest(filePath, value, label) {
+  outputDestination(filePath, label);
+  const parent = path.dirname(filePath);
+  let descriptor;
+  let temporaryPath;
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    temporaryPath = path.join(parent, `.${path.basename(filePath)}.tmp-${process.pid}-${attempt}`);
+    try {
+      descriptor = openSync(temporaryPath, "wx", 0o600);
+      break;
+    } catch (error) {
+      if (error.code !== "EEXIST") throw error;
+    }
+  }
+  if (descriptor === undefined) fail(`${label} temporary file is unavailable`);
+  try {
+    writeFileSync(descriptor, `${JSON.stringify(value, null, 2)}\n`);
+    closeSync(descriptor);
+    descriptor = undefined;
+    renameSync(temporaryPath, filePath);
+  } catch (error) {
+    if (descriptor !== undefined) {
+      try {
+        closeSync(descriptor);
+      } catch {}
+    }
+    rmSync(temporaryPath, { force: true });
+    throw error;
+  }
 }
 
 function readSystemReleaseInputs() {
@@ -379,7 +414,16 @@ function readSystemReleaseInputs() {
   const output = arg("systemReleaseOutput", "system-release-output");
   if (!output) fail("FINAL phase requires --system-release-output");
   const systemReleaseOutputPath = resolvePath(output);
-  if (systemReleaseOutputPath === outputPath) fail("--system-release-output must differ from --output");
+  const legacyOutput = outputDestination(outputPath, "--output");
+  const systemOutput = outputDestination(systemReleaseOutputPath, "--system-release-output");
+  if (legacyOutput.canonicalPath === systemOutput.canonicalPath) fail("--system-release-output must differ from --output");
+  if (
+    legacyOutput.existing?.isFile() && systemOutput.existing?.isFile()
+    && legacyOutput.existing.dev === systemOutput.existing.dev
+    && legacyOutput.existing.ino === systemOutput.existing.ino
+  ) {
+    fail("--system-release-output must not alias --output");
+  }
   const productReleaseId = arg("productReleaseId", "product-release-id");
   if (!productReleaseId) fail("FINAL phase requires --product-release-id");
   const schemas = Object.fromEntries([

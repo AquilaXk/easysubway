@@ -74,6 +74,17 @@ test("system release manifest v2 rejects every locked identity violation", () =>
   }
 });
 
+test("system release manifest v2 rejects unsafe identity integers", () => {
+  for (const [mutate, expected] of [
+    [(manifest) => { manifest.mobile.artifactIdentity.versionCode = Number.MAX_SAFE_INTEGER + 1; }, "mobile: versionCode must be a safe integer"],
+    [(manifest) => { manifest.data.artifactIdentity.releaseSequence = Number.MAX_SAFE_INTEGER + 1; }, "data: releaseSequence must be a safe integer"],
+  ]) {
+    const manifest = validManifest();
+    mutate(manifest);
+    assert.deepEqual(validateSystemReleaseManifest({ manifest, ...schemas }), [expected]);
+  }
+});
+
 test("system and component non-array issue refs return validation errors without throwing", () => {
   for (const mutate of [
     (manifest) => { manifest.issueRefs = 2693; },

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile, execFileSync } from "node:child_process";
 import { createHash, generateKeyPairSync, sign as signBytes } from "node:crypto";
-import { lstat as fsLstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
+import { link, lstat as fsLstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, utimes, writeFile } from "node:fs/promises";
 import { existsSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -5953,6 +5953,55 @@ test("[system-release-generator] FINAL은 component manifest에서 검증된 sys
       selectSystemReleaseDecision({ legacyDecision: "NO_GO", manifest: canonicalGoCandidate, ...semanticSchemas }),
       "NO_GO",
     );
+
+    const candidateSymlinkTarget = path.join(tempDir, "candidate-symlink-target.json");
+    const candidateSymlinkOutput = path.join(tempDir, "candidate-symlink-output.json");
+    await writeFile(candidateSymlinkTarget, "candidate sentinel");
+    await symlink(candidateSymlinkTarget, candidateSymlinkOutput);
+    const symlinkCandidateArgs = [...candidateArgs];
+    symlinkCandidateArgs[symlinkCandidateArgs.indexOf("--output") + 1] = candidateSymlinkOutput;
+    await assert.rejects(
+      execFileAsync(process.execPath, [...symlinkCandidateArgs, "--phase", "CANDIDATE"], { cwd: root }),
+      /--output must not be a symlink/,
+    );
+    assert.equal(await readFile(candidateSymlinkTarget, "utf8"), "candidate sentinel");
+
+    const symlinkLegacyTarget = path.join(tempDir, "symlink-legacy-target.json");
+    const symlinkLegacyOutput = path.join(tempDir, "symlink-legacy-output.json");
+    const symlinkSystemOutput = path.join(tempDir, "symlink-system-output.json");
+    await writeFile(symlinkLegacyTarget, "legacy sentinel");
+    await symlink(symlinkLegacyTarget, symlinkLegacyOutput);
+    await writeFile(symlinkSystemOutput, "system sentinel");
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ outputPath: symlinkLegacyOutput, systemOutputPath: symlinkSystemOutput }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /--output must not be a symlink/,
+    );
+    assert.equal(await readFile(symlinkLegacyTarget, "utf8"), "legacy sentinel");
+    assert.equal(await readFile(symlinkSystemOutput, "utf8"), "system sentinel");
+
+    const regularLegacyOutput = path.join(tempDir, "regular-legacy-output.json");
+    const symlinkSystemTarget = path.join(tempDir, "symlink-system-target.json");
+    const symlinkSystemAlias = path.join(tempDir, "symlink-system-alias.json");
+    await writeFile(regularLegacyOutput, "legacy sentinel");
+    await writeFile(symlinkSystemTarget, "system sentinel");
+    await symlink(symlinkSystemTarget, symlinkSystemAlias);
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ outputPath: regularLegacyOutput, systemOutputPath: symlinkSystemAlias }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /--system-release-output must not be a symlink/,
+    );
+    assert.equal(await readFile(regularLegacyOutput, "utf8"), "legacy sentinel");
+    assert.equal(await readFile(symlinkSystemTarget, "utf8"), "system sentinel");
+
+    const hardlinkLegacyOutput = path.join(tempDir, "hardlink-legacy-output.json");
+    const hardlinkSystemOutput = path.join(tempDir, "hardlink-system-output.json");
+    await writeFile(hardlinkLegacyOutput, "hardlink sentinel");
+    await link(hardlinkLegacyOutput, hardlinkSystemOutput);
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ outputPath: hardlinkLegacyOutput, systemOutputPath: hardlinkSystemOutput }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /--system-release-output must not alias --output/,
+    );
+    assert.equal(await readFile(hardlinkLegacyOutput, "utf8"), "hardlink sentinel");
+    assert.equal(await readFile(hardlinkSystemOutput, "utf8"), "hardlink sentinel");
 
     await assert.rejects(
       execFileAsync(process.execPath, [...systemArgs({ mobilePath: path.join(tempDir, "missing-mobile.json") }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
