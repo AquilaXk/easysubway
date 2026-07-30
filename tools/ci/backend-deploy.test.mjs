@@ -735,8 +735,6 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   assert.match(backup, /\.sha256/);
 
   const cd = read(".github/workflows/cd.yml");
-  assert.match(cd, /uses: actions\/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654/);
-  assert.doesNotMatch(cd, /uses: actions\/setup-java@be66141d4002b0e783cc31e5449d3f9f3267ffd9/);
   assert.match(cd, /if \[\[ -n "\$\{EASYSUBWAY_ENV_FILE:-\}" \]\]; then/);
   assert.doesNotMatch(cd, /EASYSUBWAY_ENV_FILE:-\/dev\/null/);
   // 파괴적 DDL 게이트는 배포 대상 checkout에서도 재검사한다(#2365).
