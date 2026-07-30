@@ -3504,7 +3504,23 @@ test("backend release artifact는 main에서 immutable arm64 image와 component 
   const deployBackend = read("tools/deploy/deploy-backend.sh");
 
   assert.match(backendJob, /runs-on: ubuntu-24\.04-arm/);
+  assert.match(backendJob, /actions: read/);
   assert.match(backendJob, /packages: write/);
+  assert.match(backendJob, /\n    if: \$\{\{ github\.event_name == 'push' \|\|/);
+  assert.match(backendJob, /Backend Release Image \/ Require successful main CI/);
+  assert.match(
+    backendJob,
+    /actions\/workflows\/ci\.yml\/runs\?head_sha=\$\{GITHUB_SHA\}&branch=main&event=push&status=success&per_page=20/,
+  );
+  assert.match(
+    backendJob,
+    /require-successful-workflow-run\.mjs[\s\S]*?"\$\{GITHUB_SHA\}"[\s\S]*?"CI"[\s\S]*?"push"[\s\S]*?main/,
+  );
+  assert.ok(
+    backendJob.indexOf("Backend Release Image / Require successful main CI") <
+      backendJob.indexOf("Backend Release Image / Log in to GHCR"),
+    "exact-SHA CI success must gate image publication",
+  );
   assert.match(backendJob, /mkdir -p \.\.\/release-artifacts\/backend\n\s+\.\/gradlew test --no-daemon/);
   assert.match(backendJob, /if: \$\{\{ github\.event_name != 'push' \}\}[\s\S]*docker buildx build --load --platform linux\/arm64/);
   assert.match(backendJob, /docker buildx build --load --platform linux\/arm64 -f backend\/Dockerfile -t easysubway-backend:\$\{GITHUB_SHA\} backend/);

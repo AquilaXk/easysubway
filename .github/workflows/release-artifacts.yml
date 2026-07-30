@@ -649,9 +649,10 @@ jobs:
     runs-on: ubuntu-24.04-arm
     needs: changes
     permissions:
+      actions: read
       contents: read
       packages: write
-    if: ${{ needs.changes.outputs.backend == 'true' || needs.changes.outputs.deploy == 'true' || needs.changes.outputs.android == 'true' || needs.changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch' }}
+    if: ${{ github.event_name == 'push' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.deploy == 'true' || needs.changes.outputs.android == 'true' || needs.changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch' }}
 
     steps:
       - name: Backend Release Image / Checkout repository
@@ -670,6 +671,37 @@ jobs:
         uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: "24"
+
+      - name: Backend Release Image / Require successful main CI
+        if: ${{ github.event_name == 'push' }}
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          ci_runs_file="${RUNNER_TEMP}/ci-runs.json"
+          ci_wait_deadline="$((SECONDS + 3600))"
+          while true; do
+            if curl -fsS \
+              --connect-timeout 5 \
+              --max-time 20 \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              --output "${ci_runs_file}" \
+              "https://api.github.com/repos/${GITHUB_REPOSITORY}/actions/workflows/ci.yml/runs?head_sha=${GITHUB_SHA}&branch=main&event=push&status=success&per_page=20"; then
+              if node tools/ci/require-successful-workflow-run.mjs \
+                "${ci_runs_file}" "${GITHUB_SHA}" "CI" "push" main 1209600; then
+                break
+              fi
+            fi
+            if (( SECONDS >= ci_wait_deadline )); then
+              echo "timed out waiting for successful CI for ${GITHUB_SHA}" >&2
+              exit 1
+            fi
+            sleep 15
+          done
 
       - name: Backend Release Image / Build bootJar
         working-directory: backend
