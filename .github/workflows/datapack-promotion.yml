@@ -1,0 +1,206 @@
+name: Data Pack Candidate Promotion
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidateRunId:
+        description: Successful Data Pack Release candidate run ID
+        required: true
+        type: string
+      compatibilityEvidenceRunId:
+        description: Workflow run ID containing compatibility evidence
+        required: true
+        type: string
+      compatibilityEvidenceArtifactName:
+        description: Compatibility evidence artifact name
+        required: true
+        type: string
+      issueRef:
+        description: Promotion issue reference
+        required: true
+        type: string
+
+jobs:
+  promote-candidate:
+    name: Data Pack / Promote candidate
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+      attestations: write
+    environment: datapack-promotion
+    env:
+      GH_TOKEN: ${{ github.token }}
+
+    steps:
+      - name: Data Pack Promotion / Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Data Pack Promotion / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Data Pack Promotion / Validate candidate producer run
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidateRunId }}
+        run: |
+          set -euo pipefail
+          candidate_run_id="${CANDIDATE_RUN_ID}"
+          if [[ ! "${candidate_run_id}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "candidateRunId must be a positive decimal run ID" >&2
+            exit 1
+          fi
+          candidate_metadata="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${candidate_run_id}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_sha, .path] | @tsv')"
+          IFS=$'\t' read -r actual_run_id conclusion repository head_repository event head_sha workflow_path_raw <<< "${candidate_metadata}"
+          workflow_path="${workflow_path_raw%@*}"
+          if [[ "${actual_run_id}" != "${candidate_run_id}" || "${conclusion}" != "success" \
+            || "${repository}" != "${GITHUB_REPOSITORY}" || "${head_repository}" != "${GITHUB_REPOSITORY}" \
+            || "${event}" != "workflow_dispatch" || ! "${head_sha}" =~ ^[a-f0-9]{40}$ \
+            || "${workflow_path}" != ".github/workflows/datapack-release.yml" ]]; then
+            echo "candidate run must be a successful same-repository workflow_dispatch Data Pack Release run" >&2
+            exit 1
+          fi
+          echo "CANDIDATE_HEAD_SHA=${head_sha}" >> "${GITHUB_ENV}"
+
+      - name: Data Pack Promotion / Validate candidate artifact metadata
+        env:
+          CANDIDATE_RUN_ID: ${{ inputs.candidateRunId }}
+        run: |
+          set -euo pipefail
+          candidate_artifacts="${RUNNER_TEMP}/candidate-artifacts.json"
+          candidate_artifact_name="easysubway-datapack-candidate-${CANDIDATE_RUN_ID}"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_RUN_ID}/artifacts?name=${candidate_artifact_name}&per_page=100" > "${candidate_artifacts}"
+          node tools/ci/require-workflow-artifact.mjs \
+            "${candidate_artifacts}" "${candidate_artifact_name}" "${CANDIDATE_RUN_ID}" "${CANDIDATE_HEAD_SHA}"
+
+      - name: Data Pack Promotion / Download exact candidate artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: easysubway-datapack-candidate-${{ inputs.candidateRunId }}
+          path: ${{ runner.temp }}/candidate
+          run-id: ${{ inputs.candidateRunId }}
+          github-token: ${{ github.token }}
+
+      - name: Data Pack Promotion / Rebuild exact candidate metadata
+        env:
+          EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM }}
+          EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID }}
+        run: |
+          set -euo pipefail
+          candidate_root="${RUNNER_TEMP}/candidate"
+          component_manifest="${candidate_root}/data-component-manifest.json"
+          artifact_inventory="${candidate_root}/data-artifact-inventory.json"
+          for metadata in "${component_manifest}" "${artifact_inventory}"; do
+            [[ -f "${metadata}" && ! -L "${metadata}" && -s "${metadata}" ]]
+          done
+          original_component_manifest="${RUNNER_TEMP}/candidate-original-component-manifest.json"
+          original_artifact_inventory="${RUNNER_TEMP}/candidate-original-artifact-inventory.json"
+          mv "${component_manifest}" "${original_component_manifest}"
+          mv "${artifact_inventory}" "${original_artifact_inventory}"
+          node tools/datapack/build-data-component-manifest.mjs \
+            --root "${candidate_root}" \
+            --manifest "${candidate_root}/catalog/current.json" \
+            --provenance "${candidate_root}/current.provenance.json" \
+            --repository "${GITHUB_REPOSITORY}" \
+            --git-sha "${CANDIDATE_HEAD_SHA}" \
+            --workflow-run-id "${CANDIDATE_RUN_ID}" \
+            --contract-version "datapack-contract-v3" \
+            --issue-ref "AquilaXk/easysubway#2699" \
+            --inventory-output "${artifact_inventory}" \
+            --output "${component_manifest}"
+          cmp -s "${component_manifest}" "${original_component_manifest}"
+          cmp -s "${artifact_inventory}" "${original_artifact_inventory}"
+
+      - name: Data Pack Promotion / Validate compatibility evidence artifact
+        env:
+          COMPATIBILITY_RUN_ID: ${{ inputs.compatibilityEvidenceRunId }}
+          COMPATIBILITY_ARTIFACT_NAME: ${{ inputs.compatibilityEvidenceArtifactName }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${COMPATIBILITY_RUN_ID}" =~ ^[1-9][0-9]*$ || ! "${COMPATIBILITY_ARTIFACT_NAME}" =~ ^[A-Za-z0-9_.-]+$ ]]; then
+            echo "compatibility evidence input is invalid" >&2
+            exit 1
+          fi
+          compatibility_metadata="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${COMPATIBILITY_RUN_ID}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_sha, .path] | @tsv')"
+          IFS=$'\t' read -r compatibility_run_id compatibility_conclusion compatibility_repository compatibility_head_repository compatibility_event compatibility_head_sha compatibility_workflow_path_raw <<< "${compatibility_metadata}"
+          compatibility_workflow_path="${compatibility_workflow_path_raw%@*}"
+          if [[ "${compatibility_run_id}" != "${COMPATIBILITY_RUN_ID}" || "${compatibility_conclusion}" != "success" \
+            || "${compatibility_repository}" != "${GITHUB_REPOSITORY}" || "${compatibility_head_repository}" != "${GITHUB_REPOSITORY}" \
+            || "${compatibility_event}" != "workflow_dispatch" || "${compatibility_head_sha}" != "${GITHUB_SHA}" \
+            || "${compatibility_workflow_path}" != ".github/workflows/release-artifacts.yml" ]]; then
+            echo "compatibility evidence must come from the current-SHA Release Artifacts workflow" >&2
+            exit 1
+          fi
+          echo "COMPATIBILITY_HEAD_SHA=${compatibility_head_sha}" >> "${GITHUB_ENV}"
+          compatibility_artifacts="${RUNNER_TEMP}/compatibility-artifacts.json"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${COMPATIBILITY_RUN_ID}/artifacts?name=${COMPATIBILITY_ARTIFACT_NAME}&per_page=100" > "${compatibility_artifacts}"
+          node tools/ci/require-workflow-artifact.mjs \
+            "${compatibility_artifacts}" "${COMPATIBILITY_ARTIFACT_NAME}" "${COMPATIBILITY_RUN_ID}" "${COMPATIBILITY_HEAD_SHA}"
+
+      - name: Data Pack Promotion / Download and validate compatibility evidence
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ${{ inputs.compatibilityEvidenceArtifactName }}
+          path: ${{ runner.temp }}/compatibility
+          run-id: ${{ inputs.compatibilityEvidenceRunId }}
+          github-token: ${{ github.token }}
+
+      - name: Data Pack Promotion / Require exact compatibility evidence file
+        run: |
+          set -euo pipefail
+          compatibility_root="${RUNNER_TEMP}/compatibility"
+          shopt -s dotglob nullglob
+          entries=("${compatibility_root}"/*)
+          [[ "${#entries[@]}" == "1" ]]
+          [[ "${entries[0]}" == "${compatibility_root}/compatibility-evidence.json" ]]
+          [[ -f "${entries[0]}" && ! -L "${entries[0]}" && -s "${entries[0]}" ]]
+
+      - name: Data Pack Promotion / Capture environment approvals
+        run: gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" > "${RUNNER_TEMP}/promotion-approvals.json"
+
+      - name: Data Pack Promotion / Build and validate promotion request
+        env:
+          ISSUE_REF: ${{ inputs.issueRef }}
+        run: |
+          set -euo pipefail
+          promotion_request="${RUNNER_TEMP}/promotion-request.json"
+          node tools/release/build-promotion-request.mjs \
+            --component "${RUNNER_TEMP}/candidate/data-component-manifest.json" \
+            --inventory "${RUNNER_TEMP}/candidate/data-artifact-inventory.json" \
+            --compatibility-evidence "${RUNNER_TEMP}/compatibility/compatibility-evidence.json" \
+            --requested-by "${GITHUB_ACTOR}" \
+            --approval-evidence "${RUNNER_TEMP}/promotion-approvals.json" \
+            --workflow-run-id "${GITHUB_RUN_ID}" \
+            --issue-ref "${ISSUE_REF}" \
+            --output "${promotion_request}"
+          node tools/release/validate-promotion-request.mjs \
+            --request "${promotion_request}" \
+            --component "${RUNNER_TEMP}/candidate/data-component-manifest.json" \
+            --inventory "${RUNNER_TEMP}/candidate/data-artifact-inventory.json" \
+            --compatibility-evidence "${RUNNER_TEMP}/compatibility/compatibility-evidence.json" \
+            --approval-evidence "${RUNNER_TEMP}/promotion-approvals.json" \
+            --workflow-run-id "${GITHUB_RUN_ID}"
+          mkdir -p "${RUNNER_TEMP}/promotion-artifact"
+          cp "${promotion_request}" "${RUNNER_TEMP}/promotion-artifact/promotion-request.json"
+          cp "${RUNNER_TEMP}/promotion-approvals.json" "${RUNNER_TEMP}/promotion-artifact/promotion-approvals.json"
+          cp "${RUNNER_TEMP}/compatibility/compatibility-evidence.json" "${RUNNER_TEMP}/promotion-artifact/compatibility-evidence.json"
+
+      - name: Data Pack Promotion / Attest promotion request
+        uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d
+        with:
+          subject-path: ${{ runner.temp }}/promotion-artifact/promotion-request.json
+
+      - name: Data Pack Promotion / Upload promotion artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: easysubway-datapack-promotion-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/promotion-artifact/promotion-request.json
+            ${{ runner.temp }}/promotion-artifact/promotion-approvals.json
+            ${{ runner.temp }}/promotion-artifact/compatibility-evidence.json
+          if-no-files-found: error
+          retention-days: 14

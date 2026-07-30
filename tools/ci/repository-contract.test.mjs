@@ -881,10 +881,17 @@ function assertActionsEnvSecretPolicy(file, source) {
       "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
     ]),
     ".github/workflows/datapack-release.yml": new Set([
+      "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
+      "EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM",
+      "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
       "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
       "EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PUBLIC_KEY_SHA256",
       "DATA_GO_KR_SERVICE_KEY",
       "KRIC_SERVICE_KEY",
+    ]),
+    ".github/workflows/datapack-promotion.yml": new Set([
+      "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
+      "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
     ]),
     ".github/workflows/release-artifacts.yml": new Set([
       "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
@@ -8833,7 +8840,7 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.ok(itxContractValidationIndex >= 0, "ITX coverage contract validation step must exist");
   assert.ok(sourceFreshnessIndex >= 0, "source snapshot freshness step must exist");
   assert.ok(accessibilitySourceCoverageIndex > sourceFreshnessIndex, "accessibility source coverage must run after source freshness");
-  assert.match(workflow, /Data Pack Release \/ Validate accessibility source coverage[\s\S]*?evaluation_at="\$\(date -u \+%Y-%m-%dT%H:%M:%S\.000Z\)"[\s\S]*?build-accessibility-source-coverage-report\.mjs[\s\S]*?--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"[\s\S]*?--manifest-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"[\s\S]*?--bundled-index apps\/mobile\/assets\/datapacks\/index\.json[\s\S]*?--inventory tools\/datapack\/source-inventory\.json[\s\S]*?--source-snapshots tools\/datapack\/release\/source-snapshots\.json[\s\S]*?--evaluation-at "\$\{evaluation_at\}"[\s\S]*?--output "\$\{EASYSUBWAY_ACCESSIBILITY_SOURCE_COVERAGE_REPORT\}"/);
+  assert.match(workflow, /Data Pack Release \/ Validate accessibility source coverage[\s\S]*?evaluation_at="\$\(date -u \+%Y-%m-%dT%H:%M:%S\.000Z\)"[\s\S]*?build-accessibility-source-coverage-report\.mjs[\s\S]*?--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"[\s\S]*?--manifest-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"[\s\S]*?--bundled-index "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"[\s\S]*?--bundled-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"[\s\S]*?--inventory tools\/datapack\/source-inventory\.json[\s\S]*?--source-snapshots tools\/datapack\/release\/source-snapshots\.json[\s\S]*?--evaluation-at "\$\{evaluation_at\}"[\s\S]*?--output "\$\{EASYSUBWAY_ACCESSIBILITY_SOURCE_COVERAGE_REPORT\}"/);
   assert.ok(
     itxContractValidationIndex < evidenceBundleIndex,
     "ITX coverage contract must be validated before release evidence is hashed",
@@ -8890,7 +8897,7 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.doesNotMatch(workflow, /--allow-invalid-disabled/);
   assert.match(workflow, /id: remote-publish-env/);
   assert.match(workflow, /steps\.remote-publish-env\.outputs\.enabled == 'true'/);
-  assert.match(workflow, /steps\.release-fixture\.outputs\.remote_publish_ready == 'true'/);
+  assert.doesNotMatch(workflow, /steps\.release-fixture\.outputs\.remote_publish_ready/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
   assert.match(workflow, /--require-production/);
   assert.match(workflow, /Data Pack Release \/ Upload staged data packs[\s\S]*?if: \$\{\{ always\(\) \}\}/);

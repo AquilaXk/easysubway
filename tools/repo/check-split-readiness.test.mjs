@@ -14,7 +14,7 @@ test("datapack split readiness checks id와 상태를 고정한다", () => {
     "datapack.release-workflow-no-flutter",
     "datapack.env-scope-isolated",
     "datapack.no-mobile-release-paths",
-    "datapack.candidate-promotion-separated",
+    "datapack.production-publish-no-rebuild",
     "datapack.component-manifest",
     "release.system-manifest-v2",
     "contracts.explicit-workspace",
@@ -42,7 +42,7 @@ test("split readiness target별 check id와 현재 pass 상태를 고정한다",
       "datapack.release-workflow-no-flutter",
       "datapack.env-scope-isolated",
       "datapack.no-mobile-release-paths",
-      "datapack.candidate-promotion-separated",
+      "datapack.production-publish-no-rebuild",
       "datapack.component-manifest",
       "release.system-manifest-v2",
       "contracts.explicit-workspace",
@@ -99,7 +99,7 @@ test("현재 분리 blocker를 readiness 결과에 fail로 드러낸다", () => 
   const mobile = evaluateReadiness("mobile");
 
   assert.equal(byId(datapack, "datapack.no-mobile-release-paths").status, "pass");
-  assert.equal(byId(datapack, "datapack.candidate-promotion-separated").status, "fail");
+  assert.equal(byId(datapack, "datapack.production-publish-no-rebuild").status, "pass");
   assert.equal(byId(infra, "infra.deploy-consumes-digest-only").status, "pass");
   assert.equal(byId(infra, "infra.no-backend-build").status, "pass");
   assert.equal(byId(backend, "backend.no-external-process-resources").status, "pass");
