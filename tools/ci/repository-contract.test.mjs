@@ -5659,6 +5659,118 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(corruptManifest.readiness.blockers.some((blocker) => blocker.id === "missing_aabPayloadSha256"));
 });
 
+test("[system-release-generator] FINAL은 component manifest에서 검증된 system release v2를 별도로 생성한다", async () => {
+  const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-system-release-"));
+  const candidatePath = path.join(tempDir, "candidate.json");
+  const outputPath = path.join(tempDir, "legacy-final.json");
+  const systemOutputPath = path.join(tempDir, "system-release.json");
+  const aabPayloadPath = path.join(tempDir, "payload.bin");
+  const aabPath = path.join(tempDir, "app.aab");
+  const dataManifestPath = path.join(tempDir, "data-manifest.json");
+  const dataArtifactPath = path.join(tempDir, "data.sqlite.gz");
+  const rehearsalBindingPath = path.join(tempDir, "rehearsal-binding.json");
+  const backendInspectPath = path.join(tempDir, "backend-inspect.json");
+  const componentPaths = Object.fromEntries(["mobile", "backend", "data", "platform"].map(
+    (component) => [component, path.join(tempDir, `${component}.json`)],
+  ));
+  const contractsPath = path.join(tempDir, "contracts.json");
+  const dataManifest = { releaseSequence: 1 };
+  const dataArtifact = "data-artifact";
+  const digest = (value) => createHash("sha256").update(value).digest("hex");
+  const systemArgs = (overrides = {}) => [
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "--repo-root", ".", "--app-root", "apps/mobile", "--git-sha", currentGitSha,
+    "--now", "2026-07-30T00:00:00.000Z", "--aab", aabPath,
+    "--backend-image-inspect", backendInspectPath,
+    "--data-pack-manifest", dataManifestPath, "--data-pack-artifact", dataArtifactPath,
+    "--data-pack-rehearsal-binding", rehearsalBindingPath,
+    "--output", overrides.outputPath ?? outputPath,
+    "--mobile-component-manifest", overrides.mobilePath ?? componentPaths.mobile,
+    "--backend-component-manifest", overrides.backendPath ?? componentPaths.backend,
+    "--data-component-manifest", overrides.dataPath ?? componentPaths.data,
+    "--platform-component-manifest", overrides.platformPath ?? componentPaths.platform,
+    "--contracts-identity", overrides.contractsPath ?? contractsPath,
+    "--system-release-output", overrides.systemOutputPath ?? systemOutputPath,
+    "--product-release-id", "easysubway-2026.07.30.2693",
+  ];
+  try {
+    await writeFile(aabPayloadPath, "system-release-aab");
+    await execFileAsync("zip", ["-q", aabPath, path.basename(aabPayloadPath)], { cwd: tempDir });
+    await writeFile(dataManifestPath, JSON.stringify(dataManifest));
+    await writeFile(dataArtifactPath, dataArtifact);
+    await writeFile(rehearsalBindingPath, JSON.stringify({
+      schemaVersion: 1, artifactKind: "datapack-prelaunch-rehearsal-binding",
+      executionEnvironment: "ISOLATED_PRELAUNCH", productionExecuted: false,
+      sourceSnapshotSetHash: "c".repeat(64),
+      selectedManifestSha256: digest(JSON.stringify(dataManifest)),
+      selectedArtifactSha256: digest(dataArtifact), selectedReleaseSequence: 1,
+    }));
+    await writeFile(backendInspectPath, JSON.stringify([
+      { RepoDigests: [`ghcr.io/aquilaxk/easysubway-backend@sha256:${"b".repeat(64)}`] },
+    ]));
+
+    const candidateArgs = systemArgs().filter((value, index, values) => {
+      const componentOptions = new Set([
+        "--mobile-component-manifest", "--backend-component-manifest", "--data-component-manifest",
+        "--platform-component-manifest", "--contracts-identity", "--system-release-output", "--product-release-id",
+      ]);
+      return !componentOptions.has(value) && !componentOptions.has(values[index - 1]);
+    });
+    candidateArgs[candidateArgs.indexOf("--output") + 1] = candidatePath;
+    await execFileAsync(process.execPath, [...candidateArgs, "--phase", "CANDIDATE"], { cwd: root });
+    const candidate = JSON.parse(await readFile(candidatePath, "utf8"));
+    const identity = candidate.releaseCandidateIdentity;
+    const issueRefs = ["AquilaXk/easysubway-mobile#2693", "AquilaXk/easysubway-backend#2694", "AquilaXk/easysubway-data#2695", "AquilaXk/easysubway-platform#2696"];
+    const common = { schemaVersion: 1, repository: "AquilaXk/easysubway", gitSha: currentGitSha, contractVersion: "1.2.3", evidenceSha256: "d".repeat(64) };
+    const components = {
+      mobile: { ...common, component: "mobile", issueRefs: [issueRefs[0]], artifactIdentity: { versionName: identity.appVersionName, versionCode: Number(identity.versionCode), aabSha256: identity.aabSha256, bundledDataManifestSha256: identity.dataPackManifestSha256 } },
+      backend: { ...common, component: "backend", issueRefs: [issueRefs[1]], artifactIdentity: { imageDigest: identity.backendImageDigest, apiContractVersion: "1.2.3" } },
+      data: { ...common, component: "data", issueRefs: [issueRefs[2]], artifactIdentity: { dataVersion: "2026.07.30", releaseSequence: identity.releaseSequence, manifestSha256: identity.dataPackManifestSha256, sourceSnapshotSetHash: identity.sourceSnapshotSetHash } },
+      platform: { ...common, component: "platform", issueRefs: [issueRefs[3]], artifactIdentity: { environment: "ci", deployedImageDigest: identity.backendImageDigest, deploymentEvidenceSha256: "e".repeat(64) } },
+    };
+    for (const [component, document] of Object.entries(components)) await writeFile(componentPaths[component], JSON.stringify(document));
+    await writeFile(contractsPath, JSON.stringify({ version: "1.2.3", sha256: "f".repeat(64) }));
+
+    await execFileAsync(process.execPath, [
+      ...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath,
+    ], { cwd: root });
+    const legacy = JSON.parse(await readFile(outputPath, "utf8"));
+    const system = JSON.parse(await readFile(systemOutputPath, "utf8"));
+    assert.equal(Object.hasOwn(system, "gitSha"), false);
+    assert.equal(system.schemaVersion, 2);
+    assert.equal(system.phase, "FINAL");
+    assert.equal(system.decision, "NO_GO");
+    assert.deepEqual(system.issueRefs, issueRefs);
+    assert.deepEqual(system.mobile.artifactIdentity, components.mobile.artifactIdentity);
+    assert.deepEqual(system.backend.artifactIdentity, components.backend.artifactIdentity);
+    assert.deepEqual(system.data.artifactIdentity, components.data.artifactIdentity);
+    assert.deepEqual(system.platform.artifactIdentity, components.platform.artifactIdentity);
+    assert.equal(Object.hasOwn(legacy, "mobile"), false);
+    await execFileAsync(process.execPath, ["tools/release/validate-system-release-manifest.mjs", "--manifest", systemOutputPath], { cwd: root });
+
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ mobilePath: path.join(tempDir, "missing-mobile.json") }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest is unreadable or invalid JSON/,
+    );
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs({ systemOutputPath: outputPath }), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /--system-release-output must differ from --output/,
+    );
+    await writeFile(componentPaths.mobile, "not-json");
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest is unreadable or invalid JSON/,
+    );
+    await writeFile(componentPaths.mobile, JSON.stringify({ ...components.mobile, artifactIdentity: { ...components.mobile.artifactIdentity, versionName: "9.9.9" } }));
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest drifts from candidate context/,
+    );
+  } finally {
+    await rm(tempDir, { recursive: true, force: true });
+  }
+});
+
 test("datapack readiness producer는 required gate를 동일 final identity로 결정론적으로 결합한다", async () => {
   const contract = readJson("apps/mobile/release/rc-evidence-manifest-contract.json");
   const requiredDatapackGates = [

@@ -10,6 +10,7 @@ import path from "node:path";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
+import { validateSystemReleaseManifest } from "./validate-system-release-manifest.mjs";
 
 const SUCCESSFUL_FRESHNESS_REASON_CODES = new Set([
   "PACK_PUBLISH_FRESHNESS_EXPIRED",
@@ -239,6 +240,7 @@ if (requestedPhase === "FINAL" && !candidateContextPath) {
 if (candidateContextPath) {
   validateCandidateContext(readJsonIfExists(resolvePath(candidateContextPath)), candidateContext);
 }
+const systemReleaseInputs = readSystemReleaseInputs();
 
 const gateEntries = requiredGateEntries(
   rcEvidenceContract.requiredGateStatuses, rcEvidenceContract.requiredGateChecks,
@@ -331,7 +333,9 @@ const manifest = {
   },
 };
 
+const systemReleaseManifest = buildSystemReleaseManifest(manifest, systemReleaseInputs);
 writeManifest(outputPath, manifest);
+writeManifest(systemReleaseInputs.outputPath, systemReleaseManifest);
 
 if (failOnBlocked && blockers.length > 0) {
   fail(`RC evidence manifest is blocked: ${blockers.map((blocker) => blocker.id).join(", ")}`);
@@ -340,6 +344,95 @@ if (failOnBlocked && blockers.length > 0) {
 function writeManifest(filePath, value) {
   mkdirSync(path.dirname(filePath), { recursive: true });
   writeFileSync(filePath, `${JSON.stringify(value, null, 2)}\n`);
+}
+
+function readSystemReleaseInputs() {
+  const required = [
+    ["mobile", "mobileComponentManifest", "mobile-component-manifest"],
+    ["backend", "backendComponentManifest", "backend-component-manifest"],
+    ["data", "dataComponentManifest", "data-component-manifest"],
+    ["platform", "platformComponentManifest", "platform-component-manifest"],
+  ];
+  const components = Object.fromEntries(required.map(([slot, camelName, kebabName]) => {
+    const rawPath = arg(camelName, kebabName);
+    if (!rawPath) fail(`FINAL phase requires --${kebabName}`);
+    return [slot, readRequiredJson(resolvePath(rawPath), `${slot} component manifest`)];
+  }));
+  const contractsPath = arg("contractsIdentity", "contracts-identity");
+  if (!contractsPath) fail("FINAL phase requires --contracts-identity");
+  const contracts = readRequiredJson(resolvePath(contractsPath), "contracts identity");
+  if (
+    !contracts || typeof contracts !== "object" || Array.isArray(contracts)
+    || Object.keys(contracts).length !== 2
+    || !Object.hasOwn(contracts, "version") || !Object.hasOwn(contracts, "sha256")
+    || !isSemVer(contracts.version) || !/^[a-f0-9]{64}$/.test(contracts.sha256)
+  ) {
+    fail("contracts identity must be exactly {version,sha256}");
+  }
+  const output = arg("systemReleaseOutput", "system-release-output");
+  if (!output) fail("FINAL phase requires --system-release-output");
+  const systemReleaseOutputPath = resolvePath(output);
+  if (systemReleaseOutputPath === outputPath) fail("--system-release-output must differ from --output");
+  const productReleaseId = arg("productReleaseId", "product-release-id");
+  if (!productReleaseId) fail("FINAL phase requires --product-release-id");
+  const schemas = Object.fromEntries([
+    ["componentSchema", "component-manifest.schema.json"],
+    ["systemSchema", "system-release-manifest.schema.json"],
+    ["issueRefSchema", "issue-ref.schema.json"],
+  ].map(([key, file]) => [key, readRequiredJson(path.join(repoRoot, "contracts/release", file), `release contract ${file}`)]));
+  return { components, contracts, outputPath: systemReleaseOutputPath, productReleaseId, schemas };
+}
+
+function buildSystemReleaseManifest(legacyManifest, inputs) {
+  assertComponentCandidateIdentity(inputs.components, legacyManifest.releaseCandidateIdentity);
+  const issueRefs = [];
+  for (const component of [inputs.components.mobile, inputs.components.backend, inputs.components.data, inputs.components.platform]) {
+    for (const issueRef of component.issueRefs ?? []) if (!issueRefs.includes(issueRef)) issueRefs.push(issueRef);
+  }
+  const base = {
+    schemaVersion: 2,
+    productReleaseId: inputs.productReleaseId,
+    phase: "FINAL",
+    decision: "NO_GO",
+    generatedAt,
+    issueRefs,
+    contracts: inputs.contracts,
+    ...inputs.components,
+  };
+  const goErrors = validateSystemReleaseManifest({ manifest: { ...base, decision: "GO" }, ...inputs.schemas });
+  const manifest = { ...base, decision: legacyManifest.decision === "GO" && goErrors.length === 0 ? "GO" : "NO_GO" };
+  const errors = validateSystemReleaseManifest({ manifest, ...inputs.schemas });
+  if (errors.length > 0) fail(`system release manifest validation failed: ${errors.join(", ")}`);
+  return manifest;
+}
+
+function assertComponentCandidateIdentity(components, candidate) {
+  const comparisons = [
+    ["mobile", "appVersionName", components.mobile?.artifactIdentity?.versionName],
+    ["mobile", "versionCode", components.mobile?.artifactIdentity?.versionCode],
+    ["mobile", "aabSha256", components.mobile?.artifactIdentity?.aabSha256],
+    ["mobile", "dataPackManifestSha256", components.mobile?.artifactIdentity?.bundledDataManifestSha256],
+    ["backend", "backendImageDigest", components.backend?.artifactIdentity?.imageDigest],
+    ["data", "dataPackManifestSha256", components.data?.artifactIdentity?.manifestSha256],
+    ["data", "sourceSnapshotSetHash", components.data?.artifactIdentity?.sourceSnapshotSetHash],
+    ["data", "releaseSequence", components.data?.artifactIdentity?.releaseSequence],
+    ["platform", "backendImageDigest", components.platform?.artifactIdentity?.deployedImageDigest],
+  ];
+  for (const [component, field, value] of comparisons) {
+    if (String(candidate?.[field]) !== String(value)) fail(`${component} component manifest drifts from candidate context`);
+  }
+}
+
+function readRequiredJson(filePath, label) {
+  try {
+    return JSON.parse(readFileSync(filePath, "utf8"));
+  } catch {
+    fail(`${label} is unreadable or invalid JSON`);
+  }
+}
+
+function isSemVer(value) {
+  return typeof value === "string" && /^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$/.test(value);
 }
 
 function projectRcEvidenceContract(contract) {
