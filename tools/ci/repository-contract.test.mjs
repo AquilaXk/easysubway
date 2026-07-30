@@ -5938,6 +5938,26 @@ test("[system-release-generator] FINAL은 component manifest에서 검증된 sys
     );
     assert.deepEqual(await readFile(outputPath), legacyBeforeInvalidSemVer);
     assert.deepEqual(await readFile(systemOutputPath), systemBeforeInvalidSemVer);
+    const missingIdentityMobile = structuredClone(components.mobile);
+    delete missingIdentityMobile.artifactIdentity.aabSha256;
+    await writeFile(componentPaths.mobile, JSON.stringify(missingIdentityMobile));
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest drifts from candidate context/,
+    );
+    assert.deepEqual(await readFile(outputPath), legacyBeforeInvalidSemVer);
+    assert.deepEqual(await readFile(systemOutputPath), systemBeforeInvalidSemVer);
+
+    const stringVersionCodeMobile = structuredClone(components.mobile);
+    stringVersionCodeMobile.artifactIdentity.versionCode = String(stringVersionCodeMobile.artifactIdentity.versionCode);
+    await writeFile(componentPaths.mobile, JSON.stringify(stringVersionCodeMobile));
+    await assert.rejects(
+      execFileAsync(process.execPath, [...systemArgs(), "--phase", "FINAL", "--candidate-context", candidatePath], { cwd: root }),
+      /mobile component manifest drifts from candidate context/,
+    );
+    assert.deepEqual(await readFile(outputPath), legacyBeforeInvalidSemVer);
+    assert.deepEqual(await readFile(systemOutputPath), systemBeforeInvalidSemVer);
+    await writeFile(componentPaths.mobile, JSON.stringify(components.mobile));
     const semanticSchemas = {
       componentSchema: JSON.parse(read("contracts/release/component-manifest.schema.json")),
       systemSchema: JSON.parse(read("contracts/release/system-release-manifest.schema.json")),

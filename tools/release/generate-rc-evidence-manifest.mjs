@@ -471,9 +471,27 @@ function assertComponentCandidateIdentity(components, candidate) {
     ["data", "releaseSequence", components.data?.artifactIdentity?.releaseSequence],
     ["platform", "backendImageDigest", components.platform?.artifactIdentity?.deployedImageDigest],
   ];
+  const integerFields = new Set(["versionCode", "releaseSequence"]);
   for (const [component, field, value] of comparisons) {
-    if (String(candidate?.[field]) !== String(value)) fail(`${component} component manifest drifts from candidate context`);
+    const candidateValue = candidate?.[field];
+    const matches = integerFields.has(field)
+      ? Number.isSafeInteger(value) && value >= 0 && normalizeCandidateIdentityInteger(candidateValue) === value
+      : candidateValue === value;
+    if (
+      !candidate || typeof candidate !== "object" || Array.isArray(candidate)
+      || !Object.hasOwn(candidate, field) || candidateValue === null || value === undefined || value === null || !matches
+    ) {
+      fail(`${component} component manifest drifts from candidate context`);
+    }
   }
+}
+
+function normalizeCandidateIdentityInteger(value) {
+  if (typeof value === "string") {
+    if (!isDigits(value) || (value !== "0" && value[0] === "0")) return null;
+    value = Number(value);
+  }
+  return Number.isSafeInteger(value) && value >= 0 ? value : null;
 }
 
 function readRequiredJson(filePath, label) {

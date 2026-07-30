@@ -103,6 +103,13 @@ test("builds deterministic truthful monorepo component manifests", () => {
     for (const name of requireFiles(files.output)) {
       assert.deepEqual(readFileSync(path.join(files.output, name)), readFileSync(path.join(secondOutput, name)), name);
     }
+    const cwdOutput = path.join(files.directory, "cwd-output");
+    const cwdResult = spawnSync(process.execPath, [script, ...args(files, { "--output-dir": cwdOutput })], {
+      cwd: files.directory,
+      encoding: "utf8",
+    });
+    assert.equal(cwdResult.status, 0, cwdResult.stderr);
+    assert.equal(json(cwdOutput, "contracts-identity.json").version, "1.2.3");
   } finally {
     rmSync(files.directory, { recursive: true, force: true });
   }

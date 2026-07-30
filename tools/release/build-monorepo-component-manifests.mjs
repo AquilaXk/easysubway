@@ -3,6 +3,7 @@
 import { createHash } from "node:crypto";
 import { existsSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
 
 const outputFiles = [
@@ -183,7 +184,8 @@ function main() {
   };
   let componentSchema;
   try {
-    componentSchema = JSON.parse(readFileSync(path.resolve("contracts/release/component-manifest.schema.json"), "utf8"));
+    const here = path.dirname(fileURLToPath(import.meta.url));
+    componentSchema = JSON.parse(readFileSync(path.join(here, "../../contracts/release/component-manifest.schema.json"), "utf8"));
   } catch {
     fail("component manifest schema is unavailable");
   }

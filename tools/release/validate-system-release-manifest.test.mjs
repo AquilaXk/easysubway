@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { validateSystemReleaseManifest } from "./validate-system-release-manifest.mjs";
+import { selectSystemReleaseDecision, validateSystemReleaseManifest } from "./validate-system-release-manifest.mjs";
 
 const sha = "a".repeat(64);
 const gitSha = "b".repeat(40);
@@ -18,7 +18,7 @@ function validManifest() {
     decision: "GO",
     generatedAt: "2026-07-30T00:00:00Z",
     issueRefs: [issue("easysubway", 2693)],
-    contracts: { version: "release-manifest-v2", sha256: sha },
+    contracts: { version: "1.2.3", sha256: sha },
     mobile: {
       schemaVersion: 1, component: "mobile", repository: "AquilaXk/easysubway-mobile", gitSha,
       artifactIdentity: { versionName: "1.0.0", versionCode: 1, aabSha256: sha, bundledDataManifestSha256: sha },
@@ -50,6 +50,27 @@ const schemas = {
 
 test("system release manifest v2 validates the locked release identity", () => {
   assert.deepEqual(validateSystemReleaseManifest({ manifest: validManifest(), ...schemas }), []);
+});
+
+test("system release manifest v2 rejects invalid contracts SemVer", () => {
+  const manifest = validManifest();
+  manifest.contracts.version = `1.2.3-${"a.".repeat(150)}a`;
+  assert.ok(validateSystemReleaseManifest({ manifest, ...schemas }).includes("system: contracts version must be SemVer"));
+});
+
+test("system release decision requires legacy GO and every GO transition condition", () => {
+  assert.equal(selectSystemReleaseDecision({ legacyDecision: "GO", manifest: validManifest(), ...schemas }), "GO");
+  assert.equal(selectSystemReleaseDecision({ legacyDecision: "NO_GO", manifest: validManifest(), ...schemas }), "NO_GO");
+
+  for (const mutate of [
+    (manifest) => { manifest.platform.artifactIdentity.environment = "ci"; },
+    (manifest) => { manifest.data.artifactIdentity.releaseSequence = 0; },
+    (manifest) => { for (const slot of ["mobile", "backend", "data", "platform"]) manifest[slot].repository = "AquilaXk/easysubway"; },
+  ]) {
+    const manifest = validManifest();
+    mutate(manifest);
+    assert.equal(selectSystemReleaseDecision({ legacyDecision: "GO", manifest, ...schemas }), "NO_GO");
+  }
 });
 
 test("system release manifest v2 rejects every locked identity violation", () => {
