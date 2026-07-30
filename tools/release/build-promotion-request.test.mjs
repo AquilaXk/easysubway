@@ -54,6 +54,8 @@ test("입력 hash, approval, output, symlink, run 경계를 fail closed한다", 
       symlinkSync(fixture.compatibilityPath, link);
       fixture.compatibilityPath = link;
     },
+    (fixture) => writeCompatibility(fixture, { ...fixture.compatibility, decision: "NO_GO" }),
+    (fixture) => writeCompatibility(fixture, { ...fixture.compatibility, extra: true }),
     (fixture) => { fixture.workflowRunId = "0"; },
   ];
   for (const mutate of cases) assertRejectedWithoutOutputDamage(mutate);
@@ -92,14 +94,17 @@ function createFixture() {
   const inventory = inventoryValue();
   const inventoryBytes = Buffer.from(JSON.stringify(inventory));
   const component = componentValue(sha256(inventoryBytes));
+  const compatibility = compatibilityValue(component);
+  const compatibilityBytes = Buffer.from(JSON.stringify(compatibility));
   const approvalBytes = Buffer.from(JSON.stringify([approvedReview()]));
   return {
     root,
     component,
     componentPath: file(root, "component.json", JSON.stringify(component)),
     inventoryPath: file(root, "inventory.json", inventoryBytes),
-    compatibilityPath: file(root, "compatibility.json", "compatibility"),
-    compatibilityBytes: Buffer.from("compatibility"),
+    compatibility,
+    compatibilityPath: file(root, "compatibility.json", compatibilityBytes),
+    compatibilityBytes,
     approvalPath: file(root, "approvals.json", approvalBytes),
     approvalBytes,
     workflowRunId: "456",
@@ -117,6 +122,10 @@ function replaceInventory(fixture, entries) {
 
 function writeApproval(fixture, reviews) {
   writeFileSync(fixture.approvalPath, JSON.stringify(reviews));
+}
+
+function writeCompatibility(fixture, value) {
+  writeFileSync(fixture.compatibilityPath, JSON.stringify(value));
 }
 
 function approvedReview() {
@@ -145,6 +154,15 @@ function componentValue(inventorySha256) {
     artifactInventorySha256: inventorySha256,
     contractVersion: "datapack-contract-v3",
     issueRef: "AquilaXk/easysubway#2699",
+  };
+}
+
+function compatibilityValue(component) {
+  return {
+    schemaVersion: 1,
+    artifactKind: "datapack-mobile-compatibility-evidence",
+    decision: "PASS",
+    candidate: structuredClone(component),
   };
 }
 

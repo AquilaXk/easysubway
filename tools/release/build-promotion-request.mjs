@@ -10,6 +10,7 @@ import {
   regularBytes,
   regularJson,
   reviewerFromApproval,
+  validateCompatibilityEvidence,
   validateComponent,
   validateInventory,
 } from "./validate-promotion-request.mjs";
@@ -27,10 +28,11 @@ async function main() {
     throw new Error("inventory hash mismatch");
   }
 
-  const compatibilityBytes = await regularBytes(
+  const [compatibility, compatibilityBytes] = await regularJson(
     args.get("compatibility-evidence"),
     "--compatibility-evidence",
   );
+  validateCompatibilityEvidence(compatibility, component);
   const approvalBytes = await regularBytes(args.get("approval-evidence"), "--approval-evidence");
   const reviewer = reviewerFromApproval(approvalBytes);
   const workflowRunId = args.get("workflow-run-id");

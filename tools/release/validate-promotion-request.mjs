@@ -80,6 +80,17 @@ export function validateInventory(value) {
   return value;
 }
 
+export function validateCompatibilityEvidence(value, component) {
+  exactKeys(value, ["schemaVersion", "artifactKind", "decision", "candidate"], "compatibility evidence");
+  if (value.schemaVersion !== 1
+    || value.artifactKind !== "datapack-mobile-compatibility-evidence"
+    || value.decision !== "PASS"
+    || !isDeepStrictEqual(value.candidate, component)) {
+    throw new Error("compatibility evidence is invalid");
+  }
+  return value;
+}
+
 export function reviewerFromApproval(bytes) {
   let reviews;
   try {
@@ -103,12 +114,14 @@ export function validateRequest({
   component,
   inventory,
   inventoryBytes,
+  compatibility,
   compatibilityBytes,
   approvalBytes,
   workflowRunId,
 }) {
   validateComponent(component);
   validateInventory(inventory);
+  validateCompatibilityEvidence(compatibility, component);
   exactKeys(request, requestKeys, "request");
   if (request.schemaVersion !== 1 || request.artifactKind !== "datapack-promotion-request"
     || !isDeepStrictEqual(request.candidate, component)
@@ -177,7 +190,7 @@ async function main() {
   const [request] = await regularJson(args.get("request"), "--request");
   const [component] = await regularJson(args.get("component"), "--component");
   const [inventory, inventoryBytes] = await regularJson(args.get("inventory"), "--inventory");
-  const compatibilityBytes = await regularBytes(
+  const [compatibility, compatibilityBytes] = await regularJson(
     args.get("compatibility-evidence"),
     "--compatibility-evidence",
   );
@@ -187,6 +200,7 @@ async function main() {
     component,
     inventory,
     inventoryBytes,
+    compatibility,
     compatibilityBytes,
     approvalBytes,
     workflowRunId: args.get("workflow-run-id"),

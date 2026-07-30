@@ -28,6 +28,11 @@ test("request key, evidence hash, approval run/reviewer mismatch를 거부한다
     (fixture) => { fixture.workflowRunId = "789"; },
     (fixture) => { fixture.request.approval.reviewer = "other"; writeRequest(fixture); },
     (fixture) => writeFileSync(fixture.approvalPath, JSON.stringify([approvedReview(), approvedReview()])),
+    (fixture) => replaceCompatibility(fixture, { ...fixture.compatibility, decision: "NO_GO" }),
+    (fixture) => replaceCompatibility(fixture, {
+      ...fixture.compatibility,
+      candidate: { ...fixture.compatibility.candidate, dataVersion: "other" },
+    }),
   ]) {
     const fixture = createFixture();
     try {
@@ -62,7 +67,8 @@ function createFixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "promotion-validate-"));
   const inventoryBytes = Buffer.from(JSON.stringify(inventoryValue()));
   const component = componentValue(sha256(inventoryBytes));
-  const compatibilityBytes = Buffer.from("compatibility");
+  const compatibility = compatibilityValue(component);
+  const compatibilityBytes = Buffer.from(JSON.stringify(compatibility));
   const approvalBytes = Buffer.from(JSON.stringify([approvedReview()]));
   const request = requestValue(component, compatibilityBytes, approvalBytes);
   return {
@@ -72,6 +78,7 @@ function createFixture() {
     component,
     componentPath: file(root, "component.json", JSON.stringify(component)),
     inventoryPath: file(root, "inventory.json", inventoryBytes),
+    compatibility,
     compatibilityPath: file(root, "compatibility.json", compatibilityBytes),
     approvalPath: file(root, "approval.json", approvalBytes),
     workflowRunId: "456",
@@ -90,6 +97,13 @@ function replaceInventory(fixture, entries) {
 
 function writeRequest(fixture) {
   writeFileSync(fixture.requestPath, JSON.stringify(fixture.request));
+}
+
+function replaceCompatibility(fixture, value) {
+  const bytes = Buffer.from(JSON.stringify(value));
+  writeFileSync(fixture.compatibilityPath, bytes);
+  fixture.request.compatibilityEvidenceSha256 = sha256(bytes);
+  writeRequest(fixture);
 }
 
 function requestValue(component, compatibilityBytes, approvalBytes) {
@@ -136,6 +150,15 @@ function componentValue(inventorySha256) {
     artifactInventorySha256: inventorySha256,
     contractVersion: "datapack-contract-v3",
     issueRef: "AquilaXk/easysubway#2699",
+  };
+}
+
+function compatibilityValue(component) {
+  return {
+    schemaVersion: 1,
+    artifactKind: "datapack-mobile-compatibility-evidence",
+    decision: "PASS",
+    candidate: structuredClone(component),
   };
 }
 
