@@ -78,7 +78,13 @@ export async function runMigration({ arguments_, ledger, schema, execGh }) {
     confirmations: arguments_.confirmations,
     execGh,
   });
-  return verifyTransferredIssue({ entry, transferResult, execGh });
+  try {
+    return await verifyTransferredIssue({ entry, transferResult, execGh });
+  } catch (error) {
+    const partialFailure = new Error(`issue transfer completed but post-transfer verification failed: ${error instanceof Error ? error.message : String(error)}`);
+    partialFailure.transferCompleted = true;
+    throw partialFailure;
+  }
 }
 
 export async function preflightIssueTransfer({ entry, execGh }) {
@@ -309,8 +315,9 @@ async function main() {
       schema: JSON.parse(schemaText),
       execGh,
     })));
-  } catch {
-    console.error("issue migration was not executed");
+  } catch (error) {
+    if (error?.transferCompleted === true) console.error(error.message);
+    else console.error(`issue migration was not executed: ${error instanceof Error ? error.message : String(error)}`);
     process.exitCode = 1;
   }
 }

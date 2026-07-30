@@ -212,6 +212,25 @@ test("execution transfers one approved issue and verifies redirected metadata", 
   assert.equal(Object.hasOwn(verified, "comments"), false);
 });
 
+test("completed transfer with failed verification reports a partial-success error", async () => {
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  const fake = fakeGh({ target: metadata({ url: TARGET_URL, number: 8 }) });
+
+  await assert.rejects(
+    () => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
+      ledger,
+      schema,
+      execGh: fake.execGh,
+    }),
+    (error) => error.message.startsWith("issue transfer completed but post-transfer verification failed:")
+      && error.transferCompleted === true,
+  );
+  assert.equal(transferCalls(fake.calls).length, 1);
+});
+
 test("post-transfer verification rejects metadata that does not identify the redirected issue", async () => {
   const fake = fakeGh({ target: metadata({ url: TARGET_URL, number: 8 }) });
   const entry = transferEntry();

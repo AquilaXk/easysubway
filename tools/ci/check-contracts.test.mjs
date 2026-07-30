@@ -368,10 +368,15 @@ test("boundaries v2는 모든 target과 정확히 한 번의 splitOrder를 요�
   extra.splitOrder = [...extra.splitOrder, "unknown"];
   const duplicate = structuredClone(boundaries);
   duplicate.splitOrder = ["data", "platform", "backend", "backend", "mobile"];
+  const absent = structuredClone(boundaries);
+  delete absent.extractionTargets.mobile;
+  absent.splitOrder = absent.splitOrder.filter((target) => target !== "mobile");
 
   assert.ok(validateBoundariesPayload(missing).some((error) => error.includes("mobile splitOrder 누락")));
   assert.ok(validateBoundariesPayload(extra).some((error) => error.includes("unknown extraction target 누락")));
   assert.ok(validateBoundariesPayload(duplicate).some((error) => error.includes("backend splitOrder 중복")));
+  assert.ok(validateBoundariesPayload(absent).some((error) => error.includes("mobile extraction target 누락")));
+  assert.ok(validateBoundariesPayload(absent).some((error) => error.includes("mobile splitOrder 누락")));
 });
 
 test("boundaries v2는 malformed repository, source area, global root 충돌을 거부한다", () => {

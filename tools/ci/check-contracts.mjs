@@ -252,6 +252,12 @@ export function validateBoundariesPayload(boundaries) {
   for (const targetName of Object.keys(targets)) {
     if (!splitTargets.has(targetName)) errors.push(`contracts/boundaries.json: ${targetName} splitOrder 누락`);
   }
+  for (const targetName of Object.keys(EXTRACTION_REPOSITORIES)) {
+    if (!Object.hasOwn(targets, targetName) && !splitTargets.has(targetName)) {
+      errors.push(`contracts/boundaries.json: ${targetName} extraction target 누락`);
+      errors.push(`contracts/boundaries.json: ${targetName} splitOrder 누락`);
+    }
+  }
   const repositories = new Set();
   const ownedRoots = new Set();
   const sourceAreaOwners = new Map();
