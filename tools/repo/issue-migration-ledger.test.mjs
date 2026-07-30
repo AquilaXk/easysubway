@@ -138,6 +138,9 @@ test("허용된 다섯 repository 밖의 target은 거부한다", () => {
 test("TRANSFER는 approved와 transferred execution state를 차례로 허용한다", () => {
   const ledger = ledgerFixture();
   const entry = ledger.issues[0];
+  for (const otherEntry of ledger.issues.slice(1)) {
+    otherEntry.executionApproval = null;
+  }
   entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
 
   assert.deepEqual(validateLedger(ledger), []);
