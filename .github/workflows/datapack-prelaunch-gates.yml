@@ -121,6 +121,7 @@ jobs:
 
       - name: Rehearse PostgreSQL governance migration and backend reconciliation
         env:
+          EASYSUBWAY_CONTRACTS_BUNDLE: ${{ github.workspace }}/contracts/bundles/backend-contracts-v1.0.0.json
           EASYSUBWAY_PRELAUNCH_MANIFEST_SHA256: ${{ steps.prepare.outputs.manifestSha256 }}
           EASYSUBWAY_PRELAUNCH_RELEASE_SEQUENCE: ${{ steps.prepare.outputs.releaseSequence }}
         run: |

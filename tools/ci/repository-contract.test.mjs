@@ -1473,8 +1473,12 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   const workflow = read(".github/workflows/cd.yml");
 
   assert.match(workflow, /name: CD/);
-  assert.match(workflow, /workflow_run:[\s\S]*workflows:\s*\n\s*-\s*CI[\s\S]*types:\s*\n\s*-\s*completed/);
+  assert.match(workflow, /workflow_run:[\s\S]*workflows:\s*\n\s*-\s*Release Artifacts[\s\S]*types:\s*\n\s*-\s*completed/);
   assert.match(workflow, /workflow_run:[\s\S]*branches:\s*\n\s*-\s*main/);
+  assert.match(workflow, /github\.event\.workflow_run\.conclusion == 'success'/);
+  assert.match(workflow, /github\.event\.workflow_run\.event == 'push'/);
+  assert.match(workflow, /github\.event\.workflow_run\.head_branch == 'main'/);
+  assert.match(workflow, /github\.event\.workflow_run\.head_repository\.full_name == github\.repository/);
   assert.match(workflow, /workflow_dispatch:/);
   assert.match(workflow, /permissions:[\s\S]*actions:\s*read[\s\S]*contents:\s*read/);
   assert.doesNotMatch(workflow, /\nconcurrency:\s*\n\s*group: cd-production-deploy/);
@@ -1487,6 +1491,7 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /CD Deploy \/ Validate manual dispatch CI/);
   assert.match(workflow, /manual deployment requires a successful CI workflow/);
   assert.match(workflow, /https:\/\/api\.github\.com\/repos\/\$\{GITHUB_REPOSITORY\}\/actions\/runs/);
+  assert.match(workflow, /curl -fsS \\\n\s+--connect-timeout 5 \\\n\s+--max-time 20 \\\n\s+-H "Accept: application\/vnd\.github\+json"/);
   assert.doesNotMatch(workflow, /\bgh api\b/);
   assert.match(workflow, /CD Deploy \/ Restore GitHub Actions dotenv secret/);
   assert.match(workflow, /CD Deploy \/ Restore GitHub Actions dotenv secret[\s\S]*?env:\s*\n\s*EASYSUBWAY_ENV_SECRET: \$\{\{ secrets\.EASYSUBWAY_ENV \}\}/);
@@ -1532,39 +1537,24 @@ test("지속적 배포 준비 상태는 단일 dotenv secret과 배포 설정을
   assert.match(workflow, /tools\/deploy\/backend-app-env\.allowlist/);
   assert.match(workflow, /CD Deploy \/ Validate Docker Compose deployment config/);
   assert.match(workflow, /docker compose --env-file "\$\{PREPARED_ENV_DIR\}\/compose\.env" -f infra\/docker-compose\.yml config --quiet/);
-  // build-once, deploy-same: the arm64 image is built and pushed to GHCR by the
-  // build-image job; the deploy job pulls it by digest instead of building a jar
-  // on the runner or on the server (issue #1686).
-  assert.match(workflow, /CD Build image \/ Build and push arm64 image/);
+  // build-once, deploy-same: Release Artifacts is the only producer. CD
+  // validates that exact run's component manifest and pulls only its digest.
+  assert.match(workflow, /Release Artifacts/);
+  assert.match(workflow, /workflow_run\.id/);
+  assert.match(workflow, /require-successful-workflow-run\.mjs/);
+  assert.match(workflow, /actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093/);
+  assert.match(workflow, /backend-component-manifest\.json/);
+  assert.match(workflow, /needs\.plan\.outputs\.image_digest/);
   assert.match(workflow, /ghcr\.io\/aquilaxk\/easysubway-backend/);
-  assert.match(workflow, /docker buildx create --use/);
-  assert.match(workflow, /docker buildx build \\/);
-  assert.match(workflow, /--platform linux\/arm64 \\/);
-  assert.match(workflow, /--attest type=sbom \\/);
-  assert.match(workflow, /--provenance=true \\/);
-  assert.match(workflow, /--metadata-file "\$\{metadata_file\}" \\/);
-  assert.match(workflow, /--push \\/);
-  assert.match(workflow, /backend-build-metadata\.json/);
-  assert.match(workflow, /Buildx metadata digest does not match the pushed manifest/);
-  assert.match(workflow, /backend-image-evidence/);
-  assert.match(workflow, /docker buildx imagetools inspect "\$\{tag\}" --raw/);
-  assert.match(workflow, /--format '\{\{\.Manifest\.Digest\}\}'/);
-  assert.match(
-    workflow,
-    /--format '\{\{range \.Manifest\.Manifests\}\}\{\{if eq \.Platform\.OS "linux"\}\}\{\{\.Platform\.OS\}\}\/\{\{\.Platform\.Architecture\}\}/,
-  );
-  assert.doesNotMatch(workflow, /\.Manifest\.digest|\.Manifest\.manifests|\.platform\.(?:os|architecture)/);
-  assert.match(workflow, /printf 'base_image=%s\\n' "\$\{base_image\}"/);
-  assert.match(workflow, /printf 'image_digest=%s\\n' "\$\{digest\}"/);
-  assert.match(workflow, /name: backend-image-identity-\$\{\{ needs\.plan\.outputs\.sha \}\}/);
-  assert.match(
-    workflow,
-    /if digest="\$\(docker buildx imagetools inspect[\s\S]*?else[\s\S]*?docker buildx build[\s\S]*?^          fi[\s\S]*?arch="\$\(docker buildx imagetools inspect/m,
-  );
-  assert.match(workflow, /if \[\[ "\$\{arch\}" != "linux\/arm64" \]\]; then/);
+  assert.doesNotMatch(workflow, /^  build-image:/m);
+  assert.doesNotMatch(workflow, /docker buildx build/);
+  assert.doesNotMatch(workflow, /working-directory: backend/);
+  assert.doesNotMatch(workflow, /backend\/Dockerfile/);
+  assert.doesNotMatch(workflow, /gradlew bootJar/);
   assert.match(workflow, /CD Deploy \/ Pull backend image by digest/);
   assert.match(workflow, /docker tag "\$\{IMAGE\}@\$\{DEPLOY_IMAGE_DIGEST\}" "easysubway-backend:\$\{DEPLOY_SHA\}"/);
   assert.match(workflow, /DEPLOY_IMAGE_DIGEST="\$\{DEPLOY_IMAGE_DIGEST\}"/);
+  assert.match(workflow, /CD Deploy \/ Summarize deployment result[\s\S]*IMAGE_DIGEST: \$\{\{ needs\.plan\.outputs\.image_digest \}\}[\s\S]*image digest: \$\{IMAGE_DIGEST:-unknown\}/);
   assert.doesNotMatch(workflow, /CD Deploy \/ Build backend bootJar/);
   assert.doesNotMatch(workflow, /sha256sum backend\.jar > backend\.jar\.sha256/);
   assert.match(workflow, /CD Deploy \/ Run local deployment/);
@@ -1944,7 +1934,7 @@ test("GitHub Actions Slack 알림은 채널별 webhook secret으로 필터링한
   assert.equal((inlineSlackWorkflows.match(/SLACK_RELEASE_WEBHOOK_URL: \$\{\{ secrets\.SLACK_RELEASE_WEBHOOK_URL \}\}/g) ?? []).length, 4);
   assert.equal((inlineSlackWorkflows.match(/SLACK_SECURITY_WEBHOOK_URL: \$\{\{ secrets\.SLACK_SECURITY_WEBHOOK_URL \}\}/g) ?? []).length, 2);
   assert.match(ciWorkflow, /notify-slack-ci-failure:[\s\S]*needs:\s*\n\s*-\s*changes[\s\S]*github\.event_name == 'push'[\s\S]*github\.ref == 'refs\/heads\/main'[\s\S]*contains\(needs\.\*\.result, 'failure'\)/);
-  assert.match(cdWorkflow, /notify-slack-cd-result:[\s\S]*needs:\s*\n\s*-\s*plan\n\s*-\s*build-image\n\s*-\s*deploy\n\s*-\s*record-deploy\n\s*-\s*post-deploy-smoke[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
+  assert.match(cdWorkflow, /notify-slack-cd-result:[\s\S]*needs:\s*\n\s*-\s*plan\n\s*-\s*deploy\n\s*-\s*record-deploy\n\s*-\s*post-deploy-smoke[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(releaseArtifactsWorkflow, /notify-slack-release-result:[\s\S]*github\.event_name != 'pull_request'[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(dataPackReleaseWorkflow, /notify-slack-datapack-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
   assert.match(storeDistributionWorkflow, /notify-slack-store-result:[\s\S]*SLACK_RELEASE_WEBHOOK_URL/);
@@ -3499,11 +3489,67 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 
   assert.match(workflow, /backend-release:/);
   assert.match(workflow, /name: Backend Release Image/);
+  assert.match(workflow, /runs-on: ubuntu-24\.04-arm/);
   assert.match(workflow, /working-directory: backend[\s\S]*?\.\/gradlew bootJar --no-daemon/);
-  assert.match(workflow, /docker build -f backend\/Dockerfile -t easysubway-backend:\$\{\{ github\.sha \}\} backend/);
-  assert.match(workflow, /docker image inspect easysubway-backend:\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /docker buildx build --load --platform linux\/arm64/);
+  assert.match(workflow, /docker buildx build --platform linux\/arm64 --push --sbom=true --provenance=mode=max/);
+  assert.match(workflow, /backend\/tools\/build-component-manifest\.mjs/);
   assert.match(workflow, /docker compose --env-file \.env\.example -f infra\/docker-compose\.yml config --quiet/);
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
+});
+
+test("backend release artifact는 main에서 immutable arm64 image와 component manifest를 발행한다", () => {
+  const workflow = read(".github/workflows/release-artifacts.yml");
+  const backendJob = jobBlock(workflow, "backend-release", "rc-evidence-manifest");
+  const deployBackend = read("tools/deploy/deploy-backend.sh");
+
+  assert.match(backendJob, /runs-on: ubuntu-24\.04-arm/);
+  assert.match(backendJob, /actions: read/);
+  assert.match(backendJob, /packages: write/);
+  assert.doesNotMatch(backendJob, /\n    if: \$\{\{ github\.event_name == 'push' \|\|/);
+  assert.match(backendJob, /needs\.changes\.outputs\.deploy == 'true'/);
+  assert.match(backendJob, /Backend Release Image \/ Require successful main CI/);
+  assert.match(
+    backendJob,
+    /actions\/workflows\/ci\.yml\/runs\?head_sha=\$\{GITHUB_SHA\}&branch=main&event=push&status=success&per_page=20/,
+  );
+  assert.match(
+    backendJob,
+    /require-successful-workflow-run\.mjs[\s\S]*?"\$\{GITHUB_SHA\}"[\s\S]*?"CI"[\s\S]*?"push"[\s\S]*?main/,
+  );
+  assert.ok(
+    backendJob.indexOf("Backend Release Image / Require successful main CI") <
+      backendJob.indexOf("Backend Release Image / Log in to GHCR"),
+    "exact-SHA CI success must gate image publication",
+  );
+  assert.match(backendJob, /mkdir -p \.\.\/release-artifacts\/backend\n\s+\.\/gradlew test --no-daemon/);
+  assert.match(backendJob, /if: \$\{\{ github\.event_name != 'push' \}\}[\s\S]*docker buildx build --load --platform linux\/arm64/);
+  assert.match(backendJob, /docker buildx build --load --platform linux\/arm64 -f backend\/Dockerfile -t easysubway-backend:\$\{GITHUB_SHA\} backend/);
+  assert.match(backendJob, /docker image inspect easysubway-backend:\$\{GITHUB_SHA\}/);
+  assert.doesNotMatch(backendJob.match(/Build PR validation image[\s\S]*?(?=\n      - name:|$)/)?.[0] ?? "", /--push|docker\/login-action/);
+  assert.match(backendJob, /if: \$\{\{ github\.event_name == 'push' \}\}[\s\S]*docker\/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567/);
+  assert.match(backendJob, /ghcr\.io\/aquilaxk\/easysubway-backend:sha-\$\{GITHUB_SHA\}/);
+  assert.match(backendJob, /docker buildx create --driver docker-container --use/);
+  assert.match(backendJob, /docker buildx build --platform linux\/arm64 --push --sbom=true --provenance=mode=max --metadata-file "\$\{metadata_file\}"/);
+  assert.match(backendJob, /--label "org\.opencontainers\.image\.revision=\$\{GITHUB_SHA\}"/);
+  assert.match(backendJob, /--label "org\.opencontainers\.image\.source=https:\/\/github\.com\/\$\{GITHUB_REPOSITORY\}"/);
+  assert.match(backendJob, /docker buildx imagetools inspect --format '\{\{\.Manifest\.Digest\}\}'/);
+  assert.match(backendJob, /containerimage\\\.digest/);
+  assert.match(backendJob, /image-index\.json/);
+  assert.match(backendJob, /--format '\{\{json \.SBOM\}\}'/);
+  assert.match(backendJob, /--format '\{\{json \.Provenance\}\}'/);
+  assert.match(backendJob, /\[\[ -z "\$\{sbom\}" \|\| "\$\{sbom\}" == "null" \|\| -z "\$\{provenance\}" \|\| "\$\{provenance\}" == "null" \]\]/);
+  assert.match(backendJob, /\{\{range \.Manifest\.Manifests\}\}\{\{if eq \.Platform\.OS "linux"\}\}\{\{\.Platform\.OS\}\}\/\{\{\.Platform\.Architecture\}\}\{\{end\}\}\{\{end\}\}/);
+  assert.match(backendJob, /\[\[ "\$\{arch\}" != "linux\/arm64" \]\]/);
+  assert.match(backendJob, /final_from="\$\(awk 'toupper\(\$1\) == "FROM" \{ line=\$0 \} END \{ print line \}' backend\/Dockerfile\)"/);
+  assert.match(backendJob, /\^FROM\[\[:space:\]\]\+\[\^\[:space:\]\]\+@sha256:\[a-f0-9\]\{64\}\(\[\[:space:\]\]\+AS\[\[:space:\]\]\+\[A-Za-z0-9\._-\]\+\)\?\$/);
+  assert.match(backendJob, /identity\.env/);
+  assert.match(backendJob, /backend-component-manifest\.json/);
+  assert.match(backendJob, /backend\/tools\/build-component-manifest\.mjs/);
+  assert.match(backendJob, /--image-digest "\$\{image_digest\}"/);
+  assert.match(backendJob, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
+  assert.match(deployBackend, /image_revision="\$\(docker image inspect "easysubway-backend:\$\{DEPLOY_SHA\}" --format '\{\{index \.Config\.Labels "org\.opencontainers\.image\.revision"\}\}'/);
+  assert.match(deployBackend, /\[\[ "\$\{image_revision\}" != "\$\{DEPLOY_SHA\}" \]\]/);
 });
 
 test("[release-v2] RC evidence contract uses repository-qualified issue references", async () => {

@@ -106,6 +106,7 @@ jobs:
         working-directory: backend
         shell: bash
         env:
+          EASYSUBWAY_CONTRACTS_BUNDLE: ${{ github.workspace }}/contracts/bundles/backend-contracts-v1.0.0.json
           EASYSUBWAY_CALLBACK_REHEARSAL_OUTPUT: ${{ runner.temp }}/datapack-callback-reconciliation-raw-input.json
           EASYSUBWAY_CALLBACK_OUTAGE_ARTIFACT: ${{ runner.temp }}/datapack-callback-backend-outage.json
         run: |

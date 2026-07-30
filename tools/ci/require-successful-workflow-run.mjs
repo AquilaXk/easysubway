@@ -37,33 +37,43 @@ try {
   process.exit(1);
 }
 
-if (!Array.isArray(payload?.workflow_runs)) {
-  console.error("workflow runs response is missing workflow_runs");
+if (
+  !Number.isSafeInteger(payload?.total_count) ||
+  payload.total_count < 0 ||
+  !Array.isArray(payload?.workflow_runs) ||
+  payload.total_count !== payload.workflow_runs.length
+) {
+  console.error("workflow runs response is inconsistent");
   process.exit(1);
 }
 
 const now = Date.now();
 const maxFutureSkewMs = 5 * 60 * 1000;
-const matchingRun = payload.workflow_runs.find((run) => {
+const runs = payload.workflow_runs.map((run) => {
   const updatedAt = Date.parse(run?.updated_at ?? "");
   const ageMs = now - updatedAt;
-  return (
-    run?.name === expectedName &&
-    run?.head_sha === expectedSha &&
-    run?.head_branch === expectedBranch &&
-    expectedEvents.includes(run?.event) &&
-    run?.status === "completed" &&
-    run?.conclusion === "success" &&
-    Number.isSafeInteger(run?.id) &&
-    Number.isFinite(updatedAt) &&
-    ageMs >= -maxFutureSkewMs &&
-    ageMs <= maxAgeSeconds * 1000
-  );
+  if (
+    run?.name !== expectedName ||
+    run?.head_sha !== expectedSha ||
+    run?.head_branch !== expectedBranch ||
+    !expectedEvents.includes(run?.event) ||
+    run?.status !== "completed" ||
+    run?.conclusion !== "success" ||
+    !Number.isSafeInteger(run?.id) ||
+    run.id <= 0 ||
+    !Number.isFinite(updatedAt) ||
+    ageMs < -maxFutureSkewMs
+  ) {
+    console.error("workflow runs response is inconsistent");
+    process.exit(1);
+  }
+  return { run, ageMs };
 });
 
+const matchingRun = runs.find(({ ageMs }) => ageMs <= maxAgeSeconds * 1000)?.run;
 if (!matchingRun) {
-  console.error("required successful workflow run was not found");
-  process.exit(1);
+  console.error("required successful workflow run is unavailable");
+  process.exit(3);
 }
 
 console.log(`validated_workflow_run_id=${matchingRun.id}`);

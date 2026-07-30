@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -734,8 +735,6 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   assert.match(backup, /\.sha256/);
 
   const cd = read(".github/workflows/cd.yml");
-  assert.match(cd, /uses: actions\/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654/);
-  assert.doesNotMatch(cd, /uses: actions\/setup-java@be66141d4002b0e783cc31e5449d3f9f3267ffd9/);
   assert.match(cd, /if \[\[ -n "\$\{EASYSUBWAY_ENV_FILE:-\}" \]\]; then/);
   assert.doesNotMatch(cd, /EASYSUBWAY_ENV_FILE:-\/dev\/null/);
   // 파괴적 DDL 게이트는 배포 대상 checkout에서도 재검사한다(#2365).
@@ -744,6 +743,115 @@ test("백엔드 SSH 배포 스크립트는 상태, drift, 백업, standby 승격
   // pre-#2365 SHA 롤백 재배포 시 검사기 파일 부재를 skip하는 가드가 있어야 한다.
   assert.match(cd, /if \[\[ ! -f tools\/ci\/check-migration-ddl-compat\.mjs \]\]; then/);
   assert.match(cd, /migration DDL gate absent at deploy target \(pre-#2365 SHA\); skipping/);
+});
+
+test("CD는 exact Release Artifacts run의 backend digest만 배포한다", async () => {
+  const workflow = read(".github/workflows/cd.yml");
+  const pullStep = workflow.match(
+    /- name: CD Deploy \/ Pull backend image by digest[\s\S]*?(?=\n      - name:)/,
+  )?.[0] ?? "";
+  const validator = workflow.match(
+    /node --input-type=module - <<'NODE' >> "\$\{GITHUB_OUTPUT\}"\n([\s\S]*?)\n {10}NODE/,
+  )?.[1]?.replace(/^ {10}/gm, "");
+  const digest = `sha256:${"a".repeat(64)}`;
+  const evidence = "release evidence\n";
+  const dir = await mkdtemp(path.join(tmpdir(), "easysubway-component-manifest-"));
+  deploymentTempDirs.add(dir);
+  const manifestPath = path.join(dir, "backend-component-manifest.json");
+  const evidencePath = path.join(dir, "release-metadata.txt");
+  const outputPath = path.join(dir, "github-output");
+  const validatorPath = path.join(dir, "validate-component-manifest.mjs");
+  const runnerPath = path.join(dir, "run-validator.sh");
+
+  assert.ok(validator, "CD manifest validator heredoc must exist");
+  await Promise.all([
+    writeFile(evidencePath, evidence),
+    writeFile(outputPath, ""),
+    writeFile(validatorPath, validator),
+    writeFile(runnerPath, `node "${validatorPath}" >> "\${GITHUB_OUTPUT}"\n`),
+  ]);
+  const manifest = {
+    schemaVersion: 1,
+    component: "backend",
+    repository: "AquilaXk/easysubway",
+    gitSha: "b".repeat(40),
+    artifactIdentity: { imageDigest: digest, apiContractVersion: "1.0.0" },
+    contractVersion: "1.0.0",
+    evidenceSha256: createHash("sha256").update(evidence).digest("hex"),
+  };
+  const runValidator = () => execFileAsync("bash", [runnerPath], {
+    env: {
+      ...process.env,
+      DEPLOY_SHA: manifest.gitSha,
+      GITHUB_REPOSITORY: manifest.repository,
+      GITHUB_OUTPUT: outputPath,
+      MANIFEST_PATH: manifestPath,
+      EVIDENCE_PATH: evidencePath,
+    },
+  });
+
+  assert.match(workflow, /workflows:\n {6}- Release Artifacts/);
+  assert.match(workflow, /workflow_run\.id/);
+  assert.match(workflow, /workflow_run\.head_sha/);
+  assert.match(workflow, /producer_run_id: \$\{\{ steps\.target\.outputs\.producer_run_id \}\}/);
+  assert.match(workflow, /rollback_image_digest:/);
+  assert.match(
+    workflow,
+    /image_digest: \$\{\{ steps\.manifest\.outputs\.image_digest \|\| steps\.target\.outputs\.rollback_image_digest \}\}/,
+  );
+  assert.match(
+    workflow,
+    /if \[\[ -z "\$\{producer_run_id\}" \]\]; then[\s\S]*?\[\[ ! "\$\{rollback_image_digest\}" =~ \^sha256:\[a-f0-9\]\{64\}\$ \]\]/,
+  );
+  assert.match(
+    workflow,
+    /steps\.changes\.outputs\.deploy == 'true' && steps\.target\.outputs\.rollback_image_digest == ''/,
+  );
+  assert.match(workflow, /require-successful-workflow-run\.mjs/);
+  assert.match(workflow, /run_status == 3/);
+  assert.match(workflow, /exit "\$\{run_status\}"/);
+  assert.match(workflow, /actions\/runs\/\$\{producer_run_id\}\/artifacts\?name=\$\{artifact_name\}&per_page=100/);
+  assert.match(workflow, /require-workflow-artifact\.mjs/);
+  assert.match(workflow, /artifact_status == 3/);
+  assert.match(workflow, /exit "\$\{artifact_status\}"/);
+  assert.match(workflow, /Release Artifacts/);
+  assert.match(workflow, /easysubway-backend-release-\$\{\{ steps\.target\.outputs\.sha \}\}/);
+  assert.match(workflow, /actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093/);
+  assert.match(workflow, /run-id: \$\{\{ steps\.target\.outputs\.producer_run_id \}\}/);
+  assert.match(workflow, /backend-component-manifest\.json/);
+  assert.match(workflow, /manifest\?\.component !== "backend"/);
+  assert.match(workflow, /manifest\?\.repository !== process\.env\.GITHUB_REPOSITORY/);
+  assert.match(workflow, /manifest\?\.gitSha !== process\.env\.DEPLOY_SHA/);
+  assert.match(workflow, /contractVersion !== "1\.0\.0"/);
+  assert.match(workflow, /apiContractVersion !== manifest\.contractVersion/);
+  assert.match(workflow, /evidenceSha256/);
+  assert.match(workflow, /needs\.plan\.outputs\.image_digest/);
+  assert.match(workflow, /docker pull "\$\{IMAGE\}@\$\{DEPLOY_IMAGE_DIGEST\}"/);
+  assert.match(pullStep, /docker image inspect "easysubway-backend:\$\{DEPLOY_SHA\}"/);
+  assert.match(pullStep, /\[\[ "\$\{image_revision\}" != "\$\{DEPLOY_SHA\}" \]\]/);
+  assert.doesNotMatch(workflow, /^  build-image:/m);
+  assert.doesNotMatch(workflow, /working-directory: backend/);
+  assert.doesNotMatch(workflow, /gradlew bootJar/);
+  assert.doesNotMatch(workflow, /backend\/Dockerfile/);
+  assert.doesNotMatch(workflow, /docker buildx build/);
+
+  await writeFile(manifestPath, `${JSON.stringify(manifest)}\n`);
+  await runValidator();
+  assert.equal(await readFile(outputPath, "utf8"), `image_digest=${digest}\n`);
+
+  for (const invalidManifest of [
+    { ...manifest, contractVersion: undefined },
+    {
+      ...manifest,
+      artifactIdentity: { ...manifest.artifactIdentity, apiContractVersion: "2.0.0" },
+    },
+  ]) {
+    await writeFile(manifestPath, `${JSON.stringify(invalidManifest)}\n`);
+    await assert.rejects(runValidator(), (error) => {
+      assert.match(String(error.stderr), /backend component manifest is invalid/);
+      return true;
+    });
+  }
 });
 
 test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API 스모크로 게이트한다", () => {
@@ -764,7 +872,7 @@ test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API
   assert.match(cd, /if: \$\{\{ needs\.deploy\.outputs\.deploy_ready == 'true' \}\}/);
 
   // Smoke failures must propagate into the CD result Slack notification.
-  assert.match(cd, /needs:\n {6}- plan\n {6}- build-image\n {6}- deploy\n {6}- record-deploy\n {6}- post-deploy-smoke/);
+  assert.match(cd, /needs:\n {6}- plan\n {6}- deploy\n {6}- record-deploy\n {6}- post-deploy-smoke/);
 });
 
 test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 시 Nginx 설정을 복원한다", () => {
