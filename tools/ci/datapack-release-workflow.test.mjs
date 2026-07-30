@@ -679,6 +679,29 @@ test("production-publish는 attested candidate를 no-rebuild로 소비한다", (
   const stage = step("Data Pack Release / Stage verified candidate artifact");
   assert.match(stage, /cp -a "\$\{RUNNER_TEMP\}\/downloaded-candidate\/\." "\$\{EASYSUBWAY_DATAPACK_STAGE\}\//);
 
+  const publishPlan = step("Data Pack Release / Create manifest-last publish preflight plan");
+  assert.match(publishPlan, /EASYSUBWAY_DATAPACK_RELEASE_MODE\}" == "production-publish"/);
+  assert.match(publishPlan, /\$\{RUNNER_TEMP\}\/attested-candidate-publish-plan\.json/);
+  assert.match(publishPlan, /cmp -s "\$\{candidate_publish_plan\}" "\$\{EASYSUBWAY_DATAPACK_PUBLISH_PLAN\}"/);
+  assert.match(publishPlan, /--output "\$\{candidate_publish_plan\}"/);
+
+  const signing = step("Data Pack Release / Restore candidate signing credentials");
+  assert.match(signing, /if:\s*\$\{\{ steps\.release-mode\.outputs\.mode == 'release-candidate' \}\}/);
+  const signingSecrets = [...signing.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1]).sort();
+  assert.deepEqual(signingSecrets, [
+    "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
+    "EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM",
+    "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
+  ]);
+  assert.doesNotMatch(signing, /EASYSUBWAY_ENV|OBJECT_STORAGE/);
+  assert.match(signing, /::add-mask::/);
+  assert.match(signing, /printf '%s<<%s/);
+
+  const dotenv = step("Data Pack Release / Restore GitHub Actions dotenv secret");
+  assert.match(dotenv, /mode != 'release-candidate'/);
+  const remotePublish = step("Data Pack Release / Validate remote object storage publish env");
+  assert.match(remotePublish, /mode != 'release-candidate'/);
+
   for (const name of [
     "Data Pack Release / Prepare release fixture",
     "Data Pack Release / Audit route map coordinate coverage",

@@ -4,7 +4,7 @@ import { link, lstat, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "n
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { selectEffectiveDataPack, validateManifest } from "./lib/manifest-validation.mjs";
+import { selectEffectiveDataPack, stagedPackPath, validateManifest } from "./lib/manifest-validation.mjs";
 
 const requiredArguments = new Set([
   "root", "manifest", "provenance", "repository", "git-sha", "workflow-run-id",
@@ -42,6 +42,20 @@ export async function buildDataComponentManifest(input) {
     artifactKind: "datapack-candidate-inventory",
     entries: await inventoryEntries(root, new Set([inventoryOutput, output])),
   };
+  const declaredPackPaths = new Set(manifest.packs.map(stagedPackPath));
+  const inventoryPackPaths = new Set(
+    inventory.entries.filter((entry) => entry.path.endsWith(".sqlite.gz")).map((entry) => entry.path),
+  );
+  for (const declaredPath of declaredPackPaths) {
+    if (!inventoryPackPaths.has(declaredPath)) {
+      throw new Error(`candidate stage is missing manifest-declared pack: ${declaredPath}`);
+    }
+  }
+  for (const inventoryPath of inventoryPackPaths) {
+    if (!declaredPackPaths.has(inventoryPath)) {
+      throw new Error(`candidate stage contains undeclared pack: ${inventoryPath}`);
+    }
+  }
   const inventoryBytes = jsonBytes(inventory);
   const componentManifest = {
     schemaVersion: 1,

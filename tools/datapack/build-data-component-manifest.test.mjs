@@ -27,6 +27,7 @@ test("candidate stage의 불변 data component manifest와 정렬된 artifact in
       schemaVersion: 1,
       artifactKind: "datapack-candidate-inventory",
       entries: [
+        { path: "catalog/capital-v20260730.sqlite.gz", sizeBytes: 13, sha256: "bb41876d4fd94ba70ee2b40551f435217ba9889d109ee02bbc1ce867c674bbbf" },
         { path: "catalog/current.json", sizeBytes: fixture.currentBytes.length, sha256: manifestHash(fixture.currentBytes) },
         { path: "catalog/current.provenance.json", sizeBytes: fixture.provenanceBytes.length, sha256: manifestHash(fixture.provenanceBytes) },
         { path: "nested/payload.txt", sizeBytes: 18, sha256: "52429a1993d6c6cc051d5c4319e71bf40d2c54bafeffc25fb4b86b7568fd35c7" },
@@ -46,8 +47,8 @@ test("candidate stage의 불변 data component manifest와 정렬된 artifact in
       contractVersion: "datapack-contract-v3",
       issueRef: "AquilaXk/easysubway#2699",
     });
-    assert.equal(manifest.artifactInventorySha256, "1a48800adc31d582fc97ef2030529e7ef7f04182614491c45c2b48e386b7baa5");
-    assert.equal(manifestHash(manifestBytes), "b893d2e52f75abbfb1107beff957a4f1128b30269b4b853ceb95341441028b58");
+    assert.equal(manifest.artifactInventorySha256, "f17cdab0fb8d18b329dc12e21b9c4d612ab278b3dde374f2a20627620e7e50c0");
+    assert.equal(manifestHash(manifestBytes), "92c42a0cafcf0c3972900085ef48f0d7e97fbbf1358bdf1f4acdc651f23fda9f");
   } finally {
     fixture.cleanup();
   }
@@ -69,6 +70,32 @@ test("production manifest validation이 닫는 current manifest shape를 fail cl
     } finally {
       fixture.cleanup();
     }
+  }
+});
+
+test("manifest에 없는 staged sqlite gzip pack을 fail closed한다", () => {
+  const fixture = createFixture();
+  try {
+    writeFileSync(path.join(fixture.root, "catalog", "rogue-v20260730.sqlite.gz"), "rogue gzip");
+    const result = run(fixture);
+    assert.notEqual(result.status, 0, result.stderr);
+    assert.equal(exists(fixture.inventory), false);
+    assert.equal(exists(fixture.output), false);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("manifest가 선언한 staged sqlite gzip pack 누락을 fail closed한다", () => {
+  const fixture = createFixture();
+  try {
+    rmSync(path.join(fixture.root, "catalog", "capital-v20260730.sqlite.gz"));
+    const result = run(fixture);
+    assert.notEqual(result.status, 0, result.stderr);
+    assert.equal(exists(fixture.inventory), false);
+    assert.equal(exists(fixture.output), false);
+  } finally {
+    fixture.cleanup();
   }
 });
 
@@ -142,6 +169,7 @@ function createFixture(mutate = undefined) {
   const provenance = path.join(catalog, "current.provenance.json");
   writeFileSync(manifest, currentBytes);
   writeFileSync(provenance, provenanceBytes);
+  writeFileSync(path.join(catalog, "capital-v20260730.sqlite.gz"), "declared gzip");
   writeFileSync(path.join(root, "nested", "payload.txt"), "candidate payload\n");
   return {
     root,

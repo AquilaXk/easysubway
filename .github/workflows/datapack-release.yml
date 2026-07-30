@@ -368,6 +368,7 @@ jobs:
           node tools/datapack/validate-source-snapshot-freshness.mjs "${freshness_args[@]}"
 
       - name: Data Pack Release / Restore GitHub Actions dotenv secret
+        if: ${{ steps.release-mode.outputs.mode != 'release-candidate' }}
         env:
           EASYSUBWAY_ENV_SECRET: ${{ secrets.EASYSUBWAY_ENV }}
           EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY_SECRET: ${{ secrets.EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY }}
@@ -431,8 +432,44 @@ jobs:
           chmod 600 "${env_file}"
           echo "EASYSUBWAY_ENV_FILE=${env_file}" >> "${GITHUB_ENV}"
 
+      - name: Data Pack Release / Restore candidate signing credentials
+        if: ${{ steps.release-mode.outputs.mode == 'release-candidate' }}
+        env:
+          EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM }}
+          EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM }}
+          EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID }}
+        run: |
+          set -euo pipefail
+          for name in EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM EASYSUBWAY_DATAPACK_SIGNING_KEY_ID; do
+            [[ -n "${!name}" ]] || { echo "${name} is required for release-candidate" >&2; exit 1; }
+          done
+          while IFS= read -r line || [[ -n "${line}" ]]; do
+            echo "::add-mask::${line}"
+          done <<< "${EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM}"
+          for name in EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM; do
+            delimiter="${name}_EOF"
+            [[ "${!name}" != *"${delimiter}"* ]] || { echo "${name} contains an unsafe delimiter" >&2; exit 1; }
+            printf '%s<<%s\n%s\n%s\n' "${name}" "${delimiter}" "${!name}" "${delimiter}" >> "${GITHUB_ENV}"
+          done
+          [[ "${EASYSUBWAY_DATAPACK_SIGNING_KEY_ID}" != *$'\n'* && "${EASYSUBWAY_DATAPACK_SIGNING_KEY_ID}" != *$'\r'* ]] || { echo "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID must be a single line" >&2; exit 1; }
+          printf 'EASYSUBWAY_DATAPACK_SIGNING_KEY_ID=%s\n' "${EASYSUBWAY_DATAPACK_SIGNING_KEY_ID}" >> "${GITHUB_ENV}"
+
+      - name: Data Pack Release / Restore candidate source API credentials
+        if: ${{ steps.release-mode.outputs.mode == 'release-candidate' }}
+        env:
+          EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY: ${{ secrets.EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY }}
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+          KRIC_SERVICE_KEY: ${{ secrets.KRIC_SERVICE_KEY }}
+        run: |
+          set -euo pipefail
+          for name in EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY DATA_GO_KR_SERVICE_KEY KRIC_SERVICE_KEY; do
+            [[ -n "${!name}" && "${!name}" != *$'\n'* && "${!name}" != *$'\r'* ]] || { echo "${name} must be a non-empty single line candidate credential" >&2; exit 1; }
+            printf '%s=%s\n' "${name}" "${!name}" >> "${GITHUB_ENV}"
+          done
+
       - name: Data Pack Release / Validate remote object storage publish env
         id: remote-publish-env
+        if: ${{ steps.release-mode.outputs.mode != 'release-candidate' }}
         run: |
           set -euo pipefail
           if [[ -z "${EASYSUBWAY_ENV_FILE:-}" ]]; then
@@ -583,7 +620,7 @@ jobs:
               --overrides tools/datapack/fixtures/admin-review-overrides.json \
               --output "${EASYSUBWAY_DATAPACK_REVIEWED_FIXTURE}"
             build_fixture="${EASYSUBWAY_DATAPACK_REVIEWED_FIXTURE}"
-          elif [[ "${{ steps.remote-publish-env.outputs.enabled }}" != "true" ]]; then
+          elif [[ "${EASYSUBWAY_DATAPACK_RELEASE_MODE}" != "release-candidate" && "${{ steps.remote-publish-env.outputs.enabled }}" != "true" ]]; then
             echo "release mode requires production publish env" >&2
             exit 1
           else
@@ -978,9 +1015,14 @@ jobs:
           publish_plan_args=(
             --manifest "${EASYSUBWAY_DATAPACK_STAGE}/catalog/current.json"
             --root "${EASYSUBWAY_DATAPACK_STAGE}"
-            --output "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}"
           )
-          node tools/datapack/create-publish-plan.mjs "${publish_plan_args[@]}"
+          if [[ "${EASYSUBWAY_DATAPACK_RELEASE_MODE}" == "production-publish" ]]; then
+            candidate_publish_plan="${RUNNER_TEMP}/attested-candidate-publish-plan.json"
+            node tools/datapack/create-publish-plan.mjs "${publish_plan_args[@]}" --output "${candidate_publish_plan}"
+            cmp -s "${candidate_publish_plan}" "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}"
+          else
+            node tools/datapack/create-publish-plan.mjs "${publish_plan_args[@]}" --output "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}"
+          fi
           test -f "${EASYSUBWAY_DATAPACK_PUBLISH_PLAN}"
 
       - name: Data Pack Release / Validate object storage publish executor dry run
