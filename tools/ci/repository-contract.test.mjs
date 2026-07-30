@@ -6053,10 +6053,13 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
 
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-datapack-readiness-"));
   const validationRepo = path.join(tempDir, "validation-repo");
-  for (const directory of ["apps/mobile/release", "tools/release", "tools/ops", "tools/security"]) {
+  for (const directory of ["apps/mobile/release", "contracts/release", "tools/release", "tools/ops", "tools/security"]) {
     await mkdir(path.join(validationRepo, directory), { recursive: true });
   }
   await symlink(path.join(root, "apps/mobile/release/production-datapack-scope.json"), path.join(validationRepo, "apps/mobile/release/production-datapack-scope.json"));
+  for (const schema of ["component-manifest.schema.json", "system-release-manifest.schema.json", "issue-ref.schema.json"]) {
+    await symlink(path.join(root, "contracts/release", schema), path.join(validationRepo, "contracts/release", schema));
+  }
   await symlink(path.join(root, "tools/release/hash-android-bundle-payload.mjs"), path.join(validationRepo, "tools/release/hash-android-bundle-payload.mjs"));
   await symlink(path.join(root, "tools/release/count-gzip-uncompressed-bytes.mjs"), path.join(validationRepo, "tools/release/count-gzip-uncompressed-bytes.mjs"));
   await writeFile(path.join(validationRepo, "tools/ops/validate-operations-release-summary.mjs"), `import { readFileSync } from "node:fs";
