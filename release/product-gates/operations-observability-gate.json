@@ -3,7 +3,7 @@
   "applicationId": "easysubway",
   "releaseGate": "operations-observability",
   "releaseBlockerPolicy": true,
-  "releaseEvidenceManifest": "apps/mobile/release/operations-release-evidence.json",
+  "releaseEvidenceManifest": "release/product-gates/operations-release-evidence.json",
   "policyRefreshKo": "상용 배포 전 운영 관측성과 알림 기준을 최신 main 기준으로 확인한다.",
   "signalEvidencePolicy": {
     "allowedResolutionKinds": [
@@ -21,7 +21,7 @@
       "evidenceIds": ["actuator-readiness", "productionReadiness-health-group", "backend-log-review"],
       "result": "PASS",
       "redactionNotes": "summary only; sensitive values omitted",
-      "localEvidencePath": "apps/mobile/release/operations-release-evidence.json"
+      "localEvidencePath": "release/product-gates/operations-release-evidence.json"
     },
     {
       "signalId": "report_api_error_rate",
@@ -37,7 +37,7 @@
       "evidenceIds": ["report-processing-time-summary", "review-audit-log"],
       "result": "PASS",
       "redactionNotes": "summary only; report records omitted",
-      "localEvidencePath": "apps/mobile/release/support-incident-response-gate.json"
+      "localEvidencePath": "release/product-gates/support-incident-response-gate.json"
     },
     {
       "signalId": "datapack_release_publish_result",
@@ -77,7 +77,7 @@
       "evidenceIds": ["route-result-distribution", "route-engine-version"],
       "result": "PASS",
       "redactionNotes": "summary only; test data contains no personal data",
-      "localEvidencePath": "apps/mobile/release/route-commercialization-gate.json"
+      "localEvidencePath": "release/product-gates/route-commercialization-gate.json"
     },
     {
       "signalId": "route_quality_observability_dashboard",
@@ -85,7 +85,7 @@
       "evidenceIds": ["route-quality-dashboard-url-or-external-blocker", "route-accuracy-report", "route-v2-contract-report"],
       "result": "PASS",
       "redactionNotes": "Phase A verifies the quality review runbook; live dashboard observations are recorded in Phase B",
-      "localEvidencePath": "apps/mobile/release/route-commercialization-gate.json"
+      "localEvidencePath": "release/product-gates/route-commercialization-gate.json"
     },
     {
       "signalId": "datapack_install_rollback_failure_rate",
@@ -185,7 +185,7 @@
       "thresholdKo": "릴리즈 후보 crash-free sessions 99.5% 미만이면 공개 배포 보류",
       "firstResponseKo": "store internal track 또는 crash provider 대시보드의 crash-free 세션을 확인한다.",
       "evidence": ["crash-free-session-dashboard-or-external-blocker"],
-      "linkedArtifacts": ["apps/mobile/release/release-security-gate.json"]
+      "linkedArtifacts": ["release/product-gates/release-security-gate.json"]
     },
     {
       "id": "mobile_anr_rate",
@@ -221,7 +221,7 @@
       "thresholdKo": "ETA P50/P90, wrong transfer, wrong line sequence, route not found rate 중 route commercialization gate 기준을 넘으면 배포 차단 또는 rollout 보류",
       "firstResponseKo": "route accuracy report, route v2 contract report, provider coverage report를 같은 RC evidence 묶음으로 확인한다.",
       "evidence": ["route-quality-dashboard-url-or-external-blocker", "route-accuracy-report", "route-v2-contract-report"],
-      "linkedArtifacts": ["apps/mobile/release/route-commercialization-gate.json", "tools/routes/check-route-commercialization-gate.mjs", "tools/routes/evaluate-eta-accuracy.mjs"]
+      "linkedArtifacts": ["release/product-gates/route-commercialization-gate.json", "tools/routes/check-route-commercialization-gate.mjs", "tools/routes/evaluate-eta-accuracy.mjs"]
     },
     {
       "id": "datapack_install_rollback_failure_rate",

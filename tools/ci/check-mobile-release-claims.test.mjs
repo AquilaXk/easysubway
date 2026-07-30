@@ -74,7 +74,7 @@ test("allowedPhrasesKo lets facility names pass but still blocks classification 
   await mkdir(facilityDir, { recursive: true });
   const facilityFile = path.join(facilityDir, "facility_name.dart");
 
-  const configPath = path.join(tmp, "apps/mobile/release/forbidden-release-claims.json");
+  const configPath = path.join(tmp, "release/product-gates/forbidden-release-claims.json");
   const config = JSON.parse(await readFile(configPath, "utf8"));
   config.forbiddenClaimsKo = [...(config.forbiddenClaimsKo ?? []), "장애인"];
   config.allowedPhrasesKo = ["장애인 화장실"];

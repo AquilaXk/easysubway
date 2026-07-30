@@ -6,7 +6,7 @@ import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const root = path.resolve(args.get("root") ?? process.cwd());
-  const configPath = path.resolve(root, args.get("config") ?? "apps/mobile/release/forbidden-release-claims.json");
+  const configPath = path.resolve(root, args.get("config") ?? "release/product-gates/forbidden-release-claims.json");
   const config = JSON.parse(await readFile(configPath, "utf8"));
   const scope = JSON.parse(await readFile(path.resolve(root, config.scopeSource), "utf8"));
   const supportedClaimKo = scope.verifiedAccessibilityScope?.supportedClaimKo;

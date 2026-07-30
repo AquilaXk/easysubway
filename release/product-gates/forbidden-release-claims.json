@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "releaseGate": "mobile-release-claim-scan",
   "issue": 1392,
-  "scopeSource": "apps/mobile/release/production-datapack-scope.json",
+  "scopeSource": "release/product-gates/production-datapack-scope.json",
   "scanTargets": [
     {
       "path": "apps/mobile/lib",

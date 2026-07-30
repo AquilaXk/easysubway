@@ -56,7 +56,7 @@
     "expiresWhen"
   ],
   "requiredRcEvidenceBackendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
-  "rcEvidenceManifestContract": "apps/mobile/release/rc-evidence-manifest-contract.json",
+  "rcEvidenceManifestContract": "release/product-gates/rc-evidence-manifest-contract.json",
   "releaseReadiness": {
     "openAndroidP0BlocksGo": true,
     "iosBlocksAndroidRelease": false,
@@ -192,7 +192,7 @@
       "status": "IN_PROGRESS",
       "owner": "release-governance",
       "nextAction": "release gate vocabulary, required checks, RC identity contract 정합성 검증",
-      "evidenceReference": "apps/mobile/release/release-governance-gate.json"
+      "evidenceReference": "release/product-gates/release-governance-gate.json"
     },
     {
       "id": "G1_PRODUCTION_DATAPACK",
@@ -201,7 +201,7 @@
       "status": "IN_PROGRESS",
       "owner": "datapack",
       "nextAction": "운영 데이터팩 coverage, signing, publish evidence 수집",
-      "evidenceReference": "apps/mobile/release/server-minimized-qa-gate.json"
+      "evidenceReference": "release/product-gates/server-minimized-qa-gate.json"
     },
     {
       "id": "G2_ROUTE_SAFETY",
@@ -210,7 +210,7 @@
       "status": "IN_PROGRESS",
       "owner": "mobile-routing",
       "nextAction": "server-minimized route/offline acceptance evidence 연결",
-      "evidenceReference": "apps/mobile/release/server-minimized-qa-gate.json"
+      "evidenceReference": "release/product-gates/server-minimized-qa-gate.json"
     },
     {
       "id": "G3_ANDROID_16KB_PAGE_SIZE",
@@ -237,7 +237,7 @@
       "status": "SATISFIED",
       "owner": "backend-admin",
       "nextAction": "production environment와 로컬 prod-like 배포·rollback, 실제 restore, break-glass·audit 증거 완료; production 실행은 #1020에서 판정",
-      "evidenceReference": "apps/mobile/release/operations-release-evidence.json"
+      "evidenceReference": "release/product-gates/operations-release-evidence.json"
     },
     {
       "id": "G6_SECURITY_PRIVACY",
@@ -246,7 +246,7 @@
       "status": "BLOCKED_EXTERNAL",
       "owner": "security-privacy",
       "nextAction": "abuse-case, penetration rehearsal, crash/privacy evidence 수집",
-      "evidenceReference": "apps/mobile/release/abuse-penetration-rehearsal-gate.json"
+      "evidenceReference": "release/product-gates/abuse-penetration-rehearsal-gate.json"
     },
     {
       "id": "G7_ANDROID_QUALITY",
@@ -264,7 +264,7 @@
       "status": "BLOCKED_EXTERNAL",
       "owner": "operations",
       "nextAction": "Node 24 fixed-release rehearsal을 같은 RC로 재실행하고 Phase A evidence를 재검증",
-      "evidenceReference": "apps/mobile/release/post-launch-operations-review-gate.json"
+      "evidenceReference": "release/product-gates/post-launch-operations-review-gate.json"
     },
     {
       "id": "G9_GOOGLE_PLAY",
@@ -291,7 +291,7 @@
       "status": "IN_PROGRESS",
       "owner": "release-owner",
       "nextAction": "final RC evidence manifest identity와 waiver 판정 동결",
-      "evidenceReference": "apps/mobile/release/rc-evidence-manifest-contract.json"
+      "evidenceReference": "release/product-gates/rc-evidence-manifest-contract.json"
     },
     {
       "id": "G12_ROUTE_RESULT_V2_UI_COPY",
@@ -309,7 +309,7 @@
       "status": "IN_PROGRESS",
       "owner": "datapack-release",
       "nextAction": "데이터팩·실시간 ETA readiness tracker 하위 이슈와 production artifact evidence 수집",
-      "evidenceReference": "apps/mobile/release/datapack-release-readiness-gate.json"
+      "evidenceReference": "release/product-gates/datapack-release-readiness-gate.json"
     },
     {
       "id": "G14_ROUTE_RELEASE_READINESS",
@@ -318,7 +318,7 @@
       "status": "IN_PROGRESS",
       "owner": "route-release",
       "nextAction": "길찾기 출시 readiness tracker 하위 이슈와 production route evidence 수집",
-      "evidenceReference": "apps/mobile/release/route-release-readiness-tracker.json"
+      "evidenceReference": "release/product-gates/route-release-readiness-tracker.json"
     }
   ],
   "childIssueLinks": [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230, 1414],

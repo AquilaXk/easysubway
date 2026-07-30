@@ -1061,10 +1061,10 @@ jobs:
           node tools/release/generate-route-integration-verdict.mjs \
             "${verdict_args[@]}" \
             --output release-artifacts/rc/route-integration-verdict.json
-          cp apps/mobile/release/post-launch-operations-review-gate.json release-artifacts/rc/post-launch-operations-review-gate.json
-          cp apps/mobile/release/support-incident-response-gate.json release-artifacts/rc/support-incident-response-gate.json
-          cp apps/mobile/release/operations-observability-gate.json release-artifacts/rc/operations-observability-gate.json
-          cp apps/mobile/release/rc-evidence-manifest-contract.json release-artifacts/rc/rc-evidence-manifest-contract.json
+          cp release/product-gates/post-launch-operations-review-gate.json release-artifacts/rc/post-launch-operations-review-gate.json
+          cp release/product-gates/support-incident-response-gate.json release-artifacts/rc/support-incident-response-gate.json
+          cp release/product-gates/operations-observability-gate.json release-artifacts/rc/operations-observability-gate.json
+          cp release/product-gates/rc-evidence-manifest-contract.json release-artifacts/rc/rc-evidence-manifest-contract.json
           {
             echo "commit=${GITHUB_SHA}"
             echo "manifest=final-readiness.json"

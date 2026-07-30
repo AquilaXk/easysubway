@@ -1,6 +1,6 @@
 /// 보행 프로필 프리셋 정책의 정본 상수.
 ///
-/// `apps/mobile/release/mobility-profile-policy.json`을 그대로 반영하며, 그 JSON이
+/// `release/product-gates/mobility-profile-policy.json`을 그대로 반영하며, 그 JSON이
 /// node 리포 계약 테스트와 `mobility_profile_policy_test.dart` 양쪽에서 강제되는
 /// 단일 진실 원본이다. JSON을 함께 바꾸지 않고 여기 값만 바꾸면(또는 그 반대)
 /// 동기화 테스트가 실패한다.

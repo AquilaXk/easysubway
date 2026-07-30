@@ -31,7 +31,7 @@ test("train-search canonical allowlist와 OpenAPI enum은 ITX-청춘을 제외�
   const trainTypeSchema = openapi.match(/\n    TrainType:\n([\s\S]*?)(?=\n    [A-Z][A-Za-z]+:|$)/)?.[1];
 
   assert.deepEqual(scope.services, supportedTrainTypes);
-  assert.equal(scope.exclusionContract, "apps/mobile/release/train-search-itx-exclusion-gate.json");
+  assert.equal(scope.exclusionContract, "release/product-gates/train-search-itx-exclusion-gate.json");
   assert.ok(trainTypeSchema);
   for (const trainType of supportedTrainTypes) {
     assert.match(trainTypeSchema, new RegExp(`- ${trainType}(?:\\n|$)`));
@@ -113,7 +113,7 @@ test("backend·Mobile allowlist는 canonical 열차종과 drift하지 않는다"
 });
 
 test("negative report는 request·provider·cache·catalog·Mobile에서 ITX 0건과 대전 KTX를 증명한다", () => {
-  const report = readJson("apps/mobile/release/train-search-itx-exclusion-gate.json");
+  const report = readJson("release/product-gates/train-search-itx-exclusion-gate.json");
 
   assert.equal(report.sourceIssue, 2136);
   assert.equal(report.status, "SATISFIED");

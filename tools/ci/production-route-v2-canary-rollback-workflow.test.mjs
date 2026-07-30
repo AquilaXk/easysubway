@@ -20,7 +20,7 @@ import {
 const workflowPath = ".github/workflows/production-route-v2-canary-rollback-dry-run.yml";
 const runnerPath = "tools/ops/verify-production-route-v2-canary-rollback.sh";
 const deployBackendPath = "tools/deploy/deploy-backend.sh";
-const operationsEvidencePath = "apps/mobile/release/operations-release-evidence.json";
+const operationsEvidencePath = "release/product-gates/operations-release-evidence.json";
 const timetableEvidencePath = "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json";
 const composeAllowlistPath = "tools/deploy/compose-server-env.allowlist";
 const prepareDeploymentEnvPath = "tools/deploy/prepare-deployment-env.sh";
@@ -551,7 +551,7 @@ test("canary runner dotenv parser는 키가 없으면 fail-closed로 거부한�
 });
 
 test("canary runner --test-expected-candidate는 정합된 operations-release-evidence.json과 timetable evidence에서 checked-in RC candidate를 resolve한다", async () => {
-  // apps/mobile/release/operations-release-evidence.json's
+  // release/product-gates/operations-release-evidence.json's
   // routeV2Readiness.timetableSnapshotCache.currentImplementation is now
   // reconciled with the checked-in timetable evidence file this runner actually
   // reads (backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json)

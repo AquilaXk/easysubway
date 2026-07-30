@@ -16,9 +16,9 @@ const summaryPath = requiredArg("--summary");
 const statusOutputPath = requiredArg("--status-output");
 const [rcManifest, observability, postLaunch, support] = await Promise.all([
   readJson(rcManifestPath),
-  readJson(args.get("--observability-gate") ?? "apps/mobile/release/operations-observability-gate.json"),
-  readJson(args.get("--post-launch-gate") ?? "apps/mobile/release/post-launch-operations-review-gate.json"),
-  readJson(args.get("--support-gate") ?? "apps/mobile/release/support-incident-response-gate.json"),
+  readJson(args.get("--observability-gate") ?? "release/product-gates/operations-observability-gate.json"),
+  readJson(args.get("--post-launch-gate") ?? "release/product-gates/post-launch-operations-review-gate.json"),
+  readJson(args.get("--support-gate") ?? "release/product-gates/support-incident-response-gate.json"),
 ]);
 
 const identity = rcManifest.rcIdentity ?? {};

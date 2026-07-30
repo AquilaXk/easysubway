@@ -4,7 +4,7 @@
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "route-release-readiness-tracker",
   "issue": 1414,
-  "parentGate": "apps/mobile/release/route-commercialization-gate.json",
+  "parentGate": "release/product-gates/route-commercialization-gate.json",
   "releaseBlockerPolicy": true,
   "storeReadyStatus": "blocked_route_release_tracker_incomplete",
   "releaseClaimPolicy": {
@@ -15,7 +15,7 @@
   "northStar": {
     "realtimeEtaRequiresFreshProviderEvidence": true,
     "realtimeEtaWithoutProviderObservedAtAllowed": false,
-    "etaErrorBudgetGate": "apps/mobile/release/route-commercialization-gate.json",
+    "etaErrorBudgetGate": "release/product-gates/route-commercialization-gate.json",
     "unclassifiedEtaDeviationAllowed": 0
   },
   "childIssueBlocksRelease": true,

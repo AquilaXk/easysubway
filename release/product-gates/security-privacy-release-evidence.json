@@ -46,7 +46,7 @@
     ],
     "privacyAnswerKo": "Android v1은 별도 crash SDK를 사용하지 않으며 충돌/ANR 확인은 Android vitals와 Play pre-launch report를 기준으로 한다."
   },
-  "abusePenetrationRehearsalGate": "apps/mobile/release/abuse-penetration-rehearsal-gate.json",
+  "abusePenetrationRehearsalGate": "release/product-gates/abuse-penetration-rehearsal-gate.json",
   "abusePenetrationRehearsal": {
     "requiredScenarios": [
       "report_photo_upload_abuse",

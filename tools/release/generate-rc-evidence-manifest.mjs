@@ -170,7 +170,7 @@ if (!Array.isArray(rcEvidenceContract.activeBlockerIssues)) {
   fail("RC evidence manifest contract with activeBlockerIssues is required");
 }
 validateIssueDag(rcEvidenceContract.activeBlockerIssues, issueStates);
-const launchScope = readJsonIfExists(path.join(repoRoot, "apps/mobile/release/production-datapack-scope.json"));
+const launchScope = readJsonIfExists(path.join(repoRoot, "release/product-gates/production-datapack-scope.json"));
 if (!launchScope?.routingLaunchScope || !launchScope?.identityMatrix) {
   fail("production routing launch scope and identity matrix are required");
 }
@@ -232,7 +232,7 @@ const candidateContext = {
   sourceManifests: {
     androidRcEvidenceManifest: "apps/mobile/release/android-rc-store-evidence.json",
     signedReleaseArtifactGate: "apps/mobile/release/signed-release-artifact-gate.json",
-    releaseGovernanceGate: "apps/mobile/release/release-governance-gate.json",
+    releaseGovernanceGate: "release/product-gates/release-governance-gate.json",
     dataPackManifest: path.relative(repoRoot, dataPackManifestPath),
   },
 };
@@ -339,7 +339,7 @@ const manifest = {
   sourceManifests: {
     androidRcEvidenceManifest: "apps/mobile/release/android-rc-store-evidence.json",
     signedReleaseArtifactGate: "apps/mobile/release/signed-release-artifact-gate.json",
-    releaseGovernanceGate: "apps/mobile/release/release-governance-gate.json",
+    releaseGovernanceGate: "release/product-gates/release-governance-gate.json",
     dataPackManifest: path.relative(repoRoot, dataPackManifestPath),
   },
 };

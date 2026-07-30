@@ -41,7 +41,7 @@ umask 077
 
 REPO_ROOT="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 EVIDENCE_LIB="${REPO_ROOT}/tools/ops/route-v2-canary-rollback-evidence.mjs"
-OPERATIONS_EVIDENCE="${REPO_ROOT}/apps/mobile/release/operations-release-evidence.json"
+OPERATIONS_EVIDENCE="${REPO_ROOT}/release/product-gates/operations-release-evidence.json"
 TIMETABLE_EVIDENCE="${REPO_ROOT}/backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json"
 HOST_NGINX_TEMPLATE="${REPO_ROOT}/infra/nginx/host-easysubway.conf.template"
 

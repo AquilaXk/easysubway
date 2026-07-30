@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   collectContractErrors,
+  loadWorkspace,
   loadJson,
   validateCompatibilityMatrixPayload,
   validateDatapackIndex,
@@ -16,6 +17,28 @@ import {
   validateRepositorySplitIssueLedger,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
+
+test("[gate-ownership] workspace는 legacy 경로 밖 fixture를 기준으로 상대 경로를 해석한다", () => {
+  const workspace = loadWorkspace("tools/ci/fixtures/gate-ownership-workspace/hub.json");
+
+  assert.equal(workspace.gateDirectories.hub, "release/product-gates");
+  assert.equal(workspace.gateDirectories.mobile, "apps/mobile/release");
+  assert.equal(workspace.freshnessPolicy, "release/product-gates/datapack-freshness-sla.json");
+});
+
+test("[gate-ownership] workspace는 필수 키 누락을 fail closed한다", () => {
+  const directory = mkdtempSync(join(tmpdir(), "gate-ownership-workspace-"));
+  const workspacePath = join(directory, "hub.json");
+  writeFileSync(workspacePath, JSON.stringify({
+    contracts: "contracts",
+    gateDirectories: { hub: "release/product-gates", mobile: "apps/mobile/release" },
+    datapackIndex: "apps/mobile/assets/datapacks/index.json",
+    sourceInventory: "apps/mobile/assets/datapacks/source-inventory.json",
+    governancePolicy: "tools/datapack/source-governance-policy.json",
+  }));
+
+  assert.throws(() => loadWorkspace(workspacePath), /freshnessPolicy/);
+});
 
 test("repository split issue migration ledger가 계약 gate를 통과한다", () => {
   const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
@@ -429,7 +452,7 @@ test("check-contracts CLI 검증 오류가 없다", () => {
 
 test("check-contracts는 inventory·freshness·governance 참조를 함께 검증한다", () => {
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
-  const freshnessPolicy = loadJson("apps/mobile/release/datapack-freshness-sla.json");
+  const freshnessPolicy = loadJson("release/product-gates/datapack-freshness-sla.json");
   const governancePolicy = loadJson("tools/datapack/source-governance-policy.json");
   governancePolicy.sources[0].retentionClassId = "missing-retention-class";
   const errors = [];
@@ -578,10 +601,19 @@ test("datapack compatibility matrix는 현재 번들을 지원하는 mobile 행 
   assert.deepEqual(errors, []);
 });
 
-test("gate-index가 apps/mobile/release 실물과 1:1 대응한다", () => {
+test("gate-index는 ownerComponent별 gate 디렉터리 실물과 1:1 대응한다", () => {
   const errors = collectContractErrors().filter((error) => error.includes("gate-index"));
 
   assert.deepEqual(errors, []);
+  const index = loadJson("contracts/release/gate-index.json");
+  assert.deepEqual(
+    new Set(index.gates.filter((gate) => gate.scope === "product").map((gate) => gate.ownerComponent)),
+    new Set(["hub"]),
+  );
+  assert.deepEqual(
+    new Set(index.gates.filter((gate) => gate.scope === "mobile").map((gate) => gate.ownerComponent)),
+    new Set(["mobile"]),
+  );
 });
 
 test("env-scope-map이 .env.example 키와 1:1 대응한다", () => {
