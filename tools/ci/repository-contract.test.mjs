@@ -5731,11 +5731,9 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
     "2026-06-26T00:00:00.000Z",
   ], { cwd: root });
   const metadataOnlyManifest = JSON.parse(readFileSync(metadataOnlyManifestPath, "utf8"));
-  assert.equal(metadataOnlyManifest.backendImageDigest, null);
-  assert.equal(metadataOnlyManifest.backendArtifactSha256, metadataOnlyInspectSha256);
-  assert.ok(
-    !metadataOnlyManifest.readiness.blockers.map((blocker) => blocker.id).includes("missing_backend_identity"),
-  );
+  assert.equal(metadataOnlyManifest.releaseCandidateIdentity.backendImageDigest, null);
+  assert.equal(metadataOnlyManifest.releaseCandidateIdentity.backendArtifactSha256, metadataOnlyInspectSha256);
+  assert.equal(Object.hasOwn(metadataOnlyManifest, "readiness"), false);
 
   await assert.rejects(
     runFinalGenerator([
