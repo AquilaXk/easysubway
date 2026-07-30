@@ -248,7 +248,13 @@ test("접근성 evidence identity는 실제 materialization 입력에만 결합�
 
   assert.equal(unrelatedChange.sql, baseline.sql);
   assert.deepEqual(unrelatedChange.evidence, baseline.evidence);
-  const accessSql = baseline.sql.slice(baseline.sql.indexOf("INSERT INTO data_source_snapshots"));
+  const accessibilityOffset = Math.min(
+    ...[
+      baseline.sql.indexOf("UPDATE data_source_snapshots SET "),
+      baseline.sql.indexOf("INSERT INTO data_source_snapshots "),
+    ].filter((offset) => offset >= 0),
+  );
+  const accessSql = baseline.sql.slice(accessibilityOffset);
   assert.equal(
     baseline.evidence.accessibilitySource.materializedSqlSha256,
     sha256(Buffer.from(accessSql)),

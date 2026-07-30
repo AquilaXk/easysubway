@@ -264,6 +264,15 @@ class TimetableSeedLoaderTest {
 	}
 
 	@Test
+	void legacyInsertBeforeGovernanceUpdateUsesEarliestAccessibilityStatementForHash() throws Exception {
+		SnapshotResource snapshot = withTrailingGovernanceUpdate(snapshot("mixed", false));
+
+		assertThat(loader(snapshot).activateSeed(snapshot.seed(), snapshot.evidence()))
+			.isEqualTo(TimetableSeedLoader.ActivationResult.ACTIVATED);
+		assertSnapshotRows("mixed");
+	}
+
+	@Test
 	void trackedCompleteSnapshotRejectsMismatchedExistingSourceSnapshot() {
 		jdbc.update("""
 			INSERT INTO data_source_snapshots (
@@ -494,6 +503,40 @@ class TimetableSeedLoaderTest {
 		evidence.remove("evidenceHash");
 		evidence.put("evidenceHash", sha256(objectMapper.writeValueAsBytes(evidence)));
 		return new SnapshotResource(snapshot.seed(), jsonResource(evidence, "invalid-validation-evidence.json"));
+	}
+
+	private SnapshotResource withTrailingGovernanceUpdate(SnapshotResource snapshot) throws Exception {
+		byte[] compressed;
+		try (var input = snapshot.seed().getInputStream()) {
+			compressed = input.readAllBytes();
+		}
+		String sql;
+		try (var input = new GZIPInputStream(new java.io.ByteArrayInputStream(compressed))) {
+			sql = new String(input.readAllBytes(), StandardCharsets.UTF_8);
+		}
+		sql += "UPDATE data_source_snapshots SET governance_policy_version = NULL "
+			+ "WHERE snapshot_id = 'access-snapshot-mixed';\n";
+		byte[] sqlBytes = sql.getBytes(StandardCharsets.UTF_8);
+		byte[] gzipBytes = gzip(sqlBytes);
+		ObjectNode evidence;
+		try (var input = snapshot.evidence().getInputStream()) {
+			evidence = (ObjectNode) objectMapper.readTree(input);
+		}
+		evidence.put("snapshotSha256", sha256(sqlBytes));
+		evidence.put("snapshotSqlByteSize", sqlBytes.length);
+		evidence.put("snapshotGzipSha256", sha256(gzipBytes));
+		evidence.put("snapshotGzipByteSize", gzipBytes.length);
+		evidence.withObject("/accessibilitySource").put(
+			"materializedSqlSha256",
+			sha256(sql.substring(sql.indexOf("INSERT INTO data_source_snapshots "))
+				.getBytes(StandardCharsets.UTF_8))
+		);
+		evidence.remove("evidenceHash");
+		evidence.put("evidenceHash", sha256(objectMapper.writeValueAsBytes(evidence)));
+		return new SnapshotResource(
+			namedResource(gzipBytes, "mixed-accessibility.sql.gz"),
+			jsonResource(evidence, "mixed-accessibility-evidence.json")
+		);
 	}
 
 	private SnapshotResource withoutSubwayRows(SnapshotResource snapshot) throws Exception {
