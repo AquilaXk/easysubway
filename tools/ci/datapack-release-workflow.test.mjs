@@ -636,16 +636,36 @@ test("production-publish는 attested candidate를 no-rebuild로 소비한다", (
   assert.match(runs, /\.github\/workflows\/datapack-release\.yml/);
   assert.match(runs, /\.github\/workflows\/datapack-promotion\.yml/);
   assert.match(runs, /promotion_ref\}" == "main"/);
+  for (const predicate of [
+    /candidate_id\}" == "\$\{CANDIDATE_RUN_ID\}/,
+    /candidate_conclusion\}" == "success"/,
+    /candidate_repository\}" == "\$\{GITHUB_REPOSITORY\}/,
+    /candidate_head_repository\}" == "\$\{GITHUB_REPOSITORY\}/,
+    /candidate_event\}" == "workflow_dispatch"/,
+    /candidate_head_sha\}" =~ \^\[a-f0-9\]\{40\}\$/,
+    /candidate_path\}" == "\.github\/workflows\/datapack-release\.yml"/,
+    /promotion_id\}" == "\$\{PROMOTION_RUN_ID\}/,
+    /promotion_conclusion\}" == "success"/,
+    /promotion_repository\}" == "\$\{GITHUB_REPOSITORY\}/,
+    /promotion_head_repository\}" == "\$\{GITHUB_REPOSITORY\}/,
+    /promotion_event\}" == "workflow_dispatch"/,
+    /promotion_ref\}" == "main"/,
+    /promotion_head_sha\}" =~ \^\[a-f0-9\]\{40\}\$/,
+    /promotion_path\}" == "\.github\/workflows\/datapack-promotion\.yml"/,
+  ]) assert.match(runs, predicate);
 
   const metadata = step("Data Pack Release / Validate production artifact metadata");
   assert.match(metadata, /easysubway-datapack-candidate-\$\{EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID\}/);
   assert.match(metadata, /easysubway-datapack-promotion-\$\{EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID\}/);
   assert.match(metadata, /require-workflow-artifact\.mjs/);
-  for (const [name, runId] of [
-    ["Data Pack Release / Download exact production artifacts", "candidate_run_id"],
-    ["Data Pack Release / Download exact promotion artifact", "promotion_run_id"],
+  assert.match(metadata, /easysubway-datapack-candidate-\$\{EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID\}:\$\{CANDIDATE_HEAD_SHA\}/);
+  assert.match(metadata, /easysubway-datapack-promotion-\$\{EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID\}:\$\{PROMOTION_HEAD_SHA\}/);
+  for (const [name, runId, artifactName] of [
+    ["Data Pack Release / Download exact production artifacts", "candidate_run_id", "easysubway-datapack-candidate"],
+    ["Data Pack Release / Download exact promotion artifact", "promotion_run_id", "easysubway-datapack-promotion"],
   ]) {
     const download = step(name);
+    assert.match(download, new RegExp(`name: ${artifactName}-\\$\\{\\{ steps\\.release-mode\\.outputs\\.${runId} \\}\\}`));
     assert.match(download, new RegExp(`run-id: \\$\\{\\{ steps\\.release-mode\\.outputs\\.${runId} \\}\\}`));
     assert.match(download, /github-token: \$\{\{ github\.token \}\}/);
   }
