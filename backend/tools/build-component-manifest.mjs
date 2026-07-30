@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { lstatSync, readFileSync, renameSync, writeFileSync } from "node:fs";
+import { lstatSync, readFileSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 
 const expectedOptions = new Set([
@@ -49,7 +49,7 @@ function validate(values) {
   if (!/^[a-f0-9]{40}$/.test(values["git-sha"])) throw new Error("git sha is invalid");
   if (!/^sha256:[a-f0-9]{64}$/.test(values["image-digest"])) throw new Error("image digest is invalid");
   if (!/^[^\s]+$/.test(values["contract-version"])) throw new Error("contract version is invalid");
-  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#[1-9][0-9]*$/.test(values["issue-ref"])) throw new Error("issue ref is invalid");
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+#[1-9]\d*$/.test(values["issue-ref"])) throw new Error("issue ref is invalid");
 }
 
 function readEvidence(evidencePath) {
@@ -76,11 +76,6 @@ function writeAtomically(outputPath, document) {
     writeFileSync(temporary, `${JSON.stringify(document, null, 2)}\n`, { flag: "wx" });
     renameSync(temporary, output);
   } finally {
-    try {
-      lstatSync(temporary);
-      throw new Error("temporary manifest was not published");
-    } catch (error) {
-      if (error.code !== "ENOENT") throw error;
-    }
+    rmSync(temporary, { force: true });
   }
 }

@@ -29,7 +29,7 @@ try {
   assertExactKeys(bundle, ["schemaVersion", "bundleVersion", "resources"], "bundle");
   if (bundle.schemaVersion !== 1 || bundle.bundleVersion !== lockDocument.bundleVersion) throw new Error("bundleVersion mismatch");
   if (bundle.resources === null || typeof bundle.resources !== "object" || Array.isArray(bundle.resources)) throw new Error("invalid resources");
-  if (Object.keys(bundle.resources).sort().join("\n") !== requiredResources.slice().sort().join("\n")) throw new Error("invalid resources");
+  if (Object.keys(bundle.resources).sort((left, right) => left.localeCompare(right)).join("\n") !== requiredResources.slice().sort((left, right) => left.localeCompare(right)).join("\n")) throw new Error("invalid resources");
   if (requiredResources.some((resource) => bundle.resources[resource] === null || typeof bundle.resources[resource] !== "object" || Array.isArray(bundle.resources[resource]))) throw new Error("invalid resources");
 
   const temporary = `${stagedOutput}.tmp-${process.pid}`;
@@ -99,7 +99,7 @@ function parseJson(bytes, label) {
 }
 
 function assertExactKeys(value, keys, label) {
-  if (value === null || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort().join("\n") !== keys.slice().sort().join("\n")) {
+  if (value === null || typeof value !== "object" || Array.isArray(value) || Object.keys(value).sort((left, right) => left.localeCompare(right)).join("\n") !== keys.slice().sort((left, right) => left.localeCompare(right)).join("\n")) {
     throw new Error(`invalid ${label}`);
   }
 }
