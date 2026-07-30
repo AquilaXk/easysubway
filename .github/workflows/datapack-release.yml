@@ -949,21 +949,15 @@ jobs:
             --workflow-run-id "${GITHUB_RUN_ID}" \
             --contract-version "datapack-contract-v3" \
             --issue-ref "AquilaXk/easysubway#2699" \
-            --inventory-output "${EASYSUBWAY_DATAPACK_STAGE}/candidate-inventory.json" \
-            --output "${EASYSUBWAY_DATAPACK_STAGE}/candidate-component.json"
+            --inventory-output "${EASYSUBWAY_DATAPACK_STAGE}/data-artifact-inventory.json" \
+            --output "${EASYSUBWAY_DATAPACK_STAGE}/data-component-manifest.json"
 
       - name: Data Pack Release / Upload candidate promotion artifact
         if: ${{ steps.release-mode.outputs.mode == 'release-candidate' }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: easysubway-datapack-candidate-${{ github.run_id }}
-          path: |
-            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/candidate-component.json
-            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/candidate-inventory.json
-            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/current.provenance.json
-            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/catalog
-            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/release-decision.json
-            ${{ env.EASYSUBWAY_DATAPACK_STAGE }}/release-evidence-bundle.json
+          path: ${{ env.EASYSUBWAY_DATAPACK_STAGE }}
           if-no-files-found: error
           retention-days: 14
 

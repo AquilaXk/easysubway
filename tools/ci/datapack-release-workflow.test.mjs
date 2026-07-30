@@ -546,15 +546,23 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.match(yml, /build-data-component-manifest\.mjs/);
   assert.match(yml, /easysubway-datapack-candidate-\$\{\{ github\.run_id \}\}/);
   assert.match(yml, /current\.provenance\.json/);
-  assert.match(yml, /--inventory-output/);
+  assert.match(yml, /--inventory-output "\$\{EASYSUBWAY_DATAPACK_STAGE\}\/data-artifact-inventory\.json"/);
+  assert.match(yml, /--output "\$\{EASYSUBWAY_DATAPACK_STAGE\}\/data-component-manifest\.json"/);
+  const candidateUpload = yml.match(
+    /- name: Data Pack Release \/ Upload candidate promotion artifact[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(candidateUpload, "candidate promotion artifact upload 스텝을 찾지 못함");
+  assert.match(candidateUpload, /path:\s*\$\{\{ env\.EASYSUBWAY_DATAPACK_STAGE \}\}/);
+  assert.doesNotMatch(candidateUpload, /candidate-component|candidate-inventory|data-component-manifest|data-artifact-inventory/);
 
   assert.match(promotion, /candidateRunId/);
   assert.match(promotion, /compatibilityEvidenceRunId/);
   assert.match(promotion, /compatibilityEvidenceArtifactName/);
   assert.match(promotion, /issueRef/);
-  assert.match(promotion, /actions\/runs\/\$\{candidate_run_id\}/);
+  assert.match(promotion, /gh api "repos\/\$\{GITHUB_REPOSITORY\}\/actions\/runs\/\$\{candidate_run_id\}" --jq/);
   assert.match(promotion, /\.github\/workflows\/datapack-release\.yml/);
   assert.match(promotion, /head_sha/);
+  assert.match(promotion, /workflow_path="\$\{workflow_path_raw%@\*\}"/);
   assert.match(promotion, /require-workflow-artifact\.mjs/);
   assert.match(promotion, /compatibility-evidence\.json/);
   assert.match(promotion, /actions\/runs\/\$\{GITHUB_RUN_ID\}\/approvals/);
@@ -569,6 +577,14 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.match(promotion, /actions:\s*read/);
   assert.match(promotion, /id-token:\s*write/);
   assert.match(promotion, /attestations:\s*write/);
+  assert.match(promotion, /data-component-manifest\.json/);
+  assert.match(promotion, /data-artifact-inventory\.json/);
+  assert.match(promotion, /shopt -s dotglob nullglob/);
+  assert.match(promotion, /entries=\("\$\{compatibility_root\}"\/\*\)/);
+  assert.match(promotion, /! -L "\$\{entries\[0\]\}"/);
+  assert.doesNotMatch(promotion, /\bcurl\b/);
+  assert.doesNotMatch(promotion, /node --input-type=module/);
+  assert.doesNotMatch(promotion, /<<'NODE'/);
   assert.doesNotMatch(promotion, /EASYSUBWAY_DATA_PACK/);
   assert.doesNotMatch(promotion, /OBJECT_STORAGE/);
 });
