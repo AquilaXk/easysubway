@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { lstat, mkdir, readFile, readdir, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -57,10 +57,17 @@ export async function buildDataComponentManifest(input) {
     contractVersion,
     issueRef,
   };
-  await Promise.all([
-    writeJson(inventoryOutput, inventoryBytes),
-    writeJson(output, jsonBytes(componentManifest)),
-  ]);
+  await assertAbsent(inventoryOutput, "--inventory-output");
+  await assertAbsent(output, "--output");
+  let inventoryWritten = false;
+  try {
+    await writeJson(inventoryOutput, inventoryBytes);
+    inventoryWritten = true;
+    await writeJson(output, jsonBytes(componentManifest));
+  } catch (error) {
+    if (inventoryWritten) await rm(inventoryOutput, { force: true });
+    throw error;
+  }
   return { inventory, componentManifest };
 }
 
@@ -137,6 +144,16 @@ async function regularFileBytes(target, label) {
   const stats = await lstat(target);
   if (!stats.isFile() || stats.isSymbolicLink()) throw new Error(`${label} must be a regular file`);
   return readFile(target);
+}
+
+async function assertAbsent(target, label) {
+  try {
+    await lstat(target);
+  } catch (error) {
+    if (error?.code === "ENOENT") return;
+    throw error;
+  }
+  throw new Error(`${label} must not already exist`);
 }
 
 function isContained(root, target) {

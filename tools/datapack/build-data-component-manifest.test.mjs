@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
-import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -72,6 +72,45 @@ test("production manifest validation이 닫는 current manifest shape를 fail cl
   }
 });
 
+test("candidate stage symlink와 root 밖 metadata output을 fail closed한다", () => {
+  const fixture = createFixture();
+  const outside = mkdtempSync(path.join(os.tmpdir(), "data-component-manifest-outside-"));
+  try {
+    symlinkSync(path.join(outside, "target"), path.join(fixture.root, "unsafe-link"));
+    const symlinkResult = run(fixture);
+    assert.notEqual(symlinkResult.status, 0, symlinkResult.stderr);
+    assert.equal(exists(fixture.inventory), false);
+    assert.equal(exists(fixture.output), false);
+    rmSync(path.join(fixture.root, "unsafe-link"));
+
+    const outsideResult = run(fixture, { inventory: path.join(outside, "inventory.json") });
+    assert.notEqual(outsideResult.status, 0, outsideResult.stderr);
+    assert.equal(exists(path.join(outside, "inventory.json")), false);
+    assert.equal(exists(fixture.output), false);
+  } finally {
+    fixture.cleanup();
+    rmSync(outside, { recursive: true, force: true });
+  }
+});
+
+test("한 metadata output 충돌은 선존재 파일을 보존하고 새 partial output을 남기지 않는다", () => {
+  for (const existingName of ["inventory", "output"]) {
+    const fixture = createFixture();
+    const existingPath = fixture[existingName];
+    const otherName = existingName === "inventory" ? "output" : "inventory";
+    const sentinel = `${existingName} sentinel\n`;
+    try {
+      writeFileSync(existingPath, sentinel);
+      const result = run(fixture);
+      assert.notEqual(result.status, 0, `${existingName}: ${result.stderr}`);
+      assert.equal(readFileSync(existingPath, "utf8"), sentinel, `${existingName} must be preserved`);
+      assert.equal(exists(fixture[otherName]), false, `${otherName} must not be left as partial metadata`);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+});
+
 function createFixture(mutate = undefined) {
   const root = mkdtempSync(path.join(os.tmpdir(), "data-component-manifest-"));
   const catalog = path.join(root, "catalog");
@@ -102,7 +141,7 @@ function createFixture(mutate = undefined) {
   };
 }
 
-function run(fixture) {
+function run(fixture, overrides = {}) {
   return spawnSync(process.execPath, [
     script,
     "--root", fixture.root,
@@ -113,8 +152,8 @@ function run(fixture) {
     "--workflow-run-id", "123456789",
     "--contract-version", "datapack-contract-v3",
     "--issue-ref", "AquilaXk/easysubway#2699",
-    "--inventory-output", fixture.inventory,
-    "--output", fixture.output,
+    "--inventory-output", overrides.inventory ?? fixture.inventory,
+    "--output", overrides.output ?? fixture.output,
   ], { encoding: "utf8" });
 }
 
