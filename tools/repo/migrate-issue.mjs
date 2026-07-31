@@ -91,8 +91,8 @@ export async function runMigration({ arguments_, ledger, schema, execGh, retryDe
       sourceUrl: entry.sourceUrl,
       sourceMetadata: details.source,
     });
-  } catch {
-    throw new Error("preflight evidence could not be persisted; transfer was not executed");
+  } catch (error) {
+    throw new Error("preflight evidence could not be persisted; transfer was not executed", { cause: error });
   }
   const preflightEvidence = capturePublishedEvidence(evidence, evidenceFileName(entry.sourceIssue, "preflight"));
   await afterPreflightPublish({ evidence, preflightEvidence });
@@ -111,7 +111,7 @@ export async function runMigration({ arguments_, ledger, schema, execGh, retryDe
     };
     return await verifyTransferredIssue({ entry, transferResult: verificationTransferResult, execGh, retryDelayMs, evidence, writeEvidence });
   } catch (error) {
-    const partialFailure = new Error(`issue transfer completed but post-transfer verification failed: ${error instanceof Error ? error.message : String(error)}`);
+    const partialFailure = new Error(`issue transfer completed but post-transfer verification failed: ${error instanceof Error ? error.message : String(error)}`, { cause: error });
     partialFailure.transferCompleted = true;
     throw partialFailure;
   }
@@ -157,12 +157,16 @@ export async function verifyTransferredIssue({ entry, transferResult, execGh, re
       continue;
     }
     try {
-      const redirectIdentity = { repository: targetUrl.repository, number: targetUrl.number, url: `https://github.com/${targetUrl.repository}/issues/${targetUrl.number}` };
+      const redirectIdentity = redirectIdentityFor(targetUrl);
       const identityDifferences = metadataDifferences(redirectIdentity, { repository: targetUrl.repository, number: target.number, url: target.url }, ["repository", "number", "url"]);
       const metadataDifferences_ = expected ? metadataDifferences(expected, target) : { expectedMetadata: { expected: "present", actual: "missing" } };
       const identityFields = Object.keys(identityDifferences).filter((field) => field !== "repository").map((field) => `target.${field}`);
       if (evidence) await persistPostflightAttempt({ entry, evidence, writeEvidence, attempt, redirectIdentity, targetMetadata: target, mismatchedFields: [...identityFields, ...Object.keys(metadataDifferences_)], metadataDifferences: { ...Object.fromEntries(identityFields.map((field) => [field, identityDifferences[field.slice(7)]])), ...metadataDifferences_ } });
-      if (identityFields.length) throw new Error(`redirect identity mismatched fields: ${identityFields.join(", ")}`);
+      if (identityFields.length) {
+        const identityMismatch = new Error(`redirect identity mismatched fields: ${identityFields.join(", ")}`);
+        identityMismatch.redirectIdentityMismatch = true;
+        throw identityMismatch;
+      }
       if (Object.keys(metadataDifferences_).length) throw new Error(`transferred issue metadata mismatched fields: ${Object.keys(metadataDifferences_).join(", ")}`);
       return {
         sourceUrl: entry.sourceUrl,
@@ -175,7 +179,7 @@ export async function verifyTransferredIssue({ entry, transferResult, execGh, re
         commentCount: target.commentCount,
       };
     } catch (error) {
-      if (error instanceof Error && error.message === "postflight evidence could not be persisted") throw error;
+      if (error?.postflightEvidencePersistenceFailed === true || error?.redirectIdentityMismatch === true) throw error;
       verificationError = error;
       if (attempt < 9) await delay(retryDelayMs);
     }
@@ -456,8 +460,10 @@ async function persistPostflightAttempt({ entry, evidence, writeEvidence, attemp
     const expectedBytes = Buffer.from(`${JSON.stringify(value)}\n`);
     await writeEvidence(evidence, filename, value);
     if (!capturePublishedEvidence(evidence, filename).bytes.equals(expectedBytes)) throw new Error("published evidence is invalid");
-  } catch {
-    throw new Error("postflight evidence could not be persisted");
+  } catch (error) {
+    const persistenceFailure = new Error("postflight evidence could not be persisted", { cause: error });
+    persistenceFailure.postflightEvidencePersistenceFailed = true;
+    throw persistenceFailure;
   }
 }
 

@@ -122,12 +122,13 @@ test("preflight evidence write failure prevents transfer", async () => {
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
   Object.assign(entry, transferEntry());
+  const diskFull = new Error("disk full");
   try {
     await assert.rejects(() => runMigration({
       arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
       ledger, schema, execGh: fake.execGh,
-      writeEvidence: async () => { throw new Error("disk full"); },
-    }), /preflight evidence/);
+      writeEvidence: async () => { throw diskFull; },
+    }), (error) => error.message.includes("preflight evidence") && error.cause === diskFull);
     assert.deepEqual(transferCalls(fake.calls), []);
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -367,15 +368,17 @@ test("postflight evidence write failure is terminal after one transfer attempt",
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
   Object.assign(entry, transferEntry());
+  const diskFull = new Error("disk full");
   try {
     await assert.rejects(() => runMigration({
       arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
       ledger, schema, execGh: fake.execGh, retryDelayMs: 0,
       writeEvidence: async (context, filename, value) => {
-        if (filename.includes("postflight")) throw new Error("disk full");
+        if (filename.includes("postflight")) throw diskFull;
         writeFileSync(join(context.canonicalPath, filename), `${JSON.stringify(value)}\n`);
       },
-    }), /postflight evidence could not be persisted/);
+    }), (error) => error.message.includes("postflight evidence could not be persisted")
+      && error.cause?.postflightEvidencePersistenceFailed === true && error.cause.cause === diskFull);
     assert.equal(transferCalls(fake.calls).length, 1);
     assert.equal(fake.calls.filter((args) => args[0] === "api" && args[1] === "graphql" && args.includes("name=easysubway-data")).length, 1);
   } finally {
@@ -547,17 +550,20 @@ test("migration validates whole-ledger schema and semantics before any GitHub ca
   ];
 
   for (const [name, mutate] of cases) await t.test(name, async () => {
+    const directory = evidenceDirectory();
     const { ledger, schema } = migrationContract();
     mutate(ledger);
     const fake = fakeGh();
     assert.ok(validateMigrationLedger({ ledger, schema }).length > 0);
-    await assert.rejects(() => runMigration({
-      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: evidenceDirectory() },
-      ledger,
-      schema,
-      execGh: fake.execGh,
-    }), /ledger validation failed/);
-    assert.deepEqual(fake.calls, []);
+    try {
+      await assert.rejects(() => runMigration({
+        arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+        ledger,
+        schema,
+        execGh: fake.execGh,
+      }), /ledger validation failed/);
+      assert.deepEqual(fake.calls, []);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
   });
 });
 
@@ -615,25 +621,29 @@ test("execution transfers one approved issue and verifies redirected metadata", 
 });
 
 test("completed transfer with failed verification reports a partial-success error", async () => {
+  const directory = evidenceDirectory();
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
   Object.assign(entry, { executionApproval: "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1", targetUrl: null, transferredAt: null });
   const fake = fakeGh({ target: metadata({ url: TARGET_URL, number: 8 }) });
 
-  await assert.rejects(
-    () => runMigration({
-      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: evidenceDirectory() },
-      ledger,
-      schema,
-      execGh: fake.execGh,
-    }),
-    (error) => error.message.startsWith("issue transfer completed but post-transfer verification failed:")
-      && error.transferCompleted === true,
-  );
-  assert.equal(transferCalls(fake.calls).length, 1);
+  try {
+    await assert.rejects(
+      () => runMigration({
+        arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+        ledger,
+        schema,
+        execGh: fake.execGh,
+      }),
+      (error) => error.message.startsWith("issue transfer completed but post-transfer verification failed:")
+        && error.transferCompleted === true,
+    );
+    assert.equal(transferCalls(fake.calls).length, 1);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test("post-transfer verification retries temporary target metadata propagation lag", async () => {
+  const directory = evidenceDirectory();
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
   Object.assign(entry, { executionApproval: "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1", targetUrl: null, transferredAt: null });
@@ -641,53 +651,61 @@ test("post-transfer verification retries temporary target metadata propagation l
   const stale = { ...target, comments: { totalCount: 0 } };
   const fake = fakeGh({ target, targetResponses: [stale, stale, stale, stale, target] });
 
-  const verified = await runMigration({
-    arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: evidenceDirectory() },
-    ledger,
-    schema,
-    execGh: fake.execGh,
-    retryDelayMs: 0,
-  });
+  try {
+    const verified = await runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+      ledger,
+      schema,
+      execGh: fake.execGh,
+      retryDelayMs: 0,
+    });
 
-  assert.equal(verified.targetUrl, TARGET_URL);
-  assert.equal(fake.calls.filter((args) => args[0] === "api" && args[1] === "graphql" && args.includes("name=easysubway-data")).length, 5);
+    assert.equal(verified.targetUrl, TARGET_URL);
+    assert.equal(fake.calls.filter((args) => args[0] === "api" && args[1] === "graphql" && args.includes("name=easysubway-data")).length, 5);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test("unconfirmed transfer response reports an indeterminate result", async () => {
+  const directory = evidenceDirectory();
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
   Object.assign(entry, { executionApproval: "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1", targetUrl: null, transferredAt: null });
   const fake = fakeGh({ transferFailure: true });
 
-  await assert.rejects(
-    () => runMigration({
-      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: evidenceDirectory() },
-      ledger,
-      schema,
-      execGh: fake.execGh,
-    }),
-    (error) => error.message.includes("indeterminate") && error.transferIndeterminate === true,
-  );
-  assert.equal(transferCalls(fake.calls).length, 1);
-  assert.equal(fake.calls.some((args) => args.at(-1) === `/repos/${SOURCE_REPOSITORY}/issues/${SOURCE_ISSUE}`), false);
+  try {
+    await assert.rejects(
+      () => runMigration({
+        arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+        ledger,
+        schema,
+        execGh: fake.execGh,
+      }),
+      (error) => error.message.includes("indeterminate") && error.transferIndeterminate === true,
+    );
+    assert.equal(transferCalls(fake.calls).length, 1);
+    assert.equal(fake.calls.some((args) => args.at(-1) === `/repos/${SOURCE_REPOSITORY}/issues/${SOURCE_ISSUE}`), false);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test("malformed successful transfer output reports an indeterminate result", async () => {
+  const directory = evidenceDirectory();
   const { ledger, schema } = migrationContract();
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
   Object.assign(entry, { executionApproval: "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1", targetUrl: null, transferredAt: null });
   const fake = fakeGh({ transferOutput: "Transferred\n" });
 
-  await assert.rejects(
-    () => runMigration({
-      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: evidenceDirectory() },
-      ledger,
-      schema,
-      execGh: fake.execGh,
-    }),
-    (error) => error.message.includes("indeterminate") && error.transferIndeterminate === true,
-  );
-  assert.equal(transferCalls(fake.calls).length, 1);
+  try {
+    await assert.rejects(
+      () => runMigration({
+        arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+        ledger,
+        schema,
+        execGh: fake.execGh,
+      }),
+      (error) => error.message.includes("indeterminate") && error.transferIndeterminate === true,
+    );
+    assert.equal(transferCalls(fake.calls).length, 1);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test("post-transfer verification rejects metadata that does not identify the redirected issue", async () => {
@@ -700,6 +718,7 @@ test("post-transfer verification rejects metadata that does not identify the red
       arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory }, ledger, schema, execGh: fake.execGh, retryDelayMs: 0,
     }), /redirect identity mismatched fields: target.number/);
     assert.equal(transferCalls(fake.calls).length, 1);
+    assert.equal(fake.calls.filter((args) => args[0] === "api" && args[1] === "graphql" && args.includes("name=easysubway-data")).length, 1);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
