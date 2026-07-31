@@ -8,7 +8,9 @@ import {
   validateMigrationLedger,
   verifyTransferredIssue,
 } from "./migrate-issue.mjs";
-import { readFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 const SOURCE_REPOSITORY = "AquilaXk/easysubway";
 const TARGET_REPOSITORY = "AquilaXk/easysubway-data";
@@ -79,15 +81,97 @@ function transferCalls(calls) {
   return calls.filter((args) => args[0] === "issue" && args[1] === "transfer");
 }
 
+function evidenceDirectory() {
+  return mkdtempSync(join(tmpdir(), "issue-transfer-evidence-"));
+}
+
 test("argument parser accepts exactly one source issue and one mode", () => {
   assert.deepEqual(
     parseArguments(["--ledger", "ledger.json", "--source-issue", "2684", "--dry-run"]),
-    { ledgerPath: "ledger.json", sourceIssue: 2684, mode: "dry-run", confirmations: { source: undefined, target: undefined } },
+    { ledgerPath: "ledger.json", sourceIssue: 2684, mode: "dry-run", confirmations: { source: undefined, target: undefined }, evidenceDir: undefined },
   );
   assert.throws(
     () => parseArguments(["--ledger", "ledger.json", "--source-issue", "2684", "--source-issue", "2685", "--dry-run"]),
     /exactly one --source-issue/,
   );
+});
+
+test("execute argument parser requires one absolute empty non-symlink evidence directory", () => {
+  const directory = evidenceDirectory();
+  const symlink = `${directory}-link`;
+  try {
+    const base = ["--ledger", "ledger.json", "--source-issue", "2684", "--execute", "--confirm-source", "AquilaXk/easysubway#2684", "--confirm-target", TARGET_REPOSITORY];
+    assert.throws(() => parseArguments(base), /--evidence-dir/);
+    assert.throws(() => parseArguments([...base, "--evidence-dir", "relative"]), /absolute existing empty non-symlink/);
+    symlinkSync(directory, symlink);
+    assert.throws(() => parseArguments([...base, "--evidence-dir", symlink]), /absolute existing empty non-symlink/);
+  } finally {
+    rmSync(symlink, { force: true });
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("preflight evidence write failure prevents transfer", async () => {
+  const directory = evidenceDirectory();
+  const fake = fakeGh();
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  Object.assign(entry, transferEntry());
+  try {
+    await assert.rejects(() => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+      ledger, schema, execGh: fake.execGh,
+      writeEvidence: async () => { throw new Error("disk full"); },
+    }), /preflight evidence/);
+    assert.deepEqual(transferCalls(fake.calls), []);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("postflight artifacts record propagation attempts, exact metadata differences, and redirect identity", async () => {
+  const directory = evidenceDirectory();
+  const target = metadata({ url: TARGET_URL, number: 7 });
+  const stale = { ...target, comments: { totalCount: 0 } };
+  const fake = fakeGh({ target, targetResponses: [stale, target] });
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  Object.assign(entry, transferEntry());
+  try {
+    const result = await runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+      ledger, schema, execGh: fake.execGh, retryDelayMs: 0,
+    });
+    assert.equal(result.targetUrl, TARGET_URL);
+    const firstAttempt = JSON.parse(readFileSync(join(directory, "2684-postflight-1.json"), "utf8"));
+    assert.deepEqual(firstAttempt.mismatchedFields, ["commentCount"]);
+    assert.deepEqual(firstAttempt.metadataDifferences.commentCount, { expected: 1, actual: 0 });
+    assert.deepEqual(firstAttempt.redirectIdentity, { repository: TARGET_REPOSITORY, number: 7, url: TARGET_URL });
+    assert.equal(JSON.parse(readFileSync(join(directory, "2684-postflight-2.json"), "utf8")).mismatchedFields.length, 0);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("verification re-reads the durable normalized preflight artifact", async () => {
+  const directory = evidenceDirectory();
+  const fake = fakeGh();
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  Object.assign(entry, transferEntry());
+  try {
+    await assert.rejects(() => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+      ledger, schema, execGh: fake.execGh,
+      writeEvidence: async (evidenceDir, filename, value) => {
+        const persisted = filename.endsWith("preflight.json")
+          ? { ...value, sourceMetadata: { ...value.sourceMetadata, commentCount: 99 } } : value;
+        writeFileSync(join(evidenceDir, filename), `${JSON.stringify(persisted)}\n`);
+      },
+    }), /metadata mismatched fields: commentCount/);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("preflight fails closed before transfer for unsafe ledger and GitHub metadata", async (t) => {
@@ -297,7 +381,7 @@ test("post-transfer verification rejects metadata that does not identify the red
 
   await assert.rejects(
     () => verifyTransferredIssue({ entry, transferResult, execGh: fake.execGh }),
-    /redirect target metadata is stale/,
+    /redirect identity mismatched fields: number/,
   );
 });
 
