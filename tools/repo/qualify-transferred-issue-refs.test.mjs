@@ -86,6 +86,7 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
   assert.deepEqual(qualifyIssueReferences({ text: "[label `code\n\ncontinued`](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n# heading](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\r\n#\r\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\r\rcontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[label `code\n# heading`](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n===\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
   for (const text of [
@@ -103,6 +104,7 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
   );
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n2. continued](https://example.test \"title #10\")", ledger }), []);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n1.\ncontinued](https://example.test \"title #10\")", ledger }), []);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n01. continued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
   for (const text of [
     "<span data-x=\"[\">label</span>](https://example.test \"title #10\")",
     "<!-- [ -->](https://example.test \"title #10\")",

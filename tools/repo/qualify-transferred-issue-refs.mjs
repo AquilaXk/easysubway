@@ -12,7 +12,7 @@ const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
 const OPENING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})/;
 const CLOSING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n)?$/;
 const ESCAPABLE_PUNCTUATION_PATTERN = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/;
-const INTERRUPTING_BLOCK_PATTERN = /^ {0,3}(?:#{1,6}(?:[ \t]|\r?\n|$)|>|<|[*+-][ \t]+(?=\S)|1[.)][ \t]+(?=\S)|(?:[*_-][ \t]*){3,}(?:\r?\n|$)|(?:=+[ \t]*|-+[ \t]*)(?:\r?\n|$))/;
+const INTERRUPTING_BLOCK_PATTERN = /^ {0,3}(?:#{1,6}(?:[ \t]|\r?\n|$)|>|<|[*+-][ \t]+(?=\S)|0{0,8}1[.)][ \t]+(?=\S)|(?:[*_-][ \t]*){3,}(?:\r?\n|$)|(?:=+[ \t]*|-+[ \t]*)(?:\r?\n|$))/;
 const RAW_HTML_OPENER_PATTERN = /<(?:!--|!\[CDATA\[|![A-Z]|\?|\/?[A-Za-z][A-Za-z0-9-]*(?=[ \t\r\n/>]|$))/y;
 const TABLE_DELIMITER_PATTERN = /^ {0,3}(?=[^\r\n]*\|)\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*(?:\r?\n|$)/;
 
@@ -86,6 +86,7 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
 
 export function qualifyIssueReferences({ text, ledger }) {
   if (typeof text !== "string") throw new Error("issue text must be a string");
+  text = text.replace(/\r\n?/g, "\n");
   const references = referencesFromLedger(ledger);
   let fenced = null;
   let prose = "";
