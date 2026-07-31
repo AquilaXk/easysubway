@@ -66,6 +66,9 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test>\n\n\"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test \"title\n\n#10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test> \"title\n\n#10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label `code\n\ncontinued`](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test<bad> \"title #10\")", ledger }), [ambiguous(10)]);
 });
 
 test("qualifyIssueReferences는 opening label 없는 link-like text의 bare ref를 숨기지 않는다", () => {

@@ -107,6 +107,7 @@ function qualifyText(text, references) {
   let labelDepth = 0;
   for (let index = 0; index < text.length;) {
     if (text[index] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[index + 1] ?? "")) { index += 2; continue; }
+    if (/\s/.test(text[index]) && whitespaceAt(text, index).paragraphBreak) labelDepth = 0;
     let urlLength = urlLengthAt(text, index, linkLabels);
     if (urlLength && labelDepth > 0) {
       const labelEnd = labelEndWithin(text, index, index + urlLength);
@@ -114,7 +115,10 @@ function qualifyText(text, references) {
     }
     if (urlLength) { index += urlLength; continue; }
     const codeSpanLength = codeSpanLengthAt(text, index);
-    if (codeSpanLength) { index += codeSpanLength; continue; }
+    if (codeSpanLength) {
+      if (/\r?\n[ \t]*\r?\n/.test(text.slice(index, index + codeSpanLength))) labelDepth = 0;
+      index += codeSpanLength; continue;
+    }
     const bareReference = bareReferenceAt(text, index);
     if (bareReference !== null) {
       const reference = references.get(bareReference);
@@ -141,6 +145,7 @@ function urlLengthAt(text, index, linkLabels) {
     for (let cursor = index; cursor < text.length; cursor += 1) {
       if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
       if (!destinationClosed) {
+        if (text[cursor] === "<") return bareUrlLength;
         if (/\s/.test(text[cursor])) return cursor - index;
         if (text[cursor] === ">") { destinationClosed = true; destinationLength = cursor - index; }
         continue;
