@@ -267,11 +267,12 @@ function hasTableDelimiter(text, start, end) {
 }
 
 function labelEndWithin(text, start, end) {
-  let nested = 0;
   for (let cursor = start; cursor < end; cursor += 1) {
     if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
-    if (text[cursor] === "[") nested += 1;
-    else if (text[cursor] === "]" && nested-- === 0) return cursor;
+    const codeSpanLength = codeSpanLengthAt(text, cursor);
+    if (codeSpanLength) { cursor += codeSpanLength - 1; continue; }
+    if (text[cursor] === "[") throw new Error("nested Markdown labels are unsupported");
+    if (text[cursor] === "]") return cursor;
   }
   return -1;
 }

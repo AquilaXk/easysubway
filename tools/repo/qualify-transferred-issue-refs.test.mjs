@@ -81,6 +81,7 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
     "[outer [inner](not a valid destination)](https://two.test \"title #10\")",
     "![outer [inner](https://one.test)](https://two.test \"title #10\")",
     "\\![outer [inner](https://one.test)](https://two.test \"title #10\")",
+    "[https://[inner](https://three.test)](https://two.test \"title #10\")",
   ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /nested Markdown labels are unsupported/);
   assert.throws(
     () => qualifyIssueReferences({ text: "[<https://example.test>](https://dest \"title #10\")", ledger }),
