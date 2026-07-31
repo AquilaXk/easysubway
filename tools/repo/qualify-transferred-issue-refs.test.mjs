@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { execFile } from "node:child_process";
 import test from "node:test";
+import { promisify } from "node:util";
 import { parseArguments, qualifyIssueReferences, runNormalization } from "./qualify-transferred-issue-refs.mjs";
 
 const ledger = {
@@ -12,6 +14,7 @@ const ledger = {
   ],
 };
 const ambiguous = (reference) => ({ reference, reason: "bare reference is ambiguous after issue transfer" });
+const execFileAsync = promisify(execFile);
 
 test("qualifyIssueReferences는 ledger-matching bare ref만 ambiguity로 보고한다", () => {
   assert.deepEqual(
@@ -37,8 +40,9 @@ test("qualifyIssueReferences는 multiline inline code span을 무시한다", () 
   assert.deepEqual(qualifyIssueReferences({ text, ledger }), [ambiguous(10), ambiguous(12)]);
 });
 
-test("qualifyIssueReferences는 ledger 밖 또는 미완료 transfer bare ref를 제안하지 않는다", () => {
-  assert.deepEqual(qualifyIssueReferences({ text: "unknown #99 incomplete #14", ledger }), []);
+test("qualifyIssueReferences는 ledger 밖 또는 미완료 transfer bare ref를 fail-closed한다", () => {
+  assert.throws(() => qualifyIssueReferences({ text: "unknown #99", ledger }), /unresolved bare issue reference #99/);
+  assert.throws(() => qualifyIssueReferences({ text: "incomplete #14", ledger }), /unresolved bare issue reference #14/);
 });
 
 test("qualifyIssueReferences는 fenced/inline 미종결과 indented code를 fail-closed한다", () => {
@@ -70,6 +74,14 @@ test("runNormalization dry-run은 변경 제안 없이 surface별 ambiguous ref�
 test("runNormalization execute는 source ledger 부재와 conditional PATCH 부재 모두 read/write 전에 fail-closed한다", async () => {
   const fake = fakeGh({ body: "body #10", comments: [{ id: 1, body: "comment #13" }] });
   await assert.rejects(
+    () => runNormalization({ arguments_: { sourceIssue: 10, mode: "execute", confirmations: { source: "AquilaXk/easysubway#9", target: "AquilaXk/easysubway-mobile#2" } }, ledger, execGh: fake.exec }),
+    /source confirmation does not match/,
+  );
+  await assert.rejects(
+    () => runNormalization({ arguments_: { sourceIssue: 10, mode: "execute", confirmations: { source: "AquilaXk/easysubway#10", target: "AquilaXk/easysubway-mobile#3" } }, ledger, execGh: fake.exec }),
+    /target confirmation does not match/,
+  );
+  await assert.rejects(
     () => runNormalization({ arguments_: { sourceIssue: 99, mode: "execute", confirmations: {} }, ledger, execGh: fake.exec }),
     /source issue #99 is not present in the ledger/,
   );
@@ -91,11 +103,21 @@ test("parseArguments는 invalid input을 table-driven으로 거부한다", () =>
   assert.deepEqual(parseArguments(["--ledger", "ledger.json", "--source-issue", "10", "--dry-run"]), { ledgerPath: "ledger.json", sourceIssue: 10, mode: "dry-run", confirmations: {} });
   for (const [argv, message] of [
     [["--ledger", "ledger.json", "--source-issue", "0", "--dry-run"], /required/],
+    [["--ledger", "--source-issue", "10", "--dry-run"], /exactly once/],
+    [["--ledger", "--", "--source-issue", "10", "--dry-run"], /exactly once/],
+    [["--ledger", "ledger.json", "--source-issue", "not-a-number", "--dry-run"], /required/],
     [["--ledger", "ledger.json", "--source-issue", "10", "--execute"], /both confirmations/],
     [["--ledger", "ledger.json", "--ledger", "again", "--source-issue", "10", "--dry-run"], /exactly once/],
     [["--ledger", "ledger.json", "--source-issue", "10", "--dry-run", "--execute"], /exactly one/],
     [["--ledger", "ledger.json", "--source-issue", "10", "--dry-run", "--unknown"], /unsupported/],
   ]) assert.throws(() => parseArguments(argv), message);
+});
+
+test("CLI direct invocation은 main을 시작한다", async () => {
+  await assert.rejects(
+    () => execFileAsync(process.execPath, ["tools/repo/qualify-transferred-issue-refs.mjs"], { cwd: process.cwd() }),
+    (error) => /issue reference normalization was not executed: ledger, source issue, and execution mode are required/.test(error.stderr),
+  );
 });
 
 function fakeGh({ body, comments }) {

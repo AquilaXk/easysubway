@@ -107,7 +107,8 @@ function qualifyText(text, references) {
     const match = text.slice(index).match(/^#([1-9]\d*)/);
     if (match && !/[\w/]/.test(text[index - 1] ?? "")) {
       const reference = references.get(Number(match[1]));
-      if (reference) unresolved.push({ reference: Number(match[1]), reason: "bare reference is ambiguous after issue transfer" });
+      if (!reference) throw new Error(`unresolved bare issue reference #${match[1]}`);
+      unresolved.push({ reference: Number(match[1]), reason: "bare reference is ambiguous after issue transfer" });
       index += match[0].length; continue;
     }
     index += 1;
@@ -183,4 +184,4 @@ async function main() {
   }
 }
 
-if (isMainModule()) await main();
+if (isMainModule(import.meta.url)) await main();
