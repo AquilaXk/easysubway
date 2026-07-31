@@ -146,7 +146,12 @@ function urlLengthAt(text, index, linkLabels) {
         continue;
       }
       if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; } continue; }
-      if (/\s/.test(text[cursor])) { separatorSeen = true; continue; }
+      if (/\s/.test(text[cursor])) {
+        const separator = whitespaceAt(text, cursor);
+        if (separator.paragraphBreak) return destinationLength;
+        cursor += separator.length - 1;
+        separatorSeen = true; continue;
+      }
       if (!titleClosed && separatorSeen && (text[cursor] === "\"" || text[cursor] === "'")) titleDelimiter = text[cursor];
       else if (!titleClosed && separatorSeen && text[cursor] === "(") titleDelimiter = ")";
       else if (text[cursor] === ")") return cursor - index;
@@ -163,12 +168,22 @@ function urlLengthAt(text, index, linkLabels) {
       if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
       if (destinationClosed) {
         if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; } continue; }
-        if (/\s/.test(text[cursor])) continue;
+        if (/\s/.test(text[cursor])) {
+          const separator = whitespaceAt(text, cursor);
+          if (separator.paragraphBreak) return bareUrlLength;
+          cursor += separator.length - 1; continue;
+        }
         if (!titleClosed && (text[cursor] === "\"" || text[cursor] === "'")) titleDelimiter = text[cursor];
         else if (!titleClosed && text[cursor] === "(") titleDelimiter = ")";
         else if (text[cursor] === ")") return cursor - index;
         else return bareUrlLength;
-      } else if (/\s/.test(text[cursor]) && depth === 1) destinationClosed = true;
+      } else if (/\s/.test(text[cursor])) {
+        if (depth !== 1) return bareUrlLength;
+        const separator = whitespaceAt(text, cursor);
+        if (separator.paragraphBreak) return bareUrlLength;
+        cursor += separator.length - 1;
+        destinationClosed = true;
+      }
       else if (text[cursor] === "(") depth += 1;
       else if (text[cursor] === ")" && --depth === 0) return cursor - index;
     }
@@ -184,6 +199,11 @@ function bareUrlLengthAt(text, start) {
     backslashes = text[cursor] === "\\" ? backslashes + 1 : 0;
   }
   return text.length - start;
+}
+
+function whitespaceAt(text, index) {
+  const whitespace = text.slice(index).match(/^\s*/)[0];
+  return { length: whitespace.length, paragraphBreak: /\r?\n[ \t]*\r?\n/.test(whitespace) };
 }
 
 function labelEndWithin(text, start, end) {
