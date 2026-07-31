@@ -3,6 +3,10 @@ document.querySelectorAll("[data-language]").forEach((button) => {
 		const language = button.dataset.language;
 		document.documentElement.lang = language;
 		document.body.classList.toggle("is-english", language === "en");
+		document.querySelectorAll("[data-alt-ko][data-alt-en]").forEach((image) => {
+			image.alt = language === "en" ? image.dataset.altEn : image.dataset.altKo;
+			image.lang = language;
+		});
 		document.querySelectorAll("[data-language]").forEach((option) => {
 			const isActive = option === button;
 			option.classList.toggle("is-active", isActive);
