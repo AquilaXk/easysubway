@@ -407,7 +407,7 @@ test("postflight artifacts record propagation attempts, exact metadata differenc
   }
 });
 
-test("verification re-reads the durable normalized preflight artifact", async () => {
+test("shape-valid preflight metadata substitution prevents transfer", async () => {
   const directory = evidenceDirectory();
   const fake = fakeGh();
   const { ledger, schema } = migrationContract();
@@ -418,11 +418,11 @@ test("verification re-reads the durable normalized preflight artifact", async ()
       arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
       ledger, schema, execGh: fake.execGh,
       writeEvidence: async (evidenceDir, filename, value) => {
-        const persisted = filename.endsWith("preflight.json")
-          ? { ...value, sourceMetadata: { ...value.sourceMetadata, commentCount: 99 } } : value;
-        writeFileSync(join(evidenceDir.canonicalPath, filename), `${JSON.stringify(persisted)}\n`);
+        if (filename.endsWith("preflight.json")) value.sourceMetadata.commentCount = 99;
+        writeFileSync(join(evidenceDir.canonicalPath, filename), `${JSON.stringify(value)}\n`);
       },
-    }), /metadata mismatched fields: commentCount/);
+    }), /durable preflight evidence does not match preflight details/);
+    assert.deepEqual(transferCalls(fake.calls), []);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -84,6 +84,7 @@ export async function runMigration({ arguments_, ledger, schema, execGh, retryDe
   confirmExecution(entry, arguments_.confirmations);
   const evidence = captureEvidenceDirectory(arguments_.evidenceDir);
   const details = await preflightDetails({ entry, execGh });
+  const sourceMetadataSnapshot = JSON.stringify(details.source);
   try {
     await writeEvidence(evidence, evidenceFileName(entry.sourceIssue, "preflight"), {
       sourceIssue: entry.sourceIssue,
@@ -96,6 +97,7 @@ export async function runMigration({ arguments_, ledger, schema, execGh, retryDe
   const preflightEvidence = capturePublishedEvidence(evidence, evidenceFileName(entry.sourceIssue, "preflight"));
   await afterPreflightPublish({ evidence, preflightEvidence });
   const persistedSource = readPersistedPreflight(evidence, entry.sourceIssue, entry.sourceUrl, preflightEvidence);
+  if (JSON.stringify(persistedSource) !== sourceMetadataSnapshot) throw new Error("durable preflight evidence does not match preflight details");
   const transferResult = await executeIssueTransfer({
     entry,
     confirmations: arguments_.confirmations,
