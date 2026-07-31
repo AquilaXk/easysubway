@@ -65,7 +65,8 @@ export function validateLedger(ledger, { openIssueNumbers, requirePending = fals
       if (!sameValues(entry.childRepositories, CHILD_REPOSITORIES)) {
         errors.push(`${path}.childRepositories: data와 mobile child repository가 정확히 필요함`);
       }
-      validateChildIssueUrls(entry.childIssueUrls, entry.childRepositories, `${path}.childIssueUrls`, errors);
+      if (entry.childIssueUrls === undefined) errors.push(`${path}.childIssueUrls: data와 mobile child issue URL이 필요함`);
+      else validateChildIssueUrls(entry.childIssueUrls, entry.childRepositories, `${path}.childIssueUrls`, errors);
     } else if (entry?.childRepositories !== undefined) {
       errors.push(`${path}.childRepositories: SPLIT_CHILDREN에서만 허용됨`);
     }
@@ -172,8 +173,8 @@ function sameRepositoryKeys(value, expected) {
 
 function validateChildIssueUrl(value, repository, path, errors) {
   const match = typeof value === "string"
-    ? /^https:\/\/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)$/.exec(value) : null;
-  if (match === null || Number(match[2]) < 1) {
+    ? /^https:\/\/github\.com\/([^/]+\/[^/]+)\/issues\/([1-9]\d*)$/.exec(value) : null;
+  if (match === null) {
     errors.push(`${path}: positive GitHub issue URL 불량`);
   } else if (match[1] !== repository) {
     errors.push(`${path}: repository와 URL repository 불일치`);

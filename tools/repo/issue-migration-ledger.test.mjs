@@ -221,6 +221,15 @@ test("SPLIT_CHILDREN는 childRepositories와 일치하는 child issue URL을 기
   assert.deepEqual(validateLedger(ledger), []);
 });
 
+test("SPLIT_CHILDREN는 비어 있지 않은 childIssueUrls를 반드시 기록한다", () => {
+  const ledger = ledgerFixture();
+  const schema = JSON.parse(readFileSync("contracts/repository-split-issues.schema.json", "utf8"));
+  delete entryForSourceIssue(ledger, 2605).childIssueUrls;
+
+  assert.deepEqual(validateLedger(ledger), ["issues[40].childIssueUrls: data와 mobile child issue URL이 필요함"]);
+  assert.ok(validateSchema(schema, ledger).errors.some((error) => error.includes("$.issues.40: not 분기")));
+});
+
 test("childIssueUrls는 SPLIT_CHILDREN의 정확한 repository key와 중복 없는 positive issue URL만 허용한다", () => {
   const invalidChildIssueUrls = [
     [
@@ -253,6 +262,12 @@ test("childIssueUrls는 SPLIT_CHILDREN의 정확한 repository key와 중복 없
     [
       "non-positive issue number",
       (entry) => { entry.childIssueUrls["AquilaXk/easysubway-data"] = "https://github.com/AquilaXk/easysubway-data/issues/0"; },
+      ["issues[40].childIssueUrls.AquilaXk/easysubway-data: positive GitHub issue URL 불량"],
+      "$.issues.40.childIssueUrls.AquilaXk/easysubway-data: pattern",
+    ],
+    [
+      "leading-zero issue number",
+      (entry) => { entry.childIssueUrls["AquilaXk/easysubway-data"] = "https://github.com/AquilaXk/easysubway-data/issues/01"; },
       ["issues[40].childIssueUrls.AquilaXk/easysubway-data: positive GitHub issue URL 불량"],
       "$.issues.40.childIssueUrls.AquilaXk/easysubway-data: pattern",
     ],

@@ -25,11 +25,26 @@
         "type": "object",
         "additionalProperties": false,
         "not": {
-          "type": "object",
-          "required": ["childIssueUrls"],
-          "properties": {
-            "disposition": { "not": { "const": "SPLIT_CHILDREN" } }
-          }
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["childIssueUrls"],
+              "properties": {
+                "disposition": { "not": { "const": "SPLIT_CHILDREN" } }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["disposition"],
+              "properties": {
+                "disposition": { "const": "SPLIT_CHILDREN" }
+              },
+              "not": {
+                "type": "object",
+                "required": ["childIssueUrls"]
+              }
+            }
+          ]
         },
         "oneOf": [
           {
