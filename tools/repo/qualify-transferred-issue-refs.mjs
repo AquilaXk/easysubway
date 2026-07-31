@@ -153,7 +153,9 @@ function qualifyText(text, references) {
       labelOpen = true;
       labelStart = index;
     } else if (text[index] === "]" && labelOpen) {
-      if (Array.from(text.slice(labelStart + 1, index)).length > 999) throw new Error("Markdown link labels longer than 999 characters are unsupported");
+      if (text[index + 1] === "(" && Array.from(text.slice(labelStart + 1, index)).length > 999) {
+        throw new Error("Markdown link labels longer than 999 characters are unsupported");
+      }
       linkLabels.add(index);
       labelOpen = false;
       labelStart = -1;

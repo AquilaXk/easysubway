@@ -22,6 +22,7 @@ test("qualifyIssueReferences는 ledger-matching bare ref만 ambiguity로 보고�
     [ambiguous(10), ambiguous(11), ambiguous(12), ambiguous(13)],
   );
   assert.deepEqual(qualifyIssueReferences({ text: `#10${" ".repeat(10_000)}#10`, ledger }), [ambiguous(10), ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: `[${"a".repeat(1000)}] plain #10`, ledger }), [ambiguous(10)]);
   assert.deepEqual(
     qualifyIssueReferences({
       text: "retained parent #2605",
