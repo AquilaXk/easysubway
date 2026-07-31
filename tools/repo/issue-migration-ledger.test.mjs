@@ -22,6 +22,15 @@ const BACKEND_APPROVED = new Set([2095, 2544, 2545, 2622, 2623, 2624, 2625, 2626
 const BACKEND_TRANSFERS = new Map([
   [2095, ["https://github.com/AquilaXk/easysubway-backend/issues/3", "2026-07-31T04:02:01Z"]],
   [2544, ["https://github.com/AquilaXk/easysubway-backend/issues/4", "2026-07-31T04:04:02Z"]],
+  [2545, ["https://github.com/AquilaXk/easysubway-backend/issues/5", "2026-07-31T04:17:59Z"]],
+  [2622, ["https://github.com/AquilaXk/easysubway-backend/issues/6", "2026-07-31T04:18:15Z"]],
+  [2623, ["https://github.com/AquilaXk/easysubway-backend/issues/7", "2026-07-31T04:18:28Z"]],
+  [2624, ["https://github.com/AquilaXk/easysubway-backend/issues/8", "2026-07-31T04:18:49Z"]],
+  [2625, ["https://github.com/AquilaXk/easysubway-backend/issues/9", "2026-07-31T04:19:05Z"]],
+  [2626, ["https://github.com/AquilaXk/easysubway-backend/issues/10", "2026-07-31T04:19:21Z"]],
+  [2675, ["https://github.com/AquilaXk/easysubway-backend/issues/11", "2026-07-31T04:19:40Z"]],
+  [2676, ["https://github.com/AquilaXk/easysubway-backend/issues/12", "2026-07-31T04:19:48Z"]],
+  [2677, ["https://github.com/AquilaXk/easysubway-backend/issues/13", "2026-07-31T04:20:00Z"]],
 ]);
 const DATA_TRANSFERS = new Map([
   [2138, ["https://github.com/AquilaXk/easysubway-data/issues/3", "2026-07-30T18:59:46Z"]],
