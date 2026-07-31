@@ -27,15 +27,19 @@ test("공개 랜딩은 한국어 기본값과 접근 가능한 KR/EN 전환 계�
 	assert.doesNotMatch(html, /Connected regions|Core offline route|100%|5 regions|nationwide/i);
 });
 
-test("공개 랜딩은 승인된 실제 앱 화면 3종을 self-host한다", () => {
-	for (const file of ["route-map.png", "accessible-route.png", "station-detail.png"]) {
+test("공개 랜딩은 승인된 실제 앱 화면 2종을 self-host한다", () => {
+	for (const file of ["route-map.png", "station-detail.png"]) {
 		assert.ok(existsSync(`${staticRoot}/images/landing/${file}`), `${file} 정적 에셋이 필요하다`);
 		assert.match(html, new RegExp(`/images/landing/${file.replace(".", "\\.")}`));
+		const bytes = readFileSync(`${staticRoot}/images/landing/${file}`);
+		assert.equal(bytes.subarray(1, 4).toString("ascii"), "PNG");
+		assert.deepEqual([bytes.readUInt32BE(16), bytes.readUInt32BE(20)], [1080, 2340]);
 	}
+	assert.doesNotMatch(html, /\/images\/landing\/accessible-route\.png/);
 	const screenshots = [...html.matchAll(/<img\b[^>]*src="\/images\/landing\/[^>]+>/g)].map(([tag]) => tag);
-	assert.equal(screenshots.length, 7);
+	assert.equal(screenshots.length, 5);
 	for (const tag of screenshots) assert.match(tag, /width="1080" height="2340"[^>]*decoding="async"/);
-	assert.equal(screenshots.filter((tag) => tag.includes('loading="lazy"')).length, 6);
+	assert.equal(screenshots.filter((tag) => tag.includes('loading="lazy"')).length, 4);
 });
 
 test("공개 랜딩 스타일은 공식 브랜드와 읽기 쉬운 디바이스 계약을 지킨다", () => {
@@ -48,8 +52,10 @@ test("공개 랜딩 스타일은 공식 브랜드와 읽기 쉬운 디바이스 
 	assert.match(css, /\.hero-copy\s*>\s*p\[data-copy\]/);
 	assert.doesNotMatch(css, /\.hero-copy\s*>\s*p:last-child/);
 	assert.match(css, /\.feature-copy h2\s*\{[^}]*font-size:\s*clamp\(33px,\s*9\.5vw,\s*43px\)/);
-	assert.match(css, /\.device--map img\s*\{[^}]*width:\s*122%;[^}]*height:\s*122%/);
-	assert.match(css, /\.device--route img,[\s\S]*\.device--station img[\s\S]*object-fit:\s*contain/);
+	assert.match(css, /\.device\s*\{[^}]*aspect-ratio:\s*1080\s*\/\s*2340/);
+	assert.match(css, /\.device img\s*\{[^}]*object-fit:\s*contain/);
+	assert.doesNotMatch(css, /\.device--map img\s*\{/);
+	assert.doesNotMatch(css, /object-fit:\s*cover|width:\s*122%|height:\s*122%/);
 	assert.match(css, /\.process-flow\s*\{[^}]*position:\s*absolute[^}]*\}[\s\S]*\.process-lead\s*\{[^}]*max-width/);
 	assert.match(css, /@media\s*\(max-width:\s*900px\)[\s\S]*\.process-flow\s*\{\s*top:\s*710px/);
 	assert.match(css, /@media\s*\(max-width:\s*720px\)[\s\S]*\.process-flow[\s\S]*\.feature-device/);
