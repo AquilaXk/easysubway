@@ -151,13 +151,13 @@ class HealthCheckControllerTest {
 				"/css/landing.css",
 				"/js/landing.js",
 				"/images/landing/route-map.png",
-				"/images/landing/accessible-route.png",
 				"/images/landing/station-detail.png",
 				"/privacy",
 				"/terms",
 				"/location-terms",
 				"mailto:aquila@aquilaxk.site"
 			);
+			assertThat(response.getBody()).doesNotContain("/images/landing/accessible-route.png");
 		}
 	}
 
