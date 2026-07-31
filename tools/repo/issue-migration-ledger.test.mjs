@@ -208,6 +208,111 @@ test("KEEP_HUB와 SPLIT_CHILDREN은 PENDING execution state만 허용한다", ()
   ]);
 });
 
+test("SPLIT_CHILDREN는 childRepositories와 일치하는 child issue URL을 기록한다", () => {
+  const ledger = ledgerFixture();
+  const schema = JSON.parse(readFileSync("contracts/repository-split-issues.schema.json", "utf8"));
+  const entry = entryForSourceIssue(ledger, 2605);
+
+  assert.deepEqual(entry.childIssueUrls, {
+    "AquilaXk/easysubway-data": "https://github.com/AquilaXk/easysubway-data/issues/21",
+    "AquilaXk/easysubway-mobile": "https://github.com/AquilaXk/easysubway-mobile/issues/5",
+  });
+  assert.deepEqual(validateSchema(schema, ledger).errors, []);
+  assert.deepEqual(validateLedger(ledger), []);
+});
+
+test("SPLIT_CHILDREN는 비어 있지 않은 childIssueUrls를 반드시 기록한다", () => {
+  const ledger = ledgerFixture();
+  const schema = JSON.parse(readFileSync("contracts/repository-split-issues.schema.json", "utf8"));
+  delete entryForSourceIssue(ledger, 2605).childIssueUrls;
+
+  assert.deepEqual(validateLedger(ledger), ["issues[40].childIssueUrls: data와 mobile child issue URL이 필요함"]);
+  assert.ok(validateSchema(schema, ledger).errors.some((error) => error.includes("$.issues.40: not 분기")));
+});
+
+test("childIssueUrls는 SPLIT_CHILDREN의 정확한 repository key와 중복 없는 positive issue URL만 허용한다", () => {
+  const invalidChildIssueUrls = [
+    [
+      "missing key",
+      (entry) => delete entry.childIssueUrls["AquilaXk/easysubway-mobile"],
+      ["issues[40].childIssueUrls: childRepositories key와 정확히 일치해야 함"],
+      "$.issues.40.childIssueUrls.AquilaXk/easysubway-mobile: 필수 필드 누락",
+    ],
+    [
+      "extra key",
+      (entry) => { entry.childIssueUrls["AquilaXk/easysubway-platform"] = "https://github.com/AquilaXk/easysubway-platform/issues/1"; },
+      ["issues[40].childIssueUrls: childRepositories key와 정확히 일치해야 함"],
+      "$.issues.40.childIssueUrls.AquilaXk/easysubway-platform: 허용되지 않은 필드",
+    ],
+    [
+      "duplicate URL",
+      (entry) => { entry.childIssueUrls["AquilaXk/easysubway-mobile"] = "https://github.com/AquilaXk/easysubway-data/issues/21"; },
+      [
+        "issues[40].childIssueUrls: child issue URL 중복",
+        "issues[40].childIssueUrls.AquilaXk/easysubway-mobile: repository와 URL repository 불일치",
+      ],
+      "$.issues.40.childIssueUrls.AquilaXk/easysubway-mobile: pattern",
+    ],
+    [
+      "wrong repository",
+      (entry) => { entry.childIssueUrls["AquilaXk/easysubway-mobile"] = "https://github.com/AquilaXk/easysubway-data/issues/5"; },
+      ["issues[40].childIssueUrls.AquilaXk/easysubway-mobile: repository와 URL repository 불일치"],
+      "$.issues.40.childIssueUrls.AquilaXk/easysubway-mobile: pattern",
+    ],
+    [
+      "non-positive issue number",
+      (entry) => { entry.childIssueUrls["AquilaXk/easysubway-data"] = "https://github.com/AquilaXk/easysubway-data/issues/0"; },
+      ["issues[40].childIssueUrls.AquilaXk/easysubway-data: positive GitHub issue URL 불량"],
+      "$.issues.40.childIssueUrls.AquilaXk/easysubway-data: pattern",
+    ],
+    [
+      "leading-zero issue number",
+      (entry) => { entry.childIssueUrls["AquilaXk/easysubway-data"] = "https://github.com/AquilaXk/easysubway-data/issues/01"; },
+      ["issues[40].childIssueUrls.AquilaXk/easysubway-data: positive GitHub issue URL 불량"],
+      "$.issues.40.childIssueUrls.AquilaXk/easysubway-data: pattern",
+    ],
+  ];
+
+  const schema = JSON.parse(readFileSync("contracts/repository-split-issues.schema.json", "utf8"));
+  for (const [, mutate, errors, schemaError] of invalidChildIssueUrls) {
+    const ledger = ledgerFixture();
+    mutate(entryForSourceIssue(ledger, 2605));
+    assert.deepEqual(validateLedger(ledger), errors);
+    assert.ok(validateSchema(schema, ledger).errors.some((error) => error.includes(schemaError)));
+  }
+});
+
+test("childIssueUrls는 SPLIT_CHILDREN에서만 허용한다", () => {
+  const ledger = ledgerFixture();
+  const schema = JSON.parse(readFileSync("contracts/repository-split-issues.schema.json", "utf8"));
+  ledger.issues[0].childIssueUrls = {
+    "AquilaXk/easysubway-data": "https://github.com/AquilaXk/easysubway-data/issues/1",
+    "AquilaXk/easysubway-mobile": "https://github.com/AquilaXk/easysubway-mobile/issues/1",
+  };
+
+  assert.deepEqual(validateLedger(ledger), ["issues[0].childIssueUrls: SPLIT_CHILDREN에서만 허용됨"]);
+  assert.ok(validateSchema(schema, ledger).errors.some((error) => error.includes("$.issues.0: not 분기")));
+});
+
+test("childIssueUrls가 있으면 malformed childRepositories도 결정적 오류로 거부한다", () => {
+  const childRepositoriesValues = [
+    ["missing", (entry) => delete entry.childRepositories],
+    ["null", (entry) => { entry.childRepositories = null; }],
+    ["string", (entry) => { entry.childRepositories = "AquilaXk/easysubway-data"; }],
+    ["duplicate", (entry) => { entry.childRepositories = ["AquilaXk/easysubway-data", "AquilaXk/easysubway-data"]; }],
+  ];
+
+  for (const [, mutate] of childRepositoriesValues) {
+    const ledger = ledgerFixture();
+    mutate(entryForSourceIssue(ledger, 2605));
+    assert.doesNotThrow(() => validateLedger(ledger));
+    assert.deepEqual(validateLedger(ledger), [
+      "issues[40].childRepositories: data와 mobile child repository가 정확히 필요함",
+      "issues[40].childIssueUrls: childRepositories key와 정확히 일치해야 함",
+    ]);
+  }
+});
+
 test("schema는 TRANSFER의 세 execution state를 표현하고 불완전한 조합을 거부한다", () => {
   const schema = JSON.parse(readFileSync("contracts/repository-split-issues.schema.json", "utf8"));
   const approved = ledgerFixture();

@@ -24,6 +24,28 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
+        "not": {
+          "oneOf": [
+            {
+              "type": "object",
+              "required": ["childIssueUrls"],
+              "properties": {
+                "disposition": { "not": { "const": "SPLIT_CHILDREN" } }
+              }
+            },
+            {
+              "type": "object",
+              "required": ["disposition"],
+              "properties": {
+                "disposition": { "const": "SPLIT_CHILDREN" }
+              },
+              "not": {
+                "type": "object",
+                "required": ["childIssueUrls"]
+              }
+            }
+          ]
+        },
         "oneOf": [
           {
             "type": "object",
@@ -75,6 +97,15 @@
             "maxItems": 2,
             "uniqueItems": true,
             "items": { "enum": ["AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile"] }
+          },
+          "childIssueUrls": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile"],
+            "properties": {
+              "AquilaXk/easysubway-data": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway-data/issues/[1-9][0-9]*$" },
+              "AquilaXk/easysubway-mobile": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway-mobile/issues/[1-9][0-9]*$" }
+            }
           },
           "reason": { "type": "string", "minLength": 1 },
           "classificationState": { "const": "REVIEWED" },
