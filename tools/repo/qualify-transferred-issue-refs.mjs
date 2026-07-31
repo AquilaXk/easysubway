@@ -9,6 +9,8 @@ const SOURCE_REPOSITORY = "AquilaXk/easysubway";
 const MOBILE_REPOSITORY = "AquilaXk/easysubway-mobile";
 const execFileAsync = promisify(execFile);
 const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
+const OPENING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})/;
+const CLOSING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n)?$/;
 
 export function parseArguments(argv) {
   const values = {};
@@ -73,13 +75,13 @@ export function qualifyIssueReferences({ text, ledger }) {
   const unresolved = [];
   for (const line of text.split(/(?<=\n)/)) {
     if (fenced !== null) {
-      const closingFence = line.match(/^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n)?$/);
-      if (closingFence?.[1][0] === fenced.character && closingFence[1].length >= fenced.length) fenced = null;
+      const closingFence = CLOSING_FENCE_PATTERN.exec(line);
+      if (closingFence?.[1].startsWith(fenced.character) && closingFence[1].length >= fenced.length) fenced = null;
       continue;
     }
 
     if (/^(?:\t| {4})/.test(line)) throw new Error("indented code block is unsupported");
-    const openingFence = line.match(/^ {0,3}(`{3,}|~{3,})/);
+    const openingFence = OPENING_FENCE_PATTERN.exec(line);
     if (openingFence) {
       unresolved.push(...qualifyText(prose, references));
       prose = "";
@@ -93,27 +95,48 @@ export function qualifyIssueReferences({ text, ledger }) {
 function qualifyText(text, references) {
   const unresolved = [];
   for (let index = 0; index < text.length;) {
-    if (text.startsWith("http://", index) || text.startsWith("https://", index)) {
-      const end = text.slice(index).search(/\s/);
-      const length = end === -1 ? text.length - index : end;
-      index += length; continue;
-    }
-    if (text[index] === "`") {
-      const length = text.slice(index).match(/^`+/)[0].length;
-      const delimiter = "`".repeat(length); const end = text.indexOf(delimiter, index + length);
-      if (end === -1) throw new Error("unterminated inline code span");
-      index = end + length; continue;
-    }
-    const match = text.slice(index).match(/^#([1-9]\d*)/);
-    if (match && !/[\w/]/.test(text[index - 1] ?? "")) {
-      const reference = references.get(Number(match[1]));
-      if (!reference) throw new Error(`unresolved bare issue reference #${match[1]}`);
-      unresolved.push({ reference: Number(match[1]), reason: "bare reference is ambiguous after issue transfer" });
-      index += match[0].length; continue;
+    const urlLength = urlLengthAt(text, index);
+    if (urlLength) { index += urlLength; continue; }
+    const codeSpanLength = codeSpanLengthAt(text, index);
+    if (codeSpanLength) { index += codeSpanLength; continue; }
+    const bareReference = bareReferenceAt(text, index);
+    if (bareReference !== null) {
+      const reference = references.get(bareReference);
+      if (!reference) throw new Error(`unresolved bare issue reference #${bareReference}`);
+      unresolved.push({ reference: bareReference, reason: "bare reference is ambiguous after issue transfer" });
+      index += bareReference.toString().length + 1; continue;
     }
     index += 1;
   }
   return unresolved;
+}
+
+function urlLengthAt(text, index) {
+  if (!text.startsWith("http://", index) && !text.startsWith("https://", index)) return 0;
+  const end = text.slice(index).search(/\s/);
+  return end === -1 ? text.length - index : end;
+}
+
+function codeSpanLengthAt(text, index) {
+  if (text[index] !== "`") return 0;
+  const length = text.slice(index).match(/^`+/)[0].length;
+  const end = exactBacktickRunAt(text, index + length, length);
+  if (end === -1) throw new Error("unterminated inline code span");
+  return end + length - index;
+}
+
+function exactBacktickRunAt(text, index, length) {
+  for (let candidate = text.indexOf("`", index); candidate !== -1;) {
+    const candidateLength = text.slice(candidate).match(/^`+/)[0].length;
+    if (candidateLength === length) return candidate;
+    candidate = text.indexOf("`", candidate + candidateLength);
+  }
+  return -1;
+}
+
+function bareReferenceAt(text, index) {
+  const match = text.slice(index).match(/^#([1-9]\d*)/);
+  return match && !/[\w/]/.test(text[index - 1] ?? "") ? Number(match[1]) : null;
 }
 
 function referencesFromLedger(ledger) {

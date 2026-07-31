@@ -47,6 +47,10 @@ test("qualifyIssueReferences는 multiline inline code span을 무시한다", () 
   assert.deepEqual(qualifyIssueReferences({ text, ledger }), [ambiguous(10), ambiguous(12)]);
 });
 
+test("qualifyIssueReferences는 더 긴 backtick run 내부를 inline closing fence로 처리하지 않는다", () => {
+  assert.deepEqual(qualifyIssueReferences({ text: "``code ``` #10``", ledger }), []);
+});
+
 test("qualifyIssueReferences는 ledger 밖 또는 미완료 transfer bare ref를 fail-closed한다", () => {
   assert.throws(() => qualifyIssueReferences({ text: "unknown #99", ledger }), /unresolved bare issue reference #99/);
   assert.throws(() => qualifyIssueReferences({ text: "incomplete #14", ledger }), /unresolved bare issue reference #14/);
