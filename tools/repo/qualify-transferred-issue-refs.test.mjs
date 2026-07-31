@@ -68,6 +68,20 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test> \"title\n\n#10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[label `code\n\ncontinued`](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n# heading](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label `code\n# heading`](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n===\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  for (const text of [
+    "[outer [inner](https://one.test)](https://two.test \"title #10\")",
+    "[outer [inner](/relative)](https://two.test \"title #10\")",
+    "[outer [inner][ref]](https://two.test \"title #10\")\n\n[ref]: /relative",
+    "[outer [inner](not a valid destination)](https://two.test \"title #10\")",
+    "![outer [inner](https://one.test)](https://two.test \"title #10\")",
+    "\\![outer [inner](https://one.test)](https://two.test \"title #10\")",
+  ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /nested Markdown labels are unsupported/);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n2. continued](https://example.test \"title #10\")", ledger }), []);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n1.\ncontinued](https://example.test \"title #10\")", ledger }), []);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n<div>\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test<bad> \"title #10\")", ledger }), [ambiguous(10)]);
 });
 

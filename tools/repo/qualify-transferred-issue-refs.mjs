@@ -11,6 +11,7 @@ const execFileAsync = promisify(execFile);
 const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
 const OPENING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})/;
 const CLOSING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n)?$/;
+const INTERRUPTING_BLOCK_PATTERN = /^ {0,3}(?:#{1,6}(?:[ \t]|\r?\n|$)|>|<|[*+-][ \t]+(?=\S)|1[.)][ \t]+(?=\S)|(?:[*_-][ \t]*){3,}(?:\r?\n|$)|(?:=+[ \t]*|-+[ \t]*)(?:\r?\n|$))/;
 
 export function parseArguments(argv) {
   const values = {};
@@ -104,19 +105,23 @@ export function qualifyIssueReferences({ text, ledger }) {
 function qualifyText(text, references) {
   const unresolved = [];
   const linkLabels = new Set();
-  let labelDepth = 0;
+  let labelOpen = false;
   for (let index = 0; index < text.length;) {
     if (text[index] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[index + 1] ?? "")) { index += 2; continue; }
-    if (/\s/.test(text[index]) && whitespaceAt(text, index).paragraphBreak) labelDepth = 0;
+    if (/\s/.test(text[index])) {
+      const separator = whitespaceAt(text, index);
+      if (separator.paragraphBreak || separator.blockBreak) labelOpen = false;
+    }
     let urlLength = urlLengthAt(text, index, linkLabels);
-    if (urlLength && labelDepth > 0) {
+    if (urlLength && labelOpen) {
       const labelEnd = labelEndWithin(text, index, index + urlLength);
       if (labelEnd !== -1) urlLength = labelEnd - index;
     }
     if (urlLength) { index += urlLength; continue; }
     const codeSpanLength = codeSpanLengthAt(text, index);
     if (codeSpanLength) {
-      if (/\r?\n[ \t]*\r?\n/.test(text.slice(index, index + codeSpanLength))) labelDepth = 0;
+      if (/\r?\n[ \t]*\r?\n/.test(text.slice(index, index + codeSpanLength))
+        || hasInterruptingBlock(text, index, index + codeSpanLength)) labelOpen = false;
       index += codeSpanLength; continue;
     }
     const bareReference = bareReferenceAt(text, index);
@@ -126,8 +131,13 @@ function qualifyText(text, references) {
       unresolved.push({ reference: bareReference, reason: "bare reference is ambiguous after issue transfer" });
       index += bareReference.toString().length + 1; continue;
     }
-    if (text[index] === "[") labelDepth += 1;
-    else if (text[index] === "]" && labelDepth > 0) { linkLabels.add(index); labelDepth -= 1; }
+    if (text[index] === "[") {
+      if (labelOpen) throw new Error("nested Markdown labels are unsupported");
+      labelOpen = true;
+    } else if (text[index] === "]" && labelOpen) {
+      linkLabels.add(index);
+      labelOpen = false;
+    }
     index += 1;
   }
   return unresolved;
@@ -153,14 +163,14 @@ function urlLengthAt(text, index, linkLabels) {
       if (titleDelimiter !== null) {
         if (/\s/.test(text[cursor])) {
           const titleWhitespace = whitespaceAt(text, cursor);
-          if (titleWhitespace.paragraphBreak) return destinationLength;
+          if (titleWhitespace.paragraphBreak || titleWhitespace.blockBreak) return destinationLength;
           cursor += titleWhitespace.length - 1;
         } else if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; }
         continue;
       }
       if (/\s/.test(text[cursor])) {
         const separator = whitespaceAt(text, cursor);
-        if (separator.paragraphBreak) return destinationLength;
+        if (separator.paragraphBreak || separator.blockBreak) return destinationLength;
         cursor += separator.length - 1;
         separatorSeen = true; continue;
       }
@@ -182,14 +192,14 @@ function urlLengthAt(text, index, linkLabels) {
         if (titleDelimiter !== null) {
           if (/\s/.test(text[cursor])) {
             const titleWhitespace = whitespaceAt(text, cursor);
-            if (titleWhitespace.paragraphBreak) return bareUrlLength;
+            if (titleWhitespace.paragraphBreak || titleWhitespace.blockBreak) return bareUrlLength;
             cursor += titleWhitespace.length - 1;
           } else if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; }
           continue;
         }
         if (/\s/.test(text[cursor])) {
           const separator = whitespaceAt(text, cursor);
-          if (separator.paragraphBreak) return bareUrlLength;
+          if (separator.paragraphBreak || separator.blockBreak) return bareUrlLength;
           cursor += separator.length - 1; continue;
         }
         if (!titleClosed && (text[cursor] === "\"" || text[cursor] === "'")) titleDelimiter = text[cursor];
@@ -199,7 +209,7 @@ function urlLengthAt(text, index, linkLabels) {
       } else if (/\s/.test(text[cursor])) {
         if (depth !== 1) return bareUrlLength;
         const separator = whitespaceAt(text, cursor);
-        if (separator.paragraphBreak) return bareUrlLength;
+        if (separator.paragraphBreak || separator.blockBreak) return bareUrlLength;
         cursor += separator.length - 1;
         destinationClosed = true;
       }
@@ -222,7 +232,18 @@ function bareUrlLengthAt(text, start) {
 
 function whitespaceAt(text, index) {
   const whitespace = text.slice(index).match(/^\s*/)[0];
-  return { length: whitespace.length, paragraphBreak: /\r?\n[ \t]*\r?\n/.test(whitespace) };
+  return {
+    length: whitespace.length,
+    paragraphBreak: /\r?\n[ \t]*\r?\n/.test(whitespace),
+    blockBreak: hasInterruptingBlock(text, index, index + whitespace.length),
+  };
+}
+
+function hasInterruptingBlock(text, start, end) {
+  for (let lineBreak = text.indexOf("\n", start); lineBreak !== -1 && lineBreak < end; lineBreak = text.indexOf("\n", lineBreak + 1)) {
+    if (INTERRUPTING_BLOCK_PATTERN.test(text.slice(lineBreak + 1))) return true;
+  }
+  return false;
 }
 
 function labelEndWithin(text, start, end) {
