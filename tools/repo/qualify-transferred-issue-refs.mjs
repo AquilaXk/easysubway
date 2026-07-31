@@ -114,11 +114,12 @@ function qualifyText(text, references) {
   const unresolved = [];
   const linkLabels = new Set();
   let labelOpen = false;
+  let labelStart = -1;
   for (let index = 0; index < text.length;) {
     if (text[index] === "\\" && ESCAPABLE_PUNCTUATION_PATTERN.test(text[index + 1] ?? "")) { index += 2; continue; }
     if (/\s/.test(text[index])) {
       const separator = whitespaceAt(text, index);
-      if (separator.paragraphBreak || separator.blockBreak) labelOpen = false;
+      if (separator.paragraphBreak || separator.blockBreak) { labelOpen = false; labelStart = -1; }
       index += separator.length; continue;
     }
     if (labelOpen && text[index] === "<") throw new Error("angle brackets in Markdown labels are unsupported");
@@ -131,7 +132,7 @@ function qualifyText(text, references) {
     const codeSpanLength = codeSpanLengthAt(text, index);
     if (codeSpanLength) {
       if (/\r?\n[ \t]*\r?\n/.test(text.slice(index, index + codeSpanLength))
-        || hasInterruptingBlock(text, index, index + codeSpanLength)) labelOpen = false;
+        || hasInterruptingBlock(text, index, index + codeSpanLength)) { labelOpen = false; labelStart = -1; }
       index += codeSpanLength; continue;
     }
     RAW_HTML_OPENER_PATTERN.lastIndex = index;
@@ -146,9 +147,12 @@ function qualifyText(text, references) {
     if (text[index] === "[") {
       if (labelOpen) throw new Error("nested Markdown labels are unsupported");
       labelOpen = true;
+      labelStart = index;
     } else if (text[index] === "]" && labelOpen) {
+      if (Array.from(text.slice(labelStart + 1, index)).length > 999) throw new Error("Markdown link labels longer than 999 characters are unsupported");
       linkLabels.add(index);
       labelOpen = false;
+      labelStart = -1;
     }
     index += 1;
   }
@@ -222,6 +226,8 @@ function urlLengthAt(text, index, linkLabels) {
         else if (!titleClosed && text[cursor] === "(") titleDelimiter = ")";
         else if (text[cursor] === ")") return cursor - index;
         else return bareUrlLength;
+      } else if (text[cursor] === "<" || text[cursor] === ">") {
+        throw new Error("angle brackets in unbracketed Markdown destinations are unsupported");
       } else if (/\s/.test(text[cursor])) {
         if (depth !== 1) return bareUrlLength;
         const separator = whitespaceAt(text, cursor);
@@ -233,6 +239,15 @@ function urlLengthAt(text, index, linkLabels) {
       else if (text[cursor] === ")" && --depth === 0) return cursor - index;
     }
     throw new Error("unterminated Markdown link destination");
+  }
+  if (text[index - 1] === "<") {
+    let openerBackslashes = 0;
+    for (let cursor = index - 2; text[cursor] === "\\"; cursor -= 1) openerBackslashes += 1;
+    if (openerBackslashes % 2 === 0) {
+      const closingAngle = text.indexOf(">", index);
+      if (closingAngle === -1 || /[\u0000-\u0020<\u007f]/.test(text.slice(index, closingAngle))) throw new Error("invalid angle autolink");
+      return closingAngle - index;
+    }
   }
   return bareUrlLength;
 }
