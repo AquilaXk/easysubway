@@ -65,8 +65,12 @@ export function validateLedger(ledger, { openIssueNumbers, requirePending = fals
       if (!sameValues(entry.childRepositories, CHILD_REPOSITORIES)) {
         errors.push(`${path}.childRepositories: data와 mobile child repository가 정확히 필요함`);
       }
+      validateChildIssueUrls(entry.childIssueUrls, entry.childRepositories, `${path}.childIssueUrls`, errors);
     } else if (entry?.childRepositories !== undefined) {
       errors.push(`${path}.childRepositories: SPLIT_CHILDREN에서만 허용됨`);
+    }
+    if (entry?.disposition !== "SPLIT_CHILDREN" && entry?.childIssueUrls !== undefined) {
+      errors.push(`${path}.childIssueUrls: SPLIT_CHILDREN에서만 허용됨`);
     }
     const reviewed = reviewedGroupFor(sourceIssue);
     if (reviewed === undefined) errors.push(`${path}: frozen reviewed mapping에 없는 sourceIssue`);
@@ -141,6 +145,34 @@ function isTransferExecutionState(entry) {
 function isTargetIssueUrl(value, targetRepository) {
   return typeof value === "string" && typeof targetRepository === "string"
     && new RegExp(`^https://github\\.com/${escapeRegExp(targetRepository)}/issues/\\d+$`).test(value);
+}
+
+function validateChildIssueUrls(childIssueUrls, childRepositories, path, errors) {
+  if (childIssueUrls === undefined) return;
+  if (childIssueUrls === null || typeof childIssueUrls !== "object" || Array.isArray(childIssueUrls)) {
+    errors.push(`${path}: childRepositories key와 정확히 일치해야 함`);
+    return;
+  }
+  const repositories = Object.keys(childIssueUrls);
+  if (!sameValues(repositories, childRepositories)) {
+    errors.push(`${path}: childRepositories key와 정확히 일치해야 함`);
+  }
+  const urls = Object.values(childIssueUrls);
+  if (new Set(urls).size !== urls.length) errors.push(`${path}: child issue URL 중복`);
+  for (const repository of childRepositories ?? []) {
+    if (!(repository in childIssueUrls)) continue;
+    validateChildIssueUrl(childIssueUrls[repository], repository, `${path}.${repository}`, errors);
+  }
+}
+
+function validateChildIssueUrl(value, repository, path, errors) {
+  const match = typeof value === "string"
+    ? /^https:\/\/github\.com\/([^/]+\/[^/]+)\/issues\/(\d+)$/.exec(value) : null;
+  if (match === null || Number(match[2]) < 1) {
+    errors.push(`${path}: positive GitHub issue URL 불량`);
+  } else if (match[1] !== repository) {
+    errors.push(`${path}: repository와 URL repository 불일치`);
+  }
 }
 
 function isDateTime(value) {
