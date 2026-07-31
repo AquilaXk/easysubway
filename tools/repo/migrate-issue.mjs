@@ -1,5 +1,5 @@
 import { execFile } from "node:child_process";
-import { closeSync, fsyncSync, linkSync, lstatSync, openSync, readFileSync, readdirSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { closeSync, constants as fsConstants, fstatSync, fsyncSync, linkSync, lstatSync, openSync, readFileSync, readdirSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -76,7 +76,7 @@ export function validateMigrationLedger({ ledger, schema }) {
   return [...schemaErrors, ...validateLedger(ledger)];
 }
 
-export async function runMigration({ arguments_, ledger, schema, execGh, retryDelayMs = 0, writeEvidence = writeEvidenceAtomically }) {
+export async function runMigration({ arguments_, ledger, schema, execGh, retryDelayMs = 0, writeEvidence = writeEvidenceAtomically, afterPreflightPublish = async () => {} }) {
   if (validateMigrationLedger({ ledger, schema }).length !== 0) throw new Error("ledger validation failed");
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === arguments_.sourceIssue);
   if (!entry) throw new Error("source issue is not in the ledger");
@@ -92,7 +92,9 @@ export async function runMigration({ arguments_, ledger, schema, execGh, retryDe
   } catch {
     throw new Error("preflight evidence could not be persisted; transfer was not executed");
   }
-  const persistedSource = readPersistedPreflight(evidence, entry.sourceIssue, entry.sourceUrl);
+  const preflightEvidence = capturePublishedEvidence(evidence, evidenceFileName(entry.sourceIssue, "preflight"));
+  await afterPreflightPublish({ evidence, preflightEvidence });
+  const persistedSource = readPersistedPreflight(evidence, entry.sourceIssue, entry.sourceUrl, preflightEvidence);
   const transferResult = await executeIssueTransfer({
     entry,
     confirmations: arguments_.confirmations,
@@ -117,7 +119,7 @@ export async function preflightIssueTransfer({ entry, execGh }) {
   return reportForPreflight(entry, details);
 }
 
-export async function executeIssueTransfer({ entry, confirmations, execGh, details }) {
+async function executeIssueTransfer({ entry, confirmations, execGh, details }) {
   confirmExecution(entry, confirmations);
   const normalizedDetails = details ?? await preflightDetails({ entry, execGh });
   try {
@@ -170,6 +172,7 @@ export async function verifyTransferredIssue({ entry, transferResult, execGh, re
         commentCount: target.commentCount,
       };
     } catch (error) {
+      if (error instanceof Error && error.message === "postflight evidence could not be persisted") throw error;
       verificationError = error;
       if (attempt < 9) await delay(retryDelayMs);
     }
@@ -342,6 +345,14 @@ function assertEvidenceDirectory(context) {
   }
 }
 
+function capturePublishedEvidence(context, filename) {
+  assertEvidenceDirectory(context);
+  const path = join(context.canonicalPath, filename);
+  const stat = lstatSync(path);
+  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error("durable preflight evidence is unavailable");
+  return { path, dev: stat.dev, ino: stat.ino };
+}
+
 function evidenceFileName(sourceIssue, suffix) {
   if (!Number.isSafeInteger(sourceIssue) || sourceIssue < 1 || !/^(preflight|postflight-[1-9]\d*)$/.test(suffix)) throw new Error("invalid evidence filename");
   return `${sourceIssue}-${suffix}.json`;
@@ -364,11 +375,21 @@ async function writeEvidenceAtomically(context, filename, value) {
   }
 }
 
-function readPersistedPreflight(context, sourceIssue, sourceUrl) {
+function readPersistedPreflight(context, sourceIssue, sourceUrl, publishedEvidence) {
   assertEvidenceDirectory(context);
   let evidence;
   try {
-    evidence = JSON.parse(readFileSync(join(context.canonicalPath, evidenceFileName(sourceIssue, "preflight")), "utf8"));
+    const descriptor = openSync(publishedEvidence.path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+    try {
+      const stat = fstatSync(descriptor);
+      if (!stat.isFile() || stat.dev !== publishedEvidence.dev || stat.ino !== publishedEvidence.ino) {
+        throw new Error("durable preflight evidence is unavailable");
+      }
+      evidence = JSON.parse(readFileSync(descriptor, "utf8"));
+    } finally {
+      closeSync(descriptor);
+    }
+    assertEvidenceDirectory(context);
   } catch {
     throw new Error("durable preflight evidence is unavailable");
   }
