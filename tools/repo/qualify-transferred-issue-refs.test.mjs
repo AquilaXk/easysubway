@@ -18,8 +18,15 @@ const execFileAsync = promisify(execFile);
 
 test("qualifyIssueReferences는 ledger-matching bare ref만 ambiguity로 보고한다", () => {
   assert.deepEqual(
-    qualifyIssueReferences({ text: "internal #10, hub #11, data #12, existing AquilaXk/easysubway#11", ledger }),
-    [ambiguous(10), ambiguous(11), ambiguous(12)],
+    qualifyIssueReferences({ text: "internal #10, hub #11, data #12, backend #13, existing AquilaXk/easysubway#11", ledger }),
+    [ambiguous(10), ambiguous(11), ambiguous(12), ambiguous(13)],
+  );
+  assert.deepEqual(
+    qualifyIssueReferences({
+      text: "retained parent #2605",
+      ledger: { issues: [{ sourceIssue: 2605, disposition: "SPLIT_CHILDREN", targetRepository: null, childRepositories: ["AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile"] }] },
+    }),
+    [ambiguous(2605)],
   );
 });
 
