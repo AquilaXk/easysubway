@@ -256,8 +256,11 @@ function whitespaceAt(text, index) {
 }
 
 function hasInterruptingBlock(text, start, end) {
-  for (let lineBreak = text.indexOf("\n", start); lineBreak !== -1 && lineBreak < end; lineBreak = text.indexOf("\n", lineBreak + 1)) {
-    if (INTERRUPTING_BLOCK_PATTERN.test(text.slice(lineBreak + 1))) return true;
+  const segment = text.slice(start, end);
+  for (let offset = segment.indexOf("\n"); offset !== -1; offset = segment.indexOf("\n", offset + 1)) {
+    const lineStart = start + offset + 1;
+    const lineEnd = text.indexOf("\n", lineStart);
+    if (INTERRUPTING_BLOCK_PATTERN.test(text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd + 1))) return true;
   }
   return false;
 }
