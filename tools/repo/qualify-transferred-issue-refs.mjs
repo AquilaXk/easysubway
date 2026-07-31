@@ -3,10 +3,12 @@ import { readFile } from "node:fs/promises";
 import { promisify } from "node:util";
 import { validateLedger } from "./issue-migration-ledger.mjs";
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
+import { isMainModule } from "../lib/is-main-module.mjs";
 
 const SOURCE_REPOSITORY = "AquilaXk/easysubway";
 const MOBILE_REPOSITORY = "AquilaXk/easysubway-mobile";
 const execFileAsync = promisify(execFile);
+const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
 
 export function parseArguments(argv) {
   const values = {};
@@ -22,7 +24,7 @@ export function parseArguments(argv) {
       values.mode = argument.slice(2);
     } else throw new Error("unsupported argument");
   }
-  if (!values.ledgerPath || !/^\d+$/.test(values.sourceIssue ?? "") || !values.mode) throw new Error("ledger, source issue, and execution mode are required");
+  if (!values.ledgerPath || !/^[1-9]\d*$/.test(values.sourceIssue ?? "") || !values.mode) throw new Error("ledger, source issue, and execution mode are required");
   if (values.mode === "execute" && (!values.confirmSource || !values.confirmTarget)) throw new Error("execute requires both confirmations");
   return {
     ledgerPath: values.ledgerPath,
@@ -34,6 +36,7 @@ export function parseArguments(argv) {
 
 export async function runNormalization({ arguments_, ledger, execGh }) {
   const entry = ledger?.issues?.find(({ sourceIssue }) => sourceIssue === arguments_?.sourceIssue);
+  if (!entry) throw new Error(`source issue #${arguments_?.sourceIssue} is not present in the ledger`);
   const target = transferredReference(entry);
   if (target.repository !== MOBILE_REPOSITORY) throw new Error("target repository must be easysubway-mobile");
   const targetUrl = `https://github.com/${target.repository}/issues/${target.number}`;
@@ -47,40 +50,18 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
     readIssueBody(target.repository, target.number, execGh),
     readIssueComments(target.repository, target.number, execGh),
   ]);
-  const expectedBody = qualifyIssueReferences({ text: body, ledger });
-  const expectedComments = comments.map((comment) => ({ ...comment, body: qualifyIssueReferences({ text: comment.body, ledger }) }));
-  const changedComments = expectedComments.filter((comment, index) => comment.body !== comments[index].body);
-  const changes = [
-    ...(expectedBody === body ? [] : [{ kind: "body", id: null, before: body, after: expectedBody }]),
-    ...changedComments.map((comment) => ({
-      kind: "comment",
-      id: comment.id,
-      before: comments.find(({ id }) => id === comment.id).body,
-      after: comment.body,
-    })),
+  const unresolved = [
+    ...qualifyIssueReferences({ text: body, ledger }).map((reference) => ({ surface: { kind: "body", id: null }, ...reference })),
+    ...comments.flatMap((comment) => qualifyIssueReferences({ text: comment.body, ledger })
+      .map((reference) => ({ surface: { kind: "comment", id: comment.id }, ...reference }))),
   ];
   const result = {
     sourceIssue: entry.sourceIssue,
     targetUrl,
     referenceMap: Object.fromEntries([...referencesFromLedger(ledger)].map(([sourceIssue, reference]) => [sourceIssue, `${reference.repository}#${reference.number}`])),
-    changes,
+    changes: [],
+    unresolved,
   };
-  if (arguments_.mode === "dry-run") return result;
-
-  if (expectedBody !== body) {
-    await writeIssueBody(target.repository, target.number, expectedBody, execGh);
-    if (await readIssueBody(target.repository, target.number, execGh) !== expectedBody) throw new Error("issue body reread does not match expected text");
-  }
-  for (const comment of changedComments) {
-    await writeComment(target.repository, comment.id, comment.body, execGh);
-    if (await readCommentBody(target.repository, comment.id, execGh) !== comment.body) throw new Error(`comment ${comment.id} reread does not match expected text`);
-  }
-  if (await readIssueBody(target.repository, target.number, execGh) !== expectedBody) throw new Error("final issue body reread does not match expected text");
-  const verifiedComments = await readIssueComments(target.repository, target.number, execGh);
-  if (verifiedComments.length !== expectedComments.length
-    || verifiedComments.some(({ id, body: verifiedBody }) => expectedComments.find((comment) => comment.id === id)?.body !== verifiedBody)) {
-    throw new Error("final issue comments reread does not match expected text");
-  }
   return result;
 }
 
@@ -89,50 +70,49 @@ export function qualifyIssueReferences({ text, ledger }) {
   const references = referencesFromLedger(ledger);
   let fenced = null;
   let prose = "";
-  let output = "";
+  const unresolved = [];
   for (const line of text.split(/(?<=\n)/)) {
     if (fenced !== null) {
-      output += line;
       const closingFence = line.match(/^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n)?$/);
       if (closingFence?.[1][0] === fenced.character && closingFence[1].length >= fenced.length) fenced = null;
       continue;
     }
 
+    if (/^(?:\t| {4})/.test(line)) throw new Error("indented code block is unsupported");
     const openingFence = line.match(/^ {0,3}(`{3,}|~{3,})/);
     if (openingFence) {
-      output += qualifyText(prose, references);
+      unresolved.push(...qualifyText(prose, references));
       prose = "";
-      output += line;
       fenced = { character: openingFence[1][0], length: openingFence[1].length };
     } else prose += line;
   }
   if (fenced !== null) throw new Error("unterminated fenced code block");
-  return output + qualifyText(prose, references);
+  return [...unresolved, ...qualifyText(prose, references)];
 }
 
 function qualifyText(text, references) {
-  let output = "";
+  const unresolved = [];
   for (let index = 0; index < text.length;) {
     if (text.startsWith("http://", index) || text.startsWith("https://", index)) {
       const end = text.slice(index).search(/\s/);
       const length = end === -1 ? text.length - index : end;
-      output += text.slice(index, index + length); index += length; continue;
+      index += length; continue;
     }
     if (text[index] === "`") {
       const length = text.slice(index).match(/^`+/)[0].length;
       const delimiter = "`".repeat(length); const end = text.indexOf(delimiter, index + length);
       if (end === -1) throw new Error("unterminated inline code span");
-      output += text.slice(index, end + length); index = end + length; continue;
+      index = end + length; continue;
     }
     const match = text.slice(index).match(/^#([1-9]\d*)/);
     if (match && !/[\w/]/.test(text[index - 1] ?? "")) {
       const reference = references.get(Number(match[1]));
-      if (!reference) throw new Error(`unresolved bare issue reference #${match[1]}`);
-      output += `${reference.repository}#${reference.number}`; index += match[0].length; continue;
+      if (reference) unresolved.push({ reference: Number(match[1]), reason: "bare reference is ambiguous after issue transfer" });
+      index += match[0].length; continue;
     }
-    output += text[index++];
+    index += 1;
   }
-  return output;
+  return unresolved;
 }
 
 function referencesFromLedger(ledger) {
@@ -181,22 +161,8 @@ async function readIssueComments(repository, number, execGh) {
   return comments;
 }
 
-async function readCommentBody(repository, id, execGh) {
-  const comment = JSON.parse(await execGh(["api", `repos/${repository}/issues/comments/${id}`]));
-  if (comment?.id !== id || typeof comment.body !== "string") throw new Error(`comment ${id} is invalid`);
-  return comment.body;
-}
-
-async function writeIssueBody(repository, number, body, execGh) {
-  await execGh(["api", "--method", "PATCH", `repos/${repository}/issues/${number}`, "-f", `body=${body}`]);
-}
-
-async function writeComment(repository, id, body, execGh) {
-  await execGh(["api", "--method", "PATCH", `repos/${repository}/issues/comments/${id}`, "-f", `body=${body}`]);
-}
-
 async function execGh(args) {
-  const { stdout } = await execFileAsync("gh", args, { encoding: "utf8" });
+  const { stdout } = await execFileAsync("gh", args, { encoding: "utf8", maxBuffer: MAX_GH_BUFFER_BYTES });
   return stdout;
 }
 
@@ -205,11 +171,11 @@ async function main() {
     const arguments_ = parseArguments(process.argv.slice(2));
     const [ledgerText, schemaText] = await Promise.all([
       readFile(arguments_.ledgerPath, "utf8"),
-      readFile("contracts/repository-split-issues.schema.json", "utf8"),
+      readFile(new URL("../../contracts/repository-split-issues.schema.json", import.meta.url), "utf8"),
     ]);
     const ledger = JSON.parse(ledgerText);
     const errors = [...validateSchema(JSON.parse(schemaText), ledger).errors, ...validateLedger(ledger)];
-    if (errors.length !== 0) throw new Error("ledger validation failed");
+    if (errors.length !== 0) throw new Error(`ledger validation failed: ${errors.join("; ")}`);
     console.log(JSON.stringify(await runNormalization({ arguments_, ledger, execGh })));
   } catch (error) {
     console.error(`issue reference normalization was not executed: ${error instanceof Error ? error.message : String(error)}`);
@@ -217,4 +183,4 @@ async function main() {
   }
 }
 
-if (import.meta.url === new URL(process.argv[1], "file:").href) await main();
+if (isMainModule()) await main();
