@@ -21,6 +21,7 @@ test("qualifyIssueReferences는 ledger-matching bare ref만 ambiguity로 보고�
     qualifyIssueReferences({ text: "internal #10, hub #11, data #12, backend #13, existing AquilaXk/easysubway#11", ledger }),
     [ambiguous(10), ambiguous(11), ambiguous(12), ambiguous(13)],
   );
+  assert.deepEqual(qualifyIssueReferences({ text: `#10${" ".repeat(10_000)}#10`, ledger }), [ambiguous(10), ambiguous(10)]);
   assert.deepEqual(
     qualifyIssueReferences({
       text: "retained parent #2605",
@@ -66,6 +67,8 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test>\n\n\"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test \"title\n\n#10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test> \"title\n\n#10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test \"title #10\" \\!)", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test> \"title #10\" \\!)", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[label `code\n\ncontinued`](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n# heading](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);

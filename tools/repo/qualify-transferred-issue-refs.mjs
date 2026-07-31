@@ -113,6 +113,7 @@ function qualifyText(text, references) {
       const separator = whitespaceAt(text, index);
       if (separator.tableDelimiter && labelOpen) throw new Error("GFM table boundaries are unsupported");
       if (separator.paragraphBreak || separator.blockBreak) labelOpen = false;
+      index += separator.length; continue;
     }
     let urlLength = urlLengthAt(text, index, linkLabels);
     if (urlLength && labelOpen) {
@@ -156,7 +157,8 @@ function urlLengthAt(text, index, linkLabels) {
     let titleDelimiter = null;
     let titleClosed = false;
     for (let cursor = index; cursor < text.length; cursor += 1) {
-      if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
+      if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")
+        && (!destinationClosed || titleDelimiter !== null)) { cursor += 1; continue; }
       if (!destinationClosed) {
         if (text[cursor] === "<") return bareUrlLength;
         if (text[cursor] === "\r" || text[cursor] === "\n") return cursor - index;
@@ -190,7 +192,8 @@ function urlLengthAt(text, index, linkLabels) {
     let titleDelimiter = null;
     let titleClosed = false;
     for (let cursor = index; cursor < text.length; cursor += 1) {
-      if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
+      if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")
+        && (!destinationClosed || titleDelimiter !== null)) { cursor += 1; continue; }
       if (destinationClosed) {
         if (titleDelimiter !== null) {
           if (/\s/.test(text[cursor])) {
