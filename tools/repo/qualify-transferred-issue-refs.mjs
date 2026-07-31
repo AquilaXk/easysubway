@@ -120,6 +120,7 @@ function qualifyText(text, references) {
       if (separator.paragraphBreak || separator.blockBreak) labelOpen = false;
       index += separator.length; continue;
     }
+    if (labelOpen && text[index] === "<") throw new Error("angle brackets in Markdown labels are unsupported");
     let urlLength = urlLengthAt(text, index, linkLabels);
     if (urlLength && labelOpen) {
       const labelEnd = labelEndWithin(text, index, index + urlLength);
