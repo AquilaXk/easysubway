@@ -17,6 +17,8 @@ const REVIEWED_SOURCE_ISSUE_NUMBERS = [
   2667, 2674, 2675, 2676, 2677, 2678, 2679, 2680, 2684, 2690, 2691,
 ];
 const DATA_APPROVAL_URL = "https://github.com/AquilaXk/easysubway/issues/2705#issuecomment-5134093671";
+const BACKEND_APPROVAL_URL = "https://github.com/AquilaXk/easysubway/issues/2714#issuecomment-5138826003";
+const BACKEND_APPROVED = new Set([2095, 2544, 2545, 2622, 2623, 2624, 2625, 2626, 2675, 2676, 2677]);
 const DATA_TRANSFERS = new Map([
   [2138, ["https://github.com/AquilaXk/easysubway-data/issues/3", "2026-07-30T18:59:46Z"]],
   [2523, ["https://github.com/AquilaXk/easysubway-data/issues/4", "2026-07-30T19:23:33Z"]],
@@ -32,14 +34,15 @@ function ledgerFixture() {
   return JSON.parse(readFileSync("release/migrations/repository-split-issues.json", "utf8"));
 }
 
-test("71개 reviewed source issue ledger는 data Task6 transfer와 나머지 pending state를 만족한다", () => {
+test("reviewed source issue ledger는 data transfer와 backend Task8 approval state를 만족한다", () => {
   const ledger = ledgerFixture();
 
   assert.equal(ledger.issues.length, 71);
   assert.deepEqual(validateLedger(ledger, { openIssueNumbers: REVIEWED_SOURCE_ISSUE_NUMBERS }), []);
   for (const entry of ledger.issues) {
     const transfer = DATA_TRANSFERS.get(entry.sourceIssue);
-    assert.equal(entry.executionApproval, transfer ? DATA_APPROVAL_URL : null);
+    assert.equal(entry.executionApproval, transfer ? DATA_APPROVAL_URL
+      : BACKEND_APPROVED.has(entry.sourceIssue) ? BACKEND_APPROVAL_URL : null);
     assert.equal(entry.targetUrl, transfer?.[0] ?? null);
     assert.equal(entry.transferredAt, transfer?.[1] ?? null);
   }
