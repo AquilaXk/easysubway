@@ -63,6 +63,10 @@ test("qualifyIssueReferences는 Markdown link 뒤 참조와 backslash escape를 
   assert.deepEqual(qualifyIssueReferences({ text: "\\<https://example.test/`tick`#10>", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: `[${"a".repeat(999)}](https://example.test "title #10") outside #11`, ledger }), [ambiguous(11)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n<3](https://example.test \"title #10\")", ledger }), []);
+  assert.throws(
+    () => qualifyIssueReferences({ text: "[docs](https://example.test \"title\n<script></script>\n#10\")", ledger }),
+    /raw HTML is unsupported/,
+  );
 });
 
 test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare ref를 숨기지 않는다", () => {

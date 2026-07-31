@@ -281,7 +281,10 @@ function hasInterruptingBlock(text, start, end) {
   for (let offset = segment.indexOf("\n"); offset !== -1; offset = segment.indexOf("\n", offset + 1)) {
     const lineStart = start + offset + 1;
     const lineEnd = text.indexOf("\n", lineStart);
-    if (INTERRUPTING_BLOCK_PATTERN.test(text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd + 1))) return true;
+    const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd + 1);
+    if (INTERRUPTING_BLOCK_PATTERN.test(line)) return true;
+    RAW_HTML_OPENER_PATTERN.lastIndex = line.match(/^ {0,3}/)[0].length;
+    if (RAW_HTML_OPENER_PATTERN.test(line)) return true;
   }
   return false;
 }
