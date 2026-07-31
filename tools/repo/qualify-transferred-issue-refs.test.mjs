@@ -102,6 +102,13 @@ test("runNormalization은 noncanonical transfer timestamp를 read 전에 거부�
   assert.equal(fake.calls.length, 0);
   const invalidCommentFake = fakeGh({ body: "#10", comments: [{ id: 1, body: "#10", created_at: 0, updated_at: "2026-07-31T08:00:00Z" }] });
   await assert.rejects(() => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: invalidCommentFake.exec }), /issue comments are invalid/);
+  const fractionalLedger = structuredClone(ledger);
+  fractionalLedger.issues[0].transferredAt = "2026-07-31T09:00:00.1234Z";
+  const fractionalCommentFake = fakeGh({ body: "", comments: [
+    { id: 1, body: "#10", created_at: "2026-07-31T09:00:00.1233Z", updated_at: "2026-07-31T09:00:00.1233Z" },
+    { id: 2, body: "#99", created_at: "2026-07-31T09:00:00.1235Z", updated_at: "2026-07-31T09:00:00.1235Z" },
+  ] });
+  assert.equal((await runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger: fractionalLedger, execGh: fractionalCommentFake.exec })).unresolved.length, 1);
 });
 
 test("runNormalization execute는 source ledger 부재와 conditional PATCH 부재 모두 read/write 전에 fail-closed한다", async () => {

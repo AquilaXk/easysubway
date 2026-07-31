@@ -55,7 +55,7 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
   ]);
   const unresolved = [
     ...qualifyIssueReferences({ text: body, ledger }).map((reference) => ({ surface: { kind: "body", id: null }, ...reference })),
-    ...comments.filter((comment) => comment.updatedAt <= transferredAt)
+    ...comments.filter((comment) => compareTimestamps(comment.updatedAt, transferredAt) <= 0)
       .flatMap((comment) => qualifyIssueReferences({ text: comment.body, ledger })
       .map((reference) => ({ surface: { kind: "comment", id: comment.id }, ...reference }))),
   ];
@@ -220,15 +220,26 @@ async function readIssueComments(repository, number, execGh) {
 }
 
 function parseTimestamp(value, label) {
-  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) throw new Error(`${label} is invalid`);
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value)) throw new Error(`${label} is invalid`);
   const parsed = Date.parse(value);
-  const canonical = Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
-  if (value !== canonical && value !== canonical.replace(".000Z", "Z")) throw new Error(`${label} is invalid`);
-  return parsed;
+  if (!Number.isFinite(parsed) || new Date(parsed).toISOString().slice(0, 19) !== value.slice(0, 19)) throw new Error(`${label} is invalid`);
+  return value;
+}
+
+function compareTimestamps(left, right) {
+  const [leftSecond, leftFraction = ""] = left.slice(0, -1).split(".");
+  const [rightSecond, rightFraction = ""] = right.slice(0, -1).split(".");
+  if (leftSecond !== rightSecond) return leftSecond < rightSecond ? -1 : 1;
+  const width = Math.max(leftFraction.length, rightFraction.length);
+  const leftPadded = leftFraction.padEnd(width, "0");
+  const rightPadded = rightFraction.padEnd(width, "0");
+  return leftPadded === rightPadded ? 0 : leftPadded < rightPadded ? -1 : 1;
 }
 
 function validTimestampOrder(createdAt, updatedAt) {
-  try { return parseTimestamp(createdAt, "comment timestamp") <= parseTimestamp(updatedAt, "comment timestamp"); } catch { return false; }
+  try {
+    return compareTimestamps(parseTimestamp(createdAt, "comment timestamp"), parseTimestamp(updatedAt, "comment timestamp")) <= 0;
+  } catch { return false; }
 }
 
 async function execGh(args) {
