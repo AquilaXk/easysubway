@@ -82,6 +82,11 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n2. continued](https://example.test \"title #10\")", ledger }), []);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n1.\ncontinued](https://example.test \"title #10\")", ledger }), []);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n<div>\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  for (const text of [
+    "[label | h\n--- | ---\ncontinued](https://example.test \"title #10\") | x",
+    "[label\n--- | ---\ncontinued](https://example.test \"title #10\")",
+    "`h1 | h2\n--- | ---\n#10 | x`",
+  ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /GFM table boundaries are unsupported/);
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test<bad> \"title #10\")", ledger }), [ambiguous(10)]);
 });
 

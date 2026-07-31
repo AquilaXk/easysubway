@@ -12,6 +12,7 @@ const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
 const OPENING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})/;
 const CLOSING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n)?$/;
 const INTERRUPTING_BLOCK_PATTERN = /^ {0,3}(?:#{1,6}(?:[ \t]|\r?\n|$)|>|<|[*+-][ \t]+(?=\S)|1[.)][ \t]+(?=\S)|(?:[*_-][ \t]*){3,}(?:\r?\n|$)|(?:=+[ \t]*|-+[ \t]*)(?:\r?\n|$))/;
+const TABLE_DELIMITER_PATTERN = /^ {0,3}\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*(?:\r?\n|$)/;
 
 export function parseArguments(argv) {
   const values = {};
@@ -110,6 +111,7 @@ function qualifyText(text, references) {
     if (text[index] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[index + 1] ?? "")) { index += 2; continue; }
     if (/\s/.test(text[index])) {
       const separator = whitespaceAt(text, index);
+      if (separator.tableDelimiter && labelOpen) throw new Error("GFM table boundaries are unsupported");
       if (separator.paragraphBreak || separator.blockBreak) labelOpen = false;
     }
     let urlLength = urlLengthAt(text, index, linkLabels);
@@ -120,6 +122,7 @@ function qualifyText(text, references) {
     if (urlLength) { index += urlLength; continue; }
     const codeSpanLength = codeSpanLengthAt(text, index);
     if (codeSpanLength) {
+      if (hasTableDelimiter(text, index, index + codeSpanLength)) throw new Error("GFM table boundaries are unsupported");
       if (/\r?\n[ \t]*\r?\n/.test(text.slice(index, index + codeSpanLength))
         || hasInterruptingBlock(text, index, index + codeSpanLength)) labelOpen = false;
       index += codeSpanLength; continue;
@@ -236,12 +239,20 @@ function whitespaceAt(text, index) {
     length: whitespace.length,
     paragraphBreak: /\r?\n[ \t]*\r?\n/.test(whitespace),
     blockBreak: hasInterruptingBlock(text, index, index + whitespace.length),
+    tableDelimiter: hasTableDelimiter(text, index, index + whitespace.length),
   };
 }
 
 function hasInterruptingBlock(text, start, end) {
   for (let lineBreak = text.indexOf("\n", start); lineBreak !== -1 && lineBreak < end; lineBreak = text.indexOf("\n", lineBreak + 1)) {
     if (INTERRUPTING_BLOCK_PATTERN.test(text.slice(lineBreak + 1))) return true;
+  }
+  return false;
+}
+
+function hasTableDelimiter(text, start, end) {
+  for (let lineBreak = text.indexOf("\n", start); lineBreak !== -1 && lineBreak < end; lineBreak = text.indexOf("\n", lineBreak + 1)) {
+    if (TABLE_DELIMITER_PATTERN.test(text.slice(lineBreak + 1))) return true;
   }
   return false;
 }
