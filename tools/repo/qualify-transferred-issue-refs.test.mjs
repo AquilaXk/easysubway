@@ -127,6 +127,16 @@ test("runNormalization은 transfer timestamp bucket과 겹치는 comment를 거�
   );
 });
 
+test("runNormalization은 transfer 뒤 수정된 source-era comment를 거부한다", async () => {
+  const fake = fakeGh({ body: "", comments: [
+    { id: 1, body: "#10", created_at: "2026-07-31T08:00:00Z", updated_at: "2026-07-31T10:00:00Z" },
+  ] });
+  await assert.rejects(
+    () => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: fake.exec }),
+    /comment was edited after transfer/,
+  );
+});
+
 test("runNormalization execute는 source ledger 부재와 conditional PATCH 부재 모두 read/write 전에 fail-closed한다", async () => {
   const fake = fakeGh({ body: "body #10", comments: [{ id: 1, body: "comment #13" }] });
   await assert.rejects(

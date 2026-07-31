@@ -56,8 +56,12 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
   const unresolved = [
     ...qualifyIssueReferences({ text: body, ledger }).map((reference) => ({ surface: { kind: "body", id: null }, ...reference })),
     ...comments.filter((comment) => {
-      if (timestampBucketsOverlap(comment.updatedAt, transferredAt)) throw new Error("comment timestamp overlaps transfer timestamp");
-      return compareTimestamps(comment.updatedAt, transferredAt) < 0;
+      if (timestampBucketsOverlap(comment.createdAt, transferredAt)) throw new Error("comment timestamp overlaps transfer timestamp");
+      if (compareTimestamps(comment.createdAt, transferredAt) > 0) return false;
+      if (timestampBucketsOverlap(comment.updatedAt, transferredAt) || compareTimestamps(comment.updatedAt, transferredAt) > 0) {
+        throw new Error("comment was edited after transfer");
+      }
+      return true;
     })
       .flatMap((comment) => qualifyIssueReferences({ text: comment.body, ledger })
       .map((reference) => ({ surface: { kind: "comment", id: comment.id }, ...reference }))),
@@ -226,7 +230,12 @@ async function readIssueComments(repository, number, execGh) {
       && validTimestampOrder(createdAt, updatedAt))) {
     throw new Error("issue comments are invalid");
   }
-  return comments.map(({ id, body, updated_at: updatedAt }) => ({ id, body, updatedAt: parseTimestamp(updatedAt, "comment timestamp") }));
+  return comments.map(({ id, body, created_at: createdAt, updated_at: updatedAt }) => ({
+    id,
+    body,
+    createdAt: parseTimestamp(createdAt, "comment timestamp"),
+    updatedAt: parseTimestamp(updatedAt, "comment timestamp"),
+  }));
 }
 
 function parseTimestamp(value, label) {
