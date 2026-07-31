@@ -12,7 +12,7 @@ const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
 const OPENING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})/;
 const CLOSING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n)?$/;
 const INTERRUPTING_BLOCK_PATTERN = /^ {0,3}(?:#{1,6}(?:[ \t]|\r?\n|$)|>|<|[*+-][ \t]+(?=\S)|1[.)][ \t]+(?=\S)|(?:[*_-][ \t]*){3,}(?:\r?\n|$)|(?:=+[ \t]*|-+[ \t]*)(?:\r?\n|$))/;
-const RAW_HTML_PATTERN = /<\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t\r\n][^>]*|\/?)>/;
+const RAW_HTML_PATTERN = /<(?:!--[\s\S]*?--|!\[CDATA\[[\s\S]*?\]\]|![A-Z][^>]*|\?[\s\S]*?\?|\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t\r\n][^>]*|\/?))>/;
 const TABLE_DELIMITER_PATTERN = /^ {0,3}\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*(?:\r?\n|$)/;
 
 export function parseArguments(argv) {

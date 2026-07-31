@@ -84,10 +84,13 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
   ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /nested Markdown labels are unsupported/);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n2. continued](https://example.test \"title #10\")", ledger }), []);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n1.\ncontinued](https://example.test \"title #10\")", ledger }), []);
-  assert.throws(
-    () => qualifyIssueReferences({ text: "<span data-x=\"[\">label</span>](https://example.test \"title #10\")", ledger }),
-    /raw HTML is unsupported/,
-  );
+  for (const text of [
+    "<span data-x=\"[\">label</span>](https://example.test \"title #10\")",
+    "<!-- [ -->](https://example.test \"title #10\")",
+    "<!DOCTYPE [>](https://example.test \"title #10\")",
+    "<?target [?>](https://example.test \"title #10\")",
+    "<![CDATA[[]]>](https://example.test \"title #10\")",
+  ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /raw HTML is unsupported/);
   for (const text of [
     "[label | h\n--- | ---\ncontinued](https://example.test \"title #10\") | x",
     "[label\n--- | ---\ncontinued](https://example.test \"title #10\")",
