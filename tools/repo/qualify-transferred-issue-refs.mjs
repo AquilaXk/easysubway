@@ -55,7 +55,10 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
   ]);
   const unresolved = [
     ...qualifyIssueReferences({ text: body, ledger }).map((reference) => ({ surface: { kind: "body", id: null }, ...reference })),
-    ...comments.filter((comment) => compareTimestamps(comment.updatedAt, transferredAt) <= 0)
+    ...comments.filter((comment) => {
+      if (timestampBucketsOverlap(comment.updatedAt, transferredAt)) throw new Error("comment timestamp overlaps transfer timestamp");
+      return compareTimestamps(comment.updatedAt, transferredAt) < 0;
+    })
       .flatMap((comment) => qualifyIssueReferences({ text: comment.body, ledger })
       .map((reference) => ({ surface: { kind: "comment", id: comment.id }, ...reference }))),
   ];
@@ -116,16 +119,21 @@ function qualifyText(text, references) {
 
 function urlLengthAt(text, index) {
   if (!text.startsWith("http://", index) && !text.startsWith("https://", index)) return 0;
+  const whitespaceOffset = text.slice(index).search(/\s/);
+  const bareUrlLength = whitespaceOffset === -1 ? text.length - index : whitespaceOffset;
   if (text[index - 1] === "<" && text[index - 2] === "(" && text[index - 3] === "]") {
     let destinationClosed = false;
     let titleDelimiter = null;
+    let titleClosed = false;
     for (let cursor = index; cursor < text.length; cursor += 1) {
       if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
       if (!destinationClosed) { if (text[cursor] === ">") destinationClosed = true; continue; }
-      if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) titleDelimiter = null; continue; }
-      if (text[cursor] === "\"" || text[cursor] === "'") titleDelimiter = text[cursor];
-      else if (text[cursor] === "(") titleDelimiter = ")";
+      if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; } continue; }
+      if (/\s/.test(text[cursor])) continue;
+      if (!titleClosed && (text[cursor] === "\"" || text[cursor] === "'")) titleDelimiter = text[cursor];
+      else if (!titleClosed && text[cursor] === "(") titleDelimiter = ")";
       else if (text[cursor] === ")") return cursor - index;
+      else return bareUrlLength;
     }
     throw new Error("unterminated Markdown link destination");
   }
@@ -133,21 +141,23 @@ function urlLengthAt(text, index) {
     let depth = 1;
     let destinationClosed = false;
     let titleDelimiter = null;
+    let titleClosed = false;
     for (let cursor = index; cursor < text.length; cursor += 1) {
       if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
       if (destinationClosed) {
-        if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) titleDelimiter = null; continue; }
-        if (text[cursor] === "\"" || text[cursor] === "'") titleDelimiter = text[cursor];
-        else if (text[cursor] === "(") titleDelimiter = ")";
+        if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; } continue; }
+        if (/\s/.test(text[cursor])) continue;
+        if (!titleClosed && (text[cursor] === "\"" || text[cursor] === "'")) titleDelimiter = text[cursor];
+        else if (!titleClosed && text[cursor] === "(") titleDelimiter = ")";
         else if (text[cursor] === ")") return cursor - index;
+        else return bareUrlLength;
       } else if (/\s/.test(text[cursor]) && depth === 1) destinationClosed = true;
       else if (text[cursor] === "(") depth += 1;
       else if (text[cursor] === ")" && --depth === 0) return cursor - index;
     }
     throw new Error("unterminated Markdown link destination");
   }
-  const end = text.slice(index).search(/\s/);
-  return end === -1 ? text.length - index : end;
+  return bareUrlLength;
 }
 
 function codeSpanLengthAt(text, index) {
@@ -234,6 +244,19 @@ function compareTimestamps(left, right) {
   const leftPadded = leftFraction.padEnd(width, "0");
   const rightPadded = rightFraction.padEnd(width, "0");
   return leftPadded === rightPadded ? 0 : leftPadded < rightPadded ? -1 : 1;
+}
+
+function timestampBucketsOverlap(left, right) {
+  const [leftSecond, leftFraction = ""] = left.slice(0, -1).split(".");
+  const [rightSecond, rightFraction = ""] = right.slice(0, -1).split(".");
+  if (leftSecond !== rightSecond) return false;
+  const width = Math.max(leftFraction.length, rightFraction.length);
+  const start = (fraction) => BigInt(fraction.padEnd(width, "0") || "0");
+  const leftStart = start(leftFraction);
+  const rightStart = start(rightFraction);
+  const leftEnd = leftStart + 10n ** BigInt(width - leftFraction.length);
+  const rightEnd = rightStart + 10n ** BigInt(width - rightFraction.length);
+  return leftStart < rightEnd && rightStart < leftEnd;
 }
 
 function validTimestampOrder(createdAt, updatedAt) {

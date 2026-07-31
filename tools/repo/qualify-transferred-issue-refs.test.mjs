@@ -59,6 +59,10 @@ test("qualifyIssueReferences는 Markdown link 뒤 참조와 backslash escape를 
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test/a_\\)#10) outside #11", ledger }), [ambiguous(11)]);
 });
 
+test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare ref를 숨기지 않는다", () => {
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test extra #10)", ledger }), [ambiguous(10)]);
+});
+
 test("qualifyIssueReferences는 ledger 밖 또는 미완료 transfer bare ref를 fail-closed한다", () => {
   assert.throws(() => qualifyIssueReferences({ text: "unknown #99", ledger }), /unresolved bare issue reference #99/);
   assert.throws(() => qualifyIssueReferences({ text: "incomplete #14", ledger }), /unresolved bare issue reference #14/);
@@ -109,6 +113,18 @@ test("runNormalization은 noncanonical transfer timestamp를 read 전에 거부�
     { id: 2, body: "#99", created_at: "2026-07-31T09:00:00.1235Z", updated_at: "2026-07-31T09:00:00.1235Z" },
   ] });
   assert.equal((await runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger: fractionalLedger, execGh: fractionalCommentFake.exec })).unresolved.length, 1);
+});
+
+test("runNormalization은 transfer timestamp bucket과 겹치는 comment를 거부한다", async () => {
+  const fractionalLedger = structuredClone(ledger);
+  fractionalLedger.issues[0].transferredAt = "2026-07-31T09:00:00.5Z";
+  const fake = fakeGh({ body: "", comments: [
+    { id: 1, body: "#10", created_at: "2026-07-31T09:00:00Z", updated_at: "2026-07-31T09:00:00Z" },
+  ] });
+  await assert.rejects(
+    () => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger: fractionalLedger, execGh: fake.exec }),
+    /comment timestamp overlaps transfer timestamp/,
+  );
 });
 
 test("runNormalization execute는 source ledger 부재와 conditional PATCH 부재 모두 read/write 전에 fail-closed한다", async () => {
