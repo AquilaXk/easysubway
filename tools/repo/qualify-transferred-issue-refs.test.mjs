@@ -61,6 +61,7 @@ test("qualifyIssueReferences는 Markdown link 뒤 참조와 backslash escape를 
   assert.deepEqual(qualifyIssueReferences({ text: "<https://example.test/`tick`#10> outside #11", ledger }), [ambiguous(11)]);
   assert.deepEqual(qualifyIssueReferences({ text: "\\<https://example.test/`tick`#10>", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: `[${"a".repeat(999)}](https://example.test "title #10") outside #11`, ledger }), [ambiguous(11)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n<3](https://example.test \"title #10\")", ledger }), []);
 });
 
 test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare ref를 숨기지 않는다", () => {
@@ -98,10 +99,12 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
     "\\![outer [inner](https://one.test)](https://two.test \"title #10\")",
     "[https://[inner](https://three.test)](https://two.test \"title #10\")",
   ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /nested Markdown labels are unsupported/);
-  assert.throws(
-    () => qualifyIssueReferences({ text: "[<https://example.test>](https://dest \"title #10\")", ledger }),
-    /angle brackets in Markdown labels are unsupported/,
-  );
+  for (const autolink of ["https://example.test", "HTTPS://example.test", "foo:bar", "user@example.test"]) {
+    assert.throws(
+      () => qualifyIssueReferences({ text: `[<${autolink}>](https://dest "title #10")`, ledger }),
+      /angle brackets in Markdown labels are unsupported/,
+    );
+  }
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n2. continued](https://example.test \"title #10\")", ledger }), []);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n1.\ncontinued](https://example.test \"title #10\")", ledger }), []);
   assert.deepEqual(qualifyIssueReferences({ text: "[label\n01. continued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
@@ -119,6 +122,7 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
     "[label\n--- | ---\ncontinued](https://example.test \"title #10\")",
     "`h1 | h2\n--- | ---\n#10 | x`",
     "h1 | h2\n--- | ---\n[label | continued](https://example.test \"title #10\") | x",
+    "[label | h\n| - | -- |\ncontinued](https://example.test \"title #10\")",
   ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /GFM table boundaries are unsupported/);
   assert.deepEqual(qualifyIssueReferences({ text: "paragraph\n\n---\n#10", ledger }), [ambiguous(10)]);
   assert.throws(
