@@ -166,7 +166,7 @@ test("verification re-reads the durable normalized preflight artifact", async ()
       writeEvidence: async (evidenceDir, filename, value) => {
         const persisted = filename.endsWith("preflight.json")
           ? { ...value, sourceMetadata: { ...value.sourceMetadata, commentCount: 99 } } : value;
-        writeFileSync(join(evidenceDir, filename), `${JSON.stringify(persisted)}\n`);
+        writeFileSync(join(evidenceDir.canonicalPath, filename), `${JSON.stringify(persisted)}\n`);
       },
     }), /metadata mismatched fields: commentCount/);
   } finally {
@@ -223,7 +223,7 @@ test("migration validates whole-ledger schema and semantics before any GitHub ca
     const fake = fakeGh();
     assert.ok(validateMigrationLedger({ ledger, schema }).length > 0);
     await assert.rejects(() => runMigration({
-      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: evidenceDirectory() },
       ledger,
       schema,
       execGh: fake.execGh,
@@ -302,7 +302,7 @@ test("completed transfer with failed verification reports a partial-success erro
 
   await assert.rejects(
     () => runMigration({
-      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: evidenceDirectory() },
       ledger,
       schema,
       execGh: fake.execGh,
@@ -322,7 +322,7 @@ test("post-transfer verification retries temporary target metadata propagation l
   const fake = fakeGh({ target, targetResponses: [stale, stale, stale, stale, target] });
 
   const verified = await runMigration({
-    arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
+    arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: evidenceDirectory() },
     ledger,
     schema,
     execGh: fake.execGh,
@@ -341,7 +341,7 @@ test("unconfirmed transfer response reports an indeterminate result", async () =
 
   await assert.rejects(
     () => runMigration({
-      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: evidenceDirectory() },
       ledger,
       schema,
       execGh: fake.execGh,
@@ -360,7 +360,7 @@ test("malformed successful transfer output reports an indeterminate result", asy
 
   await assert.rejects(
     () => runMigration({
-      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: evidenceDirectory() },
       ledger,
       schema,
       execGh: fake.execGh,
@@ -381,7 +381,7 @@ test("post-transfer verification rejects metadata that does not identify the red
 
   await assert.rejects(
     () => verifyTransferredIssue({ entry, transferResult, execGh: fake.execGh }),
-    /redirect identity mismatched fields: number/,
+    /redirect identity mismatched fields: target.number/,
   );
 });
 

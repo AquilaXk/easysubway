@@ -1,6 +1,6 @@
 import { execFile } from "node:child_process";
-import { lstatSync, readdirSync } from "node:fs";
-import { readFile, rename, unlink, writeFile } from "node:fs/promises";
+import { closeSync, fsyncSync, linkSync, lstatSync, openSync, readFileSync, readdirSync, realpathSync, statSync, unlinkSync, writeFileSync } from "node:fs";
+import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
 import { promisify } from "node:util";
@@ -81,31 +81,30 @@ export async function runMigration({ arguments_, ledger, schema, execGh, retryDe
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === arguments_.sourceIssue);
   if (!entry) throw new Error("source issue is not in the ledger");
   if (arguments_.mode === "dry-run") return preflightIssueTransfer({ entry, execGh });
-  if (arguments_.evidenceDir !== undefined) validateEvidenceDirectory(arguments_.evidenceDir);
+  const evidence = captureEvidenceDirectory(arguments_.evidenceDir);
   const details = await preflightDetails({ entry, execGh });
-  if (arguments_.evidenceDir !== undefined) {
-    try {
-      await writeEvidence(arguments_.evidenceDir, evidenceFileName(entry.sourceIssue, "preflight"), {
-        sourceIssue: entry.sourceIssue,
-        sourceUrl: entry.sourceUrl,
-        sourceMetadata: details.source,
-      });
-    } catch {
-      throw new Error("preflight evidence could not be persisted; transfer was not executed");
-    }
+  try {
+    await writeEvidence(evidence, evidenceFileName(entry.sourceIssue, "preflight"), {
+      sourceIssue: entry.sourceIssue,
+      sourceUrl: entry.sourceUrl,
+      sourceMetadata: details.source,
+    });
+  } catch {
+    throw new Error("preflight evidence could not be persisted; transfer was not executed");
   }
+  const persistedSource = readPersistedPreflight(evidence, entry.sourceIssue, entry.sourceUrl);
   const transferResult = await executeIssueTransfer({
     entry,
     confirmations: arguments_.confirmations,
     execGh,
-    details,
+    details: { ...details, source: persistedSource },
   });
   try {
-    const verificationTransferResult = arguments_.evidenceDir === undefined ? transferResult : {
+    const verificationTransferResult = {
       ...transferResult,
-      expectedMetadata: await readPersistedPreflight(arguments_.evidenceDir, entry.sourceIssue),
+      expectedMetadata: persistedSource,
     };
-    return await verifyTransferredIssue({ entry, transferResult: verificationTransferResult, execGh, retryDelayMs, evidenceDir: arguments_.evidenceDir, writeEvidence });
+    return await verifyTransferredIssue({ entry, transferResult: verificationTransferResult, execGh, retryDelayMs, evidence, writeEvidence });
   } catch (error) {
     const partialFailure = new Error(`issue transfer completed but post-transfer verification failed: ${error instanceof Error ? error.message : String(error)}`);
     partialFailure.transferCompleted = true;
@@ -137,22 +136,28 @@ export async function executeIssueTransfer({ entry, confirmations, execGh, detai
   }
 }
 
-export async function verifyTransferredIssue({ entry, transferResult, execGh, retryDelayMs = 0, evidenceDir, writeEvidence = writeEvidenceAtomically }) {
+export async function verifyTransferredIssue({ entry, transferResult, execGh, retryDelayMs = 0, evidence, writeEvidence = writeEvidenceAtomically }) {
   const targetUrl = transferResult?.redirectedIssue;
   if (!targetUrl) throw new Error("transferred issue identity is missing");
   const expected = transferResult?.expectedMetadata;
   let verificationError;
   for (let attempt = 0; attempt < 10; attempt += 1) {
+    let target;
     try {
-      const target = await readIssueMetadata(targetUrl.repository, targetUrl.number, execGh);
+      target = await readIssueMetadata(targetUrl.repository, targetUrl.number, execGh);
+    } catch (error) {
+      if (evidence) await persistPostflightAttempt({ entry, evidence, writeEvidence, attempt, redirectIdentity: redirectIdentityFor(targetUrl), targetMetadata: null, mismatchedFields: ["target.metadata"], metadataDifferences: { "target.metadata": { expected: "normalized metadata", actual: "unavailable" } } });
+      verificationError = error;
+      if (attempt < 9) await delay(retryDelayMs);
+      continue;
+    }
+    try {
       const redirectIdentity = { repository: targetUrl.repository, number: targetUrl.number, url: `https://github.com/${targetUrl.repository}/issues/${targetUrl.number}` };
       const identityDifferences = metadataDifferences(redirectIdentity, { repository: targetUrl.repository, number: target.number, url: target.url }, ["repository", "number", "url"]);
       const metadataDifferences_ = expected ? metadataDifferences(expected, target) : { expectedMetadata: { expected: "present", actual: "missing" } };
-      if (evidenceDir !== undefined) await writeEvidence(evidenceDir, evidenceFileName(entry.sourceIssue, `postflight-${attempt + 1}`), {
-        sourceIssue: entry.sourceIssue, sourceUrl: entry.sourceUrl, attempt: attempt + 1, redirectIdentity,
-        targetMetadata: target, mismatchedFields: Object.keys(metadataDifferences_), metadataDifferences: metadataDifferences_, identityDifferences,
-      });
-      if (Object.keys(identityDifferences).length) throw new Error(`redirect identity mismatched fields: ${Object.keys(identityDifferences).join(", ")}`);
+      const identityFields = Object.keys(identityDifferences).filter((field) => field !== "repository").map((field) => `target.${field}`);
+      if (evidence) await persistPostflightAttempt({ entry, evidence, writeEvidence, attempt, redirectIdentity, targetMetadata: target, mismatchedFields: [...identityFields, ...Object.keys(metadataDifferences_)], metadataDifferences: { ...Object.fromEntries(identityFields.map((field) => [field, identityDifferences[field.slice(7)]])), ...metadataDifferences_ } });
+      if (identityFields.length) throw new Error(`redirect identity mismatched fields: ${identityFields.join(", ")}`);
       if (Object.keys(metadataDifferences_).length) throw new Error(`transferred issue metadata mismatched fields: ${Object.keys(metadataDifferences_).join(", ")}`);
       return {
         sourceUrl: entry.sourceUrl,
@@ -323,33 +328,71 @@ function validateEvidenceDirectory(value) {
   }
 }
 
+function captureEvidenceDirectory(value) {
+  validateEvidenceDirectory(value);
+  const canonicalPath = realpathSync(value);
+  const stat = statSync(canonicalPath);
+  return { requestedPath: value, canonicalPath, dev: stat.dev, ino: stat.ino };
+}
+
+function assertEvidenceDirectory(context) {
+  const stat = statSync(context.canonicalPath);
+  if (realpathSync(context.requestedPath) !== context.canonicalPath || stat.dev !== context.dev || stat.ino !== context.ino) {
+    throw new Error("evidence directory identity changed");
+  }
+}
+
 function evidenceFileName(sourceIssue, suffix) {
   if (!Number.isSafeInteger(sourceIssue) || sourceIssue < 1 || !/^(preflight|postflight-[1-9]\d*)$/.test(suffix)) throw new Error("invalid evidence filename");
   return `${sourceIssue}-${suffix}.json`;
 }
 
-async function writeEvidenceAtomically(directory, filename, value) {
-  const destination = join(directory, filename);
-  const temporary = join(directory, `.${filename}.tmp`);
+async function writeEvidenceAtomically(context, filename, value) {
+  assertEvidenceDirectory(context);
+  const destination = join(context.canonicalPath, filename);
+  const temporary = join(context.canonicalPath, `.${filename}.tmp`);
   try {
-    await writeFile(temporary, `${JSON.stringify(value)}\n`, { encoding: "utf8", flag: "wx" });
-    await rename(temporary, destination);
+    const temporaryFd = openSync(temporary, "wx");
+    try { writeFileSync(temporaryFd, `${JSON.stringify(value)}\n`); fsyncSync(temporaryFd); } finally { closeSync(temporaryFd); }
+    linkSync(temporary, destination);
+    unlinkSync(temporary);
+    const directoryFd = openSync(context.canonicalPath, "r");
+    try { fsyncSync(directoryFd); } finally { closeSync(directoryFd); }
+    assertEvidenceDirectory(context);
   } finally {
-    await unlink(temporary).catch(() => {});
+    try { unlinkSync(temporary); } catch {}
   }
 }
 
-async function readPersistedPreflight(directory, sourceIssue) {
+function readPersistedPreflight(context, sourceIssue, sourceUrl) {
+  assertEvidenceDirectory(context);
   let evidence;
   try {
-    evidence = JSON.parse(await readFile(join(directory, evidenceFileName(sourceIssue, "preflight")), "utf8"));
+    evidence = JSON.parse(readFileSync(join(context.canonicalPath, evidenceFileName(sourceIssue, "preflight")), "utf8"));
   } catch {
     throw new Error("durable preflight evidence is unavailable");
   }
-  if (evidence?.sourceIssue !== sourceIssue || typeof evidence.sourceUrl !== "string" || !evidence.sourceMetadata) {
+  if (evidence?.sourceIssue !== sourceIssue || evidence.sourceUrl !== sourceUrl || !isNormalizedMetadata(evidence.sourceMetadata)) {
     throw new Error("durable preflight evidence is invalid");
   }
   return evidence.sourceMetadata;
+}
+
+function isNormalizedMetadata(value) {
+  return value && typeof value === "object" && typeof value.number === "number" && typeof value.url === "string"
+    && PRESERVED_METADATA_FIELDS.every((field) => Object.hasOwn(value, field));
+}
+
+async function persistPostflightAttempt({ entry, evidence, writeEvidence, attempt, redirectIdentity, targetMetadata, mismatchedFields, metadataDifferences }) {
+  try {
+    await writeEvidence(evidence, evidenceFileName(entry.sourceIssue, `postflight-${attempt + 1}`), { sourceIssue: entry.sourceIssue, sourceUrl: entry.sourceUrl, attempt: attempt + 1, redirectIdentity, targetMetadata, mismatchedFields, metadataDifferences });
+  } catch {
+    throw new Error("postflight evidence could not be persisted");
+  }
+}
+
+function redirectIdentityFor(targetUrl) {
+  return { repository: targetUrl.repository, number: targetUrl.number, url: `https://github.com/${targetUrl.repository}/issues/${targetUrl.number}` };
 }
 
 function reportForPreflight(entry, details) {
