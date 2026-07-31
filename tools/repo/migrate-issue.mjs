@@ -81,6 +81,7 @@ export async function runMigration({ arguments_, ledger, schema, execGh, retryDe
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === arguments_.sourceIssue);
   if (!entry) throw new Error("source issue is not in the ledger");
   if (arguments_.mode === "dry-run") return preflightIssueTransfer({ entry, execGh });
+  confirmExecution(entry, arguments_.confirmations);
   const evidence = captureEvidenceDirectory(arguments_.evidenceDir);
   const details = await preflightDetails({ entry, execGh });
   try {
@@ -329,20 +330,42 @@ function validateEvidenceDirectory(value) {
   if (stat.isSymbolicLink() || !stat.isDirectory() || readdirSync(value).length !== 0) {
     throw new Error("--execute requires exactly one --evidence-dir <absolute existing empty non-symlink directory>");
   }
+  return stat;
 }
 
 function captureEvidenceDirectory(value) {
-  validateEvidenceDirectory(value);
+  const requestedStat = validateEvidenceDirectory(value);
   const canonicalPath = realpathSync(value);
-  const stat = statSync(canonicalPath);
-  return { requestedPath: value, canonicalPath, dev: stat.dev, ino: stat.ino };
+  const canonicalStat = statSync(canonicalPath);
+  if (requestedStat.dev !== canonicalStat.dev || requestedStat.ino !== canonicalStat.ino) {
+    throw new Error("evidence directory identity changed");
+  }
+  const claimPath = join(canonicalPath, ".migration-claim");
+  let claimStat;
+  try {
+    const claimDescriptor = openSync(claimPath, fsConstants.O_CREAT | fsConstants.O_EXCL | fsConstants.O_NOFOLLOW | fsConstants.O_RDWR, 0o600);
+    try { claimStat = fstatSync(claimDescriptor); } finally { closeSync(claimDescriptor); }
+  } catch { throw new Error("evidence directory is already used or claimed"); }
+  if (!claimStat.isFile()) throw new Error("evidence directory identity changed");
+  const context = { requestedPath: value, canonicalPath, dev: requestedStat.dev, ino: requestedStat.ino, claimPath, claimDev: claimStat.dev, claimIno: claimStat.ino };
+  assertEvidenceDirectory(context);
+  return context;
 }
 
 function assertEvidenceDirectory(context) {
-  const stat = statSync(context.canonicalPath);
-  if (realpathSync(context.requestedPath) !== context.canonicalPath || stat.dev !== context.dev || stat.ino !== context.ino) {
+  let requestedStat;
+  let canonicalStat;
+  let claimStat;
+  try {
+    requestedStat = lstatSync(context.requestedPath);
+    canonicalStat = statSync(context.canonicalPath);
+    claimStat = lstatSync(context.claimPath);
+  } catch {
     throw new Error("evidence directory identity changed");
   }
+  if (!requestedStat.isDirectory() || requestedStat.dev !== context.dev || requestedStat.ino !== context.ino
+    || realpathSync(context.requestedPath) !== context.canonicalPath || !canonicalStat.isDirectory() || canonicalStat.dev !== context.dev || canonicalStat.ino !== context.ino
+    || !claimStat.isFile() || claimStat.dev !== context.claimDev || claimStat.ino !== context.claimIno) throw new Error("evidence directory identity changed");
 }
 
 function capturePublishedEvidence(context, filename) {

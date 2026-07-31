@@ -6,7 +6,7 @@ import {
   runMigration,
   validateMigrationLedger,
 } from "./migrate-issue.mjs";
-import { mkdirSync, mkdtempSync, readFileSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { lstatSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -127,6 +127,64 @@ test("preflight evidence write failure prevents transfer", async () => {
   }
 });
 
+test("invalid execution confirmations leave the evidence directory empty", async (t) => {
+  for (const [name, confirmations, error] of [
+    ["source", { source: "AquilaXk/easysubway#1", target: TARGET_REPOSITORY }, /source confirmation/],
+    ["target", { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: "AquilaXk/other" }, /target confirmation/],
+  ]) await t.test(name, async () => {
+    const directory = evidenceDirectory();
+    const fake = fakeGh();
+    const { ledger, schema } = migrationContract();
+    Object.assign(ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE), transferEntry());
+    try {
+      await assert.rejects(() => runMigration({
+        arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations, evidenceDir: directory }, ledger, schema, execGh: fake.execGh,
+      }), error);
+      assert.deepEqual(readdirSync(directory), []);
+      assert.deepEqual(fake.calls, []);
+    } finally { rmSync(directory, { recursive: true, force: true }); }
+  });
+});
+
+test("concurrent execute migrations claim one evidence directory before preflight", async () => {
+  const directory = evidenceDirectory();
+  const first = migrationContract();
+  const second = migrationContract();
+  const firstEntry = first.ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  const secondEntry = second.ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  Object.assign(firstEntry, transferEntry());
+  Object.assign(secondEntry, transferEntry());
+  const firstFake = fakeGh();
+  const secondFake = fakeGh();
+  const writeEvidence = async (context, filename, value) => {
+    writeFileSync(join(context.canonicalPath, filename), `${JSON.stringify(value)}\n`);
+  };
+  try {
+    const outcomes = await Promise.allSettled([
+      runMigration({ arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory }, ledger: first.ledger, schema: first.schema, execGh: firstFake.execGh, writeEvidence }),
+      runMigration({ arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory }, ledger: second.ledger, schema: second.schema, execGh: secondFake.execGh, writeEvidence }),
+    ]);
+    assert.equal(outcomes[0].status, "fulfilled");
+    assert.equal(outcomes[1].status, "rejected");
+    assert.match(outcomes[1].reason.message, /evidence-dir/);
+    assert.equal(transferCalls([...firstFake.calls, ...secondFake.calls]).length, 1);
+    assert.deepEqual(secondFake.calls, []);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("execute claim is a regular file", async () => {
+  const directory = evidenceDirectory();
+  const fake = fakeGh();
+  const { ledger, schema } = migrationContract();
+  Object.assign(ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE), transferEntry());
+  try {
+    await runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory }, ledger, schema, execGh: fake.execGh,
+    });
+    assert.equal(lstatSync(join(directory, ".migration-claim")).isFile(), true);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test("preexisting preflight destination is never clobbered or transferred", async () => {
   const directory = evidenceDirectory();
   const fake = fakeGh();
@@ -196,6 +254,49 @@ test("preflight evidence directory identity swap prevents transfer", async () =>
     rmSync(directory, { recursive: true, force: true });
     rmSync(movedDirectory, { recursive: true, force: true });
   }
+});
+
+test("preflight evidence ABA without the original claim prevents transfer", async () => {
+  const directory = evidenceDirectory();
+  const movedDirectory = `${directory}-moved`;
+  const fake = fakeGh();
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  Object.assign(entry, transferEntry());
+  try {
+    await assert.rejects(() => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+      ledger, schema, execGh: fake.execGh,
+      afterPreflightPublish: () => {
+        renameSync(directory, movedDirectory);
+        mkdirSync(directory);
+        rmSync(join(movedDirectory, ".migration-claim"), { recursive: true });
+        rmSync(directory, { recursive: true });
+        renameSync(movedDirectory, directory);
+      },
+    }), /evidence directory identity changed/);
+    assert.deepEqual(transferCalls(fake.calls), []);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(movedDirectory, { recursive: true, force: true });
+  }
+});
+
+test("preflight evidence claim replacement prevents transfer", async () => {
+  const directory = evidenceDirectory();
+  const fake = fakeGh();
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  Object.assign(entry, transferEntry());
+  const claim = join(directory, ".migration-claim");
+  try {
+    await assert.rejects(() => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+      ledger, schema, execGh: fake.execGh,
+      afterPreflightPublish: () => { rmSync(claim, { recursive: true }); mkdirSync(claim); },
+    }), /evidence directory identity changed/);
+    assert.deepEqual(transferCalls(fake.calls), []);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
 test("preflight evidence file identity or symlink swap prevents transfer", async (t) => {
