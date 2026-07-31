@@ -409,7 +409,7 @@ async function writeEvidenceAtomically(context, filename, value) {
   const temporary = join(context.canonicalPath, `.${filename}.tmp`);
   const expectedBytes = Buffer.from(`${JSON.stringify(value)}\n`);
   try {
-    const temporaryFd = openSync(temporary, "wx");
+    const temporaryFd = openSync(temporary, "wx", 0o600);
     try { writeFileSync(temporaryFd, expectedBytes); fsyncSync(temporaryFd); } finally { closeSync(temporaryFd); }
     linkSync(temporary, destination);
     unlinkSync(temporary);
