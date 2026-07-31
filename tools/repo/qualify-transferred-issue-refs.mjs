@@ -11,6 +11,7 @@ const execFileAsync = promisify(execFile);
 const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
 const OPENING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})/;
 const CLOSING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n)?$/;
+const ESCAPABLE_PUNCTUATION_PATTERN = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/;
 const INTERRUPTING_BLOCK_PATTERN = /^ {0,3}(?:#{1,6}(?:[ \t]|\r?\n|$)|>|<|[*+-][ \t]+(?=\S)|1[.)][ \t]+(?=\S)|(?:[*_-][ \t]*){3,}(?:\r?\n|$)|(?:=+[ \t]*|-+[ \t]*)(?:\r?\n|$))/;
 const RAW_HTML_OPENER_PATTERN = /<(?:!--|!\[CDATA\[|![A-Z]|\?|\/?[A-Za-z][A-Za-z0-9-]*(?=[ \t\r\n/>]|$))/y;
 const TABLE_DELIMITER_PATTERN = /^ {0,3}(?=[^\r\n]*\|)\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*(?:\r?\n|$)/;
@@ -114,7 +115,7 @@ function qualifyText(text, references) {
   const linkLabels = new Set();
   let labelOpen = false;
   for (let index = 0; index < text.length;) {
-    if (text[index] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[index + 1] ?? "")) { index += 2; continue; }
+    if (text[index] === "\\" && ESCAPABLE_PUNCTUATION_PATTERN.test(text[index + 1] ?? "")) { index += 2; continue; }
     if (/\s/.test(text[index])) {
       const separator = whitespaceAt(text, index);
       if (separator.paragraphBreak || separator.blockBreak) labelOpen = false;
@@ -164,7 +165,7 @@ function urlLengthAt(text, index, linkLabels) {
     let titleDelimiter = null;
     let titleClosed = false;
     for (let cursor = index; cursor < text.length; cursor += 1) {
-      if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")
+      if (text[cursor] === "\\" && ESCAPABLE_PUNCTUATION_PATTERN.test(text[cursor + 1] ?? "")
         && (!destinationClosed || titleDelimiter !== null)) { cursor += 1; continue; }
       if (!destinationClosed) {
         if (text[cursor] === "<") return bareUrlLength;
@@ -200,7 +201,7 @@ function urlLengthAt(text, index, linkLabels) {
     let titleDelimiter = null;
     let titleClosed = false;
     for (let cursor = index; cursor < text.length; cursor += 1) {
-      if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")
+      if (text[cursor] === "\\" && ESCAPABLE_PUNCTUATION_PATTERN.test(text[cursor + 1] ?? "")
         && (!destinationClosed || titleDelimiter !== null)) { cursor += 1; continue; }
       if (destinationClosed) {
         if (titleDelimiter !== null) {
@@ -270,7 +271,7 @@ function hasTableDelimiter(text, start, end) {
 
 function labelEndWithin(text, start, end) {
   for (let cursor = start; cursor < end; cursor += 1) {
-    if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
+    if (text[cursor] === "\\" && ESCAPABLE_PUNCTUATION_PATTERN.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
     const codeSpanLength = codeSpanLengthAt(text, cursor);
     if (codeSpanLength) { cursor += codeSpanLength - 1; continue; }
     if (text[cursor] === "[") throw new Error("nested Markdown labels are unsupported");
