@@ -43,6 +43,41 @@ const DATA_TRANSFERS = new Map([
   [2611, ["https://github.com/AquilaXk/easysubway-data/issues/9", "2026-07-30T19:46:15Z"]],
   [2684, ["https://github.com/AquilaXk/easysubway-data/issues/10", "2026-07-30T19:47:10Z"]],
 ]);
+const MOBILE_TRANSFERS = new Map([
+  [571, ["https://github.com/AquilaXk/easysubway-mobile/issues/7", "2026-07-31T07:00:04Z"]],
+  [1016, ["https://github.com/AquilaXk/easysubway-mobile/issues/8", "2026-07-31T12:30:31Z"]],
+  [1021, ["https://github.com/AquilaXk/easysubway-mobile/issues/9", "2026-07-31T12:33:02Z"]],
+  [1918, ["https://github.com/AquilaXk/easysubway-mobile/issues/10", "2026-07-31T12:34:27Z"]],
+  [2055, ["https://github.com/AquilaXk/easysubway-mobile/issues/11", "2026-07-31T12:35:23Z"]],
+  [2524, ["https://github.com/AquilaXk/easysubway-mobile/issues/12", "2026-07-31T12:37:02Z"]],
+  [2525, ["https://github.com/AquilaXk/easysubway-mobile/issues/13", "2026-07-31T12:37:22Z"]],
+  [2535, ["https://github.com/AquilaXk/easysubway-mobile/issues/14", "2026-07-31T12:37:36Z"]],
+  [2536, ["https://github.com/AquilaXk/easysubway-mobile/issues/15", "2026-07-31T12:37:52Z"]],
+  [2537, ["https://github.com/AquilaXk/easysubway-mobile/issues/16", "2026-07-31T12:45:13Z"]],
+  [2538, ["https://github.com/AquilaXk/easysubway-mobile/issues/17", "2026-07-31T12:45:29Z"]],
+  [2539, ["https://github.com/AquilaXk/easysubway-mobile/issues/18", "2026-07-31T12:45:46Z"]],
+  [2540, ["https://github.com/AquilaXk/easysubway-mobile/issues/19", "2026-07-31T12:46:01Z"]],
+  [2541, ["https://github.com/AquilaXk/easysubway-mobile/issues/20", "2026-07-31T12:49:24Z"]],
+  [2542, ["https://github.com/AquilaXk/easysubway-mobile/issues/21", "2026-07-31T12:49:42Z"]],
+  [2543, ["https://github.com/AquilaXk/easysubway-mobile/issues/22", "2026-07-31T12:49:57Z"]],
+  [2547, ["https://github.com/AquilaXk/easysubway-mobile/issues/23", "2026-07-31T12:50:12Z"]],
+  [2586, ["https://github.com/AquilaXk/easysubway-mobile/issues/24", "2026-07-31T12:51:14Z"]],
+  [2591, ["https://github.com/AquilaXk/easysubway-mobile/issues/25", "2026-07-31T12:51:35Z"]],
+  [2596, ["https://github.com/AquilaXk/easysubway-mobile/issues/26", "2026-07-31T12:52:04Z"]],
+  [2600, ["https://github.com/AquilaXk/easysubway-mobile/issues/27", "2026-07-31T12:54:23Z"]],
+  [2612, ["https://github.com/AquilaXk/easysubway-mobile/issues/28", "2026-07-31T12:54:52Z"]],
+  [2613, ["https://github.com/AquilaXk/easysubway-mobile/issues/29", "2026-07-31T12:55:36Z"]],
+  [2617, ["https://github.com/AquilaXk/easysubway-mobile/issues/30", "2026-07-31T12:55:54Z"]],
+  [2619, ["https://github.com/AquilaXk/easysubway-mobile/issues/31", "2026-07-31T12:56:09Z"]],
+  [2620, ["https://github.com/AquilaXk/easysubway-mobile/issues/32", "2026-07-31T12:56:26Z"]],
+  [2621, ["https://github.com/AquilaXk/easysubway-mobile/issues/33", "2026-07-31T12:56:52Z"]],
+  [2628, ["https://github.com/AquilaXk/easysubway-mobile/issues/34", "2026-07-31T12:57:08Z"]],
+  [2629, ["https://github.com/AquilaXk/easysubway-mobile/issues/35", "2026-07-31T12:57:23Z"]],
+  [2630, ["https://github.com/AquilaXk/easysubway-mobile/issues/36", "2026-07-31T12:57:40Z"]],
+  [2678, ["https://github.com/AquilaXk/easysubway-mobile/issues/37", "2026-07-31T12:58:00Z"]],
+  [2679, ["https://github.com/AquilaXk/easysubway-mobile/issues/38", "2026-07-31T12:58:23Z"]],
+  [2680, ["https://github.com/AquilaXk/easysubway-mobile/issues/39", "2026-07-31T12:58:39Z"]],
+]);
 
 function ledgerFixture() {
   return JSON.parse(readFileSync("release/migrations/repository-split-issues.json", "utf8"));
@@ -54,7 +89,7 @@ test("reviewed source issue ledger는 component transfer approval state를 만�
   assert.equal(ledger.issues.length, 71);
   assert.deepEqual(validateLedger(ledger, { openIssueNumbers: REVIEWED_SOURCE_ISSUE_NUMBERS }), []);
   for (const entry of ledger.issues) {
-    const transfer = DATA_TRANSFERS.get(entry.sourceIssue) ?? BACKEND_TRANSFERS.get(entry.sourceIssue);
+    const transfer = DATA_TRANSFERS.get(entry.sourceIssue) ?? BACKEND_TRANSFERS.get(entry.sourceIssue) ?? MOBILE_TRANSFERS.get(entry.sourceIssue);
     assert.equal(entry.executionApproval, DATA_TRANSFERS.has(entry.sourceIssue) ? DATA_APPROVAL_URL
       : BACKEND_APPROVED.has(entry.sourceIssue) ? BACKEND_APPROVAL_URL
         : entry.targetRepository === "AquilaXk/easysubway-mobile" ? MOBILE_APPROVAL_URL : null);
@@ -102,6 +137,8 @@ test("inventory count는 unique source issue 수와 같아야 한다", () => {
 test("지원하지 않는 disposition은 거부한다", () => {
   const ledger = ledgerFixture();
   ledger.issues[0].executionApproval = null;
+  ledger.issues[0].targetUrl = null;
+  ledger.issues[0].transferredAt = null;
   ledger.issues[0].disposition = "ARCHIVE";
 
   assert.deepEqual(validateLedger(ledger), [
@@ -114,6 +151,8 @@ test("TRANSFER는 hub를 target으로 지정할 수 없다", () => {
   const ledger = ledgerFixture();
   const entry = ledger.issues.find(({ disposition }) => disposition === "TRANSFER");
   entry.targetRepository = "AquilaXk/easysubway";
+  entry.targetUrl = null;
+  entry.transferredAt = null;
 
   assert.deepEqual(validateLedger(ledger), [
     "issues[0].targetRepository: TRANSFER는 approved non-hub target이 필요함",
@@ -124,6 +163,8 @@ test("TRANSFER는 hub를 target으로 지정할 수 없다", () => {
 test("TRANSFER는 null target을 허용하지 않는다", () => {
   const ledger = ledgerFixture();
   ledger.issues[0].targetRepository = null;
+  ledger.issues[0].targetUrl = null;
+  ledger.issues[0].transferredAt = null;
 
   assert.deepEqual(validateLedger(ledger), [
     "issues[0].targetRepository: TRANSFER는 approved non-hub target이 필요함",
@@ -156,6 +197,8 @@ test("reason과 source issue URL 번호는 ledger entry와 일치해야 한다",
 test("허용된 다섯 repository 밖의 target은 거부한다", () => {
   const ledger = ledgerFixture();
   ledger.issues[0].targetRepository = "AquilaXk/other";
+  ledger.issues[0].targetUrl = null;
+  ledger.issues[0].transferredAt = null;
 
   assert.deepEqual(validateLedger(ledger), [
     "issues[0].targetRepository: 허용되지 않은 repository",
@@ -172,6 +215,8 @@ test("TRANSFER는 approved와 transferred execution state를 차례로 허용한
     otherEntry.targetUrl = null;
     otherEntry.transferredAt = null;
   }
+  entry.targetUrl = null;
+  entry.transferredAt = null;
   entry.executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
 
   assert.deepEqual(validateLedger(ledger), []);
@@ -191,6 +236,7 @@ test("TRANSFER execution state는 approval·target URL·timestamp의 순서를 �
   const ledger = ledgerFixture();
   const entry = ledger.issues[0];
   entry.targetUrl = "https://github.com/AquilaXk/easysubway-mobile/issues/1";
+  entry.transferredAt = null;
 
   assert.deepEqual(validateLedger(ledger), [
     "issues[0].execution: 허용되지 않은 TRANSFER execution state",
@@ -317,6 +363,8 @@ test("schema는 TRANSFER의 세 execution state를 표현하고 불완전한 조
   const schema = JSON.parse(readFileSync("contracts/repository-split-issues.schema.json", "utf8"));
   const approved = ledgerFixture();
   approved.issues[0].executionApproval = "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1";
+  approved.issues[0].targetUrl = null;
+  approved.issues[0].transferredAt = null;
   const transferred = structuredClone(approved);
   transferred.issues[0].targetUrl = "https://github.com/AquilaXk/easysubway-mobile/issues/1";
   transferred.issues[0].transferredAt = "2026-07-30T00:00:00.000Z";
