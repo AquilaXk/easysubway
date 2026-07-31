@@ -86,7 +86,7 @@ test("qualifyIssueReferences는 opening label 없는 link-like text의 bare ref�
 test("qualifyIssueReferences는 angle destination 뒤 공백 없는 title의 bare ref를 숨기지 않는다", () => {
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test>\"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test>\"#10\")", ledger }), [ambiguous(10)]);
-  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test #10>)", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test #10>)", ledger }), []);
 });
 
 test("qualifyIssueReferences는 ledger 밖 또는 미완료 transfer bare ref를 fail-closed한다", () => {
@@ -98,6 +98,7 @@ test("qualifyIssueReferences는 fenced/inline 미종결과 indented code를 fail
   for (const [text, message] of [
     ["```\n#10", /unterminated fenced/],
     ["`#10", /unterminated inline/],
+    ["[docs](https://example.test \"title", /unterminated Markdown link destination/],
     ["    #10", /indented code/],
     ["\t#10", /indented code/],
   ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), message);
@@ -149,6 +150,13 @@ test("runNormalization은 transfer timestamp bucket과 겹치는 comment를 거�
   ] });
   await assert.rejects(
     () => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger: fractionalLedger, execGh: fake.exec }),
+    /comment timestamp overlaps transfer timestamp/,
+  );
+  const exactFake = fakeGh({ body: "", comments: [
+    { id: 1, body: "#10", created_at: "2026-07-31T09:00:00Z", updated_at: "2026-07-31T09:00:00Z" },
+  ] });
+  await assert.rejects(
+    () => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: exactFake.exec }),
     /comment timestamp overlaps transfer timestamp/,
   );
 });

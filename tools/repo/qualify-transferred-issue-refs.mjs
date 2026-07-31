@@ -146,7 +146,7 @@ function urlLengthAt(text, index, linkLabels) {
       if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
       if (!destinationClosed) {
         if (text[cursor] === "<") return bareUrlLength;
-        if (/\s/.test(text[cursor])) return cursor - index;
+        if (text[cursor] === "\r" || text[cursor] === "\n") return cursor - index;
         if (text[cursor] === ">") { destinationClosed = true; destinationLength = cursor - index; }
         continue;
       }
