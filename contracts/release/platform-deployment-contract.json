@@ -12,7 +12,7 @@
   "gitShaPattern": "^[a-f0-9]{40}$",
   "sha256Pattern": "^[a-f0-9]{64}$",
   "imageDigestPattern": "^sha256:[a-f0-9]{64}$",
-  "issueRefPattern": "^AquilaXk/(easysubway|easysubway-platform|easysubway-backend)#[1-9][0-9]*$",
+  "issueRefPattern": "^AquilaXk/(easysubway|easysubway-data|easysubway-platform|easysubway-backend|easysubway-mobile)#[1-9][0-9]*$",
   "forbiddenInputs": [
     "branch",
     "buildContext",

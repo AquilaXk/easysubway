@@ -25,5 +25,6 @@ test("platform contract bundle은 digest deployment 입력과 schema identity만
   assert.deepEqual(contract.allowedProducerRepositories, ["AquilaXk/easysubway", "AquilaXk/easysubway-backend"]);
   assert.equal(contract.imageRepository, "ghcr.io/aquilaxk/easysubway-backend");
   assert.equal(contract.platformRepository, "AquilaXk/easysubway-platform");
+  assert.equal(contract.issueRefPattern, JSON.parse(issueRefSchema).pattern);
   assert.deepEqual(contract.forbiddenInputs, ["branch", "buildContext", "sourceDirectory", "mutableImageTag"]);
 });
