@@ -145,7 +145,14 @@ function urlLengthAt(text, index, linkLabels) {
         if (text[cursor] === ">") { destinationClosed = true; destinationLength = cursor - index; }
         continue;
       }
-      if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; } continue; }
+      if (titleDelimiter !== null) {
+        if (/\s/.test(text[cursor])) {
+          const titleWhitespace = whitespaceAt(text, cursor);
+          if (titleWhitespace.paragraphBreak) return destinationLength;
+          cursor += titleWhitespace.length - 1;
+        } else if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; }
+        continue;
+      }
       if (/\s/.test(text[cursor])) {
         const separator = whitespaceAt(text, cursor);
         if (separator.paragraphBreak) return destinationLength;
@@ -167,7 +174,14 @@ function urlLengthAt(text, index, linkLabels) {
     for (let cursor = index; cursor < text.length; cursor += 1) {
       if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
       if (destinationClosed) {
-        if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; } continue; }
+        if (titleDelimiter !== null) {
+          if (/\s/.test(text[cursor])) {
+            const titleWhitespace = whitespaceAt(text, cursor);
+            if (titleWhitespace.paragraphBreak) return bareUrlLength;
+            cursor += titleWhitespace.length - 1;
+          } else if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; }
+          continue;
+        }
         if (/\s/.test(text[cursor])) {
           const separator = whitespaceAt(text, cursor);
           if (separator.paragraphBreak) return bareUrlLength;
