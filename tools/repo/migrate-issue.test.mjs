@@ -134,13 +134,44 @@ test("preexisting preflight destination is never clobbered or transferred", asyn
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
   Object.assign(entry, transferEntry());
   const destination = join(directory, `${SOURCE_ISSUE}-preflight.json`);
-  writeFileSync(destination, "preserve this evidence\n");
+  const sentinel = "preserve this evidence\n";
+  const original = fake.execGh;
+  let seeded = false;
+  const execGh = async (args) => {
+    if (!seeded) {
+      seeded = true;
+      writeFileSync(destination, sentinel);
+    }
+    return original(args);
+  };
+  try {
+    await assert.rejects(() => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+      ledger, schema, execGh,
+    }), /preflight evidence could not be persisted/);
+    assert.equal(readFileSync(destination, "utf8"), sentinel);
+    assert.deepEqual(transferCalls(fake.calls), []);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("preflight evidence in-place rewrite prevents transfer", async () => {
+  const directory = evidenceDirectory();
+  const fake = fakeGh();
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  Object.assign(entry, transferEntry());
   try {
     await assert.rejects(() => runMigration({
       arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
       ledger, schema, execGh: fake.execGh,
-    }), /--execute requires exactly one --evidence-dir/);
-    assert.equal(readFileSync(destination, "utf8"), "preserve this evidence\n");
+      afterPreflightPublish: ({ preflightEvidence }) => {
+        const rewritten = JSON.parse(readFileSync(preflightEvidence.path, "utf8"));
+        rewritten.sourceMetadata.commentCount = 99;
+        writeFileSync(preflightEvidence.path, JSON.stringify(rewritten));
+      },
+    }), /durable preflight evidence/);
     assert.deepEqual(transferCalls(fake.calls), []);
   } finally {
     rmSync(directory, { recursive: true, force: true });

@@ -348,9 +348,14 @@ function assertEvidenceDirectory(context) {
 function capturePublishedEvidence(context, filename) {
   assertEvidenceDirectory(context);
   const path = join(context.canonicalPath, filename);
-  const stat = lstatSync(path);
-  if (stat.isSymbolicLink() || !stat.isFile()) throw new Error("durable preflight evidence is unavailable");
-  return { path, dev: stat.dev, ino: stat.ino };
+  const descriptor = openSync(path, fsConstants.O_RDONLY | fsConstants.O_NOFOLLOW);
+  try {
+    const stat = fstatSync(descriptor);
+    if (!stat.isFile()) throw new Error("durable preflight evidence is unavailable");
+    return { path, dev: stat.dev, ino: stat.ino, bytes: readFileSync(descriptor) };
+  } finally {
+    closeSync(descriptor);
+  }
 }
 
 function evidenceFileName(sourceIssue, suffix) {
@@ -385,7 +390,9 @@ function readPersistedPreflight(context, sourceIssue, sourceUrl, publishedEviden
       if (!stat.isFile() || stat.dev !== publishedEvidence.dev || stat.ino !== publishedEvidence.ino) {
         throw new Error("durable preflight evidence is unavailable");
       }
-      evidence = JSON.parse(readFileSync(descriptor, "utf8"));
+      const bytes = readFileSync(descriptor);
+      if (!bytes.equals(publishedEvidence.bytes)) throw new Error("durable preflight evidence is unavailable");
+      evidence = JSON.parse(bytes.toString("utf8"));
     } finally {
       closeSync(descriptor);
     }
