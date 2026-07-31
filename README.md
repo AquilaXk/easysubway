@@ -1,9 +1,8 @@
 <div align="center">
 
-<!-- TODO: 앱 완성 후 로고/배너 이미지 첨부 -->
-<!-- <img alt="쉬운 지하철" src="docs/assets/banner.png" width="600" /> -->
-
 # 쉬운 지하철
+
+[서비스 소개 보기 →](https://easysubway.aquilaxk.site)
 
 ## 빠른 길보다, 갈 수 있는 길.
 
@@ -45,16 +44,10 @@
 
 ## 스크린샷
 
-<!-- TODO: 앱 완성 후 스크린샷 첨부 -->
-<!--
 <p align="center">
-  <img src="docs/assets/screenshot-route-map.png" width="240" />
-  <img src="docs/assets/screenshot-route-search.png" width="240" />
-  <img src="docs/assets/screenshot-station-detail.png" width="240" />
+  <img alt="쉬운 지하철 노선도" src="backend/src/main/resources/static/images/landing/route-map.png" width="240" />
+  <img alt="쉬운 지하철 상록수역 선택" src="backend/src/main/resources/static/images/landing/station-detail.png" width="240" />
 </p>
--->
-
-> 앱 화면이 확정되는 대로 추가합니다.
 
 ## 지금은
 
@@ -64,7 +57,7 @@
 
 Android부터 시작합니다. Google Play 출시를 준비하고 있고, iOS는 그다음입니다.
 
-출시 소식과 문의는 [Issues](https://github.com/AquilaXk/easysubway/issues)에서.
+출시 소식과 문의는 [aquila@aquilaxk.site](mailto:aquila@aquilaxk.site)로 보내주세요.
 
 ---
 
