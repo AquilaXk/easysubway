@@ -325,8 +325,9 @@ function metadataDifferences(expected, actual, fields = PRESERVED_METADATA_FIELD
 
 function validateEvidenceDirectory(value) {
   if (typeof value !== "string" || !value.startsWith("/")) throw new Error("--execute requires exactly one --evidence-dir <absolute existing empty non-symlink directory>");
+  const inspectedPath = value.length > 1 ? value.replace(/(?:\/\.?)+$/, "") : value;
   let stat;
-  try { stat = lstatSync(value); } catch { throw new Error("--execute requires exactly one --evidence-dir <absolute existing empty non-symlink directory>"); }
+  try { stat = lstatSync(inspectedPath); } catch { throw new Error("--execute requires exactly one --evidence-dir <absolute existing empty non-symlink directory>"); }
   if (stat.isSymbolicLink() || !stat.isDirectory() || readdirSync(value).length !== 0) {
     throw new Error("--execute requires exactly one --evidence-dir <absolute existing empty non-symlink directory>");
   }

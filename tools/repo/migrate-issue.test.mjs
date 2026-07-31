@@ -96,16 +96,23 @@ test("argument parser accepts exactly one source issue and one mode", () => {
 
 test("execute argument parser requires one absolute empty non-symlink evidence directory", () => {
   const directory = evidenceDirectory();
+  const symlinkTarget = evidenceDirectory();
   const symlink = `${directory}-link`;
+  const oneCharacterDirectory = join(directory, "a");
   try {
     const base = ["--ledger", "ledger.json", "--source-issue", "2684", "--execute", "--confirm-source", "AquilaXk/easysubway#2684", "--confirm-target", TARGET_REPOSITORY];
     assert.throws(() => parseArguments(base), /--evidence-dir/);
     assert.throws(() => parseArguments([...base, "--evidence-dir", "relative"]), /absolute existing empty non-symlink/);
-    symlinkSync(directory, symlink);
+    mkdirSync(oneCharacterDirectory);
+    assert.doesNotThrow(() => parseArguments([...base, "--evidence-dir", oneCharacterDirectory]));
+    symlinkSync(symlinkTarget, symlink);
     assert.throws(() => parseArguments([...base, "--evidence-dir", symlink]), /absolute existing empty non-symlink/);
+    assert.throws(() => parseArguments([...base, "--evidence-dir", `${symlink}/`]), /absolute existing empty non-symlink/);
+    assert.throws(() => parseArguments([...base, "--evidence-dir", `${symlink}/.`]), /absolute existing empty non-symlink/);
   } finally {
     rmSync(symlink, { force: true });
     rmSync(directory, { recursive: true, force: true });
+    rmSync(symlinkTarget, { recursive: true, force: true });
   }
 });
 
