@@ -234,7 +234,8 @@ test("post-transfer verification retries temporary target metadata propagation l
   const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
   Object.assign(entry, { executionApproval: "https://github.com/AquilaXk/easysubway/issues/2691#issuecomment-1", targetUrl: null, transferredAt: null });
   const target = metadata({ url: TARGET_URL, number: 7 });
-  const fake = fakeGh({ target, targetResponses: [{ ...target, comments: { totalCount: 0 } }, target] });
+  const stale = { ...target, comments: { totalCount: 0 } };
+  const fake = fakeGh({ target, targetResponses: [stale, stale, stale, stale, target] });
 
   const verified = await runMigration({
     arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY } },
@@ -245,7 +246,7 @@ test("post-transfer verification retries temporary target metadata propagation l
   });
 
   assert.equal(verified.targetUrl, TARGET_URL);
-  assert.equal(fake.calls.filter((args) => args[0] === "api" && args[1] === "graphql" && args.includes("name=easysubway-data")).length, 2);
+  assert.equal(fake.calls.filter((args) => args[0] === "api" && args[1] === "graphql" && args.includes("name=easysubway-data")).length, 5);
 });
 
 test("unconfirmed transfer response reports an indeterminate result", async () => {

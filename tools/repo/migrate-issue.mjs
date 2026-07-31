@@ -117,7 +117,7 @@ export async function verifyTransferredIssue({ entry, transferResult, execGh, re
   if (!targetUrl) throw new Error("transferred issue identity is missing");
   const expected = transferResult?.expectedMetadata;
   let verificationError;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+  for (let attempt = 0; attempt < 10; attempt += 1) {
     try {
       const target = await readIssueMetadata(targetUrl.repository, targetUrl.number, execGh);
       if (target.number !== targetUrl.number || target.url !== `https://github.com/${targetUrl.repository}/issues/${targetUrl.number}`) {
@@ -136,7 +136,7 @@ export async function verifyTransferredIssue({ entry, transferResult, execGh, re
       };
     } catch (error) {
       verificationError = error;
-      if (attempt < 2) await delay(retryDelayMs);
+      if (attempt < 9) await delay(retryDelayMs);
     }
   }
   throw verificationError;
