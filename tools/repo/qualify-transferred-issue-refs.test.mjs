@@ -63,6 +63,24 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test extra #10)", ledger }), [ambiguous(10)]);
 });
 
+test("qualifyIssueReferences는 opening label 없는 link-like text의 bare ref를 숨기지 않는다", () => {
+  assert.deepEqual(qualifyIssueReferences({ text: "plain](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "\\](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label `]`](https://example.test \"title #10\")", ledger }), []);
+  assert.deepEqual(qualifyIssueReferences({ text: "[prev](https://one.test \"title [\") plain](https://two.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[https://one.test](https://two.test)#10", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[https://one.test`]`](https://two.test)#10", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[https://one.test` code ]`](https://two.test)#10", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[https://one.test\\`](https://two.test)#10", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "unmatched [ https://example.test/?ref=#10", ledger }), []);
+});
+
+test("qualifyIssueReferences는 angle destination 뒤 공백 없는 title의 bare ref를 숨기지 않는다", () => {
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test>\"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test>\"#10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test #10>)", ledger }), [ambiguous(10)]);
+});
+
 test("qualifyIssueReferences는 ledger 밖 또는 미완료 transfer bare ref를 fail-closed한다", () => {
   assert.throws(() => qualifyIssueReferences({ text: "unknown #99", ledger }), /unresolved bare issue reference #99/);
   assert.throws(() => qualifyIssueReferences({ text: "incomplete #14", ledger }), /unresolved bare issue reference #14/);

@@ -103,9 +103,15 @@ export function qualifyIssueReferences({ text, ledger }) {
 
 function qualifyText(text, references) {
   const unresolved = [];
+  const linkLabels = new Set();
+  let labelDepth = 0;
   for (let index = 0; index < text.length;) {
     if (text[index] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[index + 1] ?? "")) { index += 2; continue; }
-    const urlLength = urlLengthAt(text, index);
+    let urlLength = urlLengthAt(text, index, linkLabels);
+    if (urlLength && labelDepth > 0) {
+      const labelEnd = labelEndWithin(text, index, index + urlLength);
+      if (labelEnd !== -1) urlLength = labelEnd - index;
+    }
     if (urlLength) { index += urlLength; continue; }
     const codeSpanLength = codeSpanLengthAt(text, index);
     if (codeSpanLength) { index += codeSpanLength; continue; }
@@ -116,32 +122,39 @@ function qualifyText(text, references) {
       unresolved.push({ reference: bareReference, reason: "bare reference is ambiguous after issue transfer" });
       index += bareReference.toString().length + 1; continue;
     }
+    if (text[index] === "[") labelDepth += 1;
+    else if (text[index] === "]" && labelDepth > 0) { linkLabels.add(index); labelDepth -= 1; }
     index += 1;
   }
   return unresolved;
 }
 
-function urlLengthAt(text, index) {
+function urlLengthAt(text, index, linkLabels) {
   if (!text.startsWith("http://", index) && !text.startsWith("https://", index)) return 0;
-  const whitespaceOffset = text.slice(index).search(/\s/);
-  const bareUrlLength = whitespaceOffset === -1 ? text.length - index : whitespaceOffset;
-  if (text[index - 1] === "<" && text[index - 2] === "(" && text[index - 3] === "]") {
+  const bareUrlLength = bareUrlLengthAt(text, index);
+  if (text[index - 1] === "<" && text[index - 2] === "(" && linkLabels.has(index - 3)) {
     let destinationClosed = false;
+    let destinationLength = 0;
+    let separatorSeen = false;
     let titleDelimiter = null;
     let titleClosed = false;
     for (let cursor = index; cursor < text.length; cursor += 1) {
       if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
-      if (!destinationClosed) { if (text[cursor] === ">") destinationClosed = true; continue; }
+      if (!destinationClosed) {
+        if (/\s/.test(text[cursor])) return cursor - index;
+        if (text[cursor] === ">") { destinationClosed = true; destinationLength = cursor - index; }
+        continue;
+      }
       if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; } continue; }
-      if (/\s/.test(text[cursor])) continue;
-      if (!titleClosed && (text[cursor] === "\"" || text[cursor] === "'")) titleDelimiter = text[cursor];
-      else if (!titleClosed && text[cursor] === "(") titleDelimiter = ")";
+      if (/\s/.test(text[cursor])) { separatorSeen = true; continue; }
+      if (!titleClosed && separatorSeen && (text[cursor] === "\"" || text[cursor] === "'")) titleDelimiter = text[cursor];
+      else if (!titleClosed && separatorSeen && text[cursor] === "(") titleDelimiter = ")";
       else if (text[cursor] === ")") return cursor - index;
-      else return bareUrlLength;
+      else return destinationLength;
     }
     throw new Error("unterminated Markdown link destination");
   }
-  if (text[index - 1] === "(" && text[index - 2] === "]") {
+  if (text[index - 1] === "(" && linkLabels.has(index - 2)) {
     let depth = 1;
     let destinationClosed = false;
     let titleDelimiter = null;
@@ -162,6 +175,25 @@ function urlLengthAt(text, index) {
     throw new Error("unterminated Markdown link destination");
   }
   return bareUrlLength;
+}
+
+function bareUrlLengthAt(text, start) {
+  let backslashes = 0;
+  for (let cursor = start; cursor < text.length; cursor += 1) {
+    if (/\s/.test(text[cursor]) || (text[cursor] === "`" && backslashes % 2 === 0)) return cursor - start;
+    backslashes = text[cursor] === "\\" ? backslashes + 1 : 0;
+  }
+  return text.length - start;
+}
+
+function labelEndWithin(text, start, end) {
+  let nested = 0;
+  for (let cursor = start; cursor < end; cursor += 1) {
+    if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
+    if (text[cursor] === "[") nested += 1;
+    else if (text[cursor] === "]" && nested-- === 0) return cursor;
+  }
+  return -1;
 }
 
 function codeSpanLengthAt(text, index) {
