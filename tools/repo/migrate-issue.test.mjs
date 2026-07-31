@@ -383,6 +383,81 @@ test("postflight evidence write failure is terminal after one transfer attempt",
   }
 });
 
+test("postflight evidence writer mutation is terminal", async () => {
+  const directory = evidenceDirectory();
+  const target = { ...metadata({ url: TARGET_URL, number: 7 }), comments: { totalCount: 0 } };
+  const fake = fakeGh({ target });
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  Object.assign(entry, transferEntry());
+  try {
+    await assert.rejects(() => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+      ledger, schema, execGh: fake.execGh, retryDelayMs: 0,
+      writeEvidence: async (context, filename, value) => {
+        if (filename.includes("postflight")) value.attempt = 99;
+        writeFileSync(join(context.canonicalPath, filename), `${JSON.stringify(value)}\n`);
+      },
+    }), /postflight evidence could not be persisted/);
+    assert.equal(transferCalls(fake.calls).length, 1);
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("postflight evidence directory replacement and restoration is terminal", async () => {
+  const directory = evidenceDirectory();
+  const movedDirectory = `${directory}-moved`;
+  const fake = fakeGh();
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  Object.assign(entry, transferEntry());
+  try {
+    await assert.rejects(() => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+      ledger, schema, execGh: fake.execGh, retryDelayMs: 0,
+      writeEvidence: async (context, filename, value) => {
+        if (!filename.includes("postflight")) return writeFileSync(join(context.canonicalPath, filename), `${JSON.stringify(value)}\n`);
+        renameSync(directory, movedDirectory);
+        mkdirSync(directory);
+        writeFileSync(join(directory, filename), `${JSON.stringify(value)}\n`);
+        rmSync(directory, { recursive: true });
+        renameSync(movedDirectory, directory);
+      },
+    }), /postflight evidence could not be persisted/);
+    assert.equal(transferCalls(fake.calls).length, 1);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(movedDirectory, { recursive: true, force: true });
+  }
+});
+
+test("postflight evidence symlink replacement and restoration is terminal", async () => {
+  const directory = evidenceDirectory();
+  const movedDirectory = `${directory}-moved`;
+  const fake = fakeGh();
+  const { ledger, schema } = migrationContract();
+  const entry = ledger.issues.find(({ sourceIssue }) => sourceIssue === SOURCE_ISSUE);
+  Object.assign(entry, transferEntry());
+  try {
+    await assert.rejects(() => runMigration({
+      arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory },
+      ledger, schema, execGh: fake.execGh, retryDelayMs: 0,
+      writeEvidence: async (context, filename, value) => {
+        if (!filename.includes("postflight")) return writeFileSync(join(context.canonicalPath, filename), `${JSON.stringify(value)}\n`);
+        renameSync(directory, movedDirectory);
+        symlinkSync(movedDirectory, directory);
+        writeFileSync(join(directory, filename), `${JSON.stringify(value)}\n`);
+        rmSync(join(movedDirectory, filename));
+        rmSync(directory);
+        renameSync(movedDirectory, directory);
+      },
+    }), /postflight evidence could not be persisted/);
+    assert.equal(transferCalls(fake.calls).length, 1);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+    rmSync(movedDirectory, { recursive: true, force: true });
+  }
+});
+
 test("postflight artifacts record propagation attempts, exact metadata differences, and redirect identity", async () => {
   const directory = evidenceDirectory();
   const target = metadata({ url: TARGET_URL, number: 7 });

@@ -378,7 +378,17 @@ function capturePublishedEvidence(context, filename) {
   try {
     const stat = fstatSync(descriptor);
     if (!stat.isFile()) throw new Error("durable preflight evidence is unavailable");
-    return { path, dev: stat.dev, ino: stat.ino, bytes: readFileSync(descriptor) };
+    const bytes = readFileSync(descriptor);
+    assertEvidenceDirectory(context);
+    const directoryDescriptor = openSync(context.canonicalPath, fsConstants.O_RDONLY | fsConstants.O_DIRECTORY | fsConstants.O_NOFOLLOW);
+    try {
+      const directoryStat = fstatSync(directoryDescriptor);
+      if (!directoryStat.isDirectory() || directoryStat.dev !== context.dev || directoryStat.ino !== context.ino) throw new Error("evidence directory identity changed");
+    } finally { closeSync(directoryDescriptor); }
+    const destinationStat = lstatSync(path);
+    if (!destinationStat.isFile() || destinationStat.dev !== stat.dev || destinationStat.ino !== stat.ino) throw new Error("durable preflight evidence is unavailable");
+    assertEvidenceDirectory(context);
+    return { path, dev: stat.dev, ino: stat.ino, bytes };
   } finally {
     closeSync(descriptor);
   }
@@ -393,14 +403,16 @@ async function writeEvidenceAtomically(context, filename, value) {
   assertEvidenceDirectory(context);
   const destination = join(context.canonicalPath, filename);
   const temporary = join(context.canonicalPath, `.${filename}.tmp`);
+  const expectedBytes = Buffer.from(`${JSON.stringify(value)}\n`);
   try {
     const temporaryFd = openSync(temporary, "wx");
-    try { writeFileSync(temporaryFd, `${JSON.stringify(value)}\n`); fsyncSync(temporaryFd); } finally { closeSync(temporaryFd); }
+    try { writeFileSync(temporaryFd, expectedBytes); fsyncSync(temporaryFd); } finally { closeSync(temporaryFd); }
     linkSync(temporary, destination);
     unlinkSync(temporary);
     const directoryFd = openSync(context.canonicalPath, "r");
     try { fsyncSync(directoryFd); } finally { closeSync(directoryFd); }
     assertEvidenceDirectory(context);
+    if (!capturePublishedEvidence(context, filename).bytes.equals(expectedBytes)) throw new Error("published evidence is invalid");
   } finally {
     try { unlinkSync(temporary); } catch {}
   }
@@ -439,7 +451,11 @@ function isNormalizedMetadata(value) {
 
 async function persistPostflightAttempt({ entry, evidence, writeEvidence, attempt, redirectIdentity, targetMetadata, mismatchedFields, metadataDifferences }) {
   try {
-    await writeEvidence(evidence, evidenceFileName(entry.sourceIssue, `postflight-${attempt + 1}`), { sourceIssue: entry.sourceIssue, sourceUrl: entry.sourceUrl, attempt: attempt + 1, redirectIdentity, targetMetadata, mismatchedFields, metadataDifferences });
+    const filename = evidenceFileName(entry.sourceIssue, `postflight-${attempt + 1}`);
+    const value = { sourceIssue: entry.sourceIssue, sourceUrl: entry.sourceUrl, attempt: attempt + 1, redirectIdentity, targetMetadata, mismatchedFields, metadataDifferences };
+    const expectedBytes = Buffer.from(`${JSON.stringify(value)}\n`);
+    await writeEvidence(evidence, filename, value);
+    if (!capturePublishedEvidence(evidence, filename).bytes.equals(expectedBytes)) throw new Error("published evidence is invalid");
   } catch {
     throw new Error("postflight evidence could not be persisted");
   }
