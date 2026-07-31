@@ -12,8 +12,8 @@ const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
 const OPENING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})/;
 const CLOSING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n)?$/;
 const INTERRUPTING_BLOCK_PATTERN = /^ {0,3}(?:#{1,6}(?:[ \t]|\r?\n|$)|>|<|[*+-][ \t]+(?=\S)|1[.)][ \t]+(?=\S)|(?:[*_-][ \t]*){3,}(?:\r?\n|$)|(?:=+[ \t]*|-+[ \t]*)(?:\r?\n|$))/;
-const RAW_HTML_PATTERN = /<(?:!--[\s\S]*?--|!\[CDATA\[[\s\S]*?\]\]|![A-Z][^>]*|\?[\s\S]*?\?|\/?[A-Za-z][A-Za-z0-9-]*(?:[ \t\r\n][^>]*|\/?))>/;
-const TABLE_DELIMITER_PATTERN = /^ {0,3}\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*(?:\r?\n|$)/;
+const RAW_HTML_OPENER_PATTERN = /<(?:!--|!\[CDATA\[|![A-Z]|\?|\/?[A-Za-z][A-Za-z0-9-]*(?=[ \t\r\n/>]|$))/y;
+const TABLE_DELIMITER_PATTERN = /^ {0,3}(?=[^\r\n]*\|)\|?[ \t]*:?-{3,}:?[ \t]*(?:\|[ \t]*:?-{3,}:?[ \t]*)*\|?[ \t]*(?:\r?\n|$)/;
 
 export function parseArguments(argv) {
   const values = {};
@@ -106,7 +106,6 @@ export function qualifyIssueReferences({ text, ledger }) {
 
 function qualifyText(text, references) {
   if (hasTableDelimiter(text, 0, text.length)) throw new Error("GFM table boundaries are unsupported");
-  if (RAW_HTML_PATTERN.test(text)) throw new Error("raw HTML is unsupported");
   const unresolved = [];
   const linkLabels = new Set();
   let labelOpen = false;
@@ -129,6 +128,8 @@ function qualifyText(text, references) {
         || hasInterruptingBlock(text, index, index + codeSpanLength)) labelOpen = false;
       index += codeSpanLength; continue;
     }
+    RAW_HTML_OPENER_PATTERN.lastIndex = index;
+    if (text[index] === "<" && RAW_HTML_OPENER_PATTERN.test(text)) throw new Error("raw HTML is unsupported");
     const bareReference = bareReferenceAt(text, index);
     if (bareReference !== null) {
       const reference = references.get(bareReference);
@@ -231,7 +232,7 @@ function urlLengthAt(text, index, linkLabels) {
 function bareUrlLengthAt(text, start) {
   let backslashes = 0;
   for (let cursor = start; cursor < text.length; cursor += 1) {
-    if (/\s/.test(text[cursor]) || (text[cursor] === "`" && backslashes % 2 === 0)) return cursor - start;
+    if (/\s/.test(text[cursor]) || text[cursor] === "<" || (text[cursor] === "`" && backslashes % 2 === 0)) return cursor - start;
     backslashes = text[cursor] === "\\" ? backslashes + 1 : 0;
   }
   return text.length - start;

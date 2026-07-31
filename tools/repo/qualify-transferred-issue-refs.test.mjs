@@ -90,13 +90,16 @@ test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare 
     "<!DOCTYPE [>](https://example.test \"title #10\")",
     "<?target [?>](https://example.test \"title #10\")",
     "<![CDATA[[]]>](https://example.test \"title #10\")",
+    "<!-- unterminated #10",
   ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /raw HTML is unsupported/);
+  assert.deepEqual(qualifyIssueReferences({ text: "Use `<div>` before #10", ledger }), [ambiguous(10)]);
   for (const text of [
     "[label | h\n--- | ---\ncontinued](https://example.test \"title #10\") | x",
     "[label\n--- | ---\ncontinued](https://example.test \"title #10\")",
     "`h1 | h2\n--- | ---\n#10 | x`",
     "h1 | h2\n--- | ---\n[label | continued](https://example.test \"title #10\") | x",
   ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /GFM table boundaries are unsupported/);
+  assert.deepEqual(qualifyIssueReferences({ text: "paragraph\n\n---\n#10", ledger }), [ambiguous(10)]);
   assert.throws(
     () => qualifyIssueReferences({ text: "[docs](<https://example.test<bad> \"title #10\")", ledger }),
     /raw HTML is unsupported/,
