@@ -180,7 +180,7 @@ test("concurrent execute migrations claim one evidence directory before prefligh
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
-test("execute claim is a regular file", async () => {
+test("execute evidence files are regular and private", async () => {
   const directory = evidenceDirectory();
   const fake = fakeGh();
   const { ledger, schema } = migrationContract();
@@ -189,7 +189,11 @@ test("execute claim is a regular file", async () => {
     await runMigration({
       arguments_: { sourceIssue: SOURCE_ISSUE, mode: "execute", confirmations: { source: `${SOURCE_REPOSITORY}#${SOURCE_ISSUE}`, target: TARGET_REPOSITORY }, evidenceDir: directory }, ledger, schema, execGh: fake.execGh,
     });
-    assert.equal(lstatSync(join(directory, ".migration-claim")).isFile(), true);
+    for (const filename of [".migration-claim", `${SOURCE_ISSUE}-preflight.json`, `${SOURCE_ISSUE}-postflight-1.json`]) {
+      const stat = lstatSync(join(directory, filename));
+      assert.equal(stat.isFile(), true);
+      assert.equal(stat.mode & 0o777, 0o600);
+    }
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
