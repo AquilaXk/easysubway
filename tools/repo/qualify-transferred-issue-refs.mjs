@@ -52,12 +52,16 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
   }
   else if (arguments_?.mode !== "dry-run") throw new Error("choose dry-run or execute mode");
 
-  const [body, comments] = await Promise.all([
+  const [issue, comments] = await Promise.all([
     readIssueBody(target.repository, target.number, execGh),
     readIssueComments(target.repository, target.number, execGh),
   ]);
+  if (issue.lastEditedAt !== null) {
+    if (timestampBucketsOverlap(issue.lastEditedAt, transferredAt)) throw new Error("issue body timestamp overlaps transfer timestamp");
+    if (compareTimestamps(issue.lastEditedAt, transferredAt) > 0) throw new Error("issue body was edited after transfer");
+  }
   const unresolved = [
-    ...qualifyIssueReferences({ text: body, ledger }).map((reference) => ({ surface: { kind: "body", id: null }, ...reference })),
+    ...qualifyIssueReferences({ text: issue.body, ledger }).map((reference) => ({ surface: { kind: "body", id: null }, ...reference })),
     ...comments.filter((comment) => {
       if (timestampBucketsOverlap(comment.createdAt, transferredAt)) throw new Error("comment timestamp overlaps transfer timestamp");
       if (compareTimestamps(comment.createdAt, transferredAt) > 0) return false;
@@ -323,9 +327,15 @@ function confirmExecution(entry, target, confirmations) {
 }
 
 async function readIssueBody(repository, number, execGh) {
-  const issue = JSON.parse(await execGh(["api", `repos/${repository}/issues/${number}`]));
-  if (issue?.body !== null && typeof issue?.body !== "string") throw new Error("issue body is invalid");
-  return issue.body ?? "";
+  const [owner, name] = repository.split("/");
+  const response = JSON.parse(await execGh([
+    "api", "graphql",
+    "-f", "query=query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issue(number: $number) { body lastEditedAt } } }",
+    "-F", `owner=${owner}`, "-F", `name=${name}`, "-F", `number=${number}`,
+  ]));
+  const issue = response?.data?.repository?.issue;
+  if (typeof issue?.body !== "string" || (issue.lastEditedAt !== null && typeof issue.lastEditedAt !== "string")) throw new Error("issue body is invalid");
+  return { body: issue.body, lastEditedAt: issue.lastEditedAt === null ? null : parseTimestamp(issue.lastEditedAt, "issue body timestamp") };
 }
 
 async function readIssueComments(repository, number, execGh) {

@@ -206,6 +206,16 @@ test("runNormalization은 transfer 뒤 수정된 source-era comment를 거부한
   );
 });
 
+test("runNormalization은 transfer 경계 이후 수정된 issue body를 거부한다", async () => {
+  for (const [bodyLastEditedAt, message] of [
+    ["2026-07-31T09:00:00Z", /issue body timestamp overlaps transfer timestamp/],
+    ["2026-07-31T10:00:00Z", /issue body was edited after transfer/],
+  ]) await assert.rejects(
+    () => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: fakeGh({ body: "#10", bodyLastEditedAt, comments: [] }).exec }),
+    message,
+  );
+});
+
 test("runNormalization execute는 source ledger 부재와 conditional PATCH 부재 모두 read/write 전에 fail-closed한다", async () => {
   const fake = fakeGh({ body: "body #10", comments: [{ id: 1, body: "comment #13" }] });
   await assert.rejects(
@@ -255,14 +265,14 @@ test("CLI direct invocation은 main을 시작한다", async () => {
   );
 });
 
-function fakeGh({ body, comments }) {
-  const state = { body, comments: structuredClone(comments).map((comment) => ({ ...comment, issue_url: "https://api.github.com/repos/AquilaXk/easysubway-mobile/issues/2" })), calls: [] };
+function fakeGh({ body, bodyLastEditedAt = null, comments }) {
+  const state = { body, bodyLastEditedAt, comments: structuredClone(comments).map((comment) => ({ ...comment, issue_url: "https://api.github.com/repos/AquilaXk/easysubway-mobile/issues/2" })), calls: [] };
   return {
     get calls() { return state.calls; },
     async exec(args) {
       state.calls.push(args);
+      if (args.includes("graphql")) return JSON.stringify({ data: { repository: { issue: { body: state.body, lastEditedAt: state.bodyLastEditedAt } } } });
       const endpoint = args.find((argument) => argument.startsWith("repos/"));
-      if (endpoint.endsWith("/issues/2")) return JSON.stringify({ body: state.body });
       if (endpoint.includes("/comments?")) return JSON.stringify([state.comments]);
       throw new Error(`unexpected gh call: ${args.join(" ")}`);
     },
