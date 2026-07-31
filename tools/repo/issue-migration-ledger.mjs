@@ -153,16 +153,21 @@ function validateChildIssueUrls(childIssueUrls, childRepositories, path, errors)
     errors.push(`${path}: childRepositories key와 정확히 일치해야 함`);
     return;
   }
+  const expectedRepositories = Array.isArray(childRepositories) ? childRepositories : [];
   const repositories = Object.keys(childIssueUrls);
-  if (!sameValues(repositories, childRepositories)) {
+  if (!sameRepositoryKeys(repositories, expectedRepositories)) {
     errors.push(`${path}: childRepositories key와 정확히 일치해야 함`);
   }
   const urls = Object.values(childIssueUrls);
   if (new Set(urls).size !== urls.length) errors.push(`${path}: child issue URL 중복`);
-  for (const repository of childRepositories ?? []) {
+  for (const repository of expectedRepositories) {
     if (!(repository in childIssueUrls)) continue;
     validateChildIssueUrl(childIssueUrls[repository], repository, `${path}.${repository}`, errors);
   }
+}
+
+function sameRepositoryKeys(value, expected) {
+  return new Set(expected).size === expected.length && sameValues(value, expected);
 }
 
 function validateChildIssueUrl(value, repository, path, errors) {
