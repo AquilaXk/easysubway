@@ -41,6 +41,7 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
   if (!entry) throw new Error(`source issue #${arguments_?.sourceIssue} is not present in the ledger`);
   const target = transferredReference(entry);
   if (target.repository !== MOBILE_REPOSITORY) throw new Error("target repository must be easysubway-mobile");
+  const transferredAt = parseTimestamp(entry.transferredAt, "transfer timestamp");
   const targetUrl = `https://github.com/${target.repository}/issues/${target.number}`;
   if (arguments_?.mode === "execute") {
     confirmExecution(entry, target, arguments_.confirmations);
@@ -54,7 +55,8 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
   ]);
   const unresolved = [
     ...qualifyIssueReferences({ text: body, ledger }).map((reference) => ({ surface: { kind: "body", id: null }, ...reference })),
-    ...comments.flatMap((comment) => qualifyIssueReferences({ text: comment.body, ledger })
+    ...comments.filter((comment) => comment.updatedAt <= transferredAt)
+      .flatMap((comment) => qualifyIssueReferences({ text: comment.body, ledger })
       .map((reference) => ({ surface: { kind: "comment", id: comment.id }, ...reference }))),
   ];
   const result = {
@@ -95,6 +97,7 @@ export function qualifyIssueReferences({ text, ledger }) {
 function qualifyText(text, references) {
   const unresolved = [];
   for (let index = 0; index < text.length;) {
+    if (text[index] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[index + 1] ?? "")) { index += 2; continue; }
     const urlLength = urlLengthAt(text, index);
     if (urlLength) { index += urlLength; continue; }
     const codeSpanLength = codeSpanLengthAt(text, index);
@@ -113,6 +116,36 @@ function qualifyText(text, references) {
 
 function urlLengthAt(text, index) {
   if (!text.startsWith("http://", index) && !text.startsWith("https://", index)) return 0;
+  if (text[index - 1] === "<" && text[index - 2] === "(" && text[index - 3] === "]") {
+    let destinationClosed = false;
+    let titleDelimiter = null;
+    for (let cursor = index; cursor < text.length; cursor += 1) {
+      if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
+      if (!destinationClosed) { if (text[cursor] === ">") destinationClosed = true; continue; }
+      if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) titleDelimiter = null; continue; }
+      if (text[cursor] === "\"" || text[cursor] === "'") titleDelimiter = text[cursor];
+      else if (text[cursor] === "(") titleDelimiter = ")";
+      else if (text[cursor] === ")") return cursor - index;
+    }
+    throw new Error("unterminated Markdown link destination");
+  }
+  if (text[index - 1] === "(" && text[index - 2] === "]") {
+    let depth = 1;
+    let destinationClosed = false;
+    let titleDelimiter = null;
+    for (let cursor = index; cursor < text.length; cursor += 1) {
+      if (text[cursor] === "\\" && /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
+      if (destinationClosed) {
+        if (titleDelimiter !== null) { if (text[cursor] === titleDelimiter) titleDelimiter = null; continue; }
+        if (text[cursor] === "\"" || text[cursor] === "'") titleDelimiter = text[cursor];
+        else if (text[cursor] === "(") titleDelimiter = ")";
+        else if (text[cursor] === ")") return cursor - index;
+      } else if (/\s/.test(text[cursor]) && depth === 1) destinationClosed = true;
+      else if (text[cursor] === "(") depth += 1;
+      else if (text[cursor] === ")" && --depth === 0) return cursor - index;
+    }
+    throw new Error("unterminated Markdown link destination");
+  }
   const end = text.slice(index).search(/\s/);
   return end === -1 ? text.length - index : end;
 }
@@ -179,10 +212,23 @@ async function readIssueComments(repository, number, execGh) {
   const comments = pages.flat();
   const issueUrl = `https://api.github.com/repos/${repository}/issues/${number}`;
   if (!Array.isArray(comments) || new Set(comments.map(({ id }) => id)).size !== comments.length
-    || !comments.every(({ id, body, issue_url: commentIssueUrl }) => Number.isInteger(id) && typeof body === "string" && commentIssueUrl === issueUrl)) {
+    || !comments.every(({ id, body, issue_url: commentIssueUrl, created_at: createdAt, updated_at: updatedAt }) => Number.isInteger(id) && typeof body === "string" && commentIssueUrl === issueUrl
+      && validTimestampOrder(createdAt, updatedAt))) {
     throw new Error("issue comments are invalid");
   }
-  return comments;
+  return comments.map(({ id, body, updated_at: updatedAt }) => ({ id, body, updatedAt: parseTimestamp(updatedAt, "comment timestamp") }));
+}
+
+function parseTimestamp(value, label) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value)) throw new Error(`${label} is invalid`);
+  const parsed = Date.parse(value);
+  const canonical = Number.isFinite(parsed) ? new Date(parsed).toISOString() : "";
+  if (value !== canonical && value !== canonical.replace(".000Z", "Z")) throw new Error(`${label} is invalid`);
+  return parsed;
+}
+
+function validTimestampOrder(createdAt, updatedAt) {
+  try { return parseTimestamp(createdAt, "comment timestamp") <= parseTimestamp(updatedAt, "comment timestamp"); } catch { return false; }
 }
 
 async function execGh(args) {

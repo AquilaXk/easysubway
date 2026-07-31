@@ -6,7 +6,7 @@ import { parseArguments, qualifyIssueReferences, runNormalization } from "./qual
 
 const ledger = {
   issues: [
-    { sourceIssue: 10, disposition: "TRANSFER", targetRepository: "AquilaXk/easysubway-mobile", targetUrl: "https://github.com/AquilaXk/easysubway-mobile/issues/2" },
+    { sourceIssue: 10, disposition: "TRANSFER", targetRepository: "AquilaXk/easysubway-mobile", targetUrl: "https://github.com/AquilaXk/easysubway-mobile/issues/2", transferredAt: "2026-07-31T09:00:00Z" },
     { sourceIssue: 11, disposition: "KEEP_HUB", targetRepository: "AquilaXk/easysubway", targetUrl: null },
     { sourceIssue: 12, disposition: "TRANSFER", targetRepository: "AquilaXk/easysubway-data", targetUrl: "https://github.com/AquilaXk/easysubway-data/issues/4" },
     { sourceIssue: 13, disposition: "TRANSFER", targetRepository: "AquilaXk/easysubway-backend", targetUrl: "https://github.com/AquilaXk/easysubway-backend/issues/7" },
@@ -51,6 +51,14 @@ test("qualifyIssueReferences는 더 긴 backtick run 내부를 inline closing fe
   assert.deepEqual(qualifyIssueReferences({ text: "``code ``` #10``", ledger }), []);
 });
 
+test("qualifyIssueReferences는 Markdown link 뒤 참조와 backslash escape를 구분한다", () => {
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test)#10 \\`live #11\\` literal \\#12", ledger }), [ambiguous(10), ambiguous(11)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test> \"title #11\")#10", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test \"title ) #10\") outside #11", ledger }), [ambiguous(11)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test/a_(b)#10) outside #11", ledger }), [ambiguous(11)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test/a_\\)#10) outside #11", ledger }), [ambiguous(11)]);
+});
+
 test("qualifyIssueReferences는 ledger 밖 또는 미완료 transfer bare ref를 fail-closed한다", () => {
   assert.throws(() => qualifyIssueReferences({ text: "unknown #99", ledger }), /unresolved bare issue reference #99/);
   assert.throws(() => qualifyIssueReferences({ text: "incomplete #14", ledger }), /unresolved bare issue reference #14/);
@@ -66,7 +74,11 @@ test("qualifyIssueReferences는 fenced/inline 미종결과 indented code를 fail
 });
 
 test("runNormalization dry-run은 변경 제안 없이 surface별 ambiguous ref만 보고한다", async () => {
-  const fake = fakeGh({ body: "body #10 and #11", comments: [{ id: 1, body: "comment #12" }, { id: 2, body: "already AquilaXk/easysubway#11" }] });
+  const fake = fakeGh({ body: "body #10 and #11", comments: [
+    { id: 1, body: "comment #12", created_at: "2026-07-31T08:00:00Z", updated_at: "2026-07-31T08:00:00Z" },
+    { id: 2, body: "already AquilaXk/easysubway#11", created_at: "2026-07-31T08:00:00Z", updated_at: "2026-07-31T08:00:00Z" },
+    { id: 3, body: "target-local #99", created_at: "2026-07-31T10:00:00Z", updated_at: "2026-07-31T10:00:00Z" },
+  ] });
   const result = await runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: fake.exec });
   assert.deepEqual(result, {
     sourceIssue: 10,
@@ -80,6 +92,16 @@ test("runNormalization dry-run은 변경 제안 없이 surface별 ambiguous ref�
     ],
   });
   assert.equal(fake.calls.some((args) => args.includes("PATCH")), false);
+});
+
+test("runNormalization은 noncanonical transfer timestamp를 read 전에 거부한다", async () => {
+  const invalidLedger = structuredClone(ledger);
+  invalidLedger.issues[0].transferredAt = "2026-07-31";
+  const fake = fakeGh({ body: "#10", comments: [] });
+  await assert.rejects(() => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger: invalidLedger, execGh: fake.exec }), /transfer timestamp is invalid/);
+  assert.equal(fake.calls.length, 0);
+  const invalidCommentFake = fakeGh({ body: "#10", comments: [{ id: 1, body: "#10", created_at: 0, updated_at: "2026-07-31T08:00:00Z" }] });
+  await assert.rejects(() => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: invalidCommentFake.exec }), /issue comments are invalid/);
 });
 
 test("runNormalization execute는 source ledger 부재와 conditional PATCH 부재 모두 read/write 전에 fail-closed한다", async () => {
