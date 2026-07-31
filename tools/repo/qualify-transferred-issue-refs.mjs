@@ -177,7 +177,8 @@ function urlLengthAt(text, index, linkLabels) {
           const titleWhitespace = whitespaceAt(text, cursor);
           if (titleWhitespace.paragraphBreak || titleWhitespace.blockBreak) return destinationLength;
           cursor += titleWhitespace.length - 1;
-        } else if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; }
+        } else if (titleDelimiter === ")" && text[cursor] === "(") return destinationLength;
+        else if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; }
         continue;
       }
       if (/\s/.test(text[cursor])) {
@@ -207,7 +208,8 @@ function urlLengthAt(text, index, linkLabels) {
             const titleWhitespace = whitespaceAt(text, cursor);
             if (titleWhitespace.paragraphBreak || titleWhitespace.blockBreak) return bareUrlLength;
             cursor += titleWhitespace.length - 1;
-          } else if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; }
+          } else if (titleDelimiter === ")" && text[cursor] === "(") return bareUrlLength;
+          else if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; }
           continue;
         }
         if (/\s/.test(text[cursor])) {

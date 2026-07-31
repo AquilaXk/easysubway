@@ -62,6 +62,8 @@ test("qualifyIssueReferences는 Markdown link 뒤 참조와 backslash escape를 
 
 test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare ref를 숨기지 않는다", () => {
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test extra #10)", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test (see (#10)))", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test> (see (#10)))", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test/a_(bad #10))", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test\n\n\"title #10\")", ledger }), [ambiguous(10)]);
   assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test>\n\n\"title #10\")", ledger }), [ambiguous(10)]);
