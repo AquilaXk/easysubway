@@ -6,7 +6,7 @@ import { parseArguments, qualifyIssueReferences, runNormalization } from "./qual
 
 const ledger = {
   issues: [
-    { sourceIssue: 10, disposition: "TRANSFER", targetRepository: "AquilaXk/easysubway-mobile", targetUrl: "https://github.com/AquilaXk/easysubway-mobile/issues/2" },
+    { sourceIssue: 10, disposition: "TRANSFER", targetRepository: "AquilaXk/easysubway-mobile", targetUrl: "https://github.com/AquilaXk/easysubway-mobile/issues/2", transferredAt: "2026-07-31T09:00:00Z" },
     { sourceIssue: 11, disposition: "KEEP_HUB", targetRepository: "AquilaXk/easysubway", targetUrl: null },
     { sourceIssue: 12, disposition: "TRANSFER", targetRepository: "AquilaXk/easysubway-data", targetUrl: "https://github.com/AquilaXk/easysubway-data/issues/4" },
     { sourceIssue: 13, disposition: "TRANSFER", targetRepository: "AquilaXk/easysubway-backend", targetUrl: "https://github.com/AquilaXk/easysubway-backend/issues/7" },
@@ -21,6 +21,8 @@ test("qualifyIssueReferences는 ledger-matching bare ref만 ambiguity로 보고�
     qualifyIssueReferences({ text: "internal #10, hub #11, data #12, backend #13, existing AquilaXk/easysubway#11", ledger }),
     [ambiguous(10), ambiguous(11), ambiguous(12), ambiguous(13)],
   );
+  assert.deepEqual(qualifyIssueReferences({ text: `#10${" ".repeat(10_000)}#10`, ledger }), [ambiguous(10), ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: `[${"a".repeat(1000)}] plain #10`, ledger }), [ambiguous(10)]);
   assert.deepEqual(
     qualifyIssueReferences({
       text: "retained parent #2605",
@@ -51,6 +53,107 @@ test("qualifyIssueReferences는 더 긴 backtick run 내부를 inline closing fe
   assert.deepEqual(qualifyIssueReferences({ text: "``code ``` #10``", ledger }), []);
 });
 
+test("qualifyIssueReferences는 Markdown link 뒤 참조와 backslash escape를 구분한다", () => {
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test)#10 \\`live #11\\` literal \\#12", ledger }), [ambiguous(10), ambiguous(11)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test> \"title #11\")#10", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test \"title ) #10\") outside #11", ledger }), [ambiguous(11)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test/a_(b)#10) outside #11", ledger }), [ambiguous(11)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test/a_\\)#10) outside #11", ledger }), [ambiguous(11)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "<https://example.test/`tick`#10> outside #11", ledger }), [ambiguous(11)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "\\<https://example.test/`tick`#10>", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: `[${"a".repeat(999)}](https://example.test "title #10") outside #11`, ledger }), [ambiguous(11)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n<3](https://example.test \"title #10\")", ledger }), []);
+  assert.throws(
+    () => qualifyIssueReferences({ text: "[docs](https://example.test \"title\n<script></script>\n#10\")", ledger }),
+    /raw HTML is unsupported/,
+  );
+});
+
+test("qualifyIssueReferences는 유효하지 않은 Markdown link title의 bare ref를 숨기지 않는다", () => {
+  assert.throws(
+    () => qualifyIssueReferences({ text: "[docs](https://host/<bad> \"title #10\")", ledger }),
+    /angle brackets in unbracketed Markdown destinations are unsupported/,
+  );
+  assert.throws(
+    () => qualifyIssueReferences({ text: `[${"a".repeat(1000)}](https://example.test "title #10")`, ledger }),
+    /Markdown link labels longer than 999 characters are unsupported/,
+  );
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test extra #10)", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test (see (#10)))", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test> (see (#10)))", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test/a_(bad #10))", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test\n\n\"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test>\n\n\"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test \"title\n\n#10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test> \"title\n\n#10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](https://example.test \"title #10\" \\!)", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test> \"title #10\" \\!)", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label `code\n\ncontinued`](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n# heading](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\r\n#\r\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\r\rcontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label `code\n# heading`](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n===\ncontinued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  for (const text of [
+    "[outer [inner](https://one.test)](https://two.test \"title #10\")",
+    "[outer [inner](/relative)](https://two.test \"title #10\")",
+    "[outer [inner][ref]](https://two.test \"title #10\")\n\n[ref]: /relative",
+    "[outer [inner](not a valid destination)](https://two.test \"title #10\")",
+    "![outer [inner](https://one.test)](https://two.test \"title #10\")",
+    "\\![outer [inner](https://one.test)](https://two.test \"title #10\")",
+    "[https://[inner](https://three.test)](https://two.test \"title #10\")",
+  ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /nested Markdown labels are unsupported/);
+  for (const autolink of ["https://example.test", "HTTPS://example.test", "foo:bar", "user@example.test"]) {
+    assert.throws(
+      () => qualifyIssueReferences({ text: `[<${autolink}>](https://dest "title #10")`, ledger }),
+      /angle brackets in Markdown labels are unsupported/,
+    );
+  }
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n2. continued](https://example.test \"title #10\")", ledger }), []);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n1.\ncontinued](https://example.test \"title #10\")", ledger }), []);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label\n01. continued](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  for (const text of [
+    "<span data-x=\"[\">label</span>](https://example.test \"title #10\")",
+    "<!-- [ -->](https://example.test \"title #10\")",
+    "<!DOCTYPE [>](https://example.test \"title #10\")",
+    "<?target [?>](https://example.test \"title #10\")",
+    "<![CDATA[[]]>](https://example.test \"title #10\")",
+    "<!-- unterminated #10",
+  ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /raw HTML is unsupported/);
+  assert.deepEqual(qualifyIssueReferences({ text: "Use `<div>` before #10", ledger }), [ambiguous(10)]);
+  for (const text of [
+    "[label | h\n--- | ---\ncontinued](https://example.test \"title #10\") | x",
+    "[label\n--- | ---\ncontinued](https://example.test \"title #10\")",
+    "`h1 | h2\n--- | ---\n#10 | x`",
+    "h1 | h2\n--- | ---\n[label | continued](https://example.test \"title #10\") | x",
+    "[label | h\n| - | -- |\ncontinued](https://example.test \"title #10\")",
+  ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), /GFM table boundaries are unsupported/);
+  assert.deepEqual(qualifyIssueReferences({ text: "paragraph\n\n---\n#10", ledger }), [ambiguous(10)]);
+  assert.throws(
+    () => qualifyIssueReferences({ text: "[docs](<https://example.test<bad> \"title #10\")", ledger }),
+    /raw HTML is unsupported/,
+  );
+});
+
+test("qualifyIssueReferences는 opening label 없는 link-like text의 bare ref를 숨기지 않는다", () => {
+  assert.deepEqual(qualifyIssueReferences({ text: "plain](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "\\](https://example.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[label `]`](https://example.test \"title #10\")", ledger }), []);
+  assert.deepEqual(qualifyIssueReferences({ text: "[prev](https://one.test \"title [\") plain](https://two.test \"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[https://one.test](https://two.test)#10", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[https://one.test`]`](https://two.test)#10", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[https://one.test` code ]`](https://two.test)#10", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[https://one.test\\`](https://two.test)#10", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "unmatched [ https://example.test/?ref=#10", ledger }), []);
+});
+
+test("qualifyIssueReferences는 angle destination 뒤 공백 없는 title의 bare ref를 숨기지 않는다", () => {
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test>\"title #10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test>\"#10\")", ledger }), [ambiguous(10)]);
+  assert.deepEqual(qualifyIssueReferences({ text: "[docs](<https://example.test #10>)", ledger }), []);
+});
+
 test("qualifyIssueReferences는 ledger 밖 또는 미완료 transfer bare ref를 fail-closed한다", () => {
   assert.throws(() => qualifyIssueReferences({ text: "unknown #99", ledger }), /unresolved bare issue reference #99/);
   assert.throws(() => qualifyIssueReferences({ text: "incomplete #14", ledger }), /unresolved bare issue reference #14/);
@@ -60,13 +163,18 @@ test("qualifyIssueReferences는 fenced/inline 미종결과 indented code를 fail
   for (const [text, message] of [
     ["```\n#10", /unterminated fenced/],
     ["`#10", /unterminated inline/],
+    ["[docs](https://example.test \"title", /unterminated Markdown link destination/],
     ["    #10", /indented code/],
     ["\t#10", /indented code/],
   ]) assert.throws(() => qualifyIssueReferences({ text, ledger }), message);
 });
 
 test("runNormalization dry-run은 변경 제안 없이 surface별 ambiguous ref만 보고한다", async () => {
-  const fake = fakeGh({ body: "body #10 and #11", comments: [{ id: 1, body: "comment #12" }, { id: 2, body: "already AquilaXk/easysubway#11" }] });
+  const fake = fakeGh({ body: "body #10 and #11", comments: [
+    { id: 1, body: "comment #12", created_at: "2026-07-31T08:00:00Z", updated_at: "2026-07-31T08:00:00Z" },
+    { id: 2, body: "already AquilaXk/easysubway#11", created_at: "2026-07-31T08:00:00Z", updated_at: "2026-07-31T08:00:00Z" },
+    { id: 3, body: "target-local #99", created_at: "2026-07-31T10:00:00Z", updated_at: "2026-07-31T10:00:00Z" },
+  ] });
   const result = await runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: fake.exec });
   assert.deepEqual(result, {
     sourceIssue: 10,
@@ -80,6 +188,62 @@ test("runNormalization dry-run은 변경 제안 없이 surface별 ambiguous ref�
     ],
   });
   assert.equal(fake.calls.some((args) => args.includes("PATCH")), false);
+});
+
+test("runNormalization은 noncanonical transfer timestamp를 read 전에 거부한다", async () => {
+  const invalidLedger = structuredClone(ledger);
+  invalidLedger.issues[0].transferredAt = "2026-07-31";
+  const fake = fakeGh({ body: "#10", comments: [] });
+  await assert.rejects(() => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger: invalidLedger, execGh: fake.exec }), /transfer timestamp is invalid/);
+  assert.equal(fake.calls.length, 0);
+  const invalidCommentFake = fakeGh({ body: "#10", comments: [{ id: 1, body: "#10", created_at: 0, updated_at: "2026-07-31T08:00:00Z" }] });
+  await assert.rejects(() => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: invalidCommentFake.exec }), /issue comments are invalid/);
+  const fractionalLedger = structuredClone(ledger);
+  fractionalLedger.issues[0].transferredAt = "2026-07-31T09:00:00.1234Z";
+  const fractionalCommentFake = fakeGh({ body: "", comments: [
+    { id: 1, body: "#10", created_at: "2026-07-31T09:00:00.1233Z", updated_at: "2026-07-31T09:00:00.1233Z" },
+    { id: 2, body: "#99", created_at: "2026-07-31T09:00:00.1235Z", updated_at: "2026-07-31T09:00:00.1235Z" },
+  ] });
+  assert.equal((await runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger: fractionalLedger, execGh: fractionalCommentFake.exec })).unresolved.length, 1);
+});
+
+test("runNormalization은 transfer timestamp bucket과 겹치는 comment를 거부한다", async () => {
+  const fractionalLedger = structuredClone(ledger);
+  fractionalLedger.issues[0].transferredAt = "2026-07-31T09:00:00.5Z";
+  const fake = fakeGh({ body: "", comments: [
+    { id: 1, body: "#10", created_at: "2026-07-31T09:00:00Z", updated_at: "2026-07-31T09:00:00Z" },
+  ] });
+  await assert.rejects(
+    () => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger: fractionalLedger, execGh: fake.exec }),
+    /comment timestamp overlaps transfer timestamp/,
+  );
+  const exactFake = fakeGh({ body: "", comments: [
+    { id: 1, body: "#10", created_at: "2026-07-31T09:00:00Z", updated_at: "2026-07-31T09:00:00Z" },
+  ] });
+  await assert.rejects(
+    () => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: exactFake.exec }),
+    /comment timestamp overlaps transfer timestamp/,
+  );
+});
+
+test("runNormalization은 transfer 뒤 수정된 source-era comment를 거부한다", async () => {
+  const fake = fakeGh({ body: "", comments: [
+    { id: 1, body: "#10", created_at: "2026-07-31T08:00:00Z", updated_at: "2026-07-31T10:00:00Z" },
+  ] });
+  await assert.rejects(
+    () => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: fake.exec }),
+    /comment was edited after transfer/,
+  );
+});
+
+test("runNormalization은 transfer 경계 이후 수정된 issue body를 거부한다", async () => {
+  for (const [bodyLastEditedAt, message] of [
+    ["2026-07-31T09:00:00Z", /issue body timestamp overlaps transfer timestamp/],
+    ["2026-07-31T10:00:00Z", /issue body was edited after transfer/],
+  ]) await assert.rejects(
+    () => runNormalization({ arguments_: { sourceIssue: 10, mode: "dry-run", confirmations: {} }, ledger, execGh: fakeGh({ body: "#10", bodyLastEditedAt, comments: [] }).exec }),
+    message,
+  );
 });
 
 test("runNormalization execute는 source ledger 부재와 conditional PATCH 부재 모두 read/write 전에 fail-closed한다", async () => {
@@ -131,14 +295,14 @@ test("CLI direct invocation은 main을 시작한다", async () => {
   );
 });
 
-function fakeGh({ body, comments }) {
-  const state = { body, comments: structuredClone(comments).map((comment) => ({ ...comment, issue_url: "https://api.github.com/repos/AquilaXk/easysubway-mobile/issues/2" })), calls: [] };
+function fakeGh({ body, bodyLastEditedAt = null, comments }) {
+  const state = { body, bodyLastEditedAt, comments: structuredClone(comments).map((comment) => ({ ...comment, issue_url: "https://api.github.com/repos/AquilaXk/easysubway-mobile/issues/2" })), calls: [] };
   return {
     get calls() { return state.calls; },
     async exec(args) {
       state.calls.push(args);
+      if (args.includes("graphql")) return JSON.stringify({ data: { repository: { issue: { body: state.body, lastEditedAt: state.bodyLastEditedAt } } } });
       const endpoint = args.find((argument) => argument.startsWith("repos/"));
-      if (endpoint.endsWith("/issues/2")) return JSON.stringify({ body: state.body });
       if (endpoint.includes("/comments?")) return JSON.stringify([state.comments]);
       throw new Error(`unexpected gh call: ${args.join(" ")}`);
     },

@@ -11,6 +11,11 @@ const execFileAsync = promisify(execFile);
 const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
 const OPENING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})/;
 const CLOSING_FENCE_PATTERN = /^ {0,3}(`{3,}|~{3,})[ \t]*(?:\r?\n)?$/;
+const ANGLE_AUTOLINK_PATTERN = /^<(?:[A-Za-z][A-Za-z0-9+.-]{1,31}:[^<>\u0000-\u0020]*|[^<>\u0000-\u0020@]+@[^<>\u0000-\u0020@]+)>/;
+const ESCAPABLE_PUNCTUATION_PATTERN = /[!"#$%&'()*+,\-./:;<=>?@[\\\]^_`{|}~]/;
+const INTERRUPTING_BLOCK_PATTERN = /^ {0,3}(?:#{1,6}(?:[ \t]|\r?\n|$)|>|[*+-][ \t]+(?=\S)|0{0,8}1[.)][ \t]+(?=\S)|(?:[*_-][ \t]*){3,}(?:\r?\n|$)|(?:=+[ \t]*|-+[ \t]*)(?:\r?\n|$))/;
+const RAW_HTML_OPENER_PATTERN = /<(?:!--|!\[CDATA\[|![A-Z]|\?|\/?[A-Za-z][A-Za-z0-9-]*(?=[ \t\r\n/>]|$))/y;
+const TABLE_DELIMITER_PATTERN = /^ {0,3}(?=[^\r\n]*\|)\|?[ \t]*:?-+:?[ \t]*(?:\|[ \t]*:?-+:?[ \t]*)*\|?[ \t]*(?:\r?\n|$)/;
 
 export function parseArguments(argv) {
   const values = {};
@@ -41,6 +46,7 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
   if (!entry) throw new Error(`source issue #${arguments_?.sourceIssue} is not present in the ledger`);
   const target = transferredReference(entry);
   if (target.repository !== MOBILE_REPOSITORY) throw new Error("target repository must be easysubway-mobile");
+  const transferredAt = parseTimestamp(entry.transferredAt, "transfer timestamp");
   const targetUrl = `https://github.com/${target.repository}/issues/${target.number}`;
   if (arguments_?.mode === "execute") {
     confirmExecution(entry, target, arguments_.confirmations);
@@ -48,13 +54,25 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
   }
   else if (arguments_?.mode !== "dry-run") throw new Error("choose dry-run or execute mode");
 
-  const [body, comments] = await Promise.all([
+  const [issue, comments] = await Promise.all([
     readIssueBody(target.repository, target.number, execGh),
     readIssueComments(target.repository, target.number, execGh),
   ]);
+  if (issue.lastEditedAt !== null) {
+    if (timestampBucketsOverlap(issue.lastEditedAt, transferredAt)) throw new Error("issue body timestamp overlaps transfer timestamp");
+    if (compareTimestamps(issue.lastEditedAt, transferredAt) > 0) throw new Error("issue body was edited after transfer");
+  }
   const unresolved = [
-    ...qualifyIssueReferences({ text: body, ledger }).map((reference) => ({ surface: { kind: "body", id: null }, ...reference })),
-    ...comments.flatMap((comment) => qualifyIssueReferences({ text: comment.body, ledger })
+    ...qualifyIssueReferences({ text: issue.body, ledger }).map((reference) => ({ surface: { kind: "body", id: null }, ...reference })),
+    ...comments.filter((comment) => {
+      if (timestampBucketsOverlap(comment.createdAt, transferredAt)) throw new Error("comment timestamp overlaps transfer timestamp");
+      if (compareTimestamps(comment.createdAt, transferredAt) > 0) return false;
+      if (timestampBucketsOverlap(comment.updatedAt, transferredAt) || compareTimestamps(comment.updatedAt, transferredAt) > 0) {
+        throw new Error("comment was edited after transfer");
+      }
+      return true;
+    })
+      .flatMap((comment) => qualifyIssueReferences({ text: comment.body, ledger })
       .map((reference) => ({ surface: { kind: "comment", id: comment.id }, ...reference }))),
   ];
   const result = {
@@ -69,6 +87,7 @@ export async function runNormalization({ arguments_, ledger, execGh }) {
 
 export function qualifyIssueReferences({ text, ledger }) {
   if (typeof text !== "string") throw new Error("issue text must be a string");
+  text = text.replace(/\r\n?/g, "\n");
   const references = referencesFromLedger(ledger);
   let fenced = null;
   let prose = "";
@@ -93,12 +112,35 @@ export function qualifyIssueReferences({ text, ledger }) {
 }
 
 function qualifyText(text, references) {
+  if (hasTableDelimiter(text, 0, text.length)) throw new Error("GFM table boundaries are unsupported");
   const unresolved = [];
+  const linkLabels = new Set();
+  let labelOpen = false;
+  let labelStart = -1;
   for (let index = 0; index < text.length;) {
-    const urlLength = urlLengthAt(text, index);
+    if (text[index] === "\\" && ESCAPABLE_PUNCTUATION_PATTERN.test(text[index + 1] ?? "")) { index += 2; continue; }
+    if (/\s/.test(text[index])) {
+      const separator = whitespaceAt(text, index);
+      if (separator.paragraphBreak || separator.blockBreak) { labelOpen = false; labelStart = -1; }
+      index += separator.length; continue;
+    }
+    if (labelOpen && ANGLE_AUTOLINK_PATTERN.test(text.slice(index))) {
+      throw new Error("angle brackets in Markdown labels are unsupported");
+    }
+    let urlLength = urlLengthAt(text, index, linkLabels);
+    if (urlLength && labelOpen) {
+      const labelEnd = labelEndWithin(text, index, index + urlLength);
+      if (labelEnd !== -1) urlLength = labelEnd - index;
+    }
     if (urlLength) { index += urlLength; continue; }
     const codeSpanLength = codeSpanLengthAt(text, index);
-    if (codeSpanLength) { index += codeSpanLength; continue; }
+    if (codeSpanLength) {
+      if (/\r?\n[ \t]*\r?\n/.test(text.slice(index, index + codeSpanLength))
+        || hasInterruptingBlock(text, index, index + codeSpanLength)) { labelOpen = false; labelStart = -1; }
+      index += codeSpanLength; continue;
+    }
+    RAW_HTML_OPENER_PATTERN.lastIndex = index;
+    if (text[index] === "<" && RAW_HTML_OPENER_PATTERN.test(text)) throw new Error("raw HTML is unsupported");
     const bareReference = bareReferenceAt(text, index);
     if (bareReference !== null) {
       const reference = references.get(bareReference);
@@ -106,15 +148,163 @@ function qualifyText(text, references) {
       unresolved.push({ reference: bareReference, reason: "bare reference is ambiguous after issue transfer" });
       index += bareReference.toString().length + 1; continue;
     }
+    if (text[index] === "[") {
+      if (labelOpen) throw new Error("nested Markdown labels are unsupported");
+      labelOpen = true;
+      labelStart = index;
+    } else if (text[index] === "]" && labelOpen) {
+      if (text[index + 1] === "(" && Array.from(text.slice(labelStart + 1, index)).length > 999) {
+        throw new Error("Markdown link labels longer than 999 characters are unsupported");
+      }
+      linkLabels.add(index);
+      labelOpen = false;
+      labelStart = -1;
+    }
     index += 1;
   }
   return unresolved;
 }
 
-function urlLengthAt(text, index) {
+function urlLengthAt(text, index, linkLabels) {
   if (!text.startsWith("http://", index) && !text.startsWith("https://", index)) return 0;
-  const end = text.slice(index).search(/\s/);
-  return end === -1 ? text.length - index : end;
+  const bareUrlLength = bareUrlLengthAt(text, index);
+  if (text[index - 1] === "<" && text[index - 2] === "(" && linkLabels.has(index - 3)) {
+    let destinationClosed = false;
+    let destinationLength = 0;
+    let separatorSeen = false;
+    let titleDelimiter = null;
+    let titleClosed = false;
+    for (let cursor = index; cursor < text.length; cursor += 1) {
+      if (text[cursor] === "\\" && ESCAPABLE_PUNCTUATION_PATTERN.test(text[cursor + 1] ?? "")
+        && (!destinationClosed || titleDelimiter !== null)) { cursor += 1; continue; }
+      if (!destinationClosed) {
+        if (text[cursor] === "<") return bareUrlLength;
+        if (text[cursor] === "\r" || text[cursor] === "\n") return cursor - index;
+        if (text[cursor] === ">") { destinationClosed = true; destinationLength = cursor - index; }
+        continue;
+      }
+      if (titleDelimiter !== null) {
+        if (/\s/.test(text[cursor])) {
+          const titleWhitespace = whitespaceAt(text, cursor);
+          if (titleWhitespace.paragraphBreak || titleWhitespace.blockBreak) return destinationLength;
+          cursor += titleWhitespace.length - 1;
+        } else if (titleDelimiter === ")" && text[cursor] === "(") return destinationLength;
+        else if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; }
+        continue;
+      }
+      if (/\s/.test(text[cursor])) {
+        const separator = whitespaceAt(text, cursor);
+        if (separator.paragraphBreak || separator.blockBreak) return destinationLength;
+        cursor += separator.length - 1;
+        separatorSeen = true; continue;
+      }
+      if (!titleClosed && separatorSeen && (text[cursor] === "\"" || text[cursor] === "'")) titleDelimiter = text[cursor];
+      else if (!titleClosed && separatorSeen && text[cursor] === "(") titleDelimiter = ")";
+      else if (text[cursor] === ")") return cursor - index;
+      else return destinationLength;
+    }
+    throw new Error("unterminated Markdown link destination");
+  }
+  if (text[index - 1] === "(" && linkLabels.has(index - 2)) {
+    let depth = 1;
+    let destinationClosed = false;
+    let titleDelimiter = null;
+    let titleClosed = false;
+    for (let cursor = index; cursor < text.length; cursor += 1) {
+      if (text[cursor] === "\\" && ESCAPABLE_PUNCTUATION_PATTERN.test(text[cursor + 1] ?? "")
+        && (!destinationClosed || titleDelimiter !== null)) { cursor += 1; continue; }
+      if (destinationClosed) {
+        if (titleDelimiter !== null) {
+          if (/\s/.test(text[cursor])) {
+            const titleWhitespace = whitespaceAt(text, cursor);
+            if (titleWhitespace.paragraphBreak || titleWhitespace.blockBreak) return bareUrlLength;
+            cursor += titleWhitespace.length - 1;
+          } else if (titleDelimiter === ")" && text[cursor] === "(") return bareUrlLength;
+          else if (text[cursor] === titleDelimiter) { titleDelimiter = null; titleClosed = true; }
+          continue;
+        }
+        if (/\s/.test(text[cursor])) {
+          const separator = whitespaceAt(text, cursor);
+          if (separator.paragraphBreak || separator.blockBreak) return bareUrlLength;
+          cursor += separator.length - 1; continue;
+        }
+        if (!titleClosed && (text[cursor] === "\"" || text[cursor] === "'")) titleDelimiter = text[cursor];
+        else if (!titleClosed && text[cursor] === "(") titleDelimiter = ")";
+        else if (text[cursor] === ")") return cursor - index;
+        else return bareUrlLength;
+      } else if (text[cursor] === "<" || text[cursor] === ">") {
+        throw new Error("angle brackets in unbracketed Markdown destinations are unsupported");
+      } else if (/\s/.test(text[cursor])) {
+        if (depth !== 1) return bareUrlLength;
+        const separator = whitespaceAt(text, cursor);
+        if (separator.paragraphBreak || separator.blockBreak) return bareUrlLength;
+        cursor += separator.length - 1;
+        destinationClosed = true;
+      }
+      else if (text[cursor] === "(") depth += 1;
+      else if (text[cursor] === ")" && --depth === 0) return cursor - index;
+    }
+    throw new Error("unterminated Markdown link destination");
+  }
+  if (text[index - 1] === "<") {
+    let openerBackslashes = 0;
+    for (let cursor = index - 2; text[cursor] === "\\"; cursor -= 1) openerBackslashes += 1;
+    if (openerBackslashes % 2 === 0) {
+      const closingAngle = text.indexOf(">", index);
+      if (closingAngle === -1 || /[\u0000-\u0020<\u007f]/.test(text.slice(index, closingAngle))) throw new Error("invalid angle autolink");
+      return closingAngle - index;
+    }
+  }
+  return bareUrlLength;
+}
+
+function bareUrlLengthAt(text, start) {
+  let backslashes = 0;
+  for (let cursor = start; cursor < text.length; cursor += 1) {
+    if (/\s/.test(text[cursor]) || text[cursor] === "<" || (text[cursor] === "`" && backslashes % 2 === 0)) return cursor - start;
+    backslashes = text[cursor] === "\\" ? backslashes + 1 : 0;
+  }
+  return text.length - start;
+}
+
+function whitespaceAt(text, index) {
+  const whitespace = text.slice(index).match(/^\s*/)[0];
+  return {
+    length: whitespace.length,
+    paragraphBreak: /\r?\n[ \t]*\r?\n/.test(whitespace),
+    blockBreak: hasInterruptingBlock(text, index, index + whitespace.length),
+  };
+}
+
+function hasInterruptingBlock(text, start, end) {
+  const segment = text.slice(start, end);
+  for (let offset = segment.indexOf("\n"); offset !== -1; offset = segment.indexOf("\n", offset + 1)) {
+    const lineStart = start + offset + 1;
+    const lineEnd = text.indexOf("\n", lineStart);
+    const line = text.slice(lineStart, lineEnd === -1 ? text.length : lineEnd + 1);
+    if (INTERRUPTING_BLOCK_PATTERN.test(line)) return true;
+    RAW_HTML_OPENER_PATTERN.lastIndex = line.match(/^ {0,3}/)[0].length;
+    if (RAW_HTML_OPENER_PATTERN.test(line)) return true;
+  }
+  return false;
+}
+
+function hasTableDelimiter(text, start, end) {
+  for (let lineBreak = text.indexOf("\n", start); lineBreak !== -1 && lineBreak < end; lineBreak = text.indexOf("\n", lineBreak + 1)) {
+    if (TABLE_DELIMITER_PATTERN.test(text.slice(lineBreak + 1))) return true;
+  }
+  return false;
+}
+
+function labelEndWithin(text, start, end) {
+  for (let cursor = start; cursor < end; cursor += 1) {
+    if (text[cursor] === "\\" && ESCAPABLE_PUNCTUATION_PATTERN.test(text[cursor + 1] ?? "")) { cursor += 1; continue; }
+    const codeSpanLength = codeSpanLengthAt(text, cursor);
+    if (codeSpanLength) { cursor += codeSpanLength - 1; continue; }
+    if (text[cursor] === "[") throw new Error("nested Markdown labels are unsupported");
+    if (text[cursor] === "]") return cursor;
+  }
+  return -1;
 }
 
 function codeSpanLengthAt(text, index) {
@@ -169,9 +359,15 @@ function confirmExecution(entry, target, confirmations) {
 }
 
 async function readIssueBody(repository, number, execGh) {
-  const issue = JSON.parse(await execGh(["api", `repos/${repository}/issues/${number}`]));
-  if (issue?.body !== null && typeof issue?.body !== "string") throw new Error("issue body is invalid");
-  return issue.body ?? "";
+  const [owner, name] = repository.split("/");
+  const response = JSON.parse(await execGh([
+    "api", "graphql",
+    "-f", "query=query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { issue(number: $number) { body lastEditedAt } } }",
+    "-F", `owner=${owner}`, "-F", `name=${name}`, "-F", `number=${number}`,
+  ]));
+  const issue = response?.data?.repository?.issue;
+  if (typeof issue?.body !== "string" || (issue.lastEditedAt !== null && typeof issue.lastEditedAt !== "string")) throw new Error("issue body is invalid");
+  return { body: issue.body, lastEditedAt: issue.lastEditedAt === null ? null : parseTimestamp(issue.lastEditedAt, "issue body timestamp") };
 }
 
 async function readIssueComments(repository, number, execGh) {
@@ -179,10 +375,52 @@ async function readIssueComments(repository, number, execGh) {
   const comments = pages.flat();
   const issueUrl = `https://api.github.com/repos/${repository}/issues/${number}`;
   if (!Array.isArray(comments) || new Set(comments.map(({ id }) => id)).size !== comments.length
-    || !comments.every(({ id, body, issue_url: commentIssueUrl }) => Number.isInteger(id) && typeof body === "string" && commentIssueUrl === issueUrl)) {
+    || !comments.every(({ id, body, issue_url: commentIssueUrl, created_at: createdAt, updated_at: updatedAt }) => Number.isInteger(id) && typeof body === "string" && commentIssueUrl === issueUrl
+      && validTimestampOrder(createdAt, updatedAt))) {
     throw new Error("issue comments are invalid");
   }
-  return comments;
+  return comments.map(({ id, body, created_at: createdAt, updated_at: updatedAt }) => ({
+    id,
+    body,
+    createdAt: parseTimestamp(createdAt, "comment timestamp"),
+    updatedAt: parseTimestamp(updatedAt, "comment timestamp"),
+  }));
+}
+
+function parseTimestamp(value, label) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z$/.test(value)) throw new Error(`${label} is invalid`);
+  const parsed = Date.parse(value);
+  if (!Number.isFinite(parsed) || new Date(parsed).toISOString().slice(0, 19) !== value.slice(0, 19)) throw new Error(`${label} is invalid`);
+  return value;
+}
+
+function compareTimestamps(left, right) {
+  const [leftSecond, leftFraction = ""] = left.slice(0, -1).split(".");
+  const [rightSecond, rightFraction = ""] = right.slice(0, -1).split(".");
+  if (leftSecond !== rightSecond) return leftSecond < rightSecond ? -1 : 1;
+  const width = Math.max(leftFraction.length, rightFraction.length);
+  const leftPadded = leftFraction.padEnd(width, "0");
+  const rightPadded = rightFraction.padEnd(width, "0");
+  return leftPadded === rightPadded ? 0 : leftPadded < rightPadded ? -1 : 1;
+}
+
+function timestampBucketsOverlap(left, right) {
+  const [leftSecond, leftFraction = ""] = left.slice(0, -1).split(".");
+  const [rightSecond, rightFraction = ""] = right.slice(0, -1).split(".");
+  if (leftSecond !== rightSecond) return false;
+  const width = Math.max(leftFraction.length, rightFraction.length);
+  const start = (fraction) => BigInt(fraction.padEnd(width, "0") || "0");
+  const leftStart = start(leftFraction);
+  const rightStart = start(rightFraction);
+  const leftEnd = leftStart + 10n ** BigInt(width - leftFraction.length);
+  const rightEnd = rightStart + 10n ** BigInt(width - rightFraction.length);
+  return leftStart < rightEnd && rightStart < leftEnd;
+}
+
+function validTimestampOrder(createdAt, updatedAt) {
+  try {
+    return compareTimestamps(parseTimestamp(createdAt, "comment timestamp"), parseTimestamp(updatedAt, "comment timestamp")) <= 0;
+  } catch { return false; }
 }
 
 async function execGh(args) {
