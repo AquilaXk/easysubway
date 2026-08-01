@@ -8,6 +8,7 @@ import { validateAmendments, validateLedger } from "./issue-migration-ledger.mjs
 
 const HUB_REPOSITORY = "AquilaXk/easysubway";
 const HUB_ISSUE_URL_PATTERN = /^https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/[1-9]\d*$/;
+const NOT_FOUND_PATTERN = /\(HTTP 404\)/;
 const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
 const MAX_OPEN_ISSUES = 1000;
 const execFileAsync = promisify(execFile);
@@ -121,11 +122,20 @@ async function readIssueRedirect(sourceIssue, execGh) {
   let output;
   try {
     output = await execGh(["api", `repos/${HUB_REPOSITORY}/issues/${sourceIssue}`, "--jq", ".html_url"]);
-  } catch {
+  } catch (error) {
+    // HTTP 404만 "hub에 그 번호가 없다"는 실측 결과다. 인증·rate limit·네트워크 실패를
+    // 실측값 부재로 흡수하면 일시적 장애가 drift 보고와 구분되지 않으므로 fail closed한다.
+    const detail = String(error?.stderr ?? "").trim();
+    if (!NOT_FOUND_PATTERN.test(detail)) {
+      throw new Error(`#${sourceIssue} redirect 실측 실패: ${detail || String(error?.message ?? error)}`, { cause: error });
+    }
     return null;
   }
   const redirect = typeof output === "string" ? output.trim() : "";
-  return HUB_ISSUE_URL_PATTERN.test(redirect) ? redirect : null;
+  if (!HUB_ISSUE_URL_PATTERN.test(redirect)) {
+    throw new Error(`#${sourceIssue} redirect 응답이 issue URL이 아니다: ${JSON.stringify(redirect)}`);
+  }
+  return redirect;
 }
 
 function hubIssueUrl(sourceIssue) {

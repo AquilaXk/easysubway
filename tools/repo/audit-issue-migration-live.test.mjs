@@ -30,6 +30,14 @@ function liveStateMatchingRecords({ ledger, amendments }) {
   return { openIssueNumbers, redirects };
 }
 
+/** `gh api` 실패는 stderr로만 원인이 구분되므로 execFile 실패 객체 형태를 그대로 흉내낸다. */
+function ghFailure(stderr) {
+  const error = new Error(`Command failed: gh api\n${stderr}`);
+  error.code = 1;
+  error.stderr = stderr;
+  return error;
+}
+
 function fakeGh({ openNumbers, redirectFor }) {
   const calls = [];
   const execGh = async (args) => {
@@ -39,7 +47,8 @@ function fakeGh({ openNumbers, redirectFor }) {
     }
     if (args[0] === "api") {
       const redirect = redirectFor(Number(args[1].split("/").at(-1)));
-      if (redirect === null) throw new Error("gh: Not Found");
+      if (redirect instanceof Error) throw redirect;
+      if (redirect === null) throw ghFailure("gh: Not Found (HTTP 404)\n");
       return `${redirect}\n`;
     }
     throw new Error(`unexpected gh invocation: ${args.join(" ")}`);
@@ -162,14 +171,20 @@ test("live 실측 입력이 불량이면 audit을 진행하지 않는다", () =>
   );
 });
 
-test("live 수집은 읽기 전용 gh 호출만 사용하고 실패한 redirect를 생략한다", async () => {
-  const ledger = {
-    issues: [
-      { sourceIssue: 11, disposition: "KEEP_HUB", targetUrl: null },
-      { sourceIssue: 12, disposition: "TRANSFER", targetUrl: "https://github.com/AquilaXk/easysubway-mobile/issues/9" },
-    ],
+function collectFixture() {
+  return {
+    ledger: {
+      issues: [
+        { sourceIssue: 11, disposition: "KEEP_HUB", targetUrl: null },
+        { sourceIssue: 12, disposition: "TRANSFER", targetUrl: "https://github.com/AquilaXk/easysubway-mobile/issues/9" },
+      ],
+    },
+    amendments: { amendments: [{ sourceIssue: 13, disposition: "KEEP_HUB", targetUrl: null }] },
   };
-  const amendments = { amendments: [{ sourceIssue: 13, disposition: "KEEP_HUB", targetUrl: null }] };
+}
+
+test("live 수집은 읽기 전용 gh 호출만 사용하고 404 redirect를 생략한다", async () => {
+  const { ledger, amendments } = collectFixture();
   const fake = fakeGh({
     openNumbers: [11, 13],
     redirectFor: (number) => (number === 13 ? null : `https://github.com/AquilaXk/easysubway/issues/${number}`),
@@ -197,6 +212,33 @@ test("live 수집은 읽기 전용 gh 호출만 사용하고 실패한 redirect�
     "#12: 기록된 이전 대상 https://github.com/AquilaXk/easysubway-mobile/issues/9와 실측 https://github.com/AquilaXk/easysubway/issues/12 불일치",
     "#13: hub redirect 실측값 없음",
   ]);
+});
+
+test("404 아닌 gh 실패와 issue URL 아닌 응답은 실측값 부재로 흡수하지 않는다", async () => {
+  const failures = [
+    [ghFailure("gh: API rate limit exceeded (HTTP 403)\n"), /#12 redirect 실측 실패: gh: API rate limit exceeded \(HTTP 403\)/],
+    [ghFailure("error connecting to api.github.com\n"), /#12 redirect 실측 실패: error connecting to api\.github\.com/],
+    [ghFailure(""), /#12 redirect 실측 실패: Command failed: gh api/],
+  ];
+
+  for (const [failure, expected] of failures) {
+    const { ledger, amendments } = collectFixture();
+    const fake = fakeGh({
+      openNumbers: [11, 13],
+      redirectFor: (number) => (number === 12 ? failure : `https://github.com/AquilaXk/easysubway/issues/${number}`),
+    });
+    await assert.rejects(() => collectLiveState({ ledger, amendments, execGh: fake.execGh }), expected);
+  }
+
+  const { ledger, amendments } = collectFixture();
+  const malformed = fakeGh({
+    openNumbers: [11, 13],
+    redirectFor: (number) => (number === 12 ? "null" : `https://github.com/AquilaXk/easysubway/issues/${number}`),
+  });
+  await assert.rejects(
+    () => collectLiveState({ ledger, amendments, execGh: malformed.execGh }),
+    /#12 redirect 응답이 issue URL이 아니다: "null"/,
+  );
 });
 
 test("hub open 목록이 잘리면 fail closed한다", async () => {
