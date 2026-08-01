@@ -6,16 +6,16 @@ const ALLOWED_REPOSITORIES = new Set([
   "AquilaXk/easysubway-backend",
   "AquilaXk/easysubway-mobile",
 ]);
-const CHILD_REPOSITORIES = ["AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile"];
 const APPROVAL_URL_PATTERN = new RegExp(
   `^https://github\\.com/${escapeRegExp(HUB_REPOSITORY)}/issues/\\d+#issuecomment-\\d+$`,
 );
 const DISPOSITIONS = new Set(["KEEP_HUB", "TRANSFER", "SPLIT_CHILDREN"]);
+const AMENDMENT_DISPOSITIONS = new Set(["KEEP_HUB", "TRANSFER"]);
 const REVIEWED_GROUPS = [
   {
     disposition: "KEEP_HUB",
     targetRepository: HUB_REPOSITORY,
-    sourceIssues: [1019, 1020, 1022, 1393, 1414, 2050, 2058, 2065, 2126, 2268, 2406, 2526, 2548, 2627, 2674, 2690, 2691],
+    sourceIssues: [1019, 1020, 1022, 1393, 1414, 2050, 2058, 2065, 2126, 2268, 2406, 2526, 2690, 2691],
   },
   {
     disposition: "TRANSFER",
@@ -25,14 +25,25 @@ const REVIEWED_GROUPS = [
   {
     disposition: "TRANSFER",
     targetRepository: "AquilaXk/easysubway-backend",
-    sourceIssues: [2095, 2544, 2545, 2622, 2623, 2624, 2625, 2626, 2667, 2675, 2676, 2677],
+    sourceIssues: [2095, 2524, 2535, 2536, 2537, 2538, 2544, 2545, 2622, 2623, 2624, 2625, 2626, 2667, 2675, 2676, 2677],
   },
   {
     disposition: "TRANSFER",
     targetRepository: "AquilaXk/easysubway-mobile",
-    sourceIssues: [571, 1016, 1021, 1918, 2055, 2524, 2525, 2535, 2536, 2537, 2538, 2539, 2540, 2541, 2542, 2543, 2547, 2586, 2591, 2596, 2600, 2612, 2613, 2617, 2619, 2620, 2621, 2628, 2629, 2630, 2678, 2679, 2680],
+    sourceIssues: [571, 1016, 1021, 1918, 2055, 2525, 2539, 2540, 2541, 2542, 2543, 2547, 2586, 2591, 2596, 2600, 2612, 2613, 2617, 2619, 2620, 2621, 2628, 2629, 2630, 2678, 2679, 2680],
   },
-  { disposition: "SPLIT_CHILDREN", targetRepository: null, sourceIssues: [2605] },
+  {
+    disposition: "SPLIT_CHILDREN",
+    targetRepository: null,
+    childRepositories: ["AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile"],
+    sourceIssues: [2605],
+  },
+  {
+    disposition: "SPLIT_CHILDREN",
+    targetRepository: null,
+    childRepositories: ["AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile"],
+    sourceIssues: [2548, 2627, 2674],
+  },
 ];
 
 export function validateLedger(ledger, { openIssueNumbers, requirePending = false } = {}) {
@@ -44,6 +55,7 @@ export function validateLedger(ledger, { openIssueNumbers, requirePending = fals
   for (const [index, entry] of issues.entries()) {
     const path = `issues[${index}]`;
     const sourceIssue = entry?.sourceIssue;
+    const reviewed = reviewedGroupFor(sourceIssue);
     if (seen.has(sourceIssue)) errors.push(`issues: sourceIssue ${sourceIssue} 중복`);
     seen.add(sourceIssue);
     if (entry?.reason == null || String(entry.reason).trim() === "") errors.push(`${path}.reason: reason이 필요함`);
@@ -62,10 +74,10 @@ export function validateLedger(ledger, { openIssueNumbers, requirePending = fals
     }
     if (entry?.disposition === "SPLIT_CHILDREN") {
       if (entry.targetRepository !== null) errors.push(`${path}.targetRepository: SPLIT_CHILDREN target은 null이어야 함`);
-      if (!sameValues(entry.childRepositories, CHILD_REPOSITORIES)) {
-        errors.push(`${path}.childRepositories: data와 mobile child repository가 정확히 필요함`);
+      if (!sameValues(entry.childRepositories, reviewed?.childRepositories ?? [])) {
+        errors.push(`${path}.childRepositories: frozen reviewed mapping의 child repository가 정확히 필요함`);
       }
-      if (entry.childIssueUrls === undefined) errors.push(`${path}.childIssueUrls: data와 mobile child issue URL이 필요함`);
+      if (entry.childIssueUrls === undefined) errors.push(`${path}.childIssueUrls: child repository별 child issue URL이 필요함`);
       else validateChildIssueUrls(entry.childIssueUrls, entry.childRepositories, `${path}.childIssueUrls`, errors);
     } else if (entry?.childRepositories !== undefined) {
       errors.push(`${path}.childRepositories: SPLIT_CHILDREN에서만 허용됨`);
@@ -73,7 +85,6 @@ export function validateLedger(ledger, { openIssueNumbers, requirePending = fals
     if (entry?.disposition !== "SPLIT_CHILDREN" && entry?.childIssueUrls !== undefined) {
       errors.push(`${path}.childIssueUrls: SPLIT_CHILDREN에서만 허용됨`);
     }
-    const reviewed = reviewedGroupFor(sourceIssue);
     if (reviewed === undefined) errors.push(`${path}: frozen reviewed mapping에 없는 sourceIssue`);
     else if (reviewed.disposition !== entry?.disposition) errors.push(`${path}.disposition: frozen reviewed mapping과 불일치`);
     else if (reviewed.targetRepository !== entry?.targetRepository) errors.push(`${path}.targetRepository: frozen reviewed mapping과 불일치`);
@@ -100,6 +111,49 @@ export function validateLedger(ledger, { openIssueNumbers, requirePending = fals
     const extra = [...seen].filter((number) => !expected.has(number)).sort(numberCompare);
     if (missing.length || extra.length) {
       errors.push(`issues: open issue inventory 불일치 (누락: ${missing.join(", ") || "없음"}; 초과: ${extra.join(", ") || "없음"})`);
+    }
+  }
+  return errors;
+}
+
+/**
+ * snapshot 동결(71건) 이후 생성된 hub issue의 분류 기록을 검증한다.
+ * snapshot은 재캡처하지 않고 amendments가 그 뒤를 이어받는다.
+ */
+export function validateAmendments(amendments, { ledger } = {}) {
+  const entries = amendments?.amendments;
+  if (!Array.isArray(entries)) return ["amendments: 배열 필요"];
+  if (!Array.isArray(ledger?.issues)) return ["amendments: 중복 판정에 snapshot ledger issues가 필요함"];
+
+  const errors = [];
+  const snapshotSourceIssues = new Set(ledger.issues.map(({ sourceIssue }) => sourceIssue));
+  const seen = new Set();
+  for (const [index, entry] of entries.entries()) {
+    const path = `amendments[${index}]`;
+    const sourceIssue = entry?.sourceIssue;
+    if (!Number.isInteger(sourceIssue) || sourceIssue < 1) errors.push(`${path}.sourceIssue: positive integer가 필요함`);
+    if (seen.has(sourceIssue)) errors.push(`amendments: sourceIssue ${sourceIssue} 중복`);
+    seen.add(sourceIssue);
+    if (snapshotSourceIssues.has(sourceIssue)) errors.push(`${path}.sourceIssue: snapshot ledger와 중복`);
+    if (typeof entry?.title !== "string" || entry.title.trim() === "") errors.push(`${path}.title: title이 필요함`);
+    if (entry?.reason == null || String(entry.reason).trim() === "") errors.push(`${path}.reason: reason이 필요함`);
+    if (!isDateTime(entry?.classifiedAt)) errors.push(`${path}.classifiedAt: UTC 시각이 필요함`);
+    if (!AMENDMENT_DISPOSITIONS.has(entry?.disposition)) {
+      errors.push(`${path}.disposition: amendments는 KEEP_HUB과 TRANSFER만 지원함`);
+    } else if (entry.disposition === "KEEP_HUB") {
+      if (entry.targetRepository !== HUB_REPOSITORY) {
+        errors.push(`${path}.targetRepository: KEEP_HUB target은 sourceRepository여야 함`);
+      }
+      if (entry.targetUrl !== null || entry.transferredAt !== null) {
+        errors.push(`${path}.execution: KEEP_HUB은 targetUrl과 transferredAt이 null이어야 함`);
+      }
+    } else {
+      if (!isApprovedTransferTarget(entry.targetRepository)) {
+        errors.push(`${path}.targetRepository: TRANSFER는 approved non-hub target이 필요함`);
+      }
+      if (!isTargetIssueUrl(entry.targetUrl, entry.targetRepository) || !isDateTime(entry.transferredAt)) {
+        errors.push(`${path}.execution: TRANSFER는 targetRepository와 일치하는 targetUrl과 transferredAt이 필요함`);
+      }
     }
   }
   return errors;

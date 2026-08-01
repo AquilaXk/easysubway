@@ -17,6 +17,7 @@ import {
   validateSourceInventory,
   validateSourceGovernanceContracts,
   validateBoundariesPayload,
+  validateRepositorySplitIssueAmendments,
   validateRepositorySplitIssueLedger,
   validateArchitectureDecision,
   validateArchitectureDecisionTransition,
@@ -1143,6 +1144,23 @@ test("repository split issue migration ledger가 계약 gate를 통과한다", (
   const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
 
   assert.deepEqual(errors, []);
+});
+
+test("contract gate는 post-snapshot amendments의 disposition↔lifecycle 결속을 검증한다", () => {
+  const ledger = loadJson("release/migrations/repository-split-issues.json");
+  const amendments = loadJson("release/migrations/repository-split-issues-amendments.json");
+  const keepHubWithTargetUrl = structuredClone(amendments);
+  keepHubWithTargetUrl.amendments[1].targetUrl = "https://github.com/AquilaXk/easysubway-mobile/issues/45";
+  const duplicatedSnapshotIssue = structuredClone(amendments);
+  duplicatedSnapshotIssue.amendments[1].sourceIssue = 2690;
+
+  assert.deepEqual(validateRepositorySplitIssueAmendments(amendments, ledger), []);
+  assert.deepEqual(validateRepositorySplitIssueAmendments(keepHubWithTargetUrl, ledger), [
+    "amendments[1].execution: KEEP_HUB은 targetUrl과 transferredAt이 null이어야 함",
+  ]);
+  assert.deepEqual(validateRepositorySplitIssueAmendments(duplicatedSnapshotIssue, ledger), [
+    "amendments[1].sourceIssue: snapshot ledger와 중복",
+  ]);
 });
 
 test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => {
