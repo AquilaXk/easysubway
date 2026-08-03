@@ -8995,6 +8995,41 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /throw new Error\(`buildSpec\.\$\{field\} must be sha256`\)/);
   assert.match(workflow, /--require-pass/);
   assert.match(workflow, /--verify-only/);
+  const productionStep = (name) => {
+    const marker = `      - name: Data Pack Release / ${name}\n`;
+    const start = workflow.indexOf(marker);
+    assert.notEqual(start, -1, `${name} step must exist`);
+    const end = workflow.indexOf("\n      - name: ", start + marker.length);
+    return { start, text: workflow.slice(start, end === -1 ? workflow.length : end) };
+  };
+  const freshness = productionStep("Validate source snapshot freshness");
+  const candidatePolicy = productionStep("Validate attested production candidate policies");
+  const evidenceValidation = productionStep("Validate release evidence bundle");
+  const publish = productionStep("Publish staged data packs to object storage");
+  assert.ok(
+    freshness.start < candidatePolicy.start
+      && candidatePolicy.start < evidenceValidation.start
+      && evidenceValidation.start < publish.start,
+    "production gates must run freshness → candidate policy → evidence validation → publish",
+  );
+  for (const [name, step] of [
+    ["freshness", freshness],
+    ["candidate policy", candidatePolicy],
+    ["publish", publish],
+  ]) {
+    assert.match(step.text, /if: \$\{\{ steps\.release-mode\.outputs\.mode == 'production-publish'/, `${name} must be production-only`);
+    assert.match(step.text, /set -euo pipefail/, `${name} must propagate failures`);
+  }
+  assert.match(evidenceValidation.text, /if: \$\{\{ steps\.release-mode\.outputs\.is-pointer-only != 'true' \}\}/);
+  assert.match(evidenceValidation.text, /if \[\[ "\$\{EASYSUBWAY_DATAPACK_RELEASE_MODE\}" == "production-publish" \]\]; then/);
+  assert.match(evidenceValidation.text, /set -euo pipefail/, "evidence validation must propagate failures");
+  assert.match(evidenceValidation.text, /--require-pass/, "evidence validation must require PASS");
+  assert.match(publish.text, /--require-pass/, "publish must revalidate PASS evidence");
+  assert.match(freshness.text, /validate-source-snapshot-freshness\.mjs/);
+  assert.match(candidatePolicy.text, /validate-datapack\.mjs/);
+  assert.match(candidatePolicy.text, /--require-production/);
+  assert.match(candidatePolicy.text, /manifest channel must match targetChannel/);
+  assert.match(candidatePolicy.text, /check-manifest-acceptance-floor\.mjs/);
   const nodeTerminatorIndents = workflow
     .split("\n")
     .filter((line) => /^\s*NODE$/.test(line))

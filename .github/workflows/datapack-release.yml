@@ -532,9 +532,15 @@ jobs:
           promotion_root="${RUNNER_TEMP}/downloaded-promotion"
           shopt -s dotglob nullglob
           promotion_entries=("${promotion_root}"/*)
-          [[ "${#promotion_entries[@]}" == 4 ]]
+          if [[ "${#promotion_entries[@]}" -ne 4 ]]; then
+            echo "production promotion artifact must contain exactly four files" >&2
+            exit 1
+          fi
           for name in promotion-request.json promotion-approvals.json compatibility-evidence.json rebuild-parity-evidence.json; do
-            [[ -f "${promotion_root}/${name}" && ! -L "${promotion_root}/${name}" && -s "${promotion_root}/${name}" ]]
+            if ! [[ -f "${promotion_root}/${name}" && ! -L "${promotion_root}/${name}" && -s "${promotion_root}/${name}" ]]; then
+              echo "production promotion artifact has an invalid required file: ${name}" >&2
+              exit 1
+            fi
           done
           gh attestation verify "${promotion_root}/promotion-request.json" --repo "${GITHUB_REPOSITORY}" --signer-workflow "AquilaXk/easysubway/.github/workflows/datapack-promotion.yml" --source-ref refs/heads/main --deny-self-hosted-runners
           node tools/release/validate-promotion-request.mjs --request "${promotion_root}/promotion-request.json" --component "${candidate_root}/data-component-manifest.json" --inventory "${candidate_root}/data-artifact-inventory.json" --compatibility-evidence "${promotion_root}/compatibility-evidence.json" --approval-evidence "${promotion_root}/promotion-approvals.json" --rebuild-parity-evidence "${promotion_root}/rebuild-parity-evidence.json" --workflow-run-id "${EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID}"

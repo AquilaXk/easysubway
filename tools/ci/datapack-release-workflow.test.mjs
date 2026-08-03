@@ -726,9 +726,15 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
   assert.match(verify, /validate-promotion-request\.mjs/);
   assert.match(verify, /--workflow-run-id "\$\{EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID\}"/);
   assert.match(verify, /--rebuild-parity-evidence "\$\{promotion_root\}\/rebuild-parity-evidence\.json"/);
-  assert.match(verify, /promotion_entries.*== 4/);
+  assert.match(
+    verify,
+    /if \[\[ "\$\{#promotion_entries\[@\]\}" -ne 4 \]\]; then\s+echo "production promotion artifact must contain exactly four files" >&2\s+exit 1\s+fi/,
+  );
   assert.match(verify, /for name in promotion-request\.json promotion-approvals\.json compatibility-evidence\.json rebuild-parity-evidence\.json; do/);
-  assert.match(verify, /\[\[ -f "\$\{promotion_root\}\/\$\{name\}" && ! -L "\$\{promotion_root\}\/\$\{name\}" && -s "\$\{promotion_root\}\/\$\{name\}" \]\]/);
+  assert.match(
+    verify,
+    /if ! \[\[ -f "\$\{promotion_root\}\/\$\{name\}" && ! -L "\$\{promotion_root\}\/\$\{name\}" && -s "\$\{promotion_root\}\/\$\{name\}" \]\]; then\s+echo "production promotion artifact has an invalid required file: \$\{name\}" >&2\s+exit 1\s+fi/,
+  );
   assert.doesNotMatch(verify, /build-data-component-manifest\.mjs/);
   assert.doesNotMatch(verify, /candidate-original-component-manifest/);
   const stage = step("Data Pack Release / Stage verified candidate artifact");
