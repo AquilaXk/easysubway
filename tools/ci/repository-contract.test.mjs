@@ -881,6 +881,7 @@ function assertActionsEnvSecretPolicy(file, source) {
       "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
     ]),
     ".github/workflows/datapack-release.yml": new Set([
+      "EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN",
       "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
       "EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM",
       "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
@@ -890,10 +891,12 @@ function assertActionsEnvSecretPolicy(file, source) {
       "KRIC_SERVICE_KEY",
     ]),
     ".github/workflows/datapack-promotion.yml": new Set([
+      "EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN",
       "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
       "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
     ]),
     ".github/workflows/release-artifacts.yml": new Set([
+      "EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN",
       "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
       "EASYSUBWAY_ANDROID_STORE_PASSWORD",
       "EASYSUBWAY_ANDROID_KEY_ALIAS",
@@ -1883,6 +1886,8 @@ test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관�
   const script = read("scripts/github/sync-actions-env-secret.sh");
   const cdWorkflow = read(".github/workflows/cd.yml");
   const datapackReleaseWorkflow = read(".github/workflows/datapack-release.yml");
+  const datapackPromotionWorkflow = read(".github/workflows/datapack-promotion.yml");
+  const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
 
   assert.match(script, /readonly SECRET_NAME="EASYSUBWAY_ENV"/);
   assert.doesNotMatch(script, /EASYSUBWAY_ACTIONS_ENV_SECRET_NAME/);
@@ -1899,6 +1904,9 @@ test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관�
   assert.match(datapackReleaseWorkflow, /KRIC_SERVICE_KEY_SECRET: \$\{\{ secrets\.KRIC_SERVICE_KEY \}\}/);
   assert.match(datapackReleaseWorkflow, /!\(\$1 in drop\)/);
   assert.match(datapackReleaseWorkflow, /tail -c 1 "\$\{env_file\}"/);
+  assert.match(datapackReleaseWorkflow, /secrets\.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN/);
+  assert.match(datapackPromotionWorkflow, /secrets\.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN/);
+  assert.match(releaseArtifactsWorkflow, /secrets\.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN/);
   assert.match(cdWorkflow, /tools\/ci\/validate-deployment-env\.sh "\$\{EASYSUBWAY_ENV_FILE\}"/);
 
   for (const file of workflowFiles()) {
