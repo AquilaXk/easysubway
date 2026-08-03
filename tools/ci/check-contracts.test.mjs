@@ -228,6 +228,9 @@ test("문서 거버넌스 계약은 workspace gate와 required CI에서 base rev
       { architectureDecision: "../documentation/ADR-HUB-0001.json" },
       { architectureDecision: "../documentation/ADR-HUB-0002.json" },
     ).some((error) => error.includes("path redirect")));
+    const validatorSource = readFileSync("tools/ci/check-contracts.mjs", "utf8");
+    assert.doesNotMatch(validatorSource, /execFileSync\("git"/);
+    assert.match(validatorSource, /execFileSync\("\/usr\/bin\/git"/);
     assert.match(readFileSync(".github/workflows/ci.yml", "utf8"),
       /check-contracts\.mjs --workspace contracts\/workspaces\/hub\.json --base-ref/);
   } finally {

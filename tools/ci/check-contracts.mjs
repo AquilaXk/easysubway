@@ -268,9 +268,9 @@ export function loadArchitectureDecisionAtRef(workspacePath, baseRef) {
   if (workspaceRepositoryPath.startsWith("..") || workspaceRepositoryPath === "") {
     throw new Error("base-ref workspace 경로는 repository 내부여야 한다");
   }
-  execFileSync("git", ["rev-parse", "--verify", `${baseRef}^{commit}`], { stdio: "ignore" });
+  execFileSync("/usr/bin/git", ["rev-parse", "--verify", `${baseRef}^{commit}`], { stdio: "ignore" });
   const loadAtRef = (repositoryPath, required) => {
-    const found = execFileSync("git", ["ls-tree", "--name-only", baseRef, "--", repositoryPath], {
+    const found = execFileSync("/usr/bin/git", ["ls-tree", "--name-only", baseRef, "--", repositoryPath], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     }).trim();
@@ -278,7 +278,7 @@ export function loadArchitectureDecisionAtRef(workspacePath, baseRef) {
       if (!required) return null;
       throw new Error(`${baseRef}:${repositoryPath} 누락`);
     }
-    const raw = execFileSync("git", ["show", `${baseRef}:${repositoryPath}`], {
+    const raw = execFileSync("/usr/bin/git", ["show", `${baseRef}:${repositoryPath}`], {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"],
     });
