@@ -38,7 +38,9 @@ function createExternalWorkspace() {
     sourceInventory: "inputs/source-inventory.json",
     governancePolicy: "inputs/governance-policy.json",
     freshnessPolicy: "inputs/freshness-policy.json",
+    architectureDecision: "inputs/architecture-decision.json",
   }));
+  copy("contracts/documentation/ADR-HUB-0001.json", "inputs/architecture-decision.json");
   return { directory, workspacePath };
 }
 
@@ -104,6 +106,59 @@ test("repository split issue migration ledger가 계약 gate를 통과한다", (
   const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
 
   assert.deepEqual(errors, []);
+});
+
+test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => {
+  const errors = [];
+
+  assert.equal(validateJson(
+    "contracts/documentation/architecture-decision.schema.json",
+    "contracts/documentation/ADR-HUB-0001.json",
+    errors,
+  ), true);
+  assert.deepEqual(errors, []);
+});
+
+test("문서 거버넌스 계약은 대표적인 ADR 계약 위반을 거부한다", () => {
+  const directory = mkdtempSync(join(tmpdir(), "architecture-decision-contract-"));
+  try {
+    const schemaPath = "contracts/documentation/architecture-decision.schema.json";
+    const valid = loadJson("contracts/documentation/ADR-HUB-0001.json");
+    for (const [name, mutate] of [
+      ["invalid-id", (adr) => { adr.id = "ADR-DATA-0001"; }],
+      ["missing-owner", (adr) => { delete adr.owner; }],
+      ["owner-prefix-mismatch", (adr) => { adr.owner.repository = "AquilaXk/easysubway-data"; }],
+      ["invalid-status", (adr) => { adr.status = "implemented"; }],
+      ["missing-decision", (adr) => { delete adr.decision; }],
+    ]) {
+      const candidate = structuredClone(valid);
+      mutate(candidate);
+      const candidatePath = join(directory, `${name}.json`);
+      writeFileSync(candidatePath, JSON.stringify(candidate));
+      const errors = [];
+
+      assert.equal(validateJson(schemaPath, candidatePath, errors), false, name);
+      assert.ok(errors.length > 0, `${name} 오류가 필요하다`);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 workspace가 지정한 잘못된 ADR을 contract gate에서 거부한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const decisionPath = join(directory, "inputs/architecture-decision.json");
+    const decision = loadJson(decisionPath);
+    delete decision.decision;
+    writeFileSync(decisionPath, JSON.stringify(decision));
+
+    assert.ok(collectContractErrors(workspacePath).some((error) => (
+      error.includes("architecture-decision.json: $.decision: 필수 필드 누락")
+    )));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("contract gate의 ledger semantic path는 valid APPROVED와 TRANSFERRED를 허용한다", () => {

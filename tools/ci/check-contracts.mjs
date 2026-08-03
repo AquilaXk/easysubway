@@ -31,7 +31,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
   if (workspace == null || typeof workspace !== "object" || Array.isArray(workspace)) {
     throw new Error(`${workspacePath}: 객체가 필요하다`);
   }
-  const required = ["contracts", "gateDirectories", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy"];
+  const required = ["contracts", "gateDirectories", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision"];
   for (const field of required) {
     if (!Object.hasOwn(workspace, field)) throw new Error(`${workspacePath}: ${field} 필수`);
   }
@@ -43,7 +43,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
       throw new Error(`${workspacePath}: gateDirectories.${ownerComponent} 필수`);
     }
   }
-  for (const field of ["contracts", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy"]) {
+  for (const field of ["contracts", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision"]) {
     if (typeof workspace[field] !== "string" || workspace[field].trim() === "") {
       throw new Error(`${workspacePath}: ${field}은 비어 있지 않은 경로가 필요하다`);
     }
@@ -59,6 +59,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     sourceInventory: resolveWorkspacePath(workspace.sourceInventory),
     governancePolicy: resolveWorkspacePath(workspace.governancePolicy),
     freshnessPolicy: resolveWorkspacePath(workspace.freshnessPolicy),
+    architectureDecision: resolveWorkspacePath(workspace.architectureDecision),
   };
 }
 
@@ -92,6 +93,11 @@ export function collectContractErrors(workspacePath = DEFAULT_WORKSPACE_PATH) {
   validateJson(
     contract("datapack/pack-app-schema-parity-allowlist.schema.json"),
     contract("datapack/pack-app-schema-parity-allowlist.json"),
+    errors,
+  );
+  validateJson(
+    contract("documentation/architecture-decision.schema.json"),
+    workspace.architectureDecision,
     errors,
   );
   validateJson(contract("datapack/catalog-raw-sql-tables.schema.json"), contract("datapack/catalog-raw-sql-tables.json"), errors);
