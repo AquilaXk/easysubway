@@ -418,7 +418,10 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       "tools/datapack/build-datapack.mjs",
       "--build-spec", earlySpecPath,
       "--output", earlyOutputDir,
-    ], { cwd: root, env });
+    ], {
+      cwd: root,
+      env: { ...env, EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-31T23:59:59.000Z" },
+    });
     const earlyManifest = JSON.parse(await readFile(path.join(earlyOutputDir, "current.json"), "utf8"));
     assert.equal(earlyManifest.expiresAt, "2026-08-01T00:00:00.000Z");
 
