@@ -738,6 +738,7 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
   assert.doesNotMatch(verify, /build-data-component-manifest\.mjs/);
   assert.doesNotMatch(verify, /candidate-original-component-manifest/);
   const stage = step("Data Pack Release / Stage verified candidate artifact");
+  assert.match(stage, /set -euo pipefail/);
   assert.match(stage, /verify-promotion-candidate-root\.mjs/);
   assert.match(stage, /EASYSUBWAY_ENV_FILE: ""/);
   assert.match(stage, /EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: ""/);
@@ -746,6 +747,7 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
   assert.doesNotMatch(stage, /node --env-file/);
   assert.match(stage, /--workflow-run-id "\$\{EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID\}"/);
   assert.match(stage, /--git-sha "\$\{CANDIDATE_HEAD_SHA\}"/);
+  assert.match(stage, /--build-spec "\$\{EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH\}"/);
   assert.ok(stage.indexOf("verify-promotion-candidate-root.mjs") < stage.indexOf("cp -a"));
   assert.match(stage, /cp -a "\$\{RUNNER_TEMP\}\/downloaded-candidate\/\." "\$\{EASYSUBWAY_DATAPACK_STAGE\}\//);
 

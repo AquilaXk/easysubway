@@ -8,6 +8,7 @@ import test from "node:test";
 import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
 
 const script = path.resolve("tools/release/build-promotion-request.mjs");
+const candidateVerifier = path.resolve("tools/release/verify-promotion-candidate-root.mjs");
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const signingPublicKey = publicKey.export({ type: "spki", format: "pem" });
@@ -99,6 +100,24 @@ test("candidate signature validation key가 없으면 fail closed한다", () => 
     } finally {
       fixture.cleanup();
     }
+  }
+});
+
+test("standalone candidate verifier는 approved build spec source snapshot set에 결속한다", () => {
+  const fixture = createFixture();
+  try {
+    const approvedSpec = file(fixture.root, "approved-build-spec.json", JSON.stringify({
+      sourceSnapshotSetHash: "c".repeat(64),
+    }));
+    assert.equal(runCandidateVerifier(fixture, approvedSpec).status, 0);
+    const differentSpec = file(fixture.root, "different-build-spec.json", JSON.stringify({
+      sourceSnapshotSetHash: "d".repeat(64),
+    }));
+    const result = runCandidateVerifier(fixture, differentSpec);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /candidate source snapshot set hash does not match build spec/);
+  } finally {
+    fixture.cleanup();
   }
 });
 
@@ -307,4 +326,21 @@ function run(fixture, env = {}) {
     "--issue-ref", "AquilaXk/easysubway#2705", "--rebuild-parity-evidence-output", fixture.evidenceOutput,
     "--output", fixture.output,
   ], { encoding: "utf8", env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: signingPublicKey, EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: "production-v1", ...env } });
+}
+
+function runCandidateVerifier(fixture, buildSpec) {
+  return spawnSync(process.execPath, [
+    candidateVerifier,
+    "--root", fixture.roots[0],
+    "--workflow-run-id", fixture.candidateWorkflowRunIds[0],
+    "--git-sha", fixture.candidateHeadShas[0],
+    "--build-spec", buildSpec,
+  ], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: signingPublicKey,
+      EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: "production-v1",
+    },
+  });
 }

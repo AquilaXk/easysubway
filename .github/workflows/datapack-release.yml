@@ -558,7 +558,8 @@ jobs:
           node tools/release/verify-promotion-candidate-root.mjs \
             --root "${RUNNER_TEMP}/downloaded-candidate" \
             --workflow-run-id "${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}" \
-            --git-sha "${CANDIDATE_HEAD_SHA}"
+            --git-sha "${CANDIDATE_HEAD_SHA}" \
+            --build-spec "${EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH}"
           cp -a "${RUNNER_TEMP}/downloaded-candidate/." "${EASYSUBWAY_DATAPACK_STAGE}/"
 
       - name: Data Pack Release / Validate attested production candidate policies
