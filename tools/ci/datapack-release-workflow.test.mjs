@@ -64,7 +64,7 @@ test("production-publish는 파일 전용 release request 입력과 !cancelled()
   assert.match(yml, /manifestSha256/);
   // 콜백 조건은 production-publish 스텝 출력 기준이어야 한다 — 비-production 모드에선 빈값
   assert.match(yml, /steps\.production-publish\.outputs\.manifestSha256/);
-  // evidence-bundle 출력을 콜백 게이트로 사용하면 release-candidate에서도 발사 → 금지
+  // evidence-bundle 출력은 production publish 결과가 아니므로 콜백 게이트로 사용 금지
   assert.doesNotMatch(yml, /steps\.evidence-bundle\.outputs\.manifestSha256/);
 });
 
@@ -292,23 +292,14 @@ test("NO_CHANGE_VALID 재실행은 current manifest binding과 callback을 복�
   assert.match(noChangeValidationGate, /exit 1/);
 });
 
-test("coverage gap 스텝은 release 모드에서만 production provenance와 release-scope를 배선한다", () => {
-  // release-scope 게이트는 게시 범위(pilot region/operator × capitalPilotTargets domains) 내 gap만 차단한다(#1999).
-  assert.match(yml, /--release-scope release\/product-gates\/production-datapack-scope\.json/);
-  // release 모드에서만 production manifest/provenance와 --release-scope를 붙인다.
-  // exploratory fixture는 inventory 기준으로 전량 MISSING을 기록하며 --allow-gaps로 통과해야 한다.
-  assert.match(
-    yml,
-    /EASYSUBWAY_DATAPACK_RELEASE_MODE\}" =~ \^\(release-candidate\|production-publish\)\$ \]\]; then\s*\n\s*coverage_args\+=\(\s*--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"\s*--provenance "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.provenance\.json"\s*--release-scope/,
-  );
+test("exploratory coverage gap 스텝은 production provenance를 배선하지 않는다", () => {
+  // production-publish는 attested data-repo candidate를 소비하므로 Hub exploratory fixture를 승격하지 않는다.
   // 전국 gap 산출은 유지 — nationwide-coverage-targets.json을 계속 targets로 쓴다.
   assert.match(yml, /--targets tools\/datapack\/nationwide-coverage-targets\.json/);
   const coverageStep = yml.match(/- name: Data Pack Release \/ Write coverage gap evidence[\s\S]*?\n\s+- name:/)?.[0];
   assert.ok(coverageStep, "coverage gap evidence 스텝을 찾지 못함");
-  const baseArgs = coverageStep.match(/coverage_args=\([\s\S]*?\n\s*\)/)?.[0];
-  assert.ok(baseArgs, "coverage_args 기본 배열을 찾지 못함");
-  assert.doesNotMatch(baseArgs, /--manifest|--provenance|--release-scope/);
-  // release 모드 --allow-gaps 금지 로직은 불변이어야 한다.
+  assert.doesNotMatch(coverageStep, /--manifest|--provenance|--release-scope/);
+  // production-publish --allow-gaps 금지 로직은 불변이어야 한다.
   assert.match(yml, /release mode cannot use --allow-gaps/);
 });
 
@@ -545,17 +536,8 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   const releaseArtifacts = readFileSync(path.join(root, ".github/workflows/release-artifacts.yml"), "utf8");
   const promotionBuilder = readFileSync(path.join(root, "tools/release/build-promotion-request.mjs"), "utf8");
 
-  assert.match(yml, /build-data-component-manifest\.mjs/);
-  assert.match(yml, /easysubway-datapack-candidate-\$\{\{ github\.run_id \}\}/);
-  assert.match(yml, /current\.provenance\.json/);
-  assert.match(yml, /--inventory-output "\$\{EASYSUBWAY_DATAPACK_STAGE\}\/data-artifact-inventory\.json"/);
-  assert.match(yml, /--output "\$\{EASYSUBWAY_DATAPACK_STAGE\}\/data-component-manifest\.json"/);
-  const candidateUpload = yml.match(
-    /- name: Data Pack Release \/ Upload candidate promotion artifact[\s\S]*?\n\s+- name:/,
-  )?.[0];
-  assert.ok(candidateUpload, "candidate promotion artifact upload 스텝을 찾지 못함");
-  assert.match(candidateUpload, /path:\s*\$\{\{ env\.EASYSUBWAY_DATAPACK_STAGE \}\}/);
-  assert.doesNotMatch(candidateUpload, /candidate-component|candidate-inventory|data-component-manifest|data-artifact-inventory/);
+  assert.doesNotMatch(yml, /release-candidate|build-data-component-manifest\.mjs|easysubway-datapack-candidate-\$\{\{ github\.run_id \}\}/);
+  assert.doesNotMatch(yml, /Data Pack Release \/ (Build candidate promotion metadata|Upload candidate promotion artifact|Restore candidate signing credentials|Restore candidate source API credentials)/);
 
   assert.deepEqual([...workflowDispatchInputNames(promotion)].sort(), [
     "candidateRunId", "compatibilityEvidenceArtifactName", "compatibilityEvidenceRunId", "issueRef",
@@ -767,19 +749,14 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
   assert.match(publishPlan, /cmp -s "\$\{candidate_publish_plan\}" "\$\{EASYSUBWAY_DATAPACK_PUBLISH_PLAN\}"/);
   assert.match(publishPlan, /--output "\$\{candidate_publish_plan\}"/);
 
-  const signing = step("Data Pack Release / Restore candidate signing credentials");
-  assert.match(signing, /if:\s*\$\{\{ steps\.release-mode\.outputs\.mode == 'release-candidate' \}\}/);
-  const signingSecrets = [...signing.matchAll(/secrets\.([A-Z0-9_]+)/g)].map((match) => match[1]).sort();
-  assert.ok(signingSecrets.includes("EASYSUBWAY_DATAPACK_SIGNING_KEY_ID"));
-  assert.ok(signingSecrets.includes("EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM"));
-  assert.doesNotMatch(signing, /EASYSUBWAY_ENV|OBJECT_STORAGE/);
-  assert.match(signing, /::add-mask::/);
-  assert.match(signing, /printf '%s<<%s/);
-
   const dotenv = step("Data Pack Release / Restore GitHub Actions dotenv secret");
-  assert.match(dotenv, /mode != 'release-candidate'/);
+  assert.match(dotenv, /mode == 'production-publish'.*mode == 'rollback'.*mode == 'rollout-update'/);
   const remotePublish = step("Data Pack Release / Validate remote object storage publish env");
-  assert.match(remotePublish, /mode != 'release-candidate'/);
+  assert.match(remotePublish, /mode == 'production-publish'.*mode == 'rollback'.*mode == 'rollout-update'/);
+  const requireReleaseEnv = step("Data Pack Release / Require release operation environment");
+  assert.match(requireReleaseEnv, /mode == 'production-publish'.*mode == 'rollback'.*mode == 'rollout-update'/);
+  assert.match(requireReleaseEnv, /REMOTE_PUBLISH_ENABLED: \$\{\{ steps\.remote-publish-env\.outputs\.enabled \}\}/);
+  assert.match(requireReleaseEnv, /REMOTE_PUBLISH_ENABLED\}" != "true"[\s\S]*?exit 1/);
 
   for (const name of [
     "Data Pack Release / Prepare release fixture",
@@ -803,13 +780,8 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
     provenance,
     /if:\s*\$\{\{ steps\.release-mode\.outputs\.is-pointer-only != 'true' && steps\.release-mode\.outputs\.mode != 'production-publish' \}\}/,
   );
-  assert.match(step("Data Pack Release / Validate source snapshot freshness"), /mode == 'release-candidate'/);
-  const accessibility = step("Data Pack Release / Validate accessibility source coverage");
-  assert.match(accessibility, /mode == 'release-candidate'/);
-  assert.match(accessibility, /--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"/);
-  assert.match(accessibility, /--manifest-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"/);
-  assert.match(accessibility, /--bundled-index "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"/);
-  assert.match(accessibility, /--bundled-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"/);
+  assert.match(step("Data Pack Release / Validate source snapshot freshness"), /mode == 'production-publish'/);
+  assert.doesNotMatch(yml, /Data Pack Release \/ Validate accessibility source coverage/);
   assert.ok(yml.indexOf("Data Pack Release / Build data packs") < yml.indexOf("Data Pack Release / Stage candidate provenance"));
   assert.ok(yml.indexOf("Data Pack Release / Stage candidate provenance") < yml.indexOf("Data Pack Release / Validate release evidence bundle"));
   assert.doesNotMatch(yml, /apps\/mobile/);

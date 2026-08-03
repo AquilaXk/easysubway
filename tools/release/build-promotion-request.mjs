@@ -115,6 +115,7 @@ export async function verifyPromotionCandidateRoot(root, label, expectedWorkflow
   const actualEntries = await actualInventory(root);
   const declaredPackPaths = new Set(manifest.packs.map(stagedPackPath));
   const actualPackPaths = new Set(actualEntries.filter((entry) => entry.path.endsWith(".sqlite.gz")).map((entry) => entry.path));
+  const actualEntriesByPath = new Map(actualEntries.map((entry) => [entry.path, entry]));
   validatePromotionCandidate(component);
   validateInventory(inventory);
   if (!positiveDecimal(expectedWorkflowRunId) || !/^[a-f0-9]{40}$/.test(expectedGitSha)
@@ -127,6 +128,10 @@ export async function verifyPromotionCandidateRoot(root, label, expectedWorkflow
     || !/^[a-f0-9]{64}$/.test(provenance?.candidateBuild?.sourceSnapshotSetHash ?? "")
     || declaredPackPaths.size !== actualPackPaths.size
     || ![...declaredPackPaths].every((packPath) => actualPackPaths.has(packPath))
+    || !manifest.packs.every((pack) => {
+      const entry = actualEntriesByPath.get(stagedPackPath(pack));
+      return entry?.sizeBytes === pack.sizeBytes && entry.sha256 === pack.sha256;
+    })
     || !isSameInventory(inventory.entries, actualEntries)) {
     throw new Error("candidate inventory is invalid");
   }

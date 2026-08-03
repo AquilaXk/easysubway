@@ -118,6 +118,17 @@ test("manifest declared pack 누락과 undeclared sqlite pack을 fail closed한�
   }
 });
 
+test("signed manifest와 다른 declared pack bytes를 fail closed한다", () => {
+  const fixture = createFixture();
+  try {
+    fixture.roots.forEach((root) => file(root, "catalog/capital-v1.sqlite.gz", "replaced"));
+    refreshCandidateMetadata(fixture);
+    assert.notEqual(run(fixture).status, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("duplicate candidate run IDs는 identity 검증 뒤 parity set에서 거부한다", () => {
   const fixture = createFixture();
   try {
@@ -173,7 +184,7 @@ function createFixture() {
     file(candidateRoot, "catalog/capital-v1.sqlite.gz", "pack");
     const provenance = { schemaVersion: 1, artifactKind: "datapack-field-provenance", candidateBuild: { sourceSnapshotSetHash: "c".repeat(64) } };
     file(candidateRoot, "current.provenance.json", JSON.stringify(provenance));
-    const manifestBytes = Buffer.from(JSON.stringify(productionManifest()));
+    const manifestBytes = Buffer.from(JSON.stringify(productionManifest(readFileSync(path.join(candidateRoot, "catalog/capital-v1.sqlite.gz")))));
     file(candidateRoot, "catalog/current.json", manifestBytes);
     const inventoryBytes = Buffer.from(JSON.stringify(inventoryValue(candidateRoot)));
     const component = componentValue(workflowRunId, sha256(inventoryBytes), sha256(manifestBytes));
@@ -250,14 +261,14 @@ function componentValue(workflowRunId, artifactInventorySha256, manifestSha256) 
   };
 }
 
-function productionManifest() {
+function productionManifest(packBytes) {
   const manifest = {
     manifestVersion: 2, channel: "production", releaseSequence: 1,
     publishedAt: "2026-07-30T00:00:00.000Z", expiresAt: "2026-08-01T00:00:00.000Z",
     keyId: "production-v1", ttlSeconds: 3600, activePack: { id: "capital", version: "1" },
     packs: [{
       id: "capital", version: "1", artifactKind: "production", url: "https://datapack.example.org/catalog/capital-v1.sqlite.gz",
-      sha256: "a".repeat(64), sqliteSha256: "b".repeat(64), sizeBytes: 1,
+      sha256: sha256(packBytes), sqliteSha256: "b".repeat(64), sizeBytes: packBytes.length,
       signature: { algorithm: "rsa-sha256-pack-manifest-v2", value: "x" }, schemaVersion: "1",
       sourceInventory: [{ id: "source", owner: "owner", url: "https://data.example.org/source", license: "open", licenseStatus: "redistributable", redistributionAllowed: true, updateFrequency: "daily", updatedAt: "2026-07-30T00:00:00.000Z", fields: ["stations"], coverageScope: { regionIds: ["capital"], operatorIds: ["operator"], sourceDomains: ["data.example.org"] } }],
       regionalQualityMetrics: { stationCount: 1, edgeCount: 1, facilityCoverageRatio: 1, requiredFacilityEvidenceCoverageRatio: 1, strictRouteEligibleFacilityRatio: 1, operationalKnownRatio: 1, freshnessValidRatio: 1, fieldVerifiedPathwayRatio: 1, unknownAccessibilityRatio: 0, unknownEdgeRatioByProfile: { wheelchair: 0, stroller: 0, lowMobility: 0 } },
