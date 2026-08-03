@@ -515,12 +515,18 @@ jobs:
           GH_TOKEN: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
         run: |
           set -euo pipefail
-          [[ "${CANDIDATE_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
+          if ! [[ "${CANDIDATE_RUN_ID}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "production candidate run ID must be a positive decimal" >&2
+            exit 1
+          fi
           data_repository="AquilaXk/easysubway-data"
           candidate_metadata="$(gh api "repos/${data_repository}/actions/runs/${CANDIDATE_RUN_ID}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_sha, .path] | @tsv')"
           IFS=$'\t' read -r candidate_id candidate_conclusion candidate_repository candidate_head_repository candidate_event candidate_head_sha candidate_path_raw <<< "${candidate_metadata}"
           candidate_path="${candidate_path_raw%@*}"
-          [[ "${candidate_id}" == "${CANDIDATE_RUN_ID}" && "${candidate_conclusion}" == "success" && "${candidate_repository}" == "${data_repository}" && "${candidate_head_repository}" == "${data_repository}" && "${candidate_event}" == "workflow_dispatch" && "${candidate_head_sha}" =~ ^[a-f0-9]{40}$ && "${candidate_path}" == ".github/workflows/datapack-release.yml" ]]
+          if ! [[ "${candidate_id}" == "${CANDIDATE_RUN_ID}" && "${candidate_conclusion}" == "success" && "${candidate_repository}" == "${data_repository}" && "${candidate_head_repository}" == "${data_repository}" && "${candidate_event}" == "workflow_dispatch" && "${candidate_head_sha}" =~ ^[a-f0-9]{40}$ && "${candidate_path}" == ".github/workflows/datapack-release.yml" ]]; then
+            echo "production candidate must be a successful easysubway-data workflow_dispatch Data Pack Release run" >&2
+            exit 1
+          fi
           echo "CANDIDATE_HEAD_SHA=${candidate_head_sha}" >> "${GITHUB_ENV}"
 
       - name: Data Pack Release / Validate production promotion run
@@ -529,11 +535,17 @@ jobs:
           PROMOTION_RUN_ID: ${{ steps.release-mode.outputs.promotion_run_id }}
         run: |
           set -euo pipefail
-          [[ "${PROMOTION_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
+          if ! [[ "${PROMOTION_RUN_ID}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "production promotion run ID must be a positive decimal" >&2
+            exit 1
+          fi
           promotion_metadata="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PROMOTION_RUN_ID}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_branch, .head_sha, .path] | @tsv')"
           IFS=$'\t' read -r promotion_id promotion_conclusion promotion_repository promotion_head_repository promotion_event promotion_ref promotion_head_sha promotion_path_raw <<< "${promotion_metadata}"
           promotion_path="${promotion_path_raw%@*}"
-          [[ "${promotion_id}" == "${PROMOTION_RUN_ID}" && "${promotion_conclusion}" == "success" && "${promotion_repository}" == "${GITHUB_REPOSITORY}" && "${promotion_head_repository}" == "${GITHUB_REPOSITORY}" && "${promotion_event}" == "workflow_dispatch" && "${promotion_ref}" == "main" && "${promotion_head_sha}" =~ ^[a-f0-9]{40}$ && "${promotion_path}" == ".github/workflows/datapack-promotion.yml" ]]
+          if ! [[ "${promotion_id}" == "${PROMOTION_RUN_ID}" && "${promotion_conclusion}" == "success" && "${promotion_repository}" == "${GITHUB_REPOSITORY}" && "${promotion_head_repository}" == "${GITHUB_REPOSITORY}" && "${promotion_event}" == "workflow_dispatch" && "${promotion_ref}" == "main" && "${promotion_head_sha}" =~ ^[a-f0-9]{40}$ && "${promotion_path}" == ".github/workflows/datapack-promotion.yml" ]]; then
+            echo "production promotion must be a successful main workflow_dispatch Data Pack Promotion run" >&2
+            exit 1
+          fi
           echo "PROMOTION_HEAD_SHA=${promotion_head_sha}" >> "${GITHUB_ENV}"
 
       - name: Data Pack Release / Validate production artifact metadata
@@ -594,6 +606,8 @@ jobs:
         env:
           EASYSUBWAY_ENV_FILE: ""
           EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: ""
+          EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM }}
+          EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID }}
         run: |
           set -euo pipefail
           mkdir -p "${EASYSUBWAY_DATAPACK_STAGE}"

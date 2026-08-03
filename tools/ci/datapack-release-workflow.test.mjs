@@ -685,6 +685,8 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
   assert.match(candidateRun, /if:\s*\$\{\{ steps\.release-mode\.outputs\.mode == 'production-publish' \}\}/);
   assert.match(candidateRun, /CANDIDATE_RUN_ID: \$\{\{ steps\.release-mode\.outputs\.candidate_run_id \}\}/);
   assert.match(candidateRun, /GH_TOKEN: \$\{\{ secrets\.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN \}\}/);
+  assert.match(candidateRun, /production candidate run ID must be a positive decimal/);
+  assert.match(candidateRun, /production candidate must be a successful easysubway-data workflow_dispatch Data Pack Release run/);
   assert.match(candidateRun, /data_repository="AquilaXk\/easysubway-data"/);
   assert.match(candidateRun, /repos\/\$\{data_repository\}\/actions\/runs\/\$\{CANDIDATE_RUN_ID\}/);
   assert.match(candidateRun, /candidate_id\}" == "\$\{CANDIDATE_RUN_ID\}/);
@@ -697,6 +699,8 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
 
   const promotionRun = step("Data Pack Release / Validate production promotion run");
   assert.match(promotionRun, /PROMOTION_RUN_ID: \$\{\{ steps\.release-mode\.outputs\.promotion_run_id \}\}/);
+  assert.match(promotionRun, /production promotion run ID must be a positive decimal/);
+  assert.match(promotionRun, /production promotion must be a successful main workflow_dispatch Data Pack Promotion run/);
   assert.match(promotionRun, /\.github\/workflows\/datapack-promotion\.yml/);
   assert.match(promotionRun, /promotion_ref\}" == "main"/);
   for (const predicate of [
@@ -749,6 +753,8 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
   assert.match(stage, /verify-promotion-candidate-root\.mjs/);
   assert.match(stage, /EASYSUBWAY_ENV_FILE: ""/);
   assert.match(stage, /EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: ""/);
+  assert.match(stage, /EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: \$\{\{ secrets\.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM \}\}/);
+  assert.match(stage, /EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: \$\{\{ secrets\.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID \}\}/);
   assert.doesNotMatch(stage, /node --env-file/);
   assert.match(stage, /--workflow-run-id "\$\{EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID\}"/);
   assert.match(stage, /--git-sha "\$\{CANDIDATE_HEAD_SHA\}"/);
