@@ -22,6 +22,17 @@ test("request는 raw parity evidence hash와 selected candidate의 exact identit
   }
 });
 
+test("validator는 유효한 parity evidence와 다른 request evidence hash를 거부한다", () => {
+  const fixture = createFixture();
+  try {
+    fixture.request.rebuildParityEvidenceSha256 = "d".repeat(64);
+    writeRequest(fixture);
+    assert.notEqual(run(fixture).status, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("validator는 request/approval/compatibility와 parity evidence의 불일치를 거부한다", () => {
   for (const mutate of [
     (fixture) => { fixture.request.extra = true; writeRequest(fixture); },

@@ -57,7 +57,6 @@ test("candidate root의 symlink·실제 inventory drift·identity·approval·com
       symlinkSync(path.join(fixture.roots[0], "data-component-manifest.json"), component);
     },
     (fixture) => writeFileSync(path.join(fixture.roots[2], "artifact.bin"), "drift"),
-    (fixture) => rewriteComponent(fixture, 2, { workflowRunId: "123" }),
     (fixture) => rewriteComponent(fixture, 1, { dataVersion: "other" }),
     (fixture) => { fixture.candidateHeadShas[1] = "f".repeat(40); },
     (fixture) => { fixture.candidateWorkflowRunIds[2] = "999"; },
@@ -78,6 +77,19 @@ test("candidate root의 symlink·실제 inventory drift·identity·approval·com
     (fixture) => writeFileSync(fixture.output, "sentinel"),
     (fixture) => writeFileSync(fixture.evidenceOutput, "evidence-sentinel"),
   ]) assertRejectedWithoutOutputDamage(mutate);
+});
+
+test("duplicate candidate run IDs는 identity 검증 뒤 parity set에서 거부한다", () => {
+  const fixture = createFixture();
+  try {
+    rewriteComponent(fixture, 2, { workflowRunId: "124" });
+    fixture.candidateWorkflowRunIds[2] = "124";
+    const result = run(fixture);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /candidate parity is invalid/);
+  } finally {
+    fixture.cleanup();
+  }
 });
 
 test("candidate inventory는 safe POSIX path와 exact fields만 허용한다", () => {

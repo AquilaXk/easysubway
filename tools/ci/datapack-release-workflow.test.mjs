@@ -605,13 +605,13 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.match(promotion, /candidate-3/);
   assert.match(promotion, /rebuild-parity-evidence\.json/);
   assert.match(promotion, /--rebuild-parity-evidence-output/);
-  assert.match(promotion, /--rebuild-parity-evidence/);
+  assert.match(promotion, /--rebuild-parity-evidence\s/);
   assert.match(promotionBuilder, /rebuildParityEvidenceSha256/);
   assert.doesNotMatch(promotion, /repository: \$\{\{ github\.repository \}\}/);
   assert.doesNotMatch(promotion, /repos\/\$\{GITHUB_REPOSITORY\}\/actions\/runs\/\$\{candidate_run_id\}/);
   assert.match(promotion, /shopt -s dotglob nullglob/);
   assert.match(promotion, /entries=\("\$\{compatibility_root\}"\/\*\)/);
-  assert.match(promotion, /! -L "\$\{entries\[0\]\}"/);
+  assert.match(promotion, /-L "\$\{entries\[0\]\}"/);
   const nodeSetup = promotion.match(
     /- name: Data Pack Promotion \/ Set up Node\.js[\s\S]*?\n\s+- name:/,
   )?.[0];
@@ -634,8 +634,10 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   }
   assert.match(candidateBinding, /--selected-candidate-workflow-run-id/);
   assert.match(candidateBinding, /--rebuild-parity-evidence-output/);
-  assert.match(candidateBinding, /--rebuild-parity-evidence/);
+  assert.match(candidateBinding, /--rebuild-parity-evidence\s/);
   assert.match(candidateBinding, /promotion-artifact\/rebuild-parity-evidence\.json/);
+  assert.match(promotion, /candidate run IDs must be distinct/);
+  assert.match(promotion, /compatibility evidence must contain exactly one regular non-empty file/);
   assert.doesNotMatch(candidateBinding.split("run: |", 2)[1], /\$\{\{ inputs\./);
   assert.doesNotMatch(candidateBinding, /build-data-component-manifest\.mjs/);
   assert.doesNotMatch(promotion, /EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM/);
@@ -653,16 +655,18 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
 
 test("compatibility producer는 data repository 후보만 token으로 내려받고 Hub 후보로 대체하지 않는다", () => {
   const releaseArtifacts = readFileSync(path.join(root, ".github/workflows/release-artifacts.yml"), "utf8");
-  const job = releaseArtifacts.slice(
-    releaseArtifacts.indexOf("  datapack-mobile-compatibility:"),
-    releaseArtifacts.indexOf("  android-production-rc-release:"),
-  );
+  const start = releaseArtifacts.indexOf("  datapack-mobile-compatibility:");
+  const end = releaseArtifacts.indexOf("  android-production-rc-release:");
+  assert.ok(start >= 0 && end > start, "compatibility job 범위를 찾지 못함");
+  const job = releaseArtifacts.slice(start, end);
 
   assert.match(job, /data_repository="AquilaXk\/easysubway-data"/);
   assert.match(job, /EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN: \$\{\{ secrets\.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN \}\}/);
   assert.match(job, /repos\/\$\{data_repository\}\/actions\/runs\/\$\{CANDIDATE_RUN_ID\}/);
   assert.match(job, /repository: AquilaXk\/easysubway-data/);
   assert.match(job, /github-token: \$\{\{ secrets\.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN \}\}/);
+  assert.match(job, /candidate run ID must be a positive decimal/);
+  assert.match(job, /candidate must be a successful easysubway-data workflow_dispatch Data Pack Release run/);
   assert.doesNotMatch(job, /repository: \$\{\{ github\.repository \}\}/);
   assert.doesNotMatch(job, /repos\/\$\{GITHUB_REPOSITORY\}\/actions\/runs\/\$\{CANDIDATE_RUN_ID\}/);
 });

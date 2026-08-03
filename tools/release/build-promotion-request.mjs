@@ -68,12 +68,13 @@ async function main() {
     contractVersion: "datapack-rebuild-parity-v1",
     issueRef: args.get("issue-ref"),
   };
+  const rebuildParityEvidenceBytes = jsonBytes(rebuildParityEvidence);
   const request = {
     schemaVersion: 1,
     artifactKind: "datapack-promotion-request",
     candidate: component,
     compatibilityEvidenceSha256: hash(compatibilityBytes),
-    rebuildParityEvidenceSha256: hash(Buffer.from(`${JSON.stringify(rebuildParityEvidence, null, 2)}\n`)),
+    rebuildParityEvidenceSha256: hash(rebuildParityEvidenceBytes),
     requestedBy,
     approval: {
       workflowRunId,
@@ -84,9 +85,10 @@ async function main() {
     contractVersion: "datapack-promotion-v1",
     issueRef: args.get("issue-ref"),
   };
+  const requestBytes = jsonBytes(request);
   await writeExclusiveJsonPair(
-    args.get("rebuild-parity-evidence-output"), rebuildParityEvidence,
-    args.get("output"), request,
+    args.get("rebuild-parity-evidence-output"), rebuildParityEvidenceBytes,
+    args.get("output"), requestBytes,
   );
 }
 
@@ -128,7 +130,7 @@ async function actualInventory(root, relative = "") {
 }
 
 function isSameInventory(left, right) {
-  return JSON.stringify(left) === JSON.stringify(right);
+  return isDeepStrictEqual(left, right);
 }
 
 function sameIdentityExceptRun(components) {
@@ -141,7 +143,9 @@ function sameIdentityExceptRun(components) {
   });
 }
 
-async function writeExclusiveJsonPair(evidenceFile, evidence, requestFile, request) {
+const jsonBytes = (value) => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
+
+async function writeExclusiveJsonPair(evidenceFile, evidenceBytes, requestFile, requestBytes) {
   const evidenceOutput = path.resolve(evidenceFile);
   const requestOutput = path.resolve(requestFile);
   await Promise.all([evidenceOutput, requestOutput].map(assertMissing));
@@ -150,14 +154,14 @@ async function writeExclusiveJsonPair(evidenceFile, evidence, requestFile, reque
   try {
     const temporaryEvidence = path.join(temporaryDirectory, "evidence.json");
     const temporaryRequest = path.join(temporaryDirectory, "request.json");
-    await writeFile(temporaryEvidence, `${JSON.stringify(evidence, null, 2)}\n`, { flag: "wx" });
-    await writeFile(temporaryRequest, `${JSON.stringify(request, null, 2)}\n`, { flag: "wx" });
+    await writeFile(temporaryEvidence, evidenceBytes, { flag: "wx" });
+    await writeFile(temporaryRequest, requestBytes, { flag: "wx" });
     try {
       await link(temporaryEvidence, evidenceOutput);
       evidencePublished = true;
       await link(temporaryRequest, requestOutput);
     } catch (error) {
-      if (evidencePublished) await unlink(evidenceOutput);
+      if (evidencePublished) await unlink(evidenceOutput).catch(() => {});
       throw error;
     }
   } finally {
