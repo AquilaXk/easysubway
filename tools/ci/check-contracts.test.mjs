@@ -16,6 +16,9 @@ import {
   validateSourceGovernanceContracts,
   validateBoundariesPayload,
   validateRepositorySplitIssueLedger,
+  validateArchitectureDecision,
+  validateArchitectureDecisionTransition,
+  validateArchitectureDecisionWorkspaceTransition,
   validateGateIndex,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
@@ -126,10 +129,15 @@ test("문서 거버넌스 계약은 대표적인 ADR 계약 위반을 거부한�
     const valid = loadJson("contracts/documentation/ADR-HUB-0001.json");
     for (const [name, mutate] of [
       ["invalid-id", (adr) => { adr.id = "ADR-DATA-0001"; }],
+      ["invalid-kind", (adr) => { adr.kind = "runbook"; }],
       ["missing-owner", (adr) => { delete adr.owner; }],
       ["owner-prefix-mismatch", (adr) => { adr.owner.repository = "AquilaXk/easysubway-data"; }],
       ["invalid-status", (adr) => { adr.status = "implemented"; }],
       ["missing-decision", (adr) => { delete adr.decision; }],
+      ["missing-context-issue", (adr) => { delete adr.contextIssue; }],
+      ["unknown-field", (adr) => { adr.futureField = true; }],
+      ["target-owner-mismatch", (adr) => { adr.decision.repositoryOwners.data = "AquilaXk/easysubway"; }],
+      ["tracked-sensitive-evidence", (adr) => { adr.decision.sensitiveEvidence.trackedContentAllowed = true; }],
     ]) {
       const candidate = structuredClone(valid);
       mutate(candidate);
@@ -140,6 +148,88 @@ test("문서 거버넌스 계약은 대표적인 ADR 계약 위반을 거부한�
       assert.equal(validateJson(schemaPath, candidatePath, errors), false, name);
       assert.ok(errors.length > 0, `${name} 오류가 필요하다`);
     }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 자기 supersession과 참조 없는 superseded 상태를 거부한다", () => {
+  const valid = loadJson("contracts/documentation/ADR-HUB-0001.json");
+  const selfSupersession = structuredClone(valid);
+  selfSupersession.supersedes = [selfSupersession.id];
+  const missingReference = structuredClone(valid);
+  missingReference.status = "superseded";
+  const prematureReference = structuredClone(valid);
+  prematureReference.supersededBy = "ADR-HUB-0002";
+
+  assert.ok(validateArchitectureDecision(selfSupersession).some((error) => error.includes("자기 자신")));
+  assert.ok(validateArchitectureDecision(missingReference).some((error) => error.includes("supersededBy")));
+  assert.ok(validateArchitectureDecision(prematureReference).some((error) => error.includes("non-superseded")));
+});
+
+test("문서 거버넌스 계약은 target owner, 민감 evidence, 첫 파생 이슈 정책을 fail closed한다", () => {
+  const adr = loadJson("contracts/documentation/ADR-HUB-0001.json");
+  const invalidOwner = structuredClone(adr);
+  invalidOwner.decision.repositoryOwners.data = "AquilaXk/easysubway";
+  const invalidEvidence = structuredClone(adr);
+  invalidEvidence.decision.sensitiveEvidence.trackedContentAllowed = true;
+  const invalidChildGate = structuredClone(adr);
+  invalidChildGate.decision.childIssuePolicy.firstChildAfter = "BEFORE_ADR_HUB_0001_MERGED";
+
+  assert.ok(validateArchitectureDecision(invalidOwner).some((error) => error.includes("repository owner")));
+  assert.ok(validateArchitectureDecision(invalidEvidence).some((error) => error.includes("trackedContentAllowed")));
+  assert.ok(validateArchitectureDecision(invalidChildGate).some((error) => error.includes("첫 파생 이슈")));
+});
+
+test("문서 거버넌스 계약은 raw evidence payload 필드를 integrated gate에서 거부한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const decisionPath = join(directory, "inputs/architecture-decision.json");
+    const decision = loadJson(decisionPath);
+    decision.confirmation[0].rawEvidence = { token: "synthetic-test-value" };
+    writeFileSync(decisionPath, JSON.stringify(decision));
+
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("rawEvidence: 허용되지 않은 필드")));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 accepted ADR 본문의 in-place 변경을 거부한다", () => {
+  const accepted = loadJson("contracts/documentation/ADR-HUB-0001.json");
+  accepted.status = "accepted";
+  const modified = structuredClone(accepted);
+  modified.title = "조용히 바뀐 결정";
+
+  assert.ok(validateArchitectureDecisionTransition(accepted, modified).some((error) => error.includes("in-place")));
+  assert.deepEqual(validateArchitectureDecisionTransition(accepted, accepted), []);
+
+  const proposed = structuredClone(accepted);
+  proposed.status = "proposed";
+  const acceptedWithChange = structuredClone(accepted);
+  acceptedWithChange.title = "accept와 함께 바뀐 결정";
+  assert.ok(validateArchitectureDecisionTransition(proposed, acceptedWithChange).some((error) => error.includes("status-only")));
+  assert.deepEqual(validateArchitectureDecisionTransition(proposed, accepted), []);
+});
+
+test("문서 거버넌스 계약은 workspace gate와 required CI에서 base revision을 비교한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const decisionPath = join(directory, "inputs/architecture-decision.json");
+    const previous = loadJson(decisionPath);
+    const current = structuredClone(previous);
+    current.status = "accepted";
+    current.title = "accept와 함께 바뀐 결정";
+    writeFileSync(decisionPath, JSON.stringify(current));
+
+    assert.ok(collectContractErrors(workspacePath, { previousArchitectureDecision: previous })
+      .some((error) => error.includes("status-only")));
+    assert.ok(validateArchitectureDecisionWorkspaceTransition(
+      { architectureDecision: "../documentation/ADR-HUB-0001.json" },
+      { architectureDecision: "../documentation/ADR-HUB-0002.json" },
+    ).some((error) => error.includes("path redirect")));
+    assert.match(readFileSync(".github/workflows/ci.yml", "utf8"),
+      /check-contracts\.mjs --workspace contracts\/workspaces\/hub\.json --base-ref/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

@@ -12,6 +12,7 @@
     "role": "architecture-governance"
   },
   "scope": ["hub", "data", "backend", "mobile", "platform"],
+  "contextIssue": "https://github.com/AquilaXk/easysubway/issues/2748",
   "relatedIssues": [
     {
       "repository": "AquilaXk/easysubway",
@@ -118,6 +119,17 @@
       "trackedContentAllowed": false,
       "forbiddenClasses": ["SECRET", "RAW_TOKEN", "PERSONAL_DATA", "PRIVATE_CONTACT", "PRIVATE_ENDPOINT_CREDENTIAL"]
     },
+    "childIssuePolicy": {
+      "firstChildAfter": "ADR_HUB_0001_MERGED",
+      "inventoryRequiredBefore": [
+        "SCHEMA_CATALOG_BOOTSTRAP",
+        "ADR_MIGRATION",
+        "OPERATIONAL_MIGRATION",
+        "ALERT_GATE_EVIDENCE_BINDING",
+        "DRILL_AND_PIR",
+        "DUPLICATE_HANDOFF"
+      ]
+    },
     "changeGrades": {
       "A": "FULL_ADR_AND_OPERATIONAL_IMPACT",
       "B": "ADR_WHEN_ARCHITECTURALLY_SIGNIFICANT",
@@ -139,7 +151,7 @@
       "기존 JSON ADR·Runbook companion·gate·evidence는 inventory 전까지 삭제하거나 이름을 바꾸지 않는다."
     ],
     "acceptedDebt": [
-      "accepted ADR semantic mutation lock과 deterministic documentation manifest는 후속 schema/CI bootstrap에서 구현한다.",
+      "deterministic documentation manifest는 후속 schema/CI bootstrap에서 구현한다.",
       "P0 정적 운영 bundle과 외부 mirror는 실제 가용성 요구가 검증될 때 별도 decision으로 다룬다."
     ]
   },

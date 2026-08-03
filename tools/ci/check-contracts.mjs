@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
 import { validateLedger } from "../repo/issue-migration-ledger.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
+import { isDeepStrictEqual } from "node:util";
 
 const DEFAULT_WORKSPACE_PATH = "contracts/workspaces/hub.json";
 const EXTRACTION_REPOSITORIES = {
@@ -63,7 +65,10 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
   };
 }
 
-export function collectContractErrors(workspacePath = DEFAULT_WORKSPACE_PATH) {
+export function collectContractErrors(
+  workspacePath = DEFAULT_WORKSPACE_PATH,
+  { previousArchitectureDecision = null } = {},
+) {
   const errors = [];
   let workspace;
   try {
@@ -95,11 +100,17 @@ export function collectContractErrors(workspacePath = DEFAULT_WORKSPACE_PATH) {
     contract("datapack/pack-app-schema-parity-allowlist.json"),
     errors,
   );
-  validateJson(
+  const architectureDecisionValid = validateJson(
     contract("documentation/architecture-decision.schema.json"),
     workspace.architectureDecision,
     errors,
   );
+  if (previousArchitectureDecision != null && architectureDecisionValid) {
+    errors.push(...validateArchitectureDecisionTransition(
+      previousArchitectureDecision,
+      loadJson(workspace.architectureDecision),
+    ).map((error) => `${workspace.architectureDecision}: ${error}`));
+  }
   validateJson(contract("datapack/catalog-raw-sql-tables.schema.json"), contract("datapack/catalog-raw-sql-tables.json"), errors);
   const repositorySplitIssueLedgerValid = validateJson(
     contract("repository-split-issues.schema.json"),
@@ -170,7 +181,12 @@ export function validateJson(schemaPath, valuePath, errors) {
   }
   const result = validateSchema(schema, value);
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
+  let semanticErrors = [];
   switch (basename(schemaPath)) {
+    case "architecture-decision.schema.json":
+      semanticErrors = validateArchitectureDecision(value);
+      errors.push(...semanticErrors.map((error) => `${valuePath}: ${error}`));
+      break;
     case "datapack-manifest.schema.json":
       validateDatapackManifest(value, valuePath, errors);
       break;
@@ -183,7 +199,108 @@ export function validateJson(schemaPath, valuePath, errors) {
     default:
       break;
   }
-  return result.errors.length === 0;
+  return result.errors.length === 0 && semanticErrors.length === 0;
+}
+
+export function validateArchitectureDecision(adr) {
+  if (adr == null || typeof adr !== "object" || Array.isArray(adr)) return [];
+  const errors = [];
+  const repositoryOwners = {
+    hub: "AquilaXk/easysubway",
+    data: "AquilaXk/easysubway-data",
+    backend: "AquilaXk/easysubway-backend",
+    mobile: "AquilaXk/easysubway-mobile",
+    platform: "AquilaXk/easysubway-platform",
+  };
+  for (const [component, repository] of Object.entries(repositoryOwners)) {
+    if (adr.decision?.repositoryOwners?.[component] !== repository) {
+      errors.push(`${component} repository owner는 ${repository}여야 한다`);
+    }
+  }
+  if (adr.supersedes?.includes(adr.id) || adr.supersededBy === adr.id) {
+    errors.push("supersession은 자기 자신을 참조할 수 없다");
+  }
+  if (adr.status === "superseded" && adr.supersededBy == null) {
+    errors.push("superseded 상태에는 supersededBy가 필요하다");
+  }
+  if (adr.status !== "superseded" && adr.supersededBy != null) {
+    errors.push("non-superseded 상태의 supersededBy는 null이어야 한다");
+  }
+  if (adr.decision?.childIssuePolicy?.firstChildAfter !== "ADR_HUB_0001_MERGED") {
+    errors.push("첫 파생 이슈는 ADR-HUB-0001 병합 뒤에만 만들 수 있다");
+  }
+  if (adr.decision?.sensitiveEvidence?.trackedContentAllowed !== false) {
+    errors.push("sensitiveEvidence.trackedContentAllowed는 false여야 한다");
+  }
+  return errors;
+}
+
+export function validateArchitectureDecisionTransition(previous, current) {
+  if (isDeepStrictEqual(previous, current)) return [];
+  if (previous?.status === "proposed" && current?.status === "accepted") {
+    const statusOnly = structuredClone(current);
+    statusOnly.status = "proposed";
+    return isDeepStrictEqual(previous, statusOnly)
+      ? []
+      : ["proposed ADR의 accepted 전환은 status-only여야 한다"];
+  }
+  if (previous?.status !== "accepted") return [];
+  const allowed = structuredClone(current);
+  allowed.status = previous.status;
+  allowed.supersededBy = previous.supersededBy;
+  if (current?.status === "superseded" && current.supersededBy != null
+    && isDeepStrictEqual(previous, allowed)) return [];
+  return ["accepted ADR 본문은 in-place 변경할 수 없고 새 ADR로 supersede해야 한다"];
+}
+
+export function validateArchitectureDecisionWorkspaceTransition(previous, current) {
+  if (!Object.hasOwn(previous, "architectureDecision")) return [];
+  if (previous.architectureDecision !== current.architectureDecision) {
+    return ["workspace architectureDecision path redirect는 허용되지 않는다"];
+  }
+  return [];
+}
+
+export function loadArchitectureDecisionAtRef(workspacePath, baseRef) {
+  if (!/^[0-9a-f]{40}$/i.test(baseRef)) throw new Error("base-ref는 40자리 Git SHA여야 한다");
+  const absoluteWorkspacePath = resolve(workspacePath);
+  const workspaceRepositoryPath = relative(process.cwd(), absoluteWorkspacePath);
+  if (workspaceRepositoryPath.startsWith("..") || workspaceRepositoryPath === "") {
+    throw new Error("base-ref workspace 경로는 repository 내부여야 한다");
+  }
+  execFileSync("git", ["rev-parse", "--verify", `${baseRef}^{commit}`], { stdio: "ignore" });
+  const loadAtRef = (repositoryPath, required) => {
+    const found = execFileSync("git", ["ls-tree", "--name-only", baseRef, "--", repositoryPath], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (found === "") {
+      if (!required) return null;
+      throw new Error(`${baseRef}:${repositoryPath} 누락`);
+    }
+    const raw = execFileSync("git", ["show", `${baseRef}:${repositoryPath}`], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    try {
+      return JSON.parse(raw);
+    } catch {
+      throw new Error(`${baseRef}:${repositoryPath}: 유효한 JSON이 필요하다`);
+    }
+  };
+  const previousWorkspace = loadAtRef(workspaceRepositoryPath, true);
+  const currentWorkspace = loadJson(absoluteWorkspacePath);
+  const workspaceErrors = validateArchitectureDecisionWorkspaceTransition(previousWorkspace, currentWorkspace);
+  if (workspaceErrors.length > 0) throw new Error(workspaceErrors.join("; "));
+  if (!Object.hasOwn(previousWorkspace, "architectureDecision")) return null;
+  const repositoryPath = relative(
+    "/",
+    resolve("/", dirname(workspaceRepositoryPath), previousWorkspace.architectureDecision),
+  );
+  if (repositoryPath.startsWith("..") || repositoryPath === "") {
+    throw new Error("base-ref ADR 경로는 repository 내부여야 한다");
+  }
+  return loadAtRef(repositoryPath, true);
 }
 
 export function validateSourceInventory(inventory, valuePath, errors) {
@@ -468,11 +585,21 @@ function compareText(left, right) {
 
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2);
-  if (args.length !== 2 || args[0] !== "--workspace" || args[1].trim() === "") {
-    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json>");
+  const validArgs = (args.length === 2 || (args.length === 4 && args[2] === "--base-ref"))
+    && args[0] === "--workspace" && args[1].trim() !== ""
+    && (args.length === 2 || args[3].trim() !== "");
+  if (!validArgs) {
+    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json> [--base-ref <40-hex-sha>]");
     process.exit(1);
   }
-  const errors = collectContractErrors(args[1]);
+  let previousArchitectureDecision = null;
+  try {
+    if (args.length === 4) previousArchitectureDecision = loadArchitectureDecisionAtRef(args[1], args[3]);
+  } catch (error) {
+    console.error(`- ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+  const errors = collectContractErrors(args[1], { previousArchitectureDecision });
   if (errors.length) {
     console.error(errors.map((error) => `- ${error}`).join("\n"));
     process.exit(1);
