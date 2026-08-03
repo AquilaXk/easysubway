@@ -11,11 +11,11 @@ test("candidate manifest와 mobile compatibility matrix를 exact component에 �
     packs: [{ schemaVersion: "1" }],
   }));
   const component = {
-    schemaVersion: 1, component: "data", repository: "AquilaXk/easysubway", gitSha: "a".repeat(40),
+    schemaVersion: 1, component: "data", repository: "AquilaXk/easysubway-data", gitSha: "a".repeat(40),
     workflowRunId: "123", dataVersion: "2026.07.30", releaseSequence: 1,
     manifestSha256: createHash("sha256").update(manifestBytes).digest("hex"),
     provenance: { sourceSnapshotSetHash: "b".repeat(64) }, artifactInventorySha256: "c".repeat(64),
-    contractVersion: "datapack-contract-v3", issueRef: "AquilaXk/easysubway#2699",
+    contractVersion: "datapack-contract-v3", issueRef: "AquilaXk/easysubway#2705",
   };
   const matrix = { schemaVersion: 1, mobile: [{
     appVersionRange: ">=1.0.0", acceptsIndexSchemaVersions: [1],

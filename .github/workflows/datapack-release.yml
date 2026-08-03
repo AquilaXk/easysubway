@@ -508,36 +508,52 @@ jobs:
             --release-request "${release_request_path}" \
             --expected-approval-id "${EASYSUBWAY_DATAPACK_RELEASE_REQUEST_ID}"
 
-      - name: Data Pack Release / Validate production candidate and promotion runs
+      - name: Data Pack Release / Validate production data candidate run
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
         env:
           CANDIDATE_RUN_ID: ${{ steps.release-mode.outputs.candidate_run_id }}
+          GH_TOKEN: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          [[ "${CANDIDATE_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
+          data_repository="AquilaXk/easysubway-data"
+          candidate_metadata="$(gh api "repos/${data_repository}/actions/runs/${CANDIDATE_RUN_ID}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_sha, .path] | @tsv')"
+          IFS=$'\t' read -r candidate_id candidate_conclusion candidate_repository candidate_head_repository candidate_event candidate_head_sha candidate_path_raw <<< "${candidate_metadata}"
+          candidate_path="${candidate_path_raw%@*}"
+          [[ "${candidate_id}" == "${CANDIDATE_RUN_ID}" && "${candidate_conclusion}" == "success" && "${candidate_repository}" == "${data_repository}" && "${candidate_head_repository}" == "${data_repository}" && "${candidate_event}" == "workflow_dispatch" && "${candidate_head_sha}" =~ ^[a-f0-9]{40}$ && "${candidate_path}" == ".github/workflows/datapack-release.yml" ]]
+          echo "CANDIDATE_HEAD_SHA=${candidate_head_sha}" >> "${GITHUB_ENV}"
+
+      - name: Data Pack Release / Validate production promotion run
+        if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
+        env:
           PROMOTION_RUN_ID: ${{ steps.release-mode.outputs.promotion_run_id }}
         run: |
           set -euo pipefail
-          for run_id in "${CANDIDATE_RUN_ID}" "${PROMOTION_RUN_ID}"; do
-            [[ "${run_id}" =~ ^[1-9][0-9]*$ ]]
-          done
-          candidate_metadata="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_RUN_ID}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_sha, .path] | @tsv')"
-          IFS=$'\t' read -r candidate_id candidate_conclusion candidate_repository candidate_head_repository candidate_event candidate_head_sha candidate_path_raw <<< "${candidate_metadata}"
-          candidate_path="${candidate_path_raw%@*}"
-          [[ "${candidate_id}" == "${CANDIDATE_RUN_ID}" && "${candidate_conclusion}" == "success" && "${candidate_repository}" == "${GITHUB_REPOSITORY}" && "${candidate_head_repository}" == "${GITHUB_REPOSITORY}" && "${candidate_event}" == "workflow_dispatch" && "${candidate_head_sha}" =~ ^[a-f0-9]{40}$ && "${candidate_path}" == ".github/workflows/datapack-release.yml" ]]
+          [[ "${PROMOTION_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
           promotion_metadata="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${PROMOTION_RUN_ID}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_branch, .head_sha, .path] | @tsv')"
           IFS=$'\t' read -r promotion_id promotion_conclusion promotion_repository promotion_head_repository promotion_event promotion_ref promotion_head_sha promotion_path_raw <<< "${promotion_metadata}"
           promotion_path="${promotion_path_raw%@*}"
           [[ "${promotion_id}" == "${PROMOTION_RUN_ID}" && "${promotion_conclusion}" == "success" && "${promotion_repository}" == "${GITHUB_REPOSITORY}" && "${promotion_head_repository}" == "${GITHUB_REPOSITORY}" && "${promotion_event}" == "workflow_dispatch" && "${promotion_ref}" == "main" && "${promotion_head_sha}" =~ ^[a-f0-9]{40}$ && "${promotion_path}" == ".github/workflows/datapack-promotion.yml" ]]
-          echo "CANDIDATE_HEAD_SHA=${candidate_head_sha}" >> "${GITHUB_ENV}"
           echo "PROMOTION_HEAD_SHA=${promotion_head_sha}" >> "${GITHUB_ENV}"
 
       - name: Data Pack Release / Validate production artifact metadata
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
+        env:
+          GH_TOKEN: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
         run: |
           set -euo pipefail
-          for pair in "${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}:easysubway-datapack-candidate-${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}:${CANDIDATE_HEAD_SHA}" "${EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID}:easysubway-datapack-promotion-${EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID}:${PROMOTION_HEAD_SHA}"; do
-            IFS=: read -r run_id artifact_name head_sha <<< "${pair}"
-            gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${run_id}/artifacts?name=${artifact_name}&per_page=100" > "${RUNNER_TEMP}/${artifact_name}.json"
-            node tools/ci/require-workflow-artifact.mjs "${RUNNER_TEMP}/${artifact_name}.json" "${artifact_name}" "${run_id}" "${head_sha}"
-          done
+          data_repository="AquilaXk/easysubway-data"
+          artifact_name="easysubway-datapack-candidate-${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}"
+          gh api "repos/${data_repository}/actions/runs/${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}/artifacts?name=${artifact_name}&per_page=100" > "${RUNNER_TEMP}/${artifact_name}.json"
+          node tools/ci/require-workflow-artifact.mjs "${RUNNER_TEMP}/${artifact_name}.json" "${artifact_name}" "${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}" "${CANDIDATE_HEAD_SHA}"
+
+      - name: Data Pack Release / Validate production promotion artifact metadata
+        if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
+        run: |
+          set -euo pipefail
+          artifact_name="easysubway-datapack-promotion-${EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID}"
+          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID}/artifacts?name=${artifact_name}&per_page=100" > "${RUNNER_TEMP}/${artifact_name}.json"
+          node tools/ci/require-workflow-artifact.mjs "${RUNNER_TEMP}/${artifact_name}.json" "${artifact_name}" "${EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID}" "${PROMOTION_HEAD_SHA}"
 
       - name: Data Pack Release / Download exact production artifacts
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
@@ -546,7 +562,8 @@ jobs:
           name: easysubway-datapack-candidate-${{ steps.release-mode.outputs.candidate_run_id }}
           path: ${{ runner.temp }}/downloaded-candidate
           run-id: ${{ steps.release-mode.outputs.candidate_run_id }}
-          github-token: ${{ github.token }}
+          repository: AquilaXk/easysubway-data
+          github-token: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
 
       - name: Data Pack Release / Download exact promotion artifact
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
@@ -565,23 +582,12 @@ jobs:
           promotion_root="${RUNNER_TEMP}/downloaded-promotion"
           shopt -s dotglob nullglob
           promotion_entries=("${promotion_root}"/*)
-          [[ "${#promotion_entries[@]}" == 3 ]]
-          for name in promotion-request.json promotion-approvals.json compatibility-evidence.json; do
+          [[ "${#promotion_entries[@]}" == 4 ]]
+          for name in promotion-request.json promotion-approvals.json compatibility-evidence.json rebuild-parity-evidence.json; do
             [[ -f "${promotion_root}/${name}" && ! -L "${promotion_root}/${name}" && -s "${promotion_root}/${name}" ]]
           done
           gh attestation verify "${promotion_root}/promotion-request.json" --repo "${GITHUB_REPOSITORY}" --signer-workflow "AquilaXk/easysubway/.github/workflows/datapack-promotion.yml" --source-ref refs/heads/main --deny-self-hosted-runners
-          validation_root="${RUNNER_TEMP}/candidate-metadata-validation"
-          cp -a "${candidate_root}" "${validation_root}"
-          component_manifest="${validation_root}/data-component-manifest.json"
-          artifact_inventory="${validation_root}/data-artifact-inventory.json"
-          original_component_manifest="${RUNNER_TEMP}/candidate-original-component-manifest.json"
-          original_artifact_inventory="${RUNNER_TEMP}/candidate-original-artifact-inventory.json"
-          mv "${component_manifest}" "${original_component_manifest}"
-          mv "${artifact_inventory}" "${original_artifact_inventory}"
-          node tools/datapack/build-data-component-manifest.mjs --root "${validation_root}" --manifest "${validation_root}/catalog/current.json" --provenance "${validation_root}/current.provenance.json" --repository "${GITHUB_REPOSITORY}" --git-sha "${CANDIDATE_HEAD_SHA}" --workflow-run-id "${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}" --contract-version "datapack-contract-v3" --issue-ref "AquilaXk/easysubway#2699" --inventory-output "${artifact_inventory}" --output "${component_manifest}"
-          cmp -s "${component_manifest}" "${original_component_manifest}"
-          cmp -s "${artifact_inventory}" "${original_artifact_inventory}"
-          node tools/release/validate-promotion-request.mjs --request "${promotion_root}/promotion-request.json" --component "${candidate_root}/data-component-manifest.json" --inventory "${candidate_root}/data-artifact-inventory.json" --compatibility-evidence "${promotion_root}/compatibility-evidence.json" --approval-evidence "${promotion_root}/promotion-approvals.json" --workflow-run-id "${EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID}"
+          node tools/release/validate-promotion-request.mjs --request "${promotion_root}/promotion-request.json" --component "${candidate_root}/data-component-manifest.json" --inventory "${candidate_root}/data-artifact-inventory.json" --compatibility-evidence "${promotion_root}/compatibility-evidence.json" --approval-evidence "${promotion_root}/promotion-approvals.json" --rebuild-parity-evidence "${promotion_root}/rebuild-parity-evidence.json" --workflow-run-id "${EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID}"
 
       - name: Data Pack Release / Stage verified candidate artifact
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
