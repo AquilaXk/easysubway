@@ -108,14 +108,23 @@ test("standalone candidate verifierëŠ” approved build spec source snapshot setì—
   try {
     const approvedSpec = file(fixture.root, "approved-build-spec.json", JSON.stringify({
       sourceSnapshotSetHash: "c".repeat(64),
+      builderGitSha: "a".repeat(40),
     }));
     assert.equal(runCandidateVerifier(fixture, approvedSpec).status, 0);
     const differentSpec = file(fixture.root, "different-build-spec.json", JSON.stringify({
       sourceSnapshotSetHash: "d".repeat(64),
+      builderGitSha: "a".repeat(40),
     }));
     const result = runCandidateVerifier(fixture, differentSpec);
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /candidate source snapshot set hash does not match build spec/);
+    const differentBuilderSpec = file(fixture.root, "different-builder-build-spec.json", JSON.stringify({
+      sourceSnapshotSetHash: "c".repeat(64),
+      builderGitSha: "b".repeat(40),
+    }));
+    const builderResult = runCandidateVerifier(fixture, differentBuilderSpec);
+    assert.notEqual(builderResult.status, 0);
+    assert.match(builderResult.stderr, /candidate builder git SHA does not match build spec/);
   } finally {
     fixture.cleanup();
   }

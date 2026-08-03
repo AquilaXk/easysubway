@@ -11,11 +11,17 @@ async function main() {
   if (!/^[a-f0-9]{64}$/.test(buildSpec?.sourceSnapshotSetHash ?? "")) {
     throw new Error("build spec source snapshot set hash is invalid");
   }
+  if (!/^[a-f0-9]{40}$/.test(buildSpec?.builderGitSha ?? "")) {
+    throw new Error("build spec builder git SHA is invalid");
+  }
   const candidate = await verifyPromotionCandidateRoot(
     args.get("root"), "--root", args.get("workflow-run-id"), args.get("git-sha"),
   );
   if (candidate.component.provenance.sourceSnapshotSetHash !== buildSpec.sourceSnapshotSetHash) {
     throw new Error("candidate source snapshot set hash does not match build spec");
+  }
+  if (candidate.component.gitSha !== buildSpec.builderGitSha) {
+    throw new Error("candidate builder git SHA does not match build spec");
   }
 }
 
