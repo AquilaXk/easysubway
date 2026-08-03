@@ -179,7 +179,7 @@
     },
     {
       "id": "hub-contract-schema",
-      "method": "node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json",
+      "method": "node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json --current-only",
       "expected": "ADR-HUB-0001 schema validation PASS"
     },
     {

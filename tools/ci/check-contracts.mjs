@@ -184,8 +184,10 @@ export function validateJson(schemaPath, valuePath, errors) {
   let semanticErrors = [];
   switch (basename(schemaPath)) {
     case "architecture-decision.schema.json":
-      semanticErrors = validateArchitectureDecision(value);
-      errors.push(...semanticErrors.map((error) => `${valuePath}: ${error}`));
+      if (result.errors.length === 0) {
+        semanticErrors = validateArchitectureDecision(value);
+        errors.push(...semanticErrors.map((error) => `${valuePath}: ${error}`));
+      }
       break;
     case "datapack-manifest.schema.json":
       validateDatapackManifest(value, valuePath, errors);
@@ -217,7 +219,7 @@ export function validateArchitectureDecision(adr) {
       errors.push(`${component} repository owner는 ${repository}여야 한다`);
     }
   }
-  if (adr.supersedes?.includes(adr.id) || adr.supersededBy === adr.id) {
+  if ((Array.isArray(adr.supersedes) && adr.supersedes.includes(adr.id)) || adr.supersededBy === adr.id) {
     errors.push("supersession은 자기 자신을 참조할 수 없다");
   }
   if (adr.status === "superseded" && adr.supersededBy == null) {
@@ -232,17 +234,33 @@ export function validateArchitectureDecision(adr) {
   if (adr.decision?.sensitiveEvidence?.trackedContentAllowed !== false) {
     errors.push("sensitiveEvidence.trackedContentAllowed는 false여야 한다");
   }
+  if (adr.id === "ADR-HUB-0001"
+    && adr.contextIssue !== "https://github.com/AquilaXk/easysubway/issues/2748") {
+    errors.push("ADR-HUB-0001 contextIssue는 Hub #2748이어야 한다");
+  }
+  if (Array.isArray(adr.consideredOptions)) {
+    const chosenCount = adr.consideredOptions.filter((option) => option?.chosen === true).length;
+    if (chosenCount !== 1) errors.push("consideredOptions에는 chosen 옵션이 정확히 하나여야 한다");
+    const optionIds = adr.consideredOptions.map((option) => option?.id);
+    if (new Set(optionIds).size !== optionIds.length) {
+      errors.push("consideredOptions의 id는 유일해야 한다");
+    }
+  }
   return errors;
 }
 
 export function validateArchitectureDecisionTransition(previous, current) {
   if (isDeepStrictEqual(previous, current)) return [];
-  if (previous?.status === "proposed" && current?.status === "accepted") {
+  if (previous?.status === "proposed" && current?.status !== "proposed") {
     const statusOnly = structuredClone(current);
     statusOnly.status = "proposed";
-    return isDeepStrictEqual(previous, statusOnly)
-      ? []
-      : ["proposed ADR의 accepted 전환은 status-only여야 한다"];
+    if (["accepted", "rejected", "withdrawn"].includes(current?.status)
+      && isDeepStrictEqual(previous, statusOnly)) return [];
+    return ["proposed ADR의 종결 전환은 status-only여야 한다"];
+  }
+  const terminalStatuses = new Set(["rejected", "withdrawn", "superseded"]);
+  if (terminalStatuses.has(previous?.status)) {
+    return ["종결 상태 ADR 본문은 변경할 수 없다"];
   }
   if (previous?.status !== "accepted") return [];
   const allowed = structuredClone(current);
@@ -585,16 +603,17 @@ function compareText(left, right) {
 
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2);
-  const validArgs = (args.length === 2 || (args.length === 4 && args[2] === "--base-ref"))
-    && args[0] === "--workspace" && args[1].trim() !== ""
-    && (args.length === 2 || args[3].trim() !== "");
+  const hasWorkspace = args[0] === "--workspace" && args[1]?.trim() !== "";
+  const hasBaseRef = args.length === 4 && args[2] === "--base-ref" && args[3].trim() !== "";
+  const isCurrentOnly = args.length === 3 && args[2] === "--current-only";
+  const validArgs = hasWorkspace && (hasBaseRef || isCurrentOnly);
   if (!validArgs) {
-    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json> [--base-ref <40-hex-sha>]");
+    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json> (--base-ref <40-hex-sha>|--current-only)");
     process.exit(1);
   }
   let previousArchitectureDecision = null;
   try {
-    if (args.length === 4) previousArchitectureDecision = loadArchitectureDecisionAtRef(args[1], args[3]);
+    if (hasBaseRef) previousArchitectureDecision = loadArchitectureDecisionAtRef(args[1], args[3]);
   } catch (error) {
     console.error(`- ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);

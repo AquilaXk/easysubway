@@ -481,11 +481,15 @@ jobs:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
         run: node --test tools/ci/*.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/mobile/*.test.mjs tools/qa/*.test.mjs
 
-      - name: Repository CI / Validate contracts
-        if: ${{ needs.changes.outputs.contracts == 'true' }}
+      - name: Repository CI / Validate PR contract transitions
+        if: ${{ needs.changes.outputs.contracts == 'true' && github.event_name == 'pull_request' }}
         env:
-          BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before || github.sha }}
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json --base-ref "${BASE_REF}"
+
+      - name: Repository CI / Validate current contracts
+        if: ${{ needs.changes.outputs.contracts == 'true' && github.event_name != 'pull_request' }}
+        run: node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json --current-only
 
       - name: Repository CI / Check directory boundaries
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' || needs.changes.outputs.contracts == 'true' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.mobile == 'true' || needs.changes.outputs.datapack == 'true' }}

@@ -57,7 +57,7 @@
     },
     "contextIssue": {
       "type": "string",
-      "const": "https://github.com/AquilaXk/easysubway/issues/2748"
+      "pattern": "^https://github\\.com/AquilaXk/easysubway/issues/[1-9][0-9]*$"
     },
     "relatedIssues": {
       "type": "array",

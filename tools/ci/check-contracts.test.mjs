@@ -91,13 +91,15 @@ test("[gate-ownership] check-contracts CLI는 정확한 workspace 인자만 허�
 
   const { directory, workspacePath } = createExternalWorkspace();
   try {
-    assert.doesNotThrow(() => run(["--workspace", workspacePath]));
+    assert.doesNotThrow(() => run(["--workspace", workspacePath, "--current-only"]));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
   for (const args of [
     [],
     ["--workspace"],
+    ["--workspace", "contracts/workspaces/hub.json"],
+    ["--workspace", "contracts/workspaces/hub.json", "--current-only", "extra"],
     ["--unexpected", "--workspace", "contracts/workspaces/hub.json"],
     ["--workspace", "contracts/workspaces/hub.json", "--workspace", "contracts/workspaces/hub.json"],
   ]) {
@@ -113,6 +115,7 @@ test("repository split issue migration ledger가 계약 gate를 통과한다", (
 
 test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => {
   const errors = [];
+  const adr = loadJson("contracts/documentation/ADR-HUB-0001.json");
 
   assert.equal(validateJson(
     "contracts/documentation/architecture-decision.schema.json",
@@ -120,6 +123,7 @@ test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => 
     errors,
   ), true);
   assert.deepEqual(errors, []);
+  assert.ok(adr.confirmation.some(({ method }) => method.endsWith("--current-only")));
 });
 
 test("문서 거버넌스 계약은 대표적인 ADR 계약 위반을 거부한다", () => {
@@ -135,9 +139,14 @@ test("문서 거버넌스 계약은 대표적인 ADR 계약 위반을 거부한�
       ["invalid-status", (adr) => { adr.status = "implemented"; }],
       ["missing-decision", (adr) => { delete adr.decision; }],
       ["missing-context-issue", (adr) => { delete adr.contextIssue; }],
+      ["wrong-context-issue", (adr) => { adr.contextIssue = "https://github.com/AquilaXk/easysubway/issues/1"; }],
       ["unknown-field", (adr) => { adr.futureField = true; }],
       ["target-owner-mismatch", (adr) => { adr.decision.repositoryOwners.data = "AquilaXk/easysubway"; }],
       ["tracked-sensitive-evidence", (adr) => { adr.decision.sensitiveEvidence.trackedContentAllowed = true; }],
+      ["malformed-supersedes", (adr) => { adr.supersedes = 1; }],
+      ["no-chosen-option", (adr) => { adr.consideredOptions.forEach((option) => { option.chosen = false; }); }],
+      ["multiple-chosen-options", (adr) => { adr.consideredOptions.forEach((option) => { option.chosen = true; }); }],
+      ["duplicate-option-id", (adr) => { adr.consideredOptions[1].id = adr.consideredOptions[0].id; }],
     ]) {
       const candidate = structuredClone(valid);
       mutate(candidate);
@@ -210,9 +219,24 @@ test("문서 거버넌스 계약은 accepted ADR 본문의 in-place 변경을 �
   acceptedWithChange.title = "accept와 함께 바뀐 결정";
   assert.ok(validateArchitectureDecisionTransition(proposed, acceptedWithChange).some((error) => error.includes("status-only")));
   assert.deepEqual(validateArchitectureDecisionTransition(proposed, accepted), []);
+
+  const superseded = structuredClone(accepted);
+  superseded.status = "superseded";
+  superseded.supersededBy = "ADR-HUB-0002";
+  assert.deepEqual(validateArchitectureDecisionTransition(accepted, superseded), []);
+
+  for (const status of ["rejected", "withdrawn", "superseded"]) {
+    const terminal = structuredClone(superseded);
+    terminal.status = status;
+    if (status !== "superseded") terminal.supersededBy = null;
+    const changed = structuredClone(terminal);
+    changed.title = "종결 뒤 바뀐 결정";
+    assert.ok(validateArchitectureDecisionTransition(terminal, changed)
+      .some((error) => error.includes("종결 상태")), status);
+  }
 });
 
-test("문서 거버넌스 계약은 workspace gate와 required CI에서 base revision을 비교한다", () => {
+test("문서 거버넌스 계약은 workspace gate에서 base revision 상태 전이를 비교한다", () => {
   const { directory, workspacePath } = createExternalWorkspace();
   try {
     const decisionPath = join(directory, "inputs/architecture-decision.json");
@@ -224,18 +248,27 @@ test("문서 거버넌스 계약은 workspace gate와 required CI에서 base rev
 
     assert.ok(collectContractErrors(workspacePath, { previousArchitectureDecision: previous })
       .some((error) => error.includes("status-only")));
-    assert.ok(validateArchitectureDecisionWorkspaceTransition(
-      { architectureDecision: "../documentation/ADR-HUB-0001.json" },
-      { architectureDecision: "../documentation/ADR-HUB-0002.json" },
-    ).some((error) => error.includes("path redirect")));
-    const validatorSource = readFileSync("tools/ci/check-contracts.mjs", "utf8");
-    assert.doesNotMatch(validatorSource, /execFileSync\("git"/);
-    assert.match(validatorSource, /execFileSync\("\/usr\/bin\/git"/);
-    assert.match(readFileSync(".github/workflows/ci.yml", "utf8"),
-      /check-contracts\.mjs --workspace contracts\/workspaces\/hub\.json --base-ref/);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("문서 거버넌스 계약은 workspace ADR path redirect를 거부한다", () => {
+  assert.ok(validateArchitectureDecisionWorkspaceTransition(
+    { architectureDecision: "../documentation/ADR-HUB-0001.json" },
+    { architectureDecision: "../documentation/ADR-HUB-0002.json" },
+  ).some((error) => error.includes("path redirect")));
+});
+
+test("문서 거버넌스 계약은 PR base와 non-PR current-only CI 경로를 분리한다", () => {
+  const validatorSource = readFileSync("tools/ci/check-contracts.mjs", "utf8");
+  assert.doesNotMatch(validatorSource, /execFileSync\("git"/);
+  assert.match(validatorSource, /execFileSync\("\/usr\/bin\/git"/);
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(workflow,
+    /Repository CI \/ Validate PR contract transitions[\s\S]{0,400}github\.event_name == 'pull_request'[\s\S]{0,400}--base-ref "\$\{BASE_REF\}"/);
+  assert.match(workflow,
+    /Repository CI \/ Validate current contracts[\s\S]{0,400}github\.event_name != 'pull_request'[\s\S]{0,400}--current-only/);
 });
 
 test("문서 거버넌스 계약은 workspace가 지정한 잘못된 ADR을 contract gate에서 거부한다", () => {
