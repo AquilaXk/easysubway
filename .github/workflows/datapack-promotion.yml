@@ -179,6 +179,9 @@ jobs:
       - name: Data Pack Promotion / Build and validate promotion request
         env:
           ISSUE_REF: ${{ inputs.issueRef }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidateRunId }}
+          REBUILD_CANDIDATE_RUN_ID_2: ${{ inputs.rebuildCandidateRunId2 }}
+          REBUILD_CANDIDATE_RUN_ID_3: ${{ inputs.rebuildCandidateRunId3 }}
         run: |
           set -euo pipefail
           promotion_request="${RUNNER_TEMP}/promotion-request.json"
@@ -187,13 +190,13 @@ jobs:
             --candidate-root-1 "${RUNNER_TEMP}/candidate-1" \
             --candidate-root-2 "${RUNNER_TEMP}/candidate-2" \
             --candidate-root-3 "${RUNNER_TEMP}/candidate-3" \
-            --candidate-workflow-run-id-1 "${{ inputs.candidateRunId }}" \
-            --candidate-workflow-run-id-2 "${{ inputs.rebuildCandidateRunId2 }}" \
-            --candidate-workflow-run-id-3 "${{ inputs.rebuildCandidateRunId3 }}" \
+            --candidate-workflow-run-id-1 "${CANDIDATE_RUN_ID}" \
+            --candidate-workflow-run-id-2 "${REBUILD_CANDIDATE_RUN_ID_2}" \
+            --candidate-workflow-run-id-3 "${REBUILD_CANDIDATE_RUN_ID_3}" \
             --candidate-head-sha-1 "${CANDIDATE_1_HEAD_SHA}" \
             --candidate-head-sha-2 "${CANDIDATE_2_HEAD_SHA}" \
             --candidate-head-sha-3 "${CANDIDATE_3_HEAD_SHA}" \
-            --selected-candidate-workflow-run-id "${{ inputs.candidateRunId }}" \
+            --selected-candidate-workflow-run-id "${CANDIDATE_RUN_ID}" \
             --compatibility-evidence "${RUNNER_TEMP}/compatibility/compatibility-evidence.json" \
             --requested-by "${GITHUB_ACTOR}" \
             --approval-evidence "${RUNNER_TEMP}/promotion-approvals.json" \

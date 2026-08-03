@@ -636,6 +636,7 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.match(candidateBinding, /--rebuild-parity-evidence-output/);
   assert.match(candidateBinding, /--rebuild-parity-evidence/);
   assert.match(candidateBinding, /promotion-artifact\/rebuild-parity-evidence\.json/);
+  assert.doesNotMatch(candidateBinding.split("run: |", 2)[1], /\$\{\{ inputs\./);
   assert.doesNotMatch(candidateBinding, /build-data-component-manifest\.mjs/);
   assert.doesNotMatch(promotion, /EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM/);
   assert.doesNotMatch(promotion, /\bcurl\b/);
