@@ -187,6 +187,8 @@ jobs:
           CANDIDATE_RUN_ID: ${{ inputs.candidateRunId }}
           REBUILD_CANDIDATE_RUN_ID_2: ${{ inputs.rebuildCandidateRunId2 }}
           REBUILD_CANDIDATE_RUN_ID_3: ${{ inputs.rebuildCandidateRunId3 }}
+          EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM }}
+          EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID }}
         run: |
           set -euo pipefail
           promotion_request="${RUNNER_TEMP}/promotion-request.json"

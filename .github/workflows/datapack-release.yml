@@ -591,9 +591,16 @@ jobs:
 
       - name: Data Pack Release / Stage verified candidate artifact
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
+        env:
+          EASYSUBWAY_ENV_FILE: ""
+          EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: ""
         run: |
           set -euo pipefail
           mkdir -p "${EASYSUBWAY_DATAPACK_STAGE}"
+          node tools/release/verify-promotion-candidate-root.mjs \
+            --root "${RUNNER_TEMP}/downloaded-candidate" \
+            --workflow-run-id "${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}" \
+            --git-sha "${CANDIDATE_HEAD_SHA}"
           cp -a "${RUNNER_TEMP}/downloaded-candidate/." "${EASYSUBWAY_DATAPACK_STAGE}/"
 
       - name: Data Pack Release / Fetch rollback approval

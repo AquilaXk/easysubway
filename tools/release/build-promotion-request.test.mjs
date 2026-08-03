@@ -1,13 +1,16 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
+import { createHash, createSign, generateKeyPairSync } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
 
 const script = path.resolve("tools/release/build-promotion-request.mjs");
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const signingPublicKey = publicKey.export({ type: "spki", format: "pem" });
 
 // Break caught: accepting one candidate, a stale inventory, or a different run identity
 // would let promotion proceed without proving three byte-identical rebuilds.
@@ -57,6 +60,12 @@ test("candidate root의 symlink·실제 inventory drift·identity·approval·com
       symlinkSync(path.join(fixture.roots[0], "data-component-manifest.json"), component);
     },
     (fixture) => writeFileSync(path.join(fixture.roots[2], "artifact.bin"), "drift"),
+    (fixture) => {
+      const manifest = path.join(fixture.roots[0], "catalog", "current.json");
+      writeFileSync(manifest, JSON.stringify({ ...JSON.parse(readFileSync(manifest)), signature: { algorithm: "rsa-sha256-manifest-v2", value: "bad" } }));
+    },
+    (fixture) => rewriteComponent(fixture, 0, { manifestSha256: "e".repeat(64) }),
+    (fixture) => writeFileSync(path.join(fixture.roots[0], "current.provenance.json"), JSON.stringify({ schemaVersion: 1, artifactKind: "datapack-field-provenance", candidateBuild: { sourceSnapshotSetHash: "f".repeat(64) } })),
     (fixture) => rewriteComponent(fixture, 1, { dataVersion: "other" }),
     (fixture) => { fixture.candidateHeadShas[1] = "f".repeat(40); },
     (fixture) => { fixture.candidateWorkflowRunIds[2] = "999"; },
@@ -77,6 +86,20 @@ test("candidate root의 symlink·실제 inventory drift·identity·approval·com
     (fixture) => writeFileSync(fixture.output, "sentinel"),
     (fixture) => writeFileSync(fixture.evidenceOutput, "evidence-sentinel"),
   ]) assertRejectedWithoutOutputDamage(mutate);
+});
+
+test("candidate signature validation key가 없으면 fail closed한다", () => {
+  for (const env of [
+    { EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: "" },
+    { EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: "" },
+  ]) {
+    const fixture = createFixture();
+    try {
+      assert.notEqual(run(fixture, env).status, 0);
+    } finally {
+      fixture.cleanup();
+    }
+  }
 });
 
 test("duplicate candidate run IDs는 identity 검증 뒤 parity set에서 거부한다", () => {
@@ -128,21 +151,27 @@ function assertRejectedWithoutOutputDamage(mutate) {
 
 function createFixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "promotion-build-"));
-  const inventoryBytes = Buffer.from(JSON.stringify(inventoryValue("artifact")));
-  const components = ["123", "124", "125"].map((workflowRunId) => componentValue(workflowRunId, sha256(inventoryBytes)));
-  const roots = components.map((component, index) => {
+  const roots = ["123", "124", "125"].map((workflowRunId, index) => {
     const candidateRoot = path.join(root, `candidate-${index + 1}`);
     file(candidateRoot, "artifact.bin", "artifact");
+    const provenance = { schemaVersion: 1, artifactKind: "datapack-field-provenance", candidateBuild: { sourceSnapshotSetHash: "c".repeat(64) } };
+    file(candidateRoot, "current.provenance.json", JSON.stringify(provenance));
+    const manifestBytes = Buffer.from(JSON.stringify(productionManifest()));
+    file(candidateRoot, "catalog/current.json", manifestBytes);
+    const inventoryBytes = Buffer.from(JSON.stringify(inventoryValue(candidateRoot)));
+    const component = componentValue(workflowRunId, sha256(inventoryBytes), sha256(manifestBytes));
     file(candidateRoot, "data-component-manifest.json", JSON.stringify(component));
     file(candidateRoot, "data-artifact-inventory.json", inventoryBytes);
-    return candidateRoot;
+    return { root: candidateRoot, component, inventoryBytes };
   });
+  const components = roots.map(({ component }) => component);
+  const inventoryBytes = roots[0].inventoryBytes;
   const compatibility = compatibilityValue(components[0]);
   const compatibilityBytes = Buffer.from(JSON.stringify(compatibility));
   const approvalBytes = Buffer.from(JSON.stringify([approvedReview()]));
   return {
     root,
-    roots,
+    roots: roots.map(({ root: candidateRoot }) => candidateRoot),
     components,
     inventoryBytes,
     compatibilityPath: file(root, "compatibility.json", compatibilityBytes),
@@ -168,21 +197,44 @@ function approvedReview() {
   return { state: "approved", environments: [{ name: "datapack-promotion" }], user: { login: "AquilaXk" } };
 }
 
-function inventoryValue(contents) {
+function inventoryValue(root) {
+  const entries = ["artifact.bin", "catalog/current.json", "current.provenance.json"].map((entry) => {
+    const bytes = readFileSync(path.join(root, entry));
+    return { path: entry, sizeBytes: bytes.length, sha256: sha256(bytes) };
+  });
   return {
     schemaVersion: 1,
     artifactKind: "datapack-candidate-inventory",
-    entries: [{ path: "artifact.bin", sizeBytes: Buffer.byteLength(contents), sha256: sha256(contents) }],
+    entries,
   };
 }
 
-function componentValue(workflowRunId, artifactInventorySha256) {
+function componentValue(workflowRunId, artifactInventorySha256, manifestSha256) {
   return {
     schemaVersion: 1, component: "data", repository: "AquilaXk/easysubway-data", gitSha: "a".repeat(40),
-    workflowRunId, dataVersion: "1", releaseSequence: 1, manifestSha256: "b".repeat(64),
+    workflowRunId, dataVersion: "1", releaseSequence: 1, manifestSha256,
     provenance: { sourceSnapshotSetHash: "c".repeat(64) }, artifactInventorySha256,
     contractVersion: "datapack-contract-v3", issueRef: "AquilaXk/easysubway#2705",
   };
+}
+
+function productionManifest() {
+  const manifest = {
+    manifestVersion: 2, channel: "production", releaseSequence: 1,
+    publishedAt: "2026-07-30T00:00:00.000Z", expiresAt: "2026-08-01T00:00:00.000Z",
+    keyId: "production-v1", ttlSeconds: 3600, activePack: { id: "capital", version: "1" },
+    packs: [{
+      id: "capital", version: "1", artifactKind: "production", url: "https://datapack.example.org/catalog/capital-v1.sqlite.gz",
+      sha256: "a".repeat(64), sqliteSha256: "b".repeat(64), sizeBytes: 1,
+      signature: { algorithm: "rsa-sha256-pack-manifest-v2", value: "x" }, schemaVersion: "1",
+      sourceInventory: [{ id: "source", owner: "owner", url: "https://data.example.org/source", license: "open", licenseStatus: "redistributable", redistributionAllowed: true, updateFrequency: "daily", updatedAt: "2026-07-30T00:00:00.000Z", fields: ["stations"], coverageScope: { regionIds: ["capital"], operatorIds: ["operator"], sourceDomains: ["data.example.org"] } }],
+      regionalQualityMetrics: { stationCount: 1, edgeCount: 1, facilityCoverageRatio: 1, requiredFacilityEvidenceCoverageRatio: 1, strictRouteEligibleFacilityRatio: 1, operationalKnownRatio: 1, freshnessValidRatio: 1, fieldVerifiedPathwayRatio: 1, unknownAccessibilityRatio: 0, unknownEdgeRatioByProfile: { wheelchair: 0, stroller: 0, lowMobility: 0 } },
+      representativeRouteRegressions: [], representativeRouteRegressionSignature: { algorithm: "sha256-route-regression-v1", value: "d".repeat(64) },
+      requiredTables: ["stations", "station_lines", "network_edges", "facilities", "station_facility_evidence"], minimumTableRows: { stations: 1, station_lines: 1, network_edges: 1, facilities: 1, station_facility_evidence: 1 },
+    }],
+  };
+  manifest.signature = { algorithm: "rsa-sha256-manifest-v2", value: createSign("RSA-SHA256").update(canonicalJson(withoutSignature(manifest))).sign(privateKey).toString("base64url") };
+  return manifest;
 }
 
 function compatibilityValue(component) {
@@ -190,8 +242,8 @@ function compatibilityValue(component) {
 }
 
 function file(root, name, value) {
-  mkdirSync(root, { recursive: true });
   const target = path.join(root, name);
+  mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, value);
   return target;
 }
@@ -200,7 +252,7 @@ function exists(target) {
   try { readFileSync(target); return true; } catch { return false; }
 }
 
-function run(fixture) {
+function run(fixture, env = {}) {
   return spawnSync(process.execPath, [
     script,
     "--candidate-root-1", fixture.roots[0], "--candidate-root-2", fixture.roots[1], "--candidate-root-3", fixture.roots[2],
@@ -211,5 +263,5 @@ function run(fixture) {
     "--approval-evidence", fixture.approvalPath, "--workflow-run-id", fixture.workflowRunId,
     "--issue-ref", "AquilaXk/easysubway#2705", "--rebuild-parity-evidence-output", fixture.evidenceOutput,
     "--output", fixture.output,
-  ], { encoding: "utf8" });
+  ], { encoding: "utf8", env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: signingPublicKey, EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: "production-v1", ...env } });
 }

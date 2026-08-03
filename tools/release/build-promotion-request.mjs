@@ -3,6 +3,7 @@ import { link, lstat, mkdtemp, readdir, rm, unlink, writeFile } from "node:fs/pr
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
+import { selectEffectiveDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 
 import {
   hash,
@@ -25,7 +26,7 @@ async function main() {
     "rebuild-parity-evidence-output", "output",
   ]);
   const candidates = await Promise.all(["candidate-root-1", "candidate-root-2", "candidate-root-3"]
-    .map((name, index) => readCandidateRoot(
+    .map((name, index) => verifyPromotionCandidateRoot(
       args.get(name), `--${name}`,
       args.get(`candidate-workflow-run-id-${index + 1}`),
       args.get(`candidate-head-sha-${index + 1}`),
@@ -92,20 +93,35 @@ async function main() {
   );
 }
 
-async function readCandidateRoot(root, label, expectedWorkflowRunId, expectedGitSha) {
+export async function verifyPromotionCandidateRoot(root, label, expectedWorkflowRunId, expectedGitSha) {
+  if (!process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM?.trim()
+    || !process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID?.trim()) {
+    throw new Error("candidate signature validation key is required");
+  }
   const stats = await lstat(root);
   if (!stats.isDirectory() || stats.isSymbolicLink()) {
     throw new Error(`${label} must be a regular non-symlink directory`);
   }
   const componentPath = path.join(root, "data-component-manifest.json");
   const inventoryPath = path.join(root, "data-artifact-inventory.json");
+  const manifestPath = path.join(root, "catalog", "current.json");
+  const provenancePath = path.join(root, "current.provenance.json");
   const [component] = await regularJson(componentPath, `${label}/data-component-manifest.json`);
   const [inventory, inventoryBytes] = await regularJson(inventoryPath, `${label}/data-artifact-inventory.json`);
+  const [manifest, manifestBytes] = await regularJson(manifestPath, `${label}/catalog/current.json`);
+  const [provenance] = await regularJson(provenancePath, `${label}/current.provenance.json`);
+  validateManifest(manifest, { requireProduction: true });
+  const activePack = selectEffectiveDataPack(manifest);
   validatePromotionCandidate(component);
   validateInventory(inventory);
   if (!positiveDecimal(expectedWorkflowRunId) || !/^[a-f0-9]{40}$/.test(expectedGitSha)
     || component.workflowRunId !== expectedWorkflowRunId || component.gitSha !== expectedGitSha
     || component.artifactInventorySha256 !== hash(inventoryBytes)
+    || manifest.manifestVersion !== 2 || !activePack
+    || component.manifestSha256 !== hash(manifestBytes)
+    || component.dataVersion !== activePack.version || component.releaseSequence !== manifest.releaseSequence
+    || component.provenance.sourceSnapshotSetHash !== provenance?.candidateBuild?.sourceSnapshotSetHash
+    || !/^[a-f0-9]{64}$/.test(provenance?.candidateBuild?.sourceSnapshotSetHash ?? "")
     || !isSameInventory(inventory.entries, await actualInventory(root))) {
     throw new Error("candidate inventory is invalid");
   }

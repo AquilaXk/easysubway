@@ -633,6 +633,10 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
     assert.match(candidateBinding, new RegExp(`--candidate-head-sha-${index}`));
   }
   assert.match(candidateBinding, /--selected-candidate-workflow-run-id/);
+  assert.match(candidateBinding, /EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: \$\{\{ secrets\.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM \}\}/);
+  assert.match(candidateBinding, /EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: \$\{\{ secrets\.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID \}\}/);
+  assert.equal((promotion.match(/secrets\.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM/g) ?? []).length, 1);
+  assert.equal((promotion.match(/secrets\.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID/g) ?? []).length, 1);
   assert.match(candidateBinding, /--rebuild-parity-evidence-output/);
   assert.match(candidateBinding, /--rebuild-parity-evidence\s/);
   assert.match(candidateBinding, /promotion-artifact\/rebuild-parity-evidence\.json/);
@@ -742,6 +746,13 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
   assert.doesNotMatch(verify, /build-data-component-manifest\.mjs/);
   assert.doesNotMatch(verify, /candidate-original-component-manifest/);
   const stage = step("Data Pack Release / Stage verified candidate artifact");
+  assert.match(stage, /verify-promotion-candidate-root\.mjs/);
+  assert.match(stage, /EASYSUBWAY_ENV_FILE: ""/);
+  assert.match(stage, /EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM: ""/);
+  assert.doesNotMatch(stage, /node --env-file/);
+  assert.match(stage, /--workflow-run-id "\$\{EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID\}"/);
+  assert.match(stage, /--git-sha "\$\{CANDIDATE_HEAD_SHA\}"/);
+  assert.ok(stage.indexOf("verify-promotion-candidate-root.mjs") < stage.indexOf("cp -a"));
   assert.match(stage, /cp -a "\$\{RUNNER_TEMP\}\/downloaded-candidate\/\." "\$\{EASYSUBWAY_DATAPACK_STAGE\}\//);
 
   const publishPlan = step("Data Pack Release / Create manifest-last publish preflight plan");
