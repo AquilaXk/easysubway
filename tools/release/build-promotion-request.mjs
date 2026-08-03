@@ -3,7 +3,7 @@ import { link, lstat, mkdtemp, readdir, rm, unlink, writeFile } from "node:fs/pr
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { isDeepStrictEqual } from "node:util";
-import { selectEffectiveDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
+import { selectEffectiveDataPack, stagedPackPath, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 
 import {
   hash,
@@ -112,6 +112,9 @@ export async function verifyPromotionCandidateRoot(root, label, expectedWorkflow
   const [provenance] = await regularJson(provenancePath, `${label}/current.provenance.json`);
   validateManifest(manifest, { requireProduction: true });
   const activePack = selectEffectiveDataPack(manifest);
+  const actualEntries = await actualInventory(root);
+  const declaredPackPaths = new Set(manifest.packs.map(stagedPackPath));
+  const actualPackPaths = new Set(actualEntries.filter((entry) => entry.path.endsWith(".sqlite.gz")).map((entry) => entry.path));
   validatePromotionCandidate(component);
   validateInventory(inventory);
   if (!positiveDecimal(expectedWorkflowRunId) || !/^[a-f0-9]{40}$/.test(expectedGitSha)
@@ -122,7 +125,9 @@ export async function verifyPromotionCandidateRoot(root, label, expectedWorkflow
     || component.dataVersion !== activePack.version || component.releaseSequence !== manifest.releaseSequence
     || component.provenance.sourceSnapshotSetHash !== provenance?.candidateBuild?.sourceSnapshotSetHash
     || !/^[a-f0-9]{64}$/.test(provenance?.candidateBuild?.sourceSnapshotSetHash ?? "")
-    || !isSameInventory(inventory.entries, await actualInventory(root))) {
+    || declaredPackPaths.size !== actualPackPaths.size
+    || ![...declaredPackPaths].every((packPath) => actualPackPaths.has(packPath))
+    || !isSameInventory(inventory.entries, actualEntries)) {
     throw new Error("candidate inventory is invalid");
   }
   return { component, inventoryBytes };

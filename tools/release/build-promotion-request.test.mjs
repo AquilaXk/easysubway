@@ -102,6 +102,22 @@ test("candidate signature validation key가 없으면 fail closed한다", () => 
   }
 });
 
+test("manifest declared pack 누락과 undeclared sqlite pack을 fail closed한다", () => {
+  for (const mutate of [
+    (fixture) => fixture.roots.forEach((root) => unlinkSync(path.join(root, "catalog/capital-v1.sqlite.gz"))),
+    (fixture) => fixture.roots.forEach((root) => file(root, "catalog/extra.sqlite.gz", "extra")),
+  ]) {
+    const fixture = createFixture();
+    try {
+      mutate(fixture);
+      refreshCandidateMetadata(fixture);
+      assert.notEqual(run(fixture).status, 0);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+});
+
 test("duplicate candidate run IDs는 identity 검증 뒤 parity set에서 거부한다", () => {
   const fixture = createFixture();
   try {
@@ -154,6 +170,7 @@ function createFixture() {
   const roots = ["123", "124", "125"].map((workflowRunId, index) => {
     const candidateRoot = path.join(root, `candidate-${index + 1}`);
     file(candidateRoot, "artifact.bin", "artifact");
+    file(candidateRoot, "catalog/capital-v1.sqlite.gz", "pack");
     const provenance = { schemaVersion: 1, artifactKind: "datapack-field-provenance", candidateBuild: { sourceSnapshotSetHash: "c".repeat(64) } };
     file(candidateRoot, "current.provenance.json", JSON.stringify(provenance));
     const manifestBytes = Buffer.from(JSON.stringify(productionManifest()));
@@ -193,12 +210,27 @@ function rewriteComponent(fixture, index, patch) {
   writeFileSync(path.join(fixture.roots[index], "data-component-manifest.json"), JSON.stringify(fixture.components[index]));
 }
 
+function refreshCandidateMetadata(fixture) {
+  fixture.components = fixture.roots.map((root, index) => {
+    const inventoryBytes = Buffer.from(JSON.stringify(inventoryValue(root)));
+    const component = componentValue(
+      fixture.candidateWorkflowRunIds[index], sha256(inventoryBytes),
+      sha256(readFileSync(path.join(root, "catalog/current.json"))),
+    );
+    writeFileSync(path.join(root, "data-artifact-inventory.json"), inventoryBytes);
+    writeFileSync(path.join(root, "data-component-manifest.json"), JSON.stringify(component));
+    return component;
+  });
+  writeFileSync(fixture.compatibilityPath, JSON.stringify(compatibilityValue(fixture.components[0])));
+}
+
 function approvedReview() {
   return { state: "approved", environments: [{ name: "datapack-promotion" }], user: { login: "AquilaXk" } };
 }
 
 function inventoryValue(root) {
-  const entries = ["artifact.bin", "catalog/current.json", "current.provenance.json"].map((entry) => {
+  const entries = ["artifact.bin", "catalog/current.json", "current.provenance.json", "catalog/capital-v1.sqlite.gz", "catalog/extra.sqlite.gz"]
+    .filter((entry) => exists(path.join(root, entry))).sort().map((entry) => {
     const bytes = readFileSync(path.join(root, entry));
     return { path: entry, sizeBytes: bytes.length, sha256: sha256(bytes) };
   });
