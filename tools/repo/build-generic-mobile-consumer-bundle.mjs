@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
 import { constants } from "node:fs";
-import { lstat, open, readFile, writeFile } from "node:fs/promises";
+import { lstat, open, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -27,7 +27,7 @@ const exactKeys = (value, keys, label) => {
 const safePath = (value) => typeof value === "string" && value.length > 0 && !value.includes("\\") && !path.posix.isAbsolute(value) && path.posix.normalize(value) === value && value.split("/").every((part) => part !== "" && part !== "." && part !== "..");
 const canonicalJson = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`; // NOSONAR: canonical JSON requires raw locale-independent JavaScript string ordering.
   return JSON.stringify(value);
 };
 
