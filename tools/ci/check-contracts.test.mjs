@@ -359,6 +359,10 @@ test("문서 거버넌스 계약은 current-only와 base 비교에서 supersessi
     assert.deepEqual(collectContractErrors(workspacePath), []);
 
     assert.ok(collectContractErrors(workspacePath, {
+      previousArchitectureDecision: [previousRoot, previousRoot],
+    }).some((error) => error.includes("base ADR ADR-HUB-0001 중복")));
+
+    assert.ok(collectContractErrors(workspacePath, {
       previousArchitectureDecision: [previousRoot],
     }).some((error) => error.includes("direct successor는 accepted")));
 
@@ -452,6 +456,14 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
     const stagedWorkspace = structuredClone(rootWorkspace);
     stagedWorkspace.architectureDecision = "staged/ADR-HUB-0001.json";
     writeFileSync(join(repository, "staged-workspace.json"), JSON.stringify(stagedWorkspace));
+    mkdirSync(join(repository, "malformed"));
+    const malformedRoot = structuredClone(root);
+    malformedRoot.supersededBy = "ADR-HUB-0099";
+    writeFileSync(join(repository, "malformed/ADR-HUB-0001.json"), JSON.stringify(malformedRoot));
+    writeFileSync(join(repository, "malformed/broken.json"), "{");
+    const malformedWorkspace = structuredClone(rootWorkspace);
+    malformedWorkspace.architectureDecision = "malformed/ADR-HUB-0001.json";
+    writeFileSync(join(repository, "malformed-workspace.json"), JSON.stringify(malformedWorkspace));
     for (const args of [["init"], ["config", "user.email", "test@example.com"], ["config", "user.name", "Test"], ["add", "."], ["commit", "-m", "base"]]) {
       execFileSync("/usr/bin/git", args, { cwd: repository, stdio: "ignore" });
     }
@@ -461,6 +473,10 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
     assert.deepEqual(
       loadArchitectureDecisionAtRef("root-workspace.json", baseRef).map(({ id }) => id),
       ["ADR-HUB-0001"],
+    );
+    assert.throws(
+      () => loadArchitectureDecisionAtRef("malformed-workspace.json", baseRef),
+      /successor ADR 판정에 유효한 JSON이 필요하다/,
     );
     const stagedBase = loadArchitectureDecisionAtRef("staged-workspace.json", baseRef);
     stagedRoot.status = "superseded";
