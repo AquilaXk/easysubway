@@ -141,6 +141,11 @@ export function collectContractErrors(
     }
     const currentById = new Map(currentArchitectureDecisions.map((member) => [member.adr.id, member]));
     for (const [previousId, previousCandidates] of previousById) {
+      if (previousCandidates.length !== 1) {
+        errors.push(`${workspace.architectureDecision}: base ADR ${previousId} 중복`);
+        continue;
+      }
+      const [previous] = previousCandidates;
       const currentCandidates = currentArchitectureDecisionCandidates.get(previousId) ?? [];
       if (currentCandidates.length > 1) {
         errors.push(`${workspace.architectureDecision}: current ADR ${previousId} 중복`);
@@ -151,22 +156,27 @@ export function collectContractErrors(
       if (current == null) {
         if (previousChainIds.has(previousId)) {
           errors.push(`${workspace.architectureDecision}: base ADR ${previousId}가 current chain에서 삭제되었다`);
+        } else if (["accepted", "rejected", "withdrawn", "superseded"].includes(previous.status)) {
+          errors.push(`${workspace.architectureDecision}: base ADR ${previousId}가 current catalog에서 삭제되었다`);
         }
         continue;
       }
-      if (previousCandidates.length !== 1) {
-        errors.push(`${workspace.architectureDecision}: base ADR ${previousId} 중복`);
-        continue;
-      }
-      const [previous] = previousCandidates;
       const transitionErrors = validateArchitectureDecisionTransition(previous, current.adr);
       errors.push(...transitionErrors
         .map((error) => `${current.path}: ${error}`));
       if (transitionErrors.length === 0
         && previous.status === "accepted" && current.adr.status === "superseded") {
-        const successor = currentArchitectureDecisions[currentArchitectureDecisions.indexOf(current) + 1];
-        if (successor?.adr.status !== "accepted") {
+        const successors = currentArchitectureDecisionCandidates.get(current.adr.supersededBy) ?? [];
+        if (successors.length === 0) {
+          errors.push(`${current.path}: successor ADR 누락`);
+        } else if (successors.length > 1) {
+          errors.push(`${current.path}: successor ADR 중복`);
+        } else if (!successors[0][2]) {
+          errors.push(`${successors[0][0]}: successor ADR는 schema와 semantic 검증을 통과해야 한다`);
+        } else if (successors[0][1].status !== "accepted") {
           errors.push(`${current.path}: accepted ADR의 direct successor는 accepted 상태여야 한다`);
+        } else if (!successors[0][1].supersedes.includes(current.adr.id)) {
+          errors.push(`${successors[0][0]}: supersedes reciprocal link가 필요하다`);
         }
       }
     }
@@ -367,15 +377,14 @@ function validateArchitectureDecisionChain(schemaPath, rootPath, root, errors, c
     candidates.push([candidatePath, candidate, candidateValid]);
     candidatesById.set(candidate.id, candidates);
   }
+  for (const [id, candidates] of candidatesById) {
+    if (candidates.length > 1) errors.push(`${rootPath}: current ADR ID 중복 (${id})`);
+  }
   const members = [];
   const visited = new Set();
   let current = [rootPath, root];
   while (true) {
     const [currentPath, currentAdr] = current;
-    if ((candidatesById.get(currentAdr.id) ?? []).length > 1) {
-      errors.push(`${currentPath}: current ADR ID 중복`);
-      return members;
-    }
     if (visited.has(currentAdr.id)) {
       errors.push(`${currentPath}: supersession cycle을 허용하지 않는다`);
       return members;
