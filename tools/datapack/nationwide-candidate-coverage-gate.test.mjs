@@ -597,7 +597,11 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
       "--resolution-plan", RESOLUTION_PLAN_PATH,
       "--resolutions", RESOLUTIONS_PATH,
       "--output", output,
-    ], { cwd: root });
+    ], {
+      cwd: root,
+      // ponytail: committed fixture replay clock; release workflow keeps actual time.
+      env: { ...process.env, EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-30T00:00:00.000Z" },
+    });
 
     const regenerated = await readFile(output, "utf8");
     const tracked = await readFile(path.join(root, EVIDENCE_PATH), "utf8");

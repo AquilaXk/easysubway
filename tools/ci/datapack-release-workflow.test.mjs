@@ -7,6 +7,10 @@ import path from "node:path";
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const yml = readFileSync(path.join(root, ".github/workflows/datapack-release.yml"), "utf8");
 
+test("production release workflow는 test fixture clock을 사용하지 않는다", () => {
+  assert.doesNotMatch(yml, /EASYSUBWAY_DATAPACK_BUILD_NOW/);
+});
+
 test("product datapack 정책 변경은 release workflow를 실행한다", () => {
   assert.match(yml, /paths:[\s\S]*release\/product-gates\/datapack-freshness-sla\.json/);
   assert.match(yml, /paths:[\s\S]*release\/product-gates\/production-datapack-scope\.json/);
