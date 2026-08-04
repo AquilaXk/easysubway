@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import {
   collectContractErrors,
+  loadArchitectureDecisionAtRef,
   loadWorkspace,
   loadJson,
   validateCompatibilityMatrixPayload,
@@ -320,6 +321,146 @@ test("문서 거버넌스 계약은 reciprocal successor가 있는 accepted ADR 
     assert.deepEqual(collectContractErrors(workspacePath, { previousArchitectureDecision: previous }), []);
   } finally {
     rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 current-only와 base 비교에서 supersession chain을 검증한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const decisionPath = join(directory, "inputs/architecture-decision.json");
+    const root = loadJson(decisionPath);
+    const previousRoot = structuredClone(root);
+    previousRoot.status = "accepted";
+    root.status = "superseded";
+    root.supersededBy = "ADR-HUB-0002";
+    writeFileSync(decisionPath, JSON.stringify(root));
+    const successor = structuredClone(root);
+    successor.id = "ADR-HUB-0002";
+    successor.status = "proposed";
+    successor.supersededBy = null;
+    successor.supersedes = [root.id];
+    const successorPath = join(directory, "inputs/ADR-HUB-0002.json");
+    writeFileSync(successorPath, JSON.stringify(successor));
+
+    assert.ok(collectContractErrors(workspacePath).some((error) => (
+      error.includes("successor ADR는 accepted 상태여야 한다")
+    )));
+
+    successor.status = "superseded";
+    successor.supersededBy = "ADR-HUB-0003";
+    writeFileSync(successorPath, JSON.stringify(successor));
+    const terminal = structuredClone(successor);
+    terminal.id = "ADR-HUB-0003";
+    terminal.status = "accepted";
+    terminal.supersededBy = null;
+    terminal.supersedes = [successor.id];
+    const terminalPath = join(directory, "inputs/ADR-HUB-0003.json");
+    writeFileSync(terminalPath, JSON.stringify(terminal));
+    assert.deepEqual(collectContractErrors(workspacePath), []);
+
+    assert.ok(collectContractErrors(workspacePath, {
+      previousArchitectureDecision: [previousRoot],
+    }).some((error) => error.includes("direct successor는 accepted")));
+
+    terminal.supersedes = [];
+    writeFileSync(terminalPath, JSON.stringify(terminal));
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("reciprocal link")));
+    terminal.supersedes = [successor.id];
+    writeFileSync(terminalPath, JSON.stringify(terminal));
+
+    writeFileSync(join(directory, "inputs/ADR-HUB-0003-duplicate.json"), JSON.stringify(terminal));
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("successor ADR 중복")));
+    rmSync(join(directory, "inputs/ADR-HUB-0003-duplicate.json"));
+
+    root.supersedes = [terminal.id];
+    terminal.status = "superseded";
+    terminal.supersededBy = root.id;
+    writeFileSync(decisionPath, JSON.stringify(root));
+    writeFileSync(terminalPath, JSON.stringify(terminal));
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("supersession cycle")));
+    root.supersedes = [];
+    terminal.status = "accepted";
+    terminal.supersededBy = null;
+    writeFileSync(decisionPath, JSON.stringify(root));
+    writeFileSync(terminalPath, JSON.stringify(terminal));
+
+    successor.status = "accepted";
+    successor.supersededBy = null;
+    writeFileSync(successorPath, JSON.stringify(successor));
+    rmSync(terminalPath);
+    const previousSuccessor = structuredClone(successor);
+    previousSuccessor.title = "base revision successor";
+    successor.title = "current revision successor";
+    writeFileSync(successorPath, JSON.stringify(successor));
+
+    assert.ok(collectContractErrors(workspacePath, {
+      previousArchitectureDecision: [structuredClone(root), previousSuccessor],
+    }).some((error) => error.includes("in-place")));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 읽는다", () => {
+  const repository = mkdtempSync(join(tmpdir(), "architecture-chain-git-"));
+  const previousCwd = process.cwd();
+  try {
+    mkdirSync(join(repository, "docs"), { recursive: true });
+    const root = loadJson("contracts/documentation/ADR-HUB-0001.json");
+    root.status = "superseded";
+    root.supersededBy = "ADR-HUB-0002";
+    const intermediate = structuredClone(root);
+    intermediate.id = "ADR-HUB-0002";
+    intermediate.status = "superseded";
+    intermediate.supersededBy = "ADR-HUB-0003";
+    intermediate.supersedes = [root.id];
+    const terminal = structuredClone(intermediate);
+    terminal.id = "ADR-HUB-0003";
+    terminal.status = "accepted";
+    terminal.supersededBy = null;
+    terminal.supersedes = [intermediate.id];
+    writeFileSync(join(repository, "docs/ADR-HUB-0001.json"), JSON.stringify(root));
+    writeFileSync(join(repository, "docs/ADR-HUB-0002.json"), JSON.stringify(intermediate));
+    writeFileSync(join(repository, "docs/ADR-HUB-0003.json"), JSON.stringify(terminal));
+    mkdirSync(join(repository, "docs/nested"));
+    writeFileSync(join(repository, "docs/nested/duplicate.json"), JSON.stringify(intermediate));
+    writeFileSync(join(repository, "workspace.json"), JSON.stringify({
+      contracts: resolve(previousCwd, "contracts"),
+      gateDirectories: { hub: resolve(previousCwd, "release/product-gates"), mobile: resolve(previousCwd, "apps/mobile/release") },
+      datapackIndex: resolve(previousCwd, "apps/mobile/assets/datapacks/index.json"),
+      sourceInventory: resolve(previousCwd, "apps/mobile/assets/datapacks/source-inventory.json"),
+      governancePolicy: resolve(previousCwd, "tools/datapack/source-governance-policy.json"),
+      freshnessPolicy: resolve(previousCwd, "release/product-gates/datapack-freshness-sla.json"),
+      architectureDecision: "docs/ADR-HUB-0001.json",
+    }));
+    const rootLevel = structuredClone(root);
+    rootLevel.status = "accepted";
+    rootLevel.supersededBy = null;
+    writeFileSync(join(repository, "ADR-HUB-0001.json"), JSON.stringify(rootLevel));
+    const rootWorkspace = loadJson(join(repository, "workspace.json"));
+    rootWorkspace.architectureDecision = "ADR-HUB-0001.json";
+    writeFileSync(join(repository, "root-workspace.json"), JSON.stringify(rootWorkspace));
+    for (const args of [["init"], ["config", "user.email", "test@example.com"], ["config", "user.name", "Test"], ["add", "."], ["commit", "-m", "base"]]) {
+      execFileSync("/usr/bin/git", args, { cwd: repository, stdio: "ignore" });
+    }
+    const baseRef = execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim();
+
+    process.chdir(repository);
+    assert.deepEqual(
+      loadArchitectureDecisionAtRef("root-workspace.json", baseRef).map(({ id }) => id),
+      ["ADR-HUB-0001"],
+    );
+    const baseChain = loadArchitectureDecisionAtRef("workspace.json", baseRef);
+    assert.deepEqual(
+      baseChain.map(({ id }) => id),
+      ["ADR-HUB-0001", "ADR-HUB-0002", "ADR-HUB-0003"],
+    );
+    rmSync(join(repository, "docs/ADR-HUB-0002.json"));
+    assert.ok(collectContractErrors("workspace.json", { previousArchitectureDecision: baseChain })
+      .some((error) => error.includes("base ADR ADR-HUB-0002가 current chain에서 삭제되었다")));
+  } finally {
+    process.chdir(previousCwd);
+    rmSync(repository, { recursive: true, force: true });
   }
 });
 
