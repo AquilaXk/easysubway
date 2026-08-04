@@ -253,6 +253,72 @@ test("문서 거버넌스 계약은 workspace gate에서 base revision 상태 �
   }
 });
 
+test("문서 거버넌스 계약은 accepted ADR의 supersession successor를 fail closed한다", () => {
+  const cases = [
+    ["missing", () => {}, "successor ADR 누락"],
+    ["malformed", (directory) => { writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), "{"); }, "유효한 JSON"],
+    ["duplicate", (directory, successor) => {
+      writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
+      writeFileSync(join(directory, "inputs/duplicate.json"), JSON.stringify(successor));
+    }, "successor ADR 중복"],
+    ["invalid", (directory, successor) => {
+      successor.decision.repositoryOwners.data = "AquilaXk/easysubway";
+      writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
+    }, "successor ADR는 schema와 semantic 검증을 통과해야 한다"],
+    ["non-reciprocal", (directory, successor) => {
+      successor.supersedes = [];
+      writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
+    }, "supersedes reciprocal link가 필요하다"],
+  ];
+
+  for (const [name, prepare, expected] of cases) {
+    const { directory, workspacePath } = createExternalWorkspace();
+    try {
+      const decisionPath = join(directory, "inputs/architecture-decision.json");
+      const previous = loadJson(decisionPath);
+      previous.status = "accepted";
+      const current = structuredClone(previous);
+      current.status = "superseded";
+      current.supersededBy = "ADR-HUB-0002";
+      writeFileSync(decisionPath, JSON.stringify(current));
+      const successor = structuredClone(previous);
+      successor.id = "ADR-HUB-0002";
+      successor.supersedes = [previous.id];
+      prepare(directory, successor);
+
+      assert.ok(
+        collectContractErrors(workspacePath, { previousArchitectureDecision: previous })
+          .some((error) => error.includes(expected)),
+        `${name}: ${expected}`,
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
+
+test("문서 거버넌스 계약은 reciprocal successor가 있는 accepted ADR supersession을 허용한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const decisionPath = join(directory, "inputs/architecture-decision.json");
+    const previous = loadJson(decisionPath);
+    previous.status = "accepted";
+    const current = structuredClone(previous);
+    current.status = "superseded";
+    current.supersededBy = "ADR-HUB-0002";
+    writeFileSync(decisionPath, JSON.stringify(current));
+    const successor = structuredClone(previous);
+    successor.id = "ADR-HUB-0002";
+    successor.supersedes = [previous.id];
+    writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
+    writeFileSync(join(directory, "inputs/unrelated-malformed.json"), "{");
+
+    assert.deepEqual(collectContractErrors(workspacePath, { previousArchitectureDecision: previous }), []);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("문서 거버넌스 계약은 workspace ADR path redirect를 거부한다", () => {
   assert.ok(validateArchitectureDecisionWorkspaceTransition(
     { architectureDecision: "../documentation/ADR-HUB-0001.json" },
