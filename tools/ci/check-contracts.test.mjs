@@ -324,6 +324,29 @@ test("문서 거버넌스 계약은 reciprocal successor가 있는 accepted ADR 
   }
 });
 
+test("문서 거버넌스 계약은 active chain 밖 ADR 후보도 검증한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const candidate = loadJson(join(directory, "inputs/architecture-decision.json"));
+    candidate.id = "ADR-HUB-0002";
+    delete candidate.decision;
+    writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(candidate));
+    const unidentified = loadJson(join(directory, "inputs/architecture-decision.json"));
+    delete unidentified.id;
+    writeFileSync(join(directory, "inputs/candidate.json"), JSON.stringify(unidentified));
+
+    const errors = collectContractErrors(workspacePath);
+    assert.ok(errors.some((error) => (
+      error.includes("ADR-HUB-0002.json") && error.includes("$.decision: 필수 필드 누락")
+    )));
+    assert.ok(errors.some((error) => (
+      error.includes("candidate.json") && error.includes("$.id: 필수 필드 누락")
+    )));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("문서 거버넌스 계약은 current-only와 base 비교에서 supersession chain을 검증한다", () => {
   const { directory, workspacePath } = createExternalWorkspace();
   try {
@@ -516,7 +539,7 @@ test("문서 거버넌스 계약은 workspace ADR path redirect를 거부한다"
   ).some((error) => error.includes("path redirect")));
 });
 
-test("문서 거버넌스 계약은 PR base와 non-PR current-only CI 경로를 분리한다", () => {
+test("문서 거버넌스 계약은 PR·push base와 dispatch current-only CI 경로를 분리한다", () => {
   const validatorSource = readFileSync("tools/ci/check-contracts.mjs", "utf8");
   assert.doesNotMatch(validatorSource, /execFileSync\("git"/);
   assert.match(validatorSource, /execFileSync\("\/usr\/bin\/git"/);
@@ -524,7 +547,9 @@ test("문서 거버넌스 계약은 PR base와 non-PR current-only CI 경로를 
   assert.match(workflow,
     /Repository CI \/ Validate PR contract transitions[\s\S]{0,400}github\.event_name == 'pull_request'[\s\S]{0,400}--base-ref "\$\{BASE_REF\}"/);
   assert.match(workflow,
-    /Repository CI \/ Validate current contracts[\s\S]{0,400}github\.event_name != 'pull_request'[\s\S]{0,400}--current-only/);
+    /Repository CI \/ Validate push contract transitions[\s\S]{0,400}github\.event_name == 'push'[\s\S]{0,400}github\.event\.before[\s\S]{0,400}--base-ref "\$\{BASE_REF\}"/);
+  assert.match(workflow,
+    /Repository CI \/ Validate current contracts[\s\S]{0,400}github\.event_name == 'workflow_dispatch'[\s\S]{0,400}--current-only/);
 });
 
 test("문서 거버넌스 계약은 workspace가 지정한 잘못된 ADR을 contract gate에서 거부한다", () => {

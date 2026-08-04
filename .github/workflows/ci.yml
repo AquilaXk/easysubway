@@ -487,8 +487,14 @@ jobs:
           BASE_REF: ${{ github.event.pull_request.base.sha }}
         run: node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json --base-ref "${BASE_REF}"
 
+      - name: Repository CI / Validate push contract transitions
+        if: ${{ needs.changes.outputs.contracts == 'true' && github.event_name == 'push' }}
+        env:
+          BASE_REF: ${{ github.event.before }}
+        run: node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json --base-ref "${BASE_REF}"
+
       - name: Repository CI / Validate current contracts
-        if: ${{ needs.changes.outputs.contracts == 'true' && github.event_name != 'pull_request' }}
+        if: ${{ needs.changes.outputs.contracts == 'true' && github.event_name == 'workflow_dispatch' }}
         run: node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json --current-only
 
       - name: Repository CI / Check directory boundaries

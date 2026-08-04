@@ -343,16 +343,28 @@ function validateArchitectureDecisionChain(schemaPath, rootPath, root, errors, c
   }
   const malformedPaths = [];
   for (const candidatePath of candidatePaths) {
+    const namedAdr = /^ADR-[A-Z0-9-]+\.json$/.test(basename(candidatePath));
     let candidate;
     try {
       candidate = loadJson(candidatePath);
     } catch {
-      malformedPaths.push(candidatePath);
+      if (namedAdr) {
+        malformedPaths.push(candidatePath);
+        errors.push(`${candidatePath}: 유효한 JSON이 필요하다`);
+      }
       continue;
     }
+    const declaredAdr = candidate?.kind === "architecture-decision"
+      || (typeof candidate?.$schema === "string"
+        && basename(candidate.$schema) === "architecture-decision.schema.json");
+    if (candidatePath !== rootPath && !namedAdr && !declaredAdr && !/^ADR-/.test(candidate?.id)) continue;
+    const candidateErrors = [];
+    const candidateValid = candidatePath === rootPath
+      || validateJson(schemaPath, candidatePath, candidateErrors);
+    errors.push(...candidateErrors);
     if (typeof candidate?.id !== "string") continue;
     const candidates = candidatesById.get(candidate.id) ?? [];
-    candidates.push([candidatePath, candidate]);
+    candidates.push([candidatePath, candidate, candidateValid]);
     candidatesById.set(candidate.id, candidates);
   }
   const members = [];
@@ -384,10 +396,8 @@ function validateArchitectureDecisionChain(schemaPath, rootPath, root, errors, c
       errors.push(`${currentPath}: successor ADR 중복`);
       return members;
     }
-    const [successorPath, successor] = successors[0];
-    const successorErrors = [];
-    if (!validateJson(schemaPath, successorPath, successorErrors)) {
-      errors.push(...successorErrors);
+    const [successorPath, successor, successorValid] = successors[0];
+    if (!successorValid) {
       errors.push(`${successorPath}: successor ADR는 schema와 semantic 검증을 통과해야 한다`);
       return members;
     }
