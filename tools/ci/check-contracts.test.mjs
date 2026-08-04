@@ -358,6 +358,10 @@ test("문서 거버넌스 계약은 current-only와 base 비교에서 supersessi
     writeFileSync(terminalPath, JSON.stringify(terminal));
     assert.deepEqual(collectContractErrors(workspacePath), []);
 
+    writeFileSync(join(directory, "inputs/ADR-HUB-0001-duplicate.json"), JSON.stringify(root));
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("current ADR ID 중복")));
+    rmSync(join(directory, "inputs/ADR-HUB-0001-duplicate.json"));
+
     assert.ok(collectContractErrors(workspacePath, {
       previousArchitectureDecision: [previousRoot, previousRoot],
     }).some((error) => error.includes("base ADR ADR-HUB-0001 중복")));
@@ -479,12 +483,15 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
       /successor ADR 판정에 유효한 JSON이 필요하다/,
     );
     const stagedBase = loadArchitectureDecisionAtRef("staged-workspace.json", baseRef);
-    stagedRoot.status = "superseded";
-    stagedRoot.supersededBy = stagedSuccessor.id;
     stagedSuccessor.status = "accepted";
     stagedSuccessor.title = "mutated current successor";
-    writeFileSync(join(repository, "staged/ADR-HUB-0001.json"), JSON.stringify(stagedRoot));
     writeFileSync(join(repository, "staged/ADR-HUB-0002.json"), JSON.stringify(stagedSuccessor));
+    assert.ok(collectContractErrors("staged-workspace.json", {
+      previousArchitectureDecision: stagedBase,
+    }).some((error) => error.includes("status-only")));
+    stagedRoot.status = "superseded";
+    stagedRoot.supersededBy = stagedSuccessor.id;
+    writeFileSync(join(repository, "staged/ADR-HUB-0001.json"), JSON.stringify(stagedRoot));
     assert.ok(collectContractErrors("staged-workspace.json", {
       previousArchitectureDecision: stagedBase,
     }).some((error) => error.includes("status-only")));

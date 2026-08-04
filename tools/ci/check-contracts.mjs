@@ -106,6 +106,7 @@ export function collectContractErrors(
     errors,
   );
   let currentArchitectureDecisions = [];
+  const currentArchitectureDecisionCandidates = new Map();
   if (architectureDecisionValid) {
     const currentArchitectureDecision = loadJson(workspace.architectureDecision);
     if (currentArchitectureDecision.id !== "ADR-HUB-0001") {
@@ -116,6 +117,7 @@ export function collectContractErrors(
         workspace.architectureDecision,
         currentArchitectureDecision,
         errors,
+        currentArchitectureDecisionCandidates,
       );
     }
   }
@@ -139,7 +141,13 @@ export function collectContractErrors(
     }
     const currentById = new Map(currentArchitectureDecisions.map((member) => [member.adr.id, member]));
     for (const [previousId, previousCandidates] of previousById) {
-      const current = currentById.get(previousId);
+      const currentCandidates = currentArchitectureDecisionCandidates.get(previousId) ?? [];
+      if (currentCandidates.length > 1) {
+        errors.push(`${workspace.architectureDecision}: current ADR ${previousId} 중복`);
+        continue;
+      }
+      const current = currentById.get(previousId) ?? (currentCandidates.length === 1
+        ? { path: currentCandidates[0][0], adr: currentCandidates[0][1] } : null);
       if (current == null) {
         if (previousChainIds.has(previousId)) {
           errors.push(`${workspace.architectureDecision}: base ADR ${previousId}가 current chain에서 삭제되었다`);
@@ -323,7 +331,7 @@ export function validateArchitectureDecisionTransition(previous, current) {
   return ["accepted ADR 본문은 in-place 변경할 수 없고 새 ADR로 supersede해야 한다"];
 }
 
-function validateArchitectureDecisionChain(schemaPath, rootPath, root, errors) {
+function validateArchitectureDecisionChain(schemaPath, rootPath, root, errors, candidatesById) {
   let candidatePaths;
   try {
     candidatePaths = readdirSync(dirname(rootPath))
@@ -333,7 +341,6 @@ function validateArchitectureDecisionChain(schemaPath, rootPath, root, errors) {
     errors.push(`${rootPath}: successor ADR directory를 읽을 수 없다`);
     return [];
   }
-  const candidatesById = new Map();
   const malformedPaths = [];
   for (const candidatePath of candidatePaths) {
     let candidate;
@@ -353,6 +360,10 @@ function validateArchitectureDecisionChain(schemaPath, rootPath, root, errors) {
   let current = [rootPath, root];
   while (true) {
     const [currentPath, currentAdr] = current;
+    if ((candidatesById.get(currentAdr.id) ?? []).length > 1) {
+      errors.push(`${currentPath}: current ADR ID 중복`);
+      return members;
+    }
     if (visited.has(currentAdr.id)) {
       errors.push(`${currentPath}: supersession cycle을 허용하지 않는다`);
       return members;
