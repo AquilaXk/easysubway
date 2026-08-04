@@ -122,13 +122,35 @@ export function collectContractErrors(
   if (previousArchitectureDecision != null && currentArchitectureDecisions.length > 0) {
     const previousArchitectureDecisions = Array.isArray(previousArchitectureDecision)
       ? previousArchitectureDecision : [previousArchitectureDecision];
-    const currentById = new Map(currentArchitectureDecisions.map((member) => [member.adr.id, member]));
+    const previousById = new Map();
     for (const previous of previousArchitectureDecisions) {
-      const current = currentById.get(previous.id);
+      const candidates = previousById.get(previous.id) ?? [];
+      candidates.push(previous);
+      previousById.set(previous.id, candidates);
+    }
+    const previousChainIds = new Set();
+    let previousMember = previousById.get("ADR-HUB-0001")?.[0];
+    while (previousMember != null && !previousChainIds.has(previousMember.id)) {
+      previousChainIds.add(previousMember.id);
+      if (previousMember.status !== "superseded") break;
+      const successors = previousById.get(previousMember.supersededBy) ?? [];
+      if (successors.length !== 1) break;
+      [previousMember] = successors;
+    }
+    const currentById = new Map(currentArchitectureDecisions.map((member) => [member.adr.id, member]));
+    for (const [previousId, previousCandidates] of previousById) {
+      const current = currentById.get(previousId);
       if (current == null) {
-        errors.push(`${workspace.architectureDecision}: base ADR ${previous.id}가 current chain에서 삭제되었다`);
+        if (previousChainIds.has(previousId)) {
+          errors.push(`${workspace.architectureDecision}: base ADR ${previousId}가 current chain에서 삭제되었다`);
+        }
         continue;
       }
+      if (previousCandidates.length !== 1) {
+        errors.push(`${workspace.architectureDecision}: base ADR ${previousId} 중복`);
+        continue;
+      }
+      const [previous] = previousCandidates;
       const transitionErrors = validateArchitectureDecisionTransition(previous, current.adr);
       errors.push(...transitionErrors
         .map((error) => `${current.path}: ${error}`));
@@ -438,14 +460,12 @@ export function loadArchitectureDecisionAtRef(workspacePath, baseRef) {
       hasMalformedCandidate = true;
     }
   }
-  const members = [];
   const visited = new Set();
   let current = root;
   while (true) {
     if (visited.has(current.id)) throw new Error(`${baseRef}:${repositoryPath}: supersession cycle을 허용하지 않는다`);
     visited.add(current.id);
-    members.push(current);
-    if (current.status !== "superseded") return members;
+    if (current.status !== "superseded") return [...candidatesById.values()].flat();
     const successors = candidatesById.get(current.supersededBy) ?? [];
     if (successors.length === 0) {
       if (hasMalformedCandidate) throw new Error(`${baseRef}:${repositoryPath}: successor ADR 판정에 유효한 JSON이 필요하다`);

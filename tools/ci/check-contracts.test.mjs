@@ -440,6 +440,18 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
     const rootWorkspace = loadJson(join(repository, "workspace.json"));
     rootWorkspace.architectureDecision = "ADR-HUB-0001.json";
     writeFileSync(join(repository, "root-workspace.json"), JSON.stringify(rootWorkspace));
+    mkdirSync(join(repository, "staged"));
+    const stagedRoot = structuredClone(rootLevel);
+    const stagedSuccessor = structuredClone(stagedRoot);
+    stagedSuccessor.id = "ADR-HUB-0002";
+    stagedSuccessor.status = "proposed";
+    stagedSuccessor.title = "base staged successor";
+    stagedSuccessor.supersedes = [stagedRoot.id];
+    writeFileSync(join(repository, "staged/ADR-HUB-0001.json"), JSON.stringify(stagedRoot));
+    writeFileSync(join(repository, "staged/ADR-HUB-0002.json"), JSON.stringify(stagedSuccessor));
+    const stagedWorkspace = structuredClone(rootWorkspace);
+    stagedWorkspace.architectureDecision = "staged/ADR-HUB-0001.json";
+    writeFileSync(join(repository, "staged-workspace.json"), JSON.stringify(stagedWorkspace));
     for (const args of [["init"], ["config", "user.email", "test@example.com"], ["config", "user.name", "Test"], ["add", "."], ["commit", "-m", "base"]]) {
       execFileSync("/usr/bin/git", args, { cwd: repository, stdio: "ignore" });
     }
@@ -450,6 +462,16 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
       loadArchitectureDecisionAtRef("root-workspace.json", baseRef).map(({ id }) => id),
       ["ADR-HUB-0001"],
     );
+    const stagedBase = loadArchitectureDecisionAtRef("staged-workspace.json", baseRef);
+    stagedRoot.status = "superseded";
+    stagedRoot.supersededBy = stagedSuccessor.id;
+    stagedSuccessor.status = "accepted";
+    stagedSuccessor.title = "mutated current successor";
+    writeFileSync(join(repository, "staged/ADR-HUB-0001.json"), JSON.stringify(stagedRoot));
+    writeFileSync(join(repository, "staged/ADR-HUB-0002.json"), JSON.stringify(stagedSuccessor));
+    assert.ok(collectContractErrors("staged-workspace.json", {
+      previousArchitectureDecision: stagedBase,
+    }).some((error) => error.includes("status-only")));
     const baseChain = loadArchitectureDecisionAtRef("workspace.json", baseRef);
     assert.deepEqual(
       baseChain.map(({ id }) => id),
