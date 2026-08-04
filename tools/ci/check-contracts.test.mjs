@@ -390,15 +390,42 @@ test("문서 거버넌스 계약은 active chain 밖 ADR lifecycle도 fail close
     }
   }
 
+  const currentOnly = createExternalWorkspace();
+  try {
+    const standalonePath = join(currentOnly.directory, "inputs/off-root-a.json");
+    const successorPath = join(currentOnly.directory, "inputs/off-root-b.json");
+    const standalone = loadJson(join(currentOnly.directory, "inputs/architecture-decision.json"));
+    standalone.id = "ADR-HUB-0006";
+    standalone.status = "superseded";
+    standalone.supersededBy = "ADR-HUB-0007";
+    writeFileSync(standalonePath, JSON.stringify(standalone));
+    assert.ok(collectContractErrors(currentOnly.workspacePath)
+      .some((error) => error.includes("off-root-a.json") && error.includes("successor ADR 누락")));
+
+    const successor = structuredClone(standalone);
+    successor.id = "ADR-HUB-0007";
+    standalone.supersedes = [successor.id];
+    successor.supersededBy = standalone.id;
+    successor.supersedes = [standalone.id];
+    writeFileSync(standalonePath, JSON.stringify(standalone));
+    writeFileSync(successorPath, JSON.stringify(successor));
+    assert.ok(collectContractErrors(currentOnly.workspacePath)
+      .some((error) => error.includes("supersession cycle")));
+  } finally {
+    rmSync(currentOnly.directory, { recursive: true, force: true });
+  }
+
   const { directory, workspacePath } = createExternalWorkspace();
   try {
     const root = loadJson(join(directory, "inputs/architecture-decision.json"));
-    const deleted = structuredClone(root);
-    deleted.id = "ADR-HUB-0006";
-    deleted.status = "accepted";
-    assert.ok(collectContractErrors(workspacePath, {
-      previousArchitectureDecision: [root, deleted],
-    }).some((error) => error.includes("base ADR ADR-HUB-0006가 current catalog에서 삭제되었다")));
+    for (const [id, status] of [["ADR-HUB-0008", "proposed"], ["ADR-HUB-0009", "accepted"]]) {
+      const deleted = structuredClone(root);
+      deleted.id = id;
+      deleted.status = status;
+      assert.ok(collectContractErrors(workspacePath, {
+        previousArchitectureDecision: [root, deleted],
+      }).some((error) => error.includes(`base ADR ${id}가 current catalog에서 삭제되었다`)));
+    }
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

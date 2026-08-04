@@ -156,7 +156,7 @@ export function collectContractErrors(
       if (current == null) {
         if (previousChainIds.has(previousId)) {
           errors.push(`${workspace.architectureDecision}: base ADR ${previousId}가 current chain에서 삭제되었다`);
-        } else if (["accepted", "rejected", "withdrawn", "superseded"].includes(previous.status)) {
+        } else {
           errors.push(`${workspace.architectureDecision}: base ADR ${previousId}가 current catalog에서 삭제되었다`);
         }
         continue;
@@ -379,6 +379,43 @@ function validateArchitectureDecisionChain(schemaPath, rootPath, root, errors, c
   }
   for (const [id, candidates] of candidatesById) {
     if (candidates.length > 1) errors.push(`${rootPath}: current ADR ID 중복 (${id})`);
+  }
+  for (const candidates of candidatesById.values()) {
+    if (candidates.length !== 1 || !candidates[0][2]) continue;
+    const startPath = candidates[0][0];
+    const seen = new Set();
+    let currentCandidate = candidates[0];
+    while (currentCandidate[1].status === "superseded") {
+      const [currentPath, currentAdr] = currentCandidate;
+      if (seen.has(currentAdr.id)) {
+        errors.push(`${startPath}: supersession cycle을 허용하지 않는다`);
+        break;
+      }
+      seen.add(currentAdr.id);
+      const successors = candidatesById.get(currentAdr.supersededBy) ?? [];
+      if (successors.length === 0) {
+        errors.push(`${currentPath}: successor ADR 누락`);
+        break;
+      }
+      if (successors.length > 1) {
+        errors.push(`${currentPath}: successor ADR 중복`);
+        break;
+      }
+      const [successorPath, successor, successorValid] = successors[0];
+      if (!successorValid) {
+        errors.push(`${successorPath}: successor ADR는 schema와 semantic 검증을 통과해야 한다`);
+        break;
+      }
+      if (!["accepted", "superseded"].includes(successor.status)) {
+        errors.push(`${successorPath}: terminal successor ADR는 accepted 상태여야 한다`);
+        break;
+      }
+      if (!successor.supersedes.includes(currentAdr.id)) {
+        errors.push(`${successorPath}: supersedes reciprocal link가 필요하다`);
+        break;
+      }
+      currentCandidate = successors[0];
+    }
   }
   const members = [];
   const visited = new Set();
