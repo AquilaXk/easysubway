@@ -255,7 +255,7 @@ test("문서 거버넌스 계약은 workspace gate에서 base revision 상태 �
 
 test("문서 거버넌스 계약은 accepted ADR의 supersession successor를 fail closed한다", () => {
   const cases = [
-    ["missing", () => {}, "successor ADR 누락"],
+    ["missing", () => {}, "current ADR directory에 successor ADR 누락"],
     ["malformed", (directory) => { writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), "{"); }, "유효한 JSON"],
     ["duplicate", (directory, successor) => {
       writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
@@ -265,6 +265,10 @@ test("문서 거버넌스 계약은 accepted ADR의 supersession successor를 fa
       successor.decision.repositoryOwners.data = "AquilaXk/easysubway";
       writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
     }, "successor ADR는 schema와 semantic 검증을 통과해야 한다"],
+    ["missing-supersedes", (directory, successor) => {
+      delete successor.supersedes;
+      writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
+    }, "$.supersedes: 필수 필드 누락"],
     ["non-reciprocal", (directory, successor) => {
       successor.supersedes = [];
       writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));

@@ -311,7 +311,7 @@ function validateArchitectureDecisionSuccessor(schemaPath, currentPath, previous
       errors.push(`${currentPath}: successor ADR 판정에 유효한 JSON이 필요하다`);
       return;
     }
-    errors.push(`${currentPath}: successor ADR 누락`);
+    errors.push(`${currentPath}: current ADR directory에 successor ADR 누락`);
     return;
   }
   if (successors.length > 1) {
