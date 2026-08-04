@@ -392,9 +392,22 @@ test("문서 거버넌스 계약은 active chain 밖 ADR lifecycle도 fail close
 
   const currentOnly = createExternalWorkspace();
   try {
+    const rootPath = join(currentOnly.directory, "inputs/architecture-decision.json");
+    const root = loadJson(rootPath);
+    root.status = "accepted";
+    writeFileSync(rootPath, JSON.stringify(root));
+    const falseClaim = structuredClone(root);
+    falseClaim.id = "ADR-HUB-0010";
+    falseClaim.status = "proposed";
+    falseClaim.supersedes = [root.id];
+    writeFileSync(join(currentOnly.directory, "inputs/false-claim.json"), JSON.stringify(falseClaim));
+    assert.ok(collectContractErrors(currentOnly.workspacePath)
+      .some((error) => error.includes("supersedes predecessor reciprocal link가 필요하다")));
+    rmSync(join(currentOnly.directory, "inputs/false-claim.json"));
+
     const standalonePath = join(currentOnly.directory, "inputs/off-root-a.json");
     const successorPath = join(currentOnly.directory, "inputs/off-root-b.json");
-    const standalone = loadJson(join(currentOnly.directory, "inputs/architecture-decision.json"));
+    const standalone = structuredClone(root);
     standalone.id = "ADR-HUB-0006";
     standalone.status = "superseded";
     standalone.supersededBy = "ADR-HUB-0007";
@@ -537,6 +550,7 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
     writeFileSync(join(repository, "docs/ADR-HUB-0001.json"), JSON.stringify(root));
     writeFileSync(join(repository, "docs/ADR-HUB-0002.json"), JSON.stringify(intermediate));
     writeFileSync(join(repository, "docs/ADR-HUB-0003.json"), JSON.stringify(terminal));
+    writeFileSync(join(repository, "docs/non-adr.json"), JSON.stringify({ id: "fixture-id", kind: "fixture" }));
     mkdirSync(join(repository, "docs/nested"));
     writeFileSync(join(repository, "docs/nested/duplicate.json"), JSON.stringify(intermediate));
     writeFileSync(join(repository, "workspace.json"), JSON.stringify({
@@ -571,7 +585,7 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
     const malformedRoot = structuredClone(root);
     malformedRoot.supersededBy = "ADR-HUB-0099";
     writeFileSync(join(repository, "malformed/ADR-HUB-0001.json"), JSON.stringify(malformedRoot));
-    writeFileSync(join(repository, "malformed/broken.json"), "{");
+    writeFileSync(join(repository, "malformed/ADR-HUB-0099.json"), "{");
     const malformedWorkspace = structuredClone(rootWorkspace);
     malformedWorkspace.architectureDecision = "malformed/ADR-HUB-0001.json";
     writeFileSync(join(repository, "malformed-workspace.json"), JSON.stringify(malformedWorkspace));

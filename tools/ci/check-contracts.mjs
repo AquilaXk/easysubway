@@ -383,6 +383,14 @@ function validateArchitectureDecisionChain(schemaPath, rootPath, root, errors, c
   for (const candidates of candidatesById.values()) {
     if (candidates.length !== 1 || !candidates[0][2]) continue;
     const startPath = candidates[0][0];
+    for (const predecessorId of candidates[0][1].supersedes) {
+      const predecessors = candidatesById.get(predecessorId) ?? [];
+      if (predecessors.length !== 1 || !predecessors[0][2]
+        || predecessors[0][1].status !== "superseded"
+        || predecessors[0][1].supersededBy !== candidates[0][1].id) {
+        errors.push(`${startPath}: supersedes predecessor reciprocal link가 필요하다`);
+      }
+    }
     const seen = new Set();
     let currentCandidate = candidates[0];
     while (currentCandidate[1].status === "superseded") {
@@ -517,14 +525,19 @@ export function loadArchitectureDecisionAtRef(workspacePath, baseRef) {
     .filter((path) => path.endsWith(".json"))
     .map((path) => join(directory, path));
   for (const candidatePath of candidatePaths) {
+    const namedAdr = /^ADR-[A-Z0-9-]+\.json$/.test(basename(candidatePath));
     try {
       const candidate = loadAtRef(candidatePath, true);
+      const declaredAdr = candidate?.kind === "architecture-decision"
+        || (typeof candidate?.$schema === "string"
+          && basename(candidate.$schema) === "architecture-decision.schema.json");
+      if (candidatePath !== repositoryPath && !namedAdr && !declaredAdr && !/^ADR-/.test(candidate?.id)) continue;
       if (typeof candidate?.id !== "string") continue;
       const candidates = candidatesById.get(candidate.id) ?? [];
       candidates.push(candidate);
       candidatesById.set(candidate.id, candidates);
     } catch {
-      hasMalformedCandidate = true;
+      if (namedAdr) hasMalformedCandidate = true;
     }
   }
   const visited = new Set();
