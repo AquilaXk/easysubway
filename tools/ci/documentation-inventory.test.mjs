@@ -78,7 +78,7 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     return { repository, root, gitSha, discoveryRoots: index === 0 ? ["docs/doc-0.json", "docs/duplicate.json", "docs/\uE000.json", "docs/😀.json"] : ["docs"], records };
   });
   const surfaceRecords = [
-    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "public", family: FAMILIES[6], surface: "PUBLIC", overrides: { resource: "https://public.example.invalid/release", publicSurfaceReachability: ["https://public.example.invalid/release"], healthContract: "contract:health", availabilityContract: "contract:availability", securityContract: "contract:security", releaseContract: "contract:release" } }),
+    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "public", family: FAMILIES[6], surface: "PUBLIC", overrides: { resource: "https://public.example.invalid/release", ownerIssue: "https://github.com/AquilaXk/easysubway/issues/2756", publicSurfaceReachability: ["https://public.example.invalid/release"], healthContract: "contract:health", availabilityContract: "contract:availability", securityContract: "contract:security", releaseContract: "contract:release" } }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "local", family: FAMILIES[7], surface: "LOCAL_ONLY" }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external", family: FAMILIES[8], surface: "EXTERNAL" }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external-e000", family: FAMILIES[8], surface: "EXTERNAL", overrides: { resource: "surface:\uE000", canonicalIdentity: `sha256:${"c".repeat(64)}`, lastVerifiedIdentity: `sha256:${"c".repeat(64)}` } }),
@@ -124,6 +124,10 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     (input) => { input.surfaceRecords[2].publicSurfaceReachability = ["https://public.example.invalid/external"]; },
     (input) => { input.surfaceRecords.push(structuredClone(input.surfaceRecords[2])); },
     (input) => { input.surfaceRecords[0].resource = "https://public.example.invalid/release?page=1"; },
+    (input) => { input.surfaceRecords[0].resource = "HTTPS://user:password@public.example.invalid/release"; },
+    (input) => { input.surfaceRecords[1].verificationEvidence = [" http://example.invalid/evidence"]; },
+    (input) => { input.surfaceRecords[0].ownerIssue = "https://github.com/AquilaXk/easysubway-mobile/issues/2756"; },
+    (input) => { input.surfaceRecords[0].lastVerifiedAt = "2026-02-31T00:00:00.000Z"; },
     (input) => { input.surfaceRecords[1].verificationEvidence = ["/private/evidence"]; },
     (input) => { input.repositories[0].records[0].orchestrationProfile = "KUBERNETES_ACTIVE"; },
   ]) {

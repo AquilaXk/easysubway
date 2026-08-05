@@ -43,8 +43,9 @@ function exactKeys(value, keys, name) {
 }
 function safeRelative(value) { return typeof value === "string" && value.length > 0 && !isAbsolute(value) && !value.split("/").includes("..") && !/[\x00-\x1f\x7f]/.test(value); }
 function safeIdentifier(value) {
-  if (typeof value !== "string" || value.length === 0 || /[\x00-\x1f\x7f]/.test(value) || isAbsolute(value)) return false;
-  if (value.startsWith("https://")) {
+  if (typeof value !== "string" || value.length === 0 || value !== value.trim() || /[\x00-\x1f\x7f]/.test(value) || isAbsolute(value)) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+    if (!value.startsWith("https://")) return false;
     try { const url = new URL(value); return !url.username && !url.password && !url.search && !url.hash; } catch { return false; }
   }
   return !value.includes("?");
@@ -69,10 +70,12 @@ function validateRecord(record, repository, sha, tracked) {
   for (const [field, values] of Object.entries(NULLABLE_ENUMS)) if (record[field] !== null && !values.includes(record[field])) fail(`invalid ${field}`);
   if (typeof record.kindCandidate !== "string" || !/^[A-Z][A-Z0-9_]*$/.test(record.kindCandidate)) fail("invalid kindCandidate");
   if (record.ownerRepository !== repository || !REPOSITORIES.includes(repository)) fail("invalid ownerRepository");
-  if (record.ownerIssue !== null && (!safeIdentifier(record.ownerIssue) || !/^https:\/\/github\.com\/AquilaXk\/(easysubway|easysubway-data|easysubway-backend|easysubway-mobile|easysubway-platform)\/issues\/\d+$/.test(record.ownerIssue))) fail("invalid ownerIssue");
+  const ownerIssuePrefix = `https://github.com/${repository}/issues/`;
+  if (record.ownerIssue !== null && (!safeIdentifier(record.ownerIssue) || !record.ownerIssue.startsWith(ownerIssuePrefix) || !/^\d+$/.test(record.ownerIssue.slice(ownerIssuePrefix.length)))) fail("invalid ownerIssue");
   for (const field of ["currentConsumers", "publicSurfaceReachability", "deletePrerequisite", "supersedes", "invalidationEvidence", "reviewTrigger", "verificationEvidence", "portabilityEvidence", "portabilityGap"]) sortedUnique(record[field], field);
   for (const field of ["duplicateGroup", "supersededBy", "invalidatedBy", "invalidationReason", "nextReviewAtOrSemanticExpiry", "portabilityOwner", "healthContract", "availabilityContract", "securityContract", "releaseContract"]) if (record[field] !== null && !safeIdentifier(record[field])) fail(`invalid ${field}`);
-  if (!Number.isFinite(Date.parse(record.lastVerifiedAt)) || !/^\d{4}-\d{2}-\d{2}T/.test(record.lastVerifiedAt)) fail("invalid lastVerifiedAt");
+  const verifiedAt = new Date(record.lastVerifiedAt);
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(record.lastVerifiedAt) || !Number.isFinite(verifiedAt.valueOf()) || verifiedAt.toISOString() !== record.lastVerifiedAt) fail("invalid lastVerifiedAt");
   if (record.lastVerifiedIdentity !== record.canonicalIdentity) fail("last verification identity mismatch");
   if (tracked) {
     if (record.sourceSurface !== "TRACKED" || !safeRelative(record.resource.split(":").slice(1).join(":"))) fail("invalid tracked resource");
