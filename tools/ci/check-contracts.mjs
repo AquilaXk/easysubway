@@ -40,7 +40,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
   if (workspace == null || typeof workspace !== "object" || Array.isArray(workspace)) {
     throw new Error(`${workspacePath}: 객체가 필요하다`);
   }
-  const required = ["contracts", "gateDirectories", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision", "documentationSystemCatalog"];
+  const required = ["contracts", "gateDirectories", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision", "documentationSystemCatalog", "productClaimCatalog"];
   for (const field of required) {
     if (!Object.hasOwn(workspace, field)) throw new Error(`${workspacePath}: ${field} 필수`);
   }
@@ -52,7 +52,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
       throw new Error(`${workspacePath}: gateDirectories.${ownerComponent} 필수`);
     }
   }
-  for (const field of ["contracts", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision", "documentationSystemCatalog"]) {
+  for (const field of ["contracts", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision", "documentationSystemCatalog", "productClaimCatalog"]) {
     if (typeof workspace[field] !== "string" || workspace[field].trim() === "") {
       throw new Error(`${workspacePath}: ${field}은 비어 있지 않은 경로가 필요하다`);
     }
@@ -70,6 +70,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     freshnessPolicy: resolveWorkspacePath(workspace.freshnessPolicy),
     architectureDecision: resolveWorkspacePath(workspace.architectureDecision),
     documentationSystemCatalog: resolveWorkspacePath(workspace.documentationSystemCatalog),
+    productClaimCatalog: resolveWorkspacePath(workspace.productClaimCatalog),
   };
 }
 
@@ -120,6 +121,13 @@ export function collectContractErrors(
     resolveActiveDocumentationFragments(catalog, documentationFragmentWorkspacePath, errors, {
       fragmentSchema: contract("documentation/documentation-fragment.schema.json"),
       resourceSchema: contract("documentation/documentation-resource.schema.json"),
+    });
+  }
+  const productClaimCatalogSchema = contract("documentation/product-claim-catalog.schema.json");
+  if (validateJson(productClaimCatalogSchema, workspace.productClaimCatalog, errors)) {
+    validateProductClaimCatalog(loadJson(workspace.productClaimCatalog), loadJson(productClaimCatalogSchema), errors, {
+      releaseDecision: loadJson(join(workspace.gateDirectories.hub, "production-datapack-scope.json")),
+      forbiddenClaims: loadJson(join(workspace.gateDirectories.hub, "forbidden-release-claims.json")),
     });
   }
   let currentArchitectureDecisions = [];
@@ -315,6 +323,42 @@ export function validateDocumentationSystemCatalog(catalog, schema, errors, { re
   const result = validateSchema(schema, catalog);
   errors.push(...result.errors.map((error) => `documentation-system-catalog: ${error}`));
   if (result.ok) validateDocumentationSystemCatalogSemantics(catalog, errors, "documentation-system-catalog", requireActiveResolution);
+}
+
+export function validateProductClaimCatalog(catalog, schema, errors, { releaseDecision, forbiddenClaims }) {
+  const result = validateSchema(schema, catalog);
+  errors.push(...result.errors.map((error) => `product-claim-catalog: ${error}`));
+  if (!result.ok) return;
+  if (catalog.releaseDecision !== releaseDecision?.decision?.currentLaunchDecision) {
+    errors.push("product-claim-catalog: releaseDecision은 releaseDecisionSource의 currentLaunchDecision과 일치해야 한다");
+  }
+  if (catalog.publicCopyPolicy !== "release/product-gates/forbidden-release-claims.json") {
+    errors.push("product-claim-catalog: publicCopyPolicy source가 일치해야 한다");
+  }
+  if (!forbiddenClaims?.scanTargets?.some(({ path }) => path === "README.md")) {
+    errors.push("product-claim-catalog: publicCopyPolicy의 README.md scan target이 필요하다");
+  }
+  const claimIds = catalog.claims.map(({ claimId }) => claimId);
+  if (!isSortedUnique(claimIds)) errors.push("product-claim-catalog: claimId는 codepoint sorted-unique여야 한다");
+  for (const claim of catalog.claims) {
+    for (const field of ["surface", "requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
+      if (!isSortedUnique(claim[field])) errors.push(`product-claim-catalog: ${claim.claimId} ${field}는 codepoint sorted-unique여야 한다`);
+    }
+    const currentPublic = claim.surface.length > 0;
+    if (currentPublic && !["CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "CURRENT_EXTERNAL_OR_DATA_BLOCKER"].includes(claim.assertionState)) {
+      errors.push(`product-claim-catalog: ${claim.claimId} current public claim assertionState가 유효하지 않다`);
+    }
+    if (claim.assertionState === "CURRENTLY_IMPLEMENTED_AND_EVIDENCED" && claim.requiredEvidence.length === 0) {
+      errors.push(`product-claim-catalog: ${claim.claimId} requiredEvidence가 필요하다`);
+    }
+    if (claim.assertionState === "REQUIRED_FINAL_PRODUCTION_BEHAVIOR" && currentPublic) {
+      errors.push(`product-claim-catalog: ${claim.claimId} required-final claim은 current surface를 가질 수 없다`);
+    }
+  }
+}
+
+function isSortedUnique(values) {
+  return Array.isArray(values) && values.every((value, index) => index === 0 || codepointCompare(values[index - 1], value) < 0);
 }
 
 function validateDocumentationSystemCatalogSemantics(catalog, errors, label, requireActiveResolution = true) {

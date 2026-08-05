@@ -24,6 +24,7 @@ import {
   validateDocumentationFragment,
   validateDocumentationSystemCatalog,
   validateGateIndex,
+  validateProductClaimCatalog,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
@@ -64,10 +65,12 @@ function createExternalWorkspace() {
     freshnessPolicy: "inputs/freshness-policy.json",
     architectureDecision: "inputs/architecture-decision.json",
     documentationSystemCatalog: "inputs/documentation-system-catalog.json",
+    productClaimCatalog: "inputs/product-claim-catalog.json",
   }));
   copy("contracts/documentation/ADR-HUB-0001.json", "inputs/architecture-decision.json");
   copy("contracts/documentation/ADR-HUB-0001-decision.schema.json", "inputs/ADR-HUB-0001-decision.schema.json");
   copy("contracts/documentation/documentation-system-catalog.json", "inputs/documentation-system-catalog.json");
+  copy("contracts/documentation/product-claim-catalog.json", "inputs/product-claim-catalog.json");
   return { directory, workspacePath };
 }
 
@@ -956,6 +959,37 @@ test("[gate-ownership] check-contracts CLI는 정확한 workspace 인자만 허�
   }
 });
 
+test("product claim catalog validates current release decision and public claim semantics", () => {
+  const schema = loadJson("contracts/documentation/product-claim-catalog.schema.json");
+  const catalog = loadJson("contracts/documentation/product-claim-catalog.json");
+  const errors = [];
+  validateProductClaimCatalog(catalog, schema, errors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.deepEqual(errors, []);
+
+  const invalid = structuredClone(catalog);
+  invalid.releaseDecision = "GO";
+  invalid.claims.find(({ assertionState }) => assertionState === "CURRENTLY_IMPLEMENTED_AND_EVIDENCED").requiredEvidence = [];
+  const invalidErrors = [];
+  validateProductClaimCatalog(invalid, schema, invalidErrors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.ok(invalidErrors.some((error) => error.includes("releaseDecision")));
+  assert.ok(invalidErrors.some((error) => error.includes("requiredEvidence")));
+
+  const schemaInvalid = structuredClone(catalog);
+  schemaInvalid.unexpected = true;
+  const schemaErrors = [];
+  validateProductClaimCatalog(schemaInvalid, schema, schemaErrors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.ok(schemaErrors.some((error) => error.includes("허용되지 않은 필드")));
+});
+
 test("repository split issue migration ledger가 계약 gate를 통과한다", () => {
   const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
 
@@ -1723,6 +1757,7 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
       freshnessPolicy: resolve(previousCwd, "release/product-gates/datapack-freshness-sla.json"),
       architectureDecision: "docs/ADR-HUB-0001.json",
       documentationSystemCatalog: resolve(previousCwd, "contracts/documentation/documentation-system-catalog.json"),
+      productClaimCatalog: resolve(previousCwd, "contracts/documentation/product-claim-catalog.json"),
     }));
     const rootLevel = structuredClone(root);
     bindRootDecisionSchema(repository, rootLevel);

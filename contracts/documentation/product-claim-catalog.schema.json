@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "easysubway/contracts/documentation/product-claim-catalog",
+  "title": "EasySubway Hub product claim catalog",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "catalogId", "status", "owner", "releaseDecisionSource", "releaseDecision", "publicCopyPolicy", "claims"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "const": "./product-claim-catalog.schema.json" },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "catalogId": { "type": "string", "const": "PRODUCT-CLAIM-HUB-0001" },
+    "status": { "type": "string", "const": "ACTIVE" },
+    "owner": { "type": "string", "const": "https://github.com/AquilaXk/easysubway/issues/2762" },
+    "releaseDecisionSource": { "type": "string", "const": "release/product-gates/production-datapack-scope.json#/decision/currentLaunchDecision" },
+    "releaseDecision": { "type": "string", "enum": ["GO", "NO_GO"] },
+    "publicCopyPolicy": { "type": "string", "const": "release/product-gates/forbidden-release-claims.json" },
+    "claims": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["claimId", "topic", "surface", "copyKo", "assertionState", "requiredEvidence", "forbiddenWhen", "owner", "reviewTrigger"],
+        "additionalProperties": false,
+        "properties": {
+          "claimId": { "type": "string", "pattern": "^PRODUCT_CLAIM_[A-Z0-9_]+$" },
+          "topic": { "type": "string", "enum": ["ACCESSIBILITY_PILOT", "ANONYMOUS_REPORT", "JOURNEY", "OFFLINE_MAP_AND_STATION", "PRIVACY", "PRODUCT_PRINCIPLE", "PROVENANCE", "RELEASE_STATUS", "VISION"] },
+          "surface": { "type": "array", "uniqueItems": true, "items": { "type": "string", "enum": ["README.md"] } },
+          "copyKo": { "type": "string", "minLength": 1 },
+          "assertionState": { "type": "string", "enum": ["CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "CURRENT_EXTERNAL_OR_DATA_BLOCKER", "REQUIRED_FINAL_PRODUCTION_BEHAVIOR", "HISTORICAL_OR_SUPERSEDED"] },
+          "requiredEvidence": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "forbiddenWhen": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+          "owner": { "type": "string", "const": "https://github.com/AquilaXk/easysubway/issues/2762" },
+          "reviewTrigger": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+        }
+      }
+    }
+  }
+}

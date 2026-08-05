@@ -1,0 +1,22 @@
+{
+  "$schema": "./product-claim-catalog.schema.json",
+  "schemaVersion": 1,
+  "catalogId": "PRODUCT-CLAIM-HUB-0001",
+  "status": "ACTIVE",
+  "owner": "https://github.com/AquilaXk/easysubway/issues/2762",
+  "releaseDecisionSource": "release/product-gates/production-datapack-scope.json#/decision/currentLaunchDecision",
+  "releaseDecision": "NO_GO",
+  "publicCopyPolicy": "release/product-gates/forbidden-release-claims.json",
+  "claims": [
+    { "claimId": "PRODUCT_CLAIM_ACCESSIBILITY_PILOT", "topic": "ACCESSIBILITY_PILOT", "surface": ["README.md"], "copyKo": "상록수·사당 접근성 정보를 먼저 검증한다.", "assertionState": "CURRENT_EXTERNAL_OR_DATA_BLOCKER", "requiredEvidence": [], "forbiddenWhen": ["검증 범위를 출시 지원 범위로 표현할 때"], "owner": "https://github.com/AquilaXk/easysubway/issues/2762", "reviewTrigger": ["release:scope-change"] },
+    { "claimId": "PRODUCT_CLAIM_ANONYMOUS_REPORT", "topic": "ANONYMOUS_REPORT", "surface": ["README.md"], "copyKo": "가입 없이 시설 문제를 신고할 수 있다.", "assertionState": "CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "requiredEvidence": ["evidence:anonymous-report-contract"], "forbiddenWhen": ["계정이나 이름이 필요하다고 바뀔 때"], "owner": "https://github.com/AquilaXk/easysubway/issues/2762", "reviewTrigger": ["runtime:anonymous-report-change"] },
+    { "claimId": "PRODUCT_CLAIM_JOURNEY_CURRENT", "topic": "JOURNEY", "surface": ["README.md"], "copyKo": "Journey V3 서버 길찾기는 출시 근거가 준비될 때 제공한다.", "assertionState": "CURRENT_EXTERNAL_OR_DATA_BLOCKER", "requiredEvidence": [], "forbiddenWhen": ["서버 길찾기 실패를 기기 내 계산으로 대체할 때"], "owner": "https://github.com/AquilaXk/easysubway/issues/2762", "reviewTrigger": ["release:journey-evidence-change"] },
+    { "claimId": "PRODUCT_CLAIM_JOURNEY_FINAL", "topic": "JOURNEY", "surface": [], "copyKo": "Journey V3 서버가 최종 길찾기를 수행한다.", "assertionState": "REQUIRED_FINAL_PRODUCTION_BEHAVIOR", "requiredEvidence": ["evidence:journey-v3-production"], "forbiddenWhen": ["오프라인 또는 이전 경로 엔진을 성공 경로로 제공할 때"], "owner": "https://github.com/AquilaXk/easysubway/issues/2762", "reviewTrigger": ["release:journey-evidence-change"] },
+    { "claimId": "PRODUCT_CLAIM_OFFLINE_MAP_AND_STATION", "topic": "OFFLINE_MAP_AND_STATION", "surface": ["README.md"], "copyKo": "노선도와 역 검색은 기기에 담아 지하에서도 확인한다.", "assertionState": "CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "requiredEvidence": ["evidence:offline-map-station-pack"], "forbiddenWhen": ["길찾기까지 오프라인이라고 표현할 때"], "owner": "https://github.com/AquilaXk/easysubway/issues/2762", "reviewTrigger": ["release:offline-pack-change"] },
+    { "claimId": "PRODUCT_CLAIM_PRIVACY", "topic": "PRIVACY", "surface": ["README.md"], "copyKo": "계정·추적·개인정보 판매 없이 즐겨찾기는 기기에 남긴다.", "assertionState": "CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "requiredEvidence": ["evidence:privacy-contract"], "forbiddenWhen": ["개인정보 처리 범위가 넓어질 때"], "owner": "https://github.com/AquilaXk/easysubway/issues/2762", "reviewTrigger": ["privacy:data-practice-change"] },
+    { "claimId": "PRODUCT_CLAIM_PRODUCT_PRINCIPLE", "topic": "PRODUCT_PRINCIPLE", "surface": ["README.md"], "copyKo": "빠른 길보다 갈 수 있는 길을 우선한다.", "assertionState": "CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "requiredEvidence": ["evidence:accessibility-routing-principle"], "forbiddenWhen": ["접근성보다 최단 시간을 우선할 때"], "owner": "https://github.com/AquilaXk/easysubway/issues/2762", "reviewTrigger": ["product:mobility-profile-change"] },
+    { "claimId": "PRODUCT_CLAIM_PROVENANCE", "topic": "PROVENANCE", "surface": ["README.md"], "copyKo": "정보의 출처와 확인 날짜를 구분해 알린다.", "assertionState": "CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "requiredEvidence": ["evidence:provenance-contract"], "forbiddenWhen": ["출처 또는 확인 날짜를 숨길 때"], "owner": "https://github.com/AquilaXk/easysubway/issues/2762", "reviewTrigger": ["data:provenance-change"] },
+    { "claimId": "PRODUCT_CLAIM_RELEASE_STATUS", "topic": "RELEASE_STATUS", "surface": ["README.md"], "copyKo": "현재 출시 결정은 NO_GO이며 Android와 iOS 다운로드를 제공하지 않는다.", "assertionState": "CURRENT_EXTERNAL_OR_DATA_BLOCKER", "requiredEvidence": [], "forbiddenWhen": ["NO_GO 상태를 다운로드 가능으로 표현할 때"], "owner": "https://github.com/AquilaXk/easysubway/issues/2762", "reviewTrigger": ["release:decision-change"] },
+    { "claimId": "PRODUCT_CLAIM_VISION", "topic": "VISION", "surface": ["README.md"], "copyKo": "이동에 어려움이 있는 사람의 갈 수 있는 길을 돕는다.", "assertionState": "CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "requiredEvidence": ["evidence:product-vision"], "forbiddenWhen": ["접근성 우선 원칙을 제거할 때"], "owner": "https://github.com/AquilaXk/easysubway/issues/2762", "reviewTrigger": ["product:vision-change"] }
+  ]
+}

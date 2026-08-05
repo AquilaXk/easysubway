@@ -21,6 +21,7 @@ test("mobile release claim scan rejects forbidden app copy", async () => {
   await cp(path.join(root, "apps/mobile/lib"), path.join(tmp, "apps/mobile/lib"), { recursive: true });
   await cp(path.join(root, "apps/mobile/release"), path.join(tmp, "apps/mobile/release"), { recursive: true });
   await cp(path.join(root, "release/product-gates"), path.join(tmp, "release/product-gates"), { recursive: true });
+  await writeFile(path.join(tmp, "README.md"), "");
   await writeFile(path.join(tmp, "apps/mobile/lib/bad_claim.dart"), "const bad = '모든 역 지원';\n");
 
   await assert.rejects(
@@ -33,6 +34,25 @@ test("mobile release claim scan rejects forbidden app copy", async () => {
   );
 });
 
+test("mobile release claim scan rejects README offline Journey claims", async () => {
+  const tmp = path.join(tmpdir(), `mobile-claim-readme-${Date.now()}`);
+  await rm(tmp, { recursive: true, force: true });
+  await mkdir(path.join(tmp, "apps/mobile"), { recursive: true });
+  await cp(path.join(root, "apps/mobile/lib"), path.join(tmp, "apps/mobile/lib"), { recursive: true });
+  await cp(path.join(root, "apps/mobile/release"), path.join(tmp, "apps/mobile/release"), { recursive: true });
+  await cp(path.join(root, "release/product-gates"), path.join(tmp, "release/product-gates"), { recursive: true });
+  await writeFile(path.join(tmp, "README.md"), "길찾기도 기기 안에서 끝납니다\n");
+
+  await assert.rejects(
+    execFileAsync(process.execPath, [
+      path.join(root, "tools/ci/check-mobile-release-claims.mjs"),
+      "--root",
+      tmp,
+    ], { cwd: root }),
+    /README\.md contains forbidden release claim: 길찾기도 기기 안에서 끝납니다/,
+  );
+});
+
 test("mobile release claim scan rejects incomplete Play launch identities", async () => {
   const tmp = path.join(tmpdir(), `mobile-claim-scope-${Date.now()}`);
   await rm(tmp, { recursive: true, force: true });
@@ -40,6 +60,7 @@ test("mobile release claim scan rejects incomplete Play launch identities", asyn
   await cp(path.join(root, "apps/mobile/lib"), path.join(tmp, "apps/mobile/lib"), { recursive: true });
   await cp(path.join(root, "apps/mobile/release"), path.join(tmp, "apps/mobile/release"), { recursive: true });
   await cp(path.join(root, "release/product-gates"), path.join(tmp, "release/product-gates"), { recursive: true });
+  await writeFile(path.join(tmp, "README.md"), "");
   const playPath = path.join(tmp, "apps/mobile/release/play-store-submission-content.json");
   const play = JSON.parse(await readFile(playPath, "utf8"));
   for (const [field, message] of [
