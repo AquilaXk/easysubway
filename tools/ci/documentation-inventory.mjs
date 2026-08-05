@@ -71,6 +71,7 @@ export function validateDocumentationRecord(record, { ownerRepository, gitSha, t
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(record.lastVerifiedAt) || !Number.isFinite(verifiedAt.valueOf()) || verifiedAt.toISOString() !== record.lastVerifiedAt) fail("invalid lastVerifiedAt");
   if (record.lastVerifiedIdentity !== record.canonicalIdentity) fail("last verification identity mismatch");
   if (tracked) {
+    if (typeof gitSha !== "string" || !/^[0-9a-f]{40}$/.test(gitSha)) fail("invalid gitSha");
     if (record.sourceSurface !== "TRACKED" || !safeRelative(record.resource.split(":").slice(1).join(":"))) fail("invalid tracked resource");
     if (!new RegExp(`^git:${gitSha}:([^:]+):[0-9a-f]{40,64}$`).test(record.canonicalIdentity)) fail("invalid tracked identity");
   } else if (record.sourceSurface === "TRACKED" || !/^sha256:[0-9a-f]{64}$/.test(record.canonicalIdentity)) fail("invalid non-tracked identity");
@@ -109,6 +110,16 @@ export function validateDocumentationRelations(records) {
       if (predecessor == null
           || predecessor.status === "INVALIDATED" && predecessor.invalidatedBy !== record.resource
           || predecessor.status !== "INVALIDATED" && (predecessor.status !== "SUPERSEDED" || predecessor.supersededBy !== record.resource)) fail("supersedes needs reciprocal predecessor");
+    }
+  }
+  // ponytail: inventories are small; use graph coloring if relation volume becomes material.
+  for (const start of records) {
+    const seen = new Set();
+    let current = start;
+    while (current != null && current.supersededBy !== null) {
+      if (seen.has(current.resource)) fail("supersession cycle");
+      seen.add(current.resource);
+      current = byResource.get(current.supersededBy);
     }
   }
 }

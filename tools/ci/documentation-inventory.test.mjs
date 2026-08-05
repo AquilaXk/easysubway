@@ -112,10 +112,19 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     gitSha: output.repositories.find(({ repository }) => repository === output.records[0].ownerRepository).gitSha,
     tracked: true,
   }));
+  assert.throws(() => validateDocumentationRecord(output.records[0], {
+    ownerRepository: output.records[0].ownerRepository,
+    gitSha: ".*",
+    tracked: true,
+  }), /invalid gitSha/);
   assert.throws(() => validateDocumentationRelations([
     { resource: "resource:old", status: "SUPERSEDED", supersededBy: "resource:new", supersedes: [], duplicateGroup: null },
     { resource: "resource:new", status: "ACTIVE", supersededBy: null, supersedes: [], duplicateGroup: null },
   ]), /reciprocal successor/);
+  assert.throws(() => validateDocumentationRelations([
+    { resource: "resource:a", status: "SUPERSEDED", supersededBy: "resource:b", supersedes: ["resource:b"], duplicateGroup: null },
+    { resource: "resource:b", status: "SUPERSEDED", supersededBy: "resource:a", supersedes: ["resource:a"], duplicateGroup: null },
+  ]), /supersession cycle/);
   assert.deepEqual(output.records.filter(({ resource }) => ["surface:\uE000", "surface:😀"].includes(resource)).map(({ resource }) => resource), ["surface:\uE000", "surface:😀"]);
   assert.deepEqual(Object.keys(output.coverage.documentationFamilies), [...FAMILIES].sort());
   assert.deepEqual(Object.keys(output.coverage.repositories), [...REPOSITORIES].sort());
@@ -136,8 +145,8 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     (input) => { input.repositories[0].records[1].deletePrerequisite = []; },
     (input) => { input.repositories[0].records[1].duplicateGroup = null; },
     (input) => { input.repositories[0].records[1].currentConsumers = []; },
-    (input) => { input.surfaceRecords[6].invalidationEvidence = []; },
-    (input) => { input.surfaceRecords[6].invalidatedBy = "evidence:missing"; },
+    (input) => { input.surfaceRecords.find(({ status }) => status === "INVALIDATED").invalidationEvidence = []; },
+    (input) => { input.surfaceRecords.find(({ status }) => status === "INVALIDATED").invalidatedBy = "evidence:missing"; },
     (input) => { input.surfaceRecords[5].releaseReachability = "PUBLIC"; },
     (input) => { input.surfaceRecords[5].currentConsumers = ["runtime:mobile"]; },
     (input) => { input.surfaceRecords[0].sensitivity = "INTERNAL"; },

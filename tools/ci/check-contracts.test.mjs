@@ -155,18 +155,18 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     "AquilaXk/easysubway-platform",
   ]);
 
-  for (const mutate of [
-    (value) => value.repositories.pop(),
-    (value) => value.repositories.push(structuredClone(value.repositories[0])),
-    (value) => { value.repositories[0].repository = "AquilaXk/unknown"; },
-    (value) => { value.repositories[0].status = "ACTIVE"; },
-    (value) => { value.repositories[0].resources = []; },
+  for (const [mutate, expected] of [
+    [(value) => value.repositories.pop(), /minItems 5/],
+    [(value) => value.repositories.push(structuredClone(value.repositories[0])), /maxItems 5/],
+    [(value) => { value.repositories[0].repository = "AquilaXk/unknown"; }, /enum/],
+    [(value) => { value.repositories[0].status = "ACTIVE"; }, /ACTIVE fragment가 필요하다/],
+    [(value) => { value.repositories[0].resources = []; }, /resources/],
   ]) {
     const invalid = structuredClone(catalog);
     mutate(invalid);
     const invalidErrors = [];
     validateDocumentationSystemCatalog(invalid, catalogSchema, invalidErrors);
-    assert.ok(invalidErrors.length > 0);
+    assert.ok(invalidErrors.some((error) => expected.test(error)), invalidErrors.join("; "));
   }
 
   const fragmentErrors = [];
@@ -181,6 +181,19 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     resources: [],
   }, fragmentSchema, resourceSchema, fragmentErrors);
   assert.ok(fragmentErrors.some((error) => error.includes("verificationEvidence")));
+
+  const missingTimestampErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "ACTIVE",
+    lastVerifiedAt: null,
+    verificationEvidence: ["evidence:fixture"],
+    resources: [],
+  }, fragmentSchema, resourceSchema, missingTimestampErrors);
+  assert.ok(missingTimestampErrors.some((error) => error.includes("lastVerifiedAt")));
 
   const unsafeEvidenceCatalog = structuredClone(catalog);
   unsafeEvidenceCatalog.repositories[0] = {

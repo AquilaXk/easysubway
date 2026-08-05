@@ -338,8 +338,13 @@ export function validateDocumentationFragment(fragment, fragmentSchema, resource
   const result = validateSchema(fragmentSchema, fragment);
   errors.push(...result.errors.map((error) => `documentation-fragment: ${error}`));
   if (!result.ok) return;
-  if (fragment.status === "ACTIVE" && fragment.verificationEvidence.length === 0) {
-    errors.push("documentation-fragment: ACTIVE verificationEvidence가 필요하다");
+  if (fragment.status === "ACTIVE") {
+    if (fragment.verificationEvidence.length === 0) {
+      errors.push("documentation-fragment: ACTIVE verificationEvidence가 필요하다");
+    }
+    if (fragment.lastVerifiedAt === null) {
+      errors.push("documentation-fragment: ACTIVE lastVerifiedAt이 필요하다");
+    }
   }
   validateDocumentationEvidence(fragment.verificationEvidence, "documentation-fragment: verificationEvidence", errors);
   if (fragment.lastVerifiedAt !== null && !isCanonicalUtc(fragment.lastVerifiedAt)) {
