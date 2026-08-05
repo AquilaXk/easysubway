@@ -82,13 +82,19 @@ function documentationCatalogRecord(repository, innerSha, blobSha) {
   };
 }
 
-function createDocumentationCatalogWorkspace() {
+function createDocumentationCatalogWorkspace({ activeIndexes = null } = {}) {
   const { directory, workspacePath } = createExternalWorkspace();
   const catalogPath = join(directory, "inputs/documentation-system-catalog.json");
   const catalog = loadJson(catalogPath);
+  const active = activeIndexes ?? catalog.repositories.map((_, index) => index);
   const repositories = [];
   try {
     for (const [index, entry] of catalog.repositories.entries()) {
+      if (!active.includes(index)) {
+        entry.status = "PROPOSED";
+        entry.fragment = null;
+        continue;
+      }
       const root = join(directory, `repository-${index}`);
       mkdirSync(join(root, "docs"), { recursive: true });
       for (const args of [["init"], ["config", "user.email", "test@example.com"], ["config", "user.name", "Test"]]) {
@@ -128,6 +134,10 @@ function createDocumentationCatalogWorkspace() {
     rmSync(directory, { recursive: true, force: true });
     throw error;
   }
+}
+
+function createSingleDocumentationCatalogWorkspace() {
+  return createDocumentationCatalogWorkspace({ activeIndexes: [0] });
 }
 
 function replaceDocumentationCatalogFragment(fixture, index, value) {
@@ -171,6 +181,27 @@ function commitDocumentationCatalogFragment(fixture, index, value, mutateCatalog
   fragment.blobSha = execFileSync("/usr/bin/git", ["rev-parse", "HEAD:docs/fragment.json"], { cwd: root, encoding: "utf8" }).trim();
   mutateCatalog(catalog.repositories[index]);
   writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+}
+
+function rebindDocumentationCatalogFragment(fixture, index, path, blobSha) {
+  const root = fixture.repositories[index].root;
+  const catalog = loadJson(fixture.catalogPath);
+  catalog.repositories[index].fragment = {
+    ...catalog.repositories[index].fragment,
+    gitSha: execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
+    path,
+    blobSha,
+  };
+  writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+}
+
+function rewriteDocumentationFragmentInnerCommit(fragment, innerSha, resourcePath = "docs/resource.txt", blobSha = null) {
+  const record = fragment.resources[0];
+  const identity = blobSha ?? record.canonicalIdentity.split(":").at(-1);
+  record.resource = `${fragment.repository}:${resourcePath}`;
+  record.canonicalIdentity = `git:${innerSha}:${resourcePath}:${identity}`;
+  record.lastVerifiedIdentity = record.canonicalIdentity;
+  fragment.gitSha = innerSha;
 }
 
 test("documentation catalog resolves exact outer and inner Git blobs", () => {
@@ -363,6 +394,122 @@ test("documentation catalog rejects fragment header and TRACKED identity drift",
       assertDocumentationCatalogFailure(fixture, expected);
     } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
   }
+});
+
+test("documentation catalog rejects non-blob outer fragment paths", () => {
+  const cases = [
+    ["symlink", (fixture) => {
+      const root = fixture.repositories[0].root;
+      rmSync(join(root, "docs/fragment.json"));
+      symlinkSync("resource.txt", join(root, "docs/fragment.json"));
+      execFileSync("/usr/bin/git", ["add", "-A"], { cwd: root, stdio: "ignore" });
+      execFileSync("/usr/bin/git", ["commit", "-m", "symlink fragment"], { cwd: root, stdio: "ignore" });
+      rebindDocumentationCatalogFragment(fixture, 0, "docs/fragment.json", "0".repeat(40));
+    }],
+    ["tree", (fixture) => {
+      const root = fixture.repositories[0].root;
+      rebindDocumentationCatalogFragment(fixture, 0, "docs", "0".repeat(40));
+    }],
+    ["gitlink", (fixture) => {
+      const root = fixture.repositories[0].root;
+      rmSync(join(root, "docs/fragment.json"));
+      execFileSync("/usr/bin/git", ["rm", "--cached", "docs/fragment.json"], { cwd: root, stdio: "ignore" });
+      execFileSync("/usr/bin/git", ["update-index", "--add", "--cacheinfo", `160000,${"1".repeat(40)},docs/fragment.json`], { cwd: root, stdio: "ignore" });
+      execFileSync("/usr/bin/git", ["commit", "-m", "gitlink fragment"], { cwd: root, stdio: "ignore" });
+      rebindDocumentationCatalogFragment(fixture, 0, "docs/fragment.json", "0".repeat(40));
+    }],
+  ];
+  for (const [, mutate] of cases) {
+    const fixture = createSingleDocumentationCatalogWorkspace();
+    try {
+      mutate(fixture);
+      assertDocumentationCatalogFailure(fixture, "fragment blob");
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+});
+
+test("documentation catalog rejects missing and non-ancestor inner commits", () => {
+  const cases = [
+    ["missing", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      rewriteDocumentationFragmentInnerCommit(fragment, "f".repeat(40));
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    }],
+    ["non-ancestor", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const innerSha = execFileSync("/usr/bin/git", ["commit-tree", "HEAD^{tree}", "-m", "orphan inner"], { cwd: root, encoding: "utf8" }).trim();
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      rewriteDocumentationFragmentInnerCommit(fragment, innerSha);
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    }],
+  ];
+  for (const [, mutate] of cases) {
+    const fixture = createSingleDocumentationCatalogWorkspace();
+    try {
+      mutate(fixture);
+      assertDocumentationCatalogFailure(fixture, "inner commit relation");
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+});
+
+test("documentation catalog rejects missing and symlink TRACKED resources", () => {
+  const missing = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = missing.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    rewriteDocumentationFragmentInnerCommit(fragment, fragment.gitSha, "docs/missing.txt", "0".repeat(40));
+    commitDocumentationCatalogFragment(missing, 0, JSON.stringify(fragment));
+    assertDocumentationCatalogFailure(missing, "TRACKED resource blob identity");
+  } finally { rmSync(missing.directory, { recursive: true, force: true }); }
+
+  const symlink = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = symlink.repositories[0].root;
+    rmSync(join(root, "docs/resource.txt"));
+    symlinkSync("fragment.json", join(root, "docs/resource.txt"));
+    execFileSync("/usr/bin/git", ["add", "-A"], { cwd: root, stdio: "ignore" });
+    execFileSync("/usr/bin/git", ["commit", "-m", "symlink resource inner"], { cwd: root, stdio: "ignore" });
+    const innerSha = execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    rewriteDocumentationFragmentInnerCommit(fragment, innerSha);
+    commitDocumentationCatalogFragment(symlink, 0, JSON.stringify(fragment));
+    assertDocumentationCatalogFailure(symlink, "TRACKED resource blob identity");
+  } finally { rmSync(symlink.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog ignores local Git replacement objects", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const goodOuter = execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const goodBlob = execFileSync("/usr/bin/git", ["rev-parse", "HEAD:docs/fragment.json"], { cwd: root, encoding: "utf8" }).trim();
+    writeFileSync(join(root, "docs/fragment.json"), "null");
+    execFileSync("/usr/bin/git", ["add", "."], { cwd: root, stdio: "ignore" });
+    execFileSync("/usr/bin/git", ["commit", "-m", "bad outer"], { cwd: root, stdio: "ignore" });
+    const badOuter = execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    execFileSync("/usr/bin/git", ["replace", badOuter, goodOuter], { cwd: root, stdio: "ignore" });
+    const catalog = loadJson(fixture.catalogPath);
+    catalog.repositories[0].fragment.gitSha = badOuter;
+    catalog.repositories[0].fragment.blobSha = goodBlob;
+    writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    assertDocumentationCatalogFailure(fixture, "fragment blob identity");
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog rejects SHA-256 Git roots when local Git supports them", (t) => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = join(fixture.directory, "sha256-root");
+    try {
+      execFileSync("/usr/bin/git", ["init", "--object-format=sha256", root], { encoding: "utf8", stdio: "pipe" });
+    } catch (error) {
+      t.skip(`fixed /usr/bin/git init --object-format=sha256 unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    updateDocumentationCatalogWorkspace(fixture, (workspace) => { workspace.repositories[0].root = root; });
+    assertDocumentationCatalogFailure(fixture, "Git root");
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
 
 test("[gate-ownership] workspace는 legacy 경로 밖 복사 입력을 검증한다", () => {
