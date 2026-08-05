@@ -4,6 +4,13 @@ import { mkdtempSync, mkdirSync, readFileSync, symlinkSync, writeFileSync } from
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import {
+  DOCUMENTATION_FAMILIES,
+  DOCUMENTATION_REPOSITORIES,
+  DOCUMENTATION_RESOURCE_CLASSES,
+  validateDocumentationRecord,
+  validateDocumentationRelations,
+} from "./documentation-inventory.mjs";
 
 const SCRIPT = new URL("./documentation-inventory.mjs", import.meta.url).pathname;
 const REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-data", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
@@ -87,14 +94,28 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external-e000", family: FAMILIES[8], surface: "EXTERNAL", overrides: { resource: "surface:\uE000", canonicalIdentity: `sha256:${"c".repeat(64)}`, lastVerifiedIdentity: `sha256:${"c".repeat(64)}` } }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external-grinning", family: FAMILIES[8], surface: "EXTERNAL", overrides: { resource: "surface:😀", canonicalIdentity: `sha256:${"d".repeat(64)}`, lastVerifiedIdentity: `sha256:${"d".repeat(64)}` } }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "revoked", family: FAMILIES[9], surface: "PUBLIC", overrides: { resource: "https://public.example.invalid/revoked", canonicalIdentity: `sha256:${"f".repeat(64)}`, lastVerifiedIdentity: `sha256:${"f".repeat(64)}`, status: "REVOKED", currentConsumers: [], publicSurfaceReachability: [] } }),
-    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "invalidated", family: FAMILIES[10], surface: "LOCAL_ONLY", overrides: { resource: `local-evidence:sha256:${"e".repeat(64)}`, canonicalIdentity: `sha256:${"e".repeat(64)}`, lastVerifiedIdentity: `sha256:${"e".repeat(64)}`, resourceClass: "EVIDENCE", status: "INVALIDATED", currentConsumers: ["evidence:audit"], invalidatedBy: "evidence:replacement", invalidationReason: "reason:replaced", invalidationEvidence: ["evidence:replacement"], mutationPolicy: "EVIDENCE_IMMUTABLE" } }),
+    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "invalidated", family: FAMILIES[10], surface: "LOCAL_ONLY", overrides: { resource: `local-evidence:sha256:${"e".repeat(64)}`, canonicalIdentity: `sha256:${"e".repeat(64)}`, lastVerifiedIdentity: `sha256:${"e".repeat(64)}`, resourceClass: "EVIDENCE", status: "INVALIDATED", currentConsumers: ["evidence:audit"], invalidatedBy: `local-evidence:sha256:${"f".repeat(64)}`, invalidationReason: "reason:replaced", invalidationEvidence: ["evidence:replacement"], mutationPolicy: "EVIDENCE_IMMUTABLE" } }),
+    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "replacement", family: FAMILIES[10], surface: "LOCAL_ONLY", overrides: { resource: `local-evidence:sha256:${"f".repeat(64)}`, canonicalIdentity: `sha256:${"f".repeat(64)}`, lastVerifiedIdentity: `sha256:${"f".repeat(64)}`, resourceClass: "EVIDENCE", mutationPolicy: "EVIDENCE_IMMUTABLE", supersedes: [`local-evidence:sha256:${"e".repeat(64)}`] } }),
   ];
   const workspace = { schemaVersion: 1, repositories, surfaceRecords };
   const first = invoke(workspace, join(temp, "first"));
   assert.equal(first.status, 0, first.stderr);
   const output = JSON.parse(readFileSync(join(temp, "first", "inventory.json"), "utf8"));
   assert.deepEqual(Object.keys(output), ["coverage", "gaps", "gates", "producer", "records", "repositories", "schemaVersion"]);
-  assert.equal(output.records.length, 16);
+  assert.equal(output.records.length, 17);
+  assert.deepEqual(DOCUMENTATION_REPOSITORIES, REPOSITORIES);
+  assert.deepEqual(DOCUMENTATION_FAMILIES, FAMILIES);
+  assert.ok(DOCUMENTATION_RESOURCE_CLASSES.includes("EVIDENCE"));
+  assert.doesNotThrow(() => validateDocumentationRelations(output.records));
+  assert.doesNotThrow(() => validateDocumentationRecord(output.records[0], {
+    ownerRepository: output.records[0].ownerRepository,
+    gitSha: output.repositories.find(({ repository }) => repository === output.records[0].ownerRepository).gitSha,
+    tracked: true,
+  }));
+  assert.throws(() => validateDocumentationRelations([
+    { resource: "resource:old", status: "SUPERSEDED", supersededBy: "resource:new", supersedes: [], duplicateGroup: null },
+    { resource: "resource:new", status: "ACTIVE", supersededBy: null, supersedes: [], duplicateGroup: null },
+  ]), /reciprocal successor/);
   assert.deepEqual(output.records.filter(({ resource }) => ["surface:\uE000", "surface:😀"].includes(resource)).map(({ resource }) => resource), ["surface:\uE000", "surface:😀"]);
   assert.deepEqual(Object.keys(output.coverage.documentationFamilies), [...FAMILIES].sort());
   assert.deepEqual(Object.keys(output.coverage.repositories), [...REPOSITORIES].sort());
@@ -116,6 +137,7 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     (input) => { input.repositories[0].records[1].duplicateGroup = null; },
     (input) => { input.repositories[0].records[1].currentConsumers = []; },
     (input) => { input.surfaceRecords[6].invalidationEvidence = []; },
+    (input) => { input.surfaceRecords[6].invalidatedBy = "evidence:missing"; },
     (input) => { input.surfaceRecords[5].releaseReachability = "PUBLIC"; },
     (input) => { input.surfaceRecords[5].currentConsumers = ["runtime:mobile"]; },
     (input) => { input.surfaceRecords[0].sensitivity = "INTERNAL"; },

@@ -20,6 +20,8 @@ import {
   validateArchitectureDecision,
   validateArchitectureDecisionTransition,
   validateArchitectureDecisionWorkspaceTransition,
+  validateDocumentationFragment,
+  validateDocumentationSystemCatalog,
   validateGateIndex,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
@@ -43,9 +45,11 @@ function createExternalWorkspace() {
     governancePolicy: "inputs/governance-policy.json",
     freshnessPolicy: "inputs/freshness-policy.json",
     architectureDecision: "inputs/architecture-decision.json",
+    documentationSystemCatalog: "inputs/documentation-system-catalog.json",
   }));
   copy("contracts/documentation/ADR-HUB-0001.json", "inputs/architecture-decision.json");
   copy("contracts/documentation/ADR-HUB-0001-decision.schema.json", "inputs/ADR-HUB-0001-decision.schema.json");
+  copy("contracts/documentation/documentation-system-catalog.json", "inputs/documentation-system-catalog.json");
   return { directory, workspacePath };
 }
 
@@ -132,6 +136,108 @@ test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => 
   ), true);
   assert.deepEqual(errors, []);
   assert.ok(adr.confirmation.some(({ method }) => method.endsWith("--current-only")));
+});
+
+test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifecycle을 fail closed한다", () => {
+  const resourceSchema = loadJson("contracts/documentation/documentation-resource.schema.json");
+  const fragmentSchema = loadJson("contracts/documentation/documentation-fragment.schema.json");
+  const catalogSchema = loadJson("contracts/documentation/documentation-system-catalog.schema.json");
+  const catalog = loadJson("contracts/documentation/documentation-system-catalog.json");
+  const errors = [];
+
+  validateDocumentationSystemCatalog(catalog, catalogSchema, errors);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(catalog.repositories.map(({ repository }) => repository), [
+    "AquilaXk/easysubway",
+    "AquilaXk/easysubway-backend",
+    "AquilaXk/easysubway-data",
+    "AquilaXk/easysubway-mobile",
+    "AquilaXk/easysubway-platform",
+  ]);
+
+  for (const mutate of [
+    (value) => value.repositories.pop(),
+    (value) => value.repositories.push(structuredClone(value.repositories[0])),
+    (value) => { value.repositories[0].repository = "AquilaXk/unknown"; },
+    (value) => { value.repositories[0].status = "ACTIVE"; },
+    (value) => { value.repositories[0].resources = []; },
+  ]) {
+    const invalid = structuredClone(catalog);
+    mutate(invalid);
+    const invalidErrors = [];
+    validateDocumentationSystemCatalog(invalid, catalogSchema, invalidErrors);
+    assert.ok(invalidErrors.length > 0);
+  }
+
+  const fragmentErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "ACTIVE",
+    lastVerifiedAt: "2026-08-05T00:00:00.000Z",
+    verificationEvidence: [],
+    resources: [],
+  }, fragmentSchema, resourceSchema, fragmentErrors);
+  assert.ok(fragmentErrors.some((error) => error.includes("verificationEvidence")));
+
+  const unsafeEvidenceCatalog = structuredClone(catalog);
+  unsafeEvidenceCatalog.repositories[0] = {
+    repository: "AquilaXk/easysubway",
+    status: "ACTIVE",
+    fragment: {
+      gitSha: "a".repeat(40),
+      path: "contracts/documentation/documentation-fragment.json",
+      blobSha: "b".repeat(40),
+      lastVerifiedAt: "2026-08-05T00:00:00.000Z",
+      verificationEvidence: ["/private/owner/raw.json"],
+    },
+  };
+  const unsafeEvidenceErrors = [];
+  validateDocumentationSystemCatalog(unsafeEvidenceCatalog, catalogSchema, unsafeEvidenceErrors);
+  assert.ok(unsafeEvidenceErrors.some((error) => error.includes("verificationEvidence")));
+
+  const unsortedErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "PROPOSED",
+    lastVerifiedAt: null,
+    verificationEvidence: [],
+    resources: [{ resource: "resource:z" }, { resource: "resource:a" }],
+  }, fragmentSchema, resourceSchema, unsortedErrors);
+  assert.ok(unsortedErrors.some((error) => error.includes("sorted-unique")));
+
+  const crossRepositoryErrors = [];
+  const canonicalIdentity = `sha256:${"c".repeat(64)}`;
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "PROPOSED",
+    lastVerifiedAt: null,
+    verificationEvidence: [],
+    resources: [{
+      resource: "surface:current", resourceClass: "CANONICAL_RESOURCE", documentationFamily: "ARCHITECTURE",
+      kindCandidate: "CROSS_REPOSITORY_HANDOFF", sourceSurface: "EXTERNAL", canonicalIdentity, status: "ACTIVE",
+      ownerRepository: "AquilaXk/easysubway", ownerIssue: null, currentConsumers: ["consumer:architecture"],
+      releaseReachability: "NONE", publicSurfaceReachability: [], assertionState: "REQUIRED_FINAL_PRODUCTION_BEHAVIOR",
+      sensitivity: "INTERNAL", duplicateGroup: null, disposition: "RETAIN_CANONICAL", deletePrerequisite: [],
+      supersedes: ["surface:external-predecessor"], supersededBy: null, invalidatedBy: null, invalidationReason: null,
+      invalidationEvidence: [], mutationPolicy: "CURRENT_STATE_WITH_CHANGE", reviewPolicyId: "EVENT_ONLY",
+      reviewTrigger: ["event:change"], lastVerifiedAt: "2026-08-05T00:00:00.000Z",
+      lastVerifiedIdentity: canonicalIdentity, verificationMethod: "contract-test", verificationEvidence: ["evidence:fixture"],
+      nextReviewAtOrSemanticExpiry: null, implementationPlan: "PLAN-DOC", workloadClass: null,
+      orchestrationProfile: null, stateClass: null, configurationDelivery: null, healthContract: null,
+      availabilityContract: null, securityContract: null, releaseContract: null, portabilityOwner: null,
+      portabilityEvidence: [], portabilityGap: [],
+    }],
+  }, fragmentSchema, resourceSchema, crossRepositoryErrors);
+  assert.deepEqual(crossRepositoryErrors, []);
 });
 
 test("문서 거버넌스 계약은 successor의 자체 decision schema와 안전한 schema path만 허용한다", () => {
@@ -642,6 +748,7 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
       governancePolicy: resolve(previousCwd, "tools/datapack/source-governance-policy.json"),
       freshnessPolicy: resolve(previousCwd, "release/product-gates/datapack-freshness-sla.json"),
       architectureDecision: "docs/ADR-HUB-0001.json",
+      documentationSystemCatalog: resolve(previousCwd, "contracts/documentation/documentation-system-catalog.json"),
     }));
     const rootLevel = structuredClone(root);
     bindRootDecisionSchema(repository, rootLevel);
