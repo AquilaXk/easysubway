@@ -204,6 +204,22 @@ function rewriteDocumentationFragmentInnerCommit(fragment, innerSha, resourcePat
   fragment.gitSha = innerSha;
 }
 
+function documentationExternalRecord(record, resource) {
+  const output = structuredClone(record);
+  output.resource = resource;
+  output.sourceSurface = "EXTERNAL";
+  output.canonicalIdentity = `sha256:${"a".repeat(64)}`;
+  output.lastVerifiedIdentity = output.canonicalIdentity;
+  return output;
+}
+
+function commitDocumentationCatalogResources(fixture, index, mutate) {
+  const root = fixture.repositories[index].root;
+  const fragment = loadJson(join(root, "docs/fragment.json"));
+  mutate(fragment.resources);
+  commitDocumentationCatalogFragment(fixture, index, JSON.stringify(fragment));
+}
+
 test("documentation catalog resolves exact outer and inner Git blobs", () => {
   const fixture = createDocumentationCatalogWorkspace();
   try {
@@ -396,6 +412,47 @@ test("documentation catalog rejects fragment header and TRACKED identity drift",
   }
 });
 
+test("documentation catalog validates global relations across two ACTIVE fragments", () => {
+  const cases = [
+    ["duplicate resource", (fixture) => {
+      commitDocumentationCatalogResources(fixture, 0, (records) => { records[0] = documentationExternalRecord(records[0], "external:duplicate"); });
+      commitDocumentationCatalogResources(fixture, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:duplicate"); });
+    }],
+    ["invalid duplicate group", (fixture) => {
+      commitDocumentationCatalogResources(fixture, 0, (records) => { records[0] = documentationExternalRecord(records[0], "external:solo"); records[0].duplicateGroup = "group:solo"; });
+    }],
+    ["missing supersession reciprocal", (fixture) => {
+      commitDocumentationCatalogResources(fixture, 0, (records) => { records[0] = documentationExternalRecord(records[0], "external:old"); records[0].status = "SUPERSEDED"; records[0].supersededBy = "external:new"; });
+      commitDocumentationCatalogResources(fixture, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:new"); });
+    }],
+    ["missing invalidation reciprocal", (fixture) => {
+      commitDocumentationCatalogResources(fixture, 0, (records) => {
+        records[0] = documentationExternalRecord(records[0], "external:invalidated");
+        Object.assign(records[0], { resourceClass: "EVIDENCE", status: "INVALIDATED", invalidatedBy: "external:replacement", invalidationReason: "reason:test", invalidationEvidence: ["evidence:test"], mutationPolicy: "EVIDENCE_IMMUTABLE", releaseReachability: "EVIDENCE", currentConsumers: ["evidence:test"] });
+      });
+      commitDocumentationCatalogResources(fixture, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:replacement"); });
+    }],
+    ["supersession cycle", (fixture) => {
+      commitDocumentationCatalogResources(fixture, 0, (records) => { records[0] = documentationExternalRecord(records[0], "external:a"); records[0].status = "SUPERSEDED"; records[0].supersededBy = "external:b"; records[0].supersedes = ["external:b"]; });
+      commitDocumentationCatalogResources(fixture, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:b"); records[0].status = "SUPERSEDED"; records[0].supersededBy = "external:a"; records[0].supersedes = ["external:a"]; });
+    }],
+  ];
+  for (const [, mutate] of cases) {
+    const fixture = createDocumentationCatalogWorkspace({ activeIndexes: [0, 1] });
+    try {
+      mutate(fixture);
+      assertDocumentationCatalogFailure(fixture, "ACTIVE fragment relation");
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+
+  const valid = createDocumentationCatalogWorkspace({ activeIndexes: [0, 1] });
+  try {
+    commitDocumentationCatalogResources(valid, 0, (records) => { records[0] = documentationExternalRecord(records[0], "external:old"); records[0].status = "SUPERSEDED"; records[0].supersededBy = "external:new"; });
+    commitDocumentationCatalogResources(valid, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:new"); records[0].supersedes = ["external:old"]; });
+    assert.deepEqual(documentationCatalogErrors(valid), []);
+  } finally { rmSync(valid.directory, { recursive: true, force: true }); }
+});
+
 test("documentation catalog rejects non-blob outer fragment paths", () => {
   const cases = [
     ["symlink", (fixture) => {
@@ -509,6 +566,70 @@ test("documentation catalog rejects SHA-256 Git roots when local Git supports th
     }
     updateDocumentationCatalogWorkspace(fixture, (workspace) => { workspace.repositories[0].root = root; });
     assertDocumentationCatalogFailure(fixture, "Git root");
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog CLI accepts compatibility modes and rejects malformed optional pairs", () => {
+  const run = (args, cwd = process.cwd()) => execFileSync("node", [resolve("tools/ci/check-contracts.mjs"), ...args], {
+    cwd, encoding: "utf8", stdio: "pipe",
+  });
+  const proposed = createExternalWorkspace();
+  try {
+    assert.doesNotThrow(() => run(["--workspace", proposed.workspacePath, "--current-only"]));
+  } finally { rmSync(proposed.directory, { recursive: true, force: true }); }
+
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const valid = ["--workspace", fixture.workspacePath, "--current-only", "--documentation-fragment-workspace", fixture.fragmentWorkspacePath];
+    assert.doesNotThrow(() => run(valid));
+    const clone = mkdtempSync(join(tmpdir(), "documentation-catalog-cli-"));
+    try {
+      execFileSync("/usr/bin/git", ["init", clone], { stdio: "ignore" });
+      const copied = join(clone, "fixture");
+      mkdirSync(copied);
+      cpSync("contracts", join(clone, "contracts"), { recursive: true });
+      for (const name of ["hub.json", "inputs", "gates"]) cpSync(join(fixture.directory, name), join(copied, name), { recursive: true });
+      mkdirSync(join(clone, "release/migrations"), { recursive: true });
+      cpSync("release/migrations/repository-split-issues.json", join(clone, "release/migrations/repository-split-issues.json"));
+      const clonedWorkspacePath = join(copied, "hub.json");
+      const clonedWorkspace = loadJson(clonedWorkspacePath);
+      clonedWorkspace.contracts = "../contracts";
+      writeFileSync(clonedWorkspacePath, JSON.stringify(clonedWorkspace));
+      execFileSync("/usr/bin/git", ["config", "user.email", "test@example.com"], { cwd: clone, stdio: "ignore" });
+      execFileSync("/usr/bin/git", ["config", "user.name", "Test"], { cwd: clone, stdio: "ignore" });
+      execFileSync("/usr/bin/git", ["add", "fixture"], { cwd: clone, stdio: "ignore" });
+      execFileSync("/usr/bin/git", ["commit", "-m", "CLI fixture"], { cwd: clone, stdio: "ignore" });
+      const baseRef = execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: clone, encoding: "utf8" }).trim();
+      assert.doesNotThrow(() => run([
+        "--workspace", "fixture/hub.json", "--base-ref", baseRef,
+        "--documentation-fragment-workspace", fixture.fragmentWorkspacePath,
+      ], clone));
+    } finally { rmSync(clone, { recursive: true, force: true }); }
+    for (const args of [
+      valid.slice(0, -1),
+      ["--workspace", fixture.workspacePath, "--documentation-fragment-workspace", fixture.fragmentWorkspacePath, "--current-only"],
+      [...valid, "--documentation-fragment-workspace", fixture.fragmentWorkspacePath],
+      [...valid, "extra"],
+    ]) assert.throws(() => run(args), /사용법/);
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog redacts real Git object diagnostics", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const marker = "RAW-FRAGMENT-BYTES-MUST-NOT-LEAK";
+    writeFileSync(join(root, "docs/fragment.json"), marker);
+    execFileSync("/usr/bin/git", ["add", "."], { cwd: root, stdio: "ignore" });
+    execFileSync("/usr/bin/git", ["commit", "-m", "bad bytes"], { cwd: root, stdio: "ignore" });
+    const badSha = execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const catalog = loadJson(fixture.catalogPath);
+    catalog.repositories[0].fragment.gitSha = badSha;
+    catalog.repositories[0].fragment.blobSha = "0".repeat(40);
+    writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    const errors = documentationCatalogErrors(fixture).join("\n");
+    assert.match(errors, /fragment blob identity/);
+    for (const secret of [root, badSha, marker]) assert.ok(!errors.includes(secret), errors);
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
 
