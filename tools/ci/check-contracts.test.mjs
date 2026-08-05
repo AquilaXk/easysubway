@@ -226,6 +226,21 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
 
   const crossRepositoryErrors = [];
   const canonicalIdentity = `sha256:${"c".repeat(64)}`;
+  const crossRepositoryRecord = {
+    resource: "surface:current", resourceClass: "CANONICAL_RESOURCE", documentationFamily: "ARCHITECTURE",
+    kindCandidate: "CROSS_REPOSITORY_HANDOFF", sourceSurface: "EXTERNAL", canonicalIdentity, status: "ACTIVE",
+    ownerRepository: "AquilaXk/easysubway", ownerIssue: null, currentConsumers: ["consumer:architecture"],
+    releaseReachability: "NONE", publicSurfaceReachability: [], assertionState: "REQUIRED_FINAL_PRODUCTION_BEHAVIOR",
+    sensitivity: "INTERNAL", duplicateGroup: null, disposition: "RETAIN_CANONICAL", deletePrerequisite: [],
+    supersedes: ["surface:external-predecessor"], supersededBy: null, invalidatedBy: null, invalidationReason: null,
+    invalidationEvidence: [], mutationPolicy: "CURRENT_STATE_WITH_CHANGE", reviewPolicyId: "EVENT_ONLY",
+    reviewTrigger: ["event:change"], lastVerifiedAt: "2026-08-05T00:00:00.000Z",
+    lastVerifiedIdentity: canonicalIdentity, verificationMethod: "contract-test", verificationEvidence: ["evidence:fixture"],
+    nextReviewAtOrSemanticExpiry: null, implementationPlan: "PLAN-DOC", workloadClass: null,
+    orchestrationProfile: null, stateClass: null, configurationDelivery: null, healthContract: null,
+    availabilityContract: null, securityContract: null, releaseContract: null, portabilityOwner: null,
+    portabilityEvidence: [], portabilityGap: [],
+  };
   validateDocumentationFragment({
     $schema: "./documentation-fragment.schema.json",
     schemaVersion: 1,
@@ -234,23 +249,38 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     status: "PROPOSED",
     lastVerifiedAt: null,
     verificationEvidence: [],
-    resources: [{
-      resource: "surface:current", resourceClass: "CANONICAL_RESOURCE", documentationFamily: "ARCHITECTURE",
-      kindCandidate: "CROSS_REPOSITORY_HANDOFF", sourceSurface: "EXTERNAL", canonicalIdentity, status: "ACTIVE",
-      ownerRepository: "AquilaXk/easysubway", ownerIssue: null, currentConsumers: ["consumer:architecture"],
-      releaseReachability: "NONE", publicSurfaceReachability: [], assertionState: "REQUIRED_FINAL_PRODUCTION_BEHAVIOR",
-      sensitivity: "INTERNAL", duplicateGroup: null, disposition: "RETAIN_CANONICAL", deletePrerequisite: [],
-      supersedes: ["surface:external-predecessor"], supersededBy: null, invalidatedBy: null, invalidationReason: null,
-      invalidationEvidence: [], mutationPolicy: "CURRENT_STATE_WITH_CHANGE", reviewPolicyId: "EVENT_ONLY",
-      reviewTrigger: ["event:change"], lastVerifiedAt: "2026-08-05T00:00:00.000Z",
-      lastVerifiedIdentity: canonicalIdentity, verificationMethod: "contract-test", verificationEvidence: ["evidence:fixture"],
-      nextReviewAtOrSemanticExpiry: null, implementationPlan: "PLAN-DOC", workloadClass: null,
-      orchestrationProfile: null, stateClass: null, configurationDelivery: null, healthContract: null,
-      availabilityContract: null, securityContract: null, releaseContract: null, portabilityOwner: null,
-      portabilityEvidence: [], portabilityGap: [],
-    }],
+    resources: [crossRepositoryRecord],
   }, fragmentSchema, resourceSchema, crossRepositoryErrors);
   assert.deepEqual(crossRepositoryErrors, []);
+
+  const trackedRecord = structuredClone(crossRepositoryRecord);
+  trackedRecord.resource = "AquilaXk/easysubway-mobile:docs/a.json";
+  trackedRecord.sourceSurface = "TRACKED";
+  trackedRecord.canonicalIdentity = `git:${"a".repeat(40)}:docs/b.json:${"b".repeat(40)}`;
+  trackedRecord.lastVerifiedIdentity = trackedRecord.canonicalIdentity;
+  trackedRecord.supersedes = [];
+  const trackedIdentityErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [trackedRecord],
+  }, fragmentSchema, resourceSchema, trackedIdentityErrors);
+  assert.ok(trackedIdentityErrors.some((error) => error.includes("tracked fragment identity mismatch")));
+
+  for (const mutate of [
+    (record) => { record.resource = "surface:self"; record.supersedes = ["surface:self"]; },
+    (record) => { record.supersededBy = "surface:successor"; },
+  ]) {
+    const record = structuredClone(crossRepositoryRecord);
+    mutate(record);
+    const lifecycleErrors = [];
+    validateDocumentationFragment({
+      $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+      repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+      lastVerifiedAt: null, verificationEvidence: [], resources: [record],
+    }, fragmentSchema, resourceSchema, lifecycleErrors);
+    assert.ok(lifecycleErrors.some((error) => error.includes("fragment lifecycle contradiction")));
+  }
 });
 
 test("문서 거버넌스 계약은 successor의 자체 decision schema와 안전한 schema path만 허용한다", () => {

@@ -365,6 +365,17 @@ export function validateDocumentationFragment(fragment, fragmentSchema, resource
         gitSha: fragment.gitSha,
         tracked: record.sourceSurface === "TRACKED",
       });
+      if (record.sourceSurface === "TRACKED") {
+        const prefix = `${fragment.repository}:`;
+        const identity = /^git:[0-9a-f]{40}:([^:]+):[0-9a-f]{40,64}$/.exec(record.canonicalIdentity);
+        if (!record.resource.startsWith(prefix) || identity?.[1] !== record.resource.slice(prefix.length)) {
+          throw new Error("tracked fragment identity mismatch");
+        }
+      }
+      if (record.supersededBy === record.resource || record.supersedes.includes(record.resource)
+          || (record.status === "SUPERSEDED") !== (record.supersededBy !== null)) {
+        throw new Error("fragment lifecycle contradiction");
+      }
     } catch (error) {
       errors.push(`documentation-fragment resource: ${error instanceof Error ? error.message : String(error)}`);
     }
