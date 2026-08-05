@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { isMainModule } from "../lib/is-main-module.mjs";
-import { existsSync, readFileSync, readdirSync, realpathSync } from "node:fs";
+import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
@@ -309,6 +309,10 @@ function validateArchitectureDecisionSchema(adr, valuePath, errors) {
   const schemaPath = resolve(dirname(valuePath), reference);
   if (!existsSync(schemaPath)) {
     errors.push(`${valuePath}: decisionSchema ${reference} 누락`);
+    return false;
+  }
+  if (lstatSync(schemaPath).isSymbolicLink()) {
+    errors.push(`${valuePath}: decisionSchema symlink는 허용하지 않는다`);
     return false;
   }
   if (dirname(realpathSync(schemaPath)) !== realpathSync(dirname(resolve(valuePath)))) {

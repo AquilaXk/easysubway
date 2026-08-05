@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import {
@@ -171,6 +171,10 @@ test("문서 거버넌스 계약은 successor의 자체 decision schema와 안�
       ["missing-file", () => { rmSync(decisionSchemaPath); }, "decisionSchema ./ADR-HUB-0002-decision.schema.json 누락"],
       ["absolute", (adr) => { adr.decisionSchema = "/tmp/decision.schema.json"; }, "repository 내부 상대 JSON path"],
       ["escape", (adr) => { adr.decisionSchema = "../ADR-HUB-0002-decision.schema.json"; }, "repository 내부 상대 JSON path"],
+      ["symlink", () => {
+        rmSync(decisionSchemaPath);
+        symlinkSync("ADR-HUB-0001-decision.schema.json", decisionSchemaPath);
+      }, "symlink"],
       ["malformed", () => { writeFileSync(decisionSchemaPath, "{"); }, "유효한 JSON이 필요하다"],
       ["empty-schema", () => { writeFileSync(decisionSchemaPath, "{}"); }, "비어 있지 않은 required"],
       ["array-schema", () => { writeFileSync(decisionSchemaPath, "[]"); }, "비어 있지 않은 required"],
@@ -181,6 +185,7 @@ test("문서 거버넌스 계약은 successor의 자체 decision schema와 안�
       writeFileSync(successorPath, JSON.stringify(candidate));
       const errors = collectContractErrors(workspacePath);
       assert.ok(errors.some((error) => error.includes("ADR-HUB-0002.json") && error.includes(expected)), name);
+      rmSync(decisionSchemaPath, { force: true });
       writeFileSync(decisionSchemaPath, JSON.stringify(successorDecisionSchema));
     }
   } finally {
