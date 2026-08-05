@@ -346,6 +346,13 @@ export function validateProductClaimCatalog(catalog, schema, errors, { releaseDe
   const result = validateSchema(schema, catalog);
   errors.push(...result.errors.map((error) => `product-claim-catalog: ${error}`));
   if (!result.ok) return;
+  validateProductClaimReleaseAndPublicCopy(catalog, releaseDecision, forbiddenClaims, errors);
+  validateProductClaimInventory(catalog, errors);
+  validateProductClaimDecisionTokens(catalog, releaseDecision, publicCopy, errors);
+  validateProductClaimSemantics(catalog.claims, errors);
+}
+
+function validateProductClaimReleaseAndPublicCopy(catalog, releaseDecision, forbiddenClaims, errors) {
   if (catalog.releaseDecision !== releaseDecision?.decision?.currentLaunchDecision) {
     errors.push("product-claim-catalog: releaseDecision은 releaseDecisionSource의 currentLaunchDecision과 일치해야 한다");
   }
@@ -355,17 +362,26 @@ export function validateProductClaimCatalog(catalog, schema, errors, { releaseDe
   if (!forbiddenClaims?.scanTargets?.some(({ path }) => path === "README.md")) {
     errors.push("product-claim-catalog: publicCopyPolicy의 README.md scan target이 필요하다");
   }
+}
+
+function validateProductClaimInventory(catalog, errors) {
   const claimIds = catalog.claims.map(({ claimId }) => claimId);
   if (!isSortedUnique(claimIds)) errors.push("product-claim-catalog: claimId는 codepoint sorted-unique여야 한다");
   const claimInventory = catalog.claims.map(({ claimId, topic }) => `${claimId}:${topic}`);
   if (!isDeepStrictEqual(claimInventory, PRODUCT_CLAIM_INVENTORY)) {
     errors.push("product-claim-catalog: required claim inventory가 정확히 일치해야 한다");
   }
+}
+
+function validateProductClaimDecisionTokens(catalog, releaseDecision, publicCopy, errors) {
   const releaseStatusClaim = catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS");
   const decision = releaseDecision?.decision?.currentLaunchDecision;
   if (releaseStatusClaim != null) validateReleaseDecisionToken("release-status claim", releaseStatusClaim.copyKo, decision, errors);
   if (publicCopy != null) validateReleaseDecisionToken("README.md", publicCopy, decision, errors);
-  for (const claim of catalog.claims) {
+}
+
+function validateProductClaimSemantics(claims, errors) {
+  for (const claim of claims) {
     for (const field of ["surface", "requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
       if (!isSortedUnique(claim[field])) errors.push(`product-claim-catalog: ${claim.claimId} ${field}는 codepoint sorted-unique여야 한다`);
     }

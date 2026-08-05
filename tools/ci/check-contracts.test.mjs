@@ -1015,6 +1015,18 @@ for (const [name, mutate, expected] of [
   });
 }
 
+test("product claim catalog rejects empty forbiddenWhen", () => {
+  const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+  const claim = catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_ANONYMOUS_REPORT");
+  claim.forbiddenWhen = [];
+  const errors = [];
+  validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.ok(errors.some((error) => error.includes("forbiddenWhen")));
+});
+
 for (const field of ["requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
   test(`product claim catalog rejects duplicate ${field}`, () => {
     const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
