@@ -90,7 +90,7 @@ function validateRecord(record, repository, sha, tracked) {
 function validateRepository(entry) {
   exactKeys(entry, ["repository", "root", "gitSha", "discoveryRoots", "records"], "repository");
   if (!REPOSITORIES.includes(entry.repository) || typeof entry.root !== "string" || !isAbsolute(entry.root) || !/^[0-9a-f]{40}$/.test(entry.gitSha)) fail("invalid repository input");
-  if (!Array.isArray(entry.discoveryRoots) || entry.discoveryRoots.length === 0 || entry.discoveryRoots.some((root) => !safeRelative(root)) || entry.discoveryRoots.join("\0") !== [...new Set(entry.discoveryRoots)].sort().join("\0")) fail("invalid discovery roots");
+  if (!Array.isArray(entry.discoveryRoots) || entry.discoveryRoots.length === 0 || entry.discoveryRoots.some((root) => !safeRelative(root)) || entry.discoveryRoots.join("\0") !== [...new Set(entry.discoveryRoots)].sort(codepointCompare).join("\0")) fail("invalid discovery roots");
   try { git(entry.root, ["cat-file", "-e", `${entry.gitSha}^{commit}`]); } catch { fail("missing git commit"); }
   const entries = treeEntries(entry.root, entry.gitSha);
   const selected = [];
@@ -134,6 +134,7 @@ function main() {
   if (seen.size !== REPOSITORIES.length || REPOSITORIES.some((repository) => !seen.has(repository))) fail("repository set mismatch");
   const records = workspace.repositories.flatMap(validateRepository);
   for (const record of workspace.surfaceRecords) { validateRecord(record, record.ownerRepository, null, false); records.push(record); }
+  if (new Set(records.map((record) => record.resource)).size !== records.length) fail("duplicate resource");
   const duplicateGroups = new Map();
   for (const record of records) if (record.duplicateGroup !== null) duplicateGroups.set(record.duplicateGroup, [...(duplicateGroups.get(record.duplicateGroup) ?? []), record]);
   for (const group of duplicateGroups.values()) {
