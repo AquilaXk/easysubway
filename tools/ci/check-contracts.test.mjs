@@ -218,6 +218,12 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   validateDocumentationSystemCatalog(unsupportedBlobCatalog, catalogSchema, unsupportedBlobErrors);
   assert.ok(unsupportedBlobErrors.some((error) => error.includes("oneOf")), unsupportedBlobErrors.join("; "));
 
+  const unverifiedActiveCatalog = structuredClone(unsafeEvidenceCatalog);
+  unverifiedActiveCatalog.repositories[0].fragment.verificationEvidence = ["evidence:fixture"];
+  const unverifiedActiveErrors = [];
+  validateDocumentationSystemCatalog(unverifiedActiveCatalog, catalogSchema, unverifiedActiveErrors);
+  assert.ok(unverifiedActiveErrors.some((error) => error.includes("ACTIVE fragment resolution contract")));
+
   const unsortedErrors = [];
   validateDocumentationFragment({
     $schema: "./documentation-fragment.schema.json",

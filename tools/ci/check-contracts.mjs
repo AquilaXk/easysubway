@@ -326,6 +326,9 @@ function validateDocumentationSystemCatalogSemantics(catalog, errors, label) {
       errors.push(`${label}: ${entry.repository} ACTIVE fragment가 필요하다`);
       continue;
     }
+    if (entry.status === "ACTIVE") {
+      errors.push(`${label}: ${entry.repository} ACTIVE fragment resolution contract가 필요하다`);
+    }
     if (entry.fragment !== null) {
       if (!safeDocumentationPath(entry.fragment.path)) errors.push(`${label}: ${entry.repository} fragment path가 안전하지 않다`);
       if (!isCanonicalUtc(entry.fragment.lastVerifiedAt)) errors.push(`${label}: ${entry.repository} fragment lastVerifiedAt은 canonical UTC여야 한다`);
