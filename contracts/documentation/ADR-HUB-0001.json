@@ -1,0 +1,198 @@
+{
+  "$schema": "./architecture-decision.schema.json",
+  "schemaVersion": 1,
+  "id": "ADR-HUB-0001",
+  "kind": "architecture-decision",
+  "title": "ADR·Runbook·Playbook artifact taxonomy와 5개 저장소 정본 소유권",
+  "status": "proposed",
+  "date": "2026-08-04",
+  "decisionClass": "A",
+  "owner": {
+    "repository": "AquilaXk/easysubway",
+    "role": "architecture-governance"
+  },
+  "scope": ["hub", "data", "backend", "mobile", "platform"],
+  "contextIssue": "https://github.com/AquilaXk/easysubway/issues/2748",
+  "relatedIssues": [
+    {
+      "repository": "AquilaXk/easysubway",
+      "number": 2748,
+      "purpose": "문서 거버넌스 도입과 전체 실행 추적"
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "number": 2690,
+      "purpose": "5개 저장소 책임과 Hub contraction 경계"
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "number": 2742,
+      "purpose": "Journey V3 서버 정본 실행 조정"
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "number": 2743,
+      "purpose": "semantic no-fallback 정본"
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "number": 2740,
+      "purpose": "freshness 운영 문서 migration 실행"
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "number": 1019,
+      "purpose": "same-RC 운영 gate 최종 소비"
+    }
+  ],
+  "context": [
+    "아키텍처 결정, 운영 절차, 장애 조사, gate, evidence가 GitHub 이슈와 JSON, 테스트, 실행 스크립트에 혼재한다.",
+    "Hub와 target 저장소에 동일한 실행 자산 또는 evidence가 남아 정본 소유권이 흔들릴 수 있다.",
+    "현재 repository contract는 README와 PR template 외 tracked Markdown을 금지한다.",
+    "accepted decision과 현재 구현 진행 상태를 같은 장문 이슈에서 계속 수정하면 과거 판단 근거가 사라진다."
+  ],
+  "decisionDrivers": [
+    "현재 tracked Markdown 금지 계약 유지",
+    "5개 저장소의 독립 검증과 명확한 owner",
+    "결정·절차·gate·evidence의 기계 검증 가능성",
+    "target 실패를 Hub 복제본으로 우회하지 않는 no-fallback",
+    "공개 저장소의 secret·개인정보·private endpoint 비노출",
+    "작은 독립 PR과 current-head Review로 수렴 가능한 변경 단위"
+  ],
+  "consideredOptions": [
+    {
+      "id": "tracked-markdown-tree",
+      "chosen": false,
+      "summary": "각 저장소에 ADR·Runbook·Playbook Markdown 디렉터리를 추가한다.",
+      "pros": ["사람이 긴 서술과 절차를 읽기 쉽다."],
+      "cons": ["현재 Markdown 추적 금지 contract와 충돌한다.", "기계 계약과 문장 정본이 중복될 수 있다."],
+      "risks": ["README 전용 정책 완화와 장문 문서 drift가 함께 발생한다."]
+    },
+    {
+      "id": "machine-contract-with-github-review",
+      "chosen": true,
+      "summary": "사람의 판단은 GitHub issue·PR Review에 두고 지속 계약은 JSON과 test로 고정한다.",
+      "pros": ["현재 machine-first 정책을 유지한다.", "ID·상태·owner·link를 CI에서 검증할 수 있다.", "문서와 gate/evidence의 책임을 분리한다."],
+      "cons": ["JSON은 긴 운영 서술을 읽는 경험이 Markdown보다 불편하다."],
+      "risks": ["schema가 과도해지면 운영 지식보다 형식 유지 비용이 커질 수 있다."]
+    },
+    {
+      "id": "github-issues-only",
+      "chosen": false,
+      "summary": "별도 tracked contract 없이 GitHub issue만 결정과 절차 정본으로 사용한다.",
+      "pros": ["새 repository 파일과 validator가 필요 없다."],
+      "cons": ["ID·상태·owner·alert binding을 required CI에서 검사하기 어렵다."],
+      "risks": ["issue 편집으로 accepted decision의 의미가 조용히 바뀔 수 있다."]
+    }
+  ],
+  "decision": {
+    "trackedHumanDocumentFormat": "NONE",
+    "durableMachineFormat": "JSON",
+    "humanReviewSurfaces": ["github-issue", "github-pr-review"],
+    "artifactKinds": ["ADR", "DESIGN", "RUNBOOK", "PLAYBOOK", "POLICY", "GATE", "EVIDENCE", "PIR"],
+    "repositoryOwners": {
+      "hub": "AquilaXk/easysubway",
+      "data": "AquilaXk/easysubway-data",
+      "backend": "AquilaXk/easysubway-backend",
+      "mobile": "AquilaXk/easysubway-mobile",
+      "platform": "AquilaXk/easysubway-platform"
+    },
+    "lifecycle": {
+      "adrStatuses": ["proposed", "accepted", "rejected", "withdrawn", "superseded"],
+      "operationalStatuses": ["draft", "active", "deprecated", "retired"],
+      "acceptedMutationPolicy": "SUPERSEDE_ONLY",
+      "identifierReuseAllowed": false
+    },
+    "contentBoundary": {
+      "humanJudgment": "GITHUB_ISSUE_AND_PR_REVIEW",
+      "machineContract": "VERSIONED_JSON",
+      "executableProcedure": "TRACKED_SCRIPT_OR_WORKFLOW",
+      "gate": "MACHINE_DECISION_JSON",
+      "evidence": "IMMUTABLE_RESULT_OR_DIGEST_REFERENCE"
+    },
+    "hubCatalog": {
+      "targetContentReplicationAllowed": false,
+      "navigationReference": "REPOSITORY_AND_PATH",
+      "releaseBinding": "FULL_SHA_AND_MANIFEST_DIGEST"
+    },
+    "sensitiveEvidence": {
+      "trackedContentAllowed": false,
+      "forbiddenClasses": ["SECRET", "RAW_TOKEN", "PERSONAL_DATA", "PRIVATE_CONTACT", "PRIVATE_ENDPOINT_CREDENTIAL"]
+    },
+    "childIssuePolicy": {
+      "firstChildAfter": "ADR_HUB_0001_MERGED",
+      "inventoryRequiredBefore": [
+        "SCHEMA_CATALOG_BOOTSTRAP",
+        "ADR_MIGRATION",
+        "OPERATIONAL_MIGRATION",
+        "ALERT_GATE_EVIDENCE_BINDING",
+        "DRILL_AND_PIR",
+        "DUPLICATE_HANDOFF"
+      ]
+    },
+    "changeGrades": {
+      "A": "FULL_ADR_AND_OPERATIONAL_IMPACT",
+      "B": "ADR_WHEN_ARCHITECTURALLY_SIGNIFICANT",
+      "C": "NO_ADR"
+    },
+    "implementationFallbackAllowed": false
+  },
+  "consequences": {
+    "positive": [
+      "결정, 실행 도구, gate, evidence가 서로 다른 책임으로 검증된다.",
+      "Hub는 target 문서 내용을 복제하지 않고 repository/path와 immutable digest만 소비한다.",
+      "현재 tracked Markdown 금지와 README 상품 소개 계약을 유지한다."
+    ],
+    "negative": [
+      "긴 운영 판단은 JSON만으로 읽기 어려워 GitHub Review 가용성에 의존한다.",
+      "각 target 저장소가 동일 contract version을 독립 소비하는 bootstrap 작업이 필요하다."
+    ],
+    "neutral": [
+      "기존 JSON ADR·Runbook companion·gate·evidence는 inventory 전까지 삭제하거나 이름을 바꾸지 않는다."
+    ],
+    "acceptedDebt": [
+      "deterministic documentation manifest는 후속 schema/CI bootstrap에서 구현한다.",
+      "P0 정적 운영 bundle과 외부 mirror는 실제 가용성 요구가 검증될 때 별도 decision으로 다룬다."
+    ]
+  },
+  "operationalImpact": {
+    "initialSlice": [
+      "ADR-HUB-0001 schema와 payload를 기존 Hub contract gate에 연결한다.",
+      "제품 runtime, deploy, release claim은 변경하지 않는다."
+    ],
+    "deferredWaves": [
+      "5개 저장소 current-head dynamic inventory",
+      "shared schema, validator, manifest bootstrap",
+      "P0 architecture decision migration",
+      "P0 Runbook·Playbook contract와 machine companion 결속",
+      "Alert·Gate·same-RC evidence binding",
+      "drill·game day·PIR loop",
+      "검증된 target manifest 전환 뒤 Hub duplicate removal",
+      "scheduled documentation health와 지속 운영"
+    ]
+  },
+  "confirmation": [
+    {
+      "id": "tracked-markdown-zero",
+      "method": "repository Markdown tracking contract test",
+      "expected": "README와 PR template 외 tracked Markdown 0"
+    },
+    {
+      "id": "hub-contract-schema",
+      "method": "node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json --current-only",
+      "expected": "ADR-HUB-0001 schema validation PASS"
+    },
+    {
+      "id": "owner-review",
+      "method": "current-head GitHub PR Review",
+      "expected": "5개 repository owner 검토와 unresolved thread 0 이후에만 accepted 전환"
+    }
+  ],
+  "revisitConditions": [
+    "repository contract가 README 외 tracked human documentation을 명시적으로 허용하는 새 ADR로 supersede될 때",
+    "incident drill에서 JSON과 GitHub review만으로 첫 안전 조치까지의 목표 시간을 반복해서 충족하지 못할 때",
+    "5개 저장소 밖의 새 owner repository가 추가돼 현재 owner mapping이 완전하지 않을 때"
+  ],
+  "supersedes": [],
+  "supersededBy": null
+}

@@ -1,0 +1,330 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "easysubway/contracts/documentation/architecture-decision",
+  "title": "EasySubway Hub Architecture Decision",
+  "type": "object",
+  "required": [
+    "$schema",
+    "schemaVersion",
+    "id",
+    "kind",
+    "title",
+    "status",
+    "date",
+    "decisionClass",
+    "owner",
+    "scope",
+    "contextIssue",
+    "relatedIssues",
+    "context",
+    "decisionDrivers",
+    "consideredOptions",
+    "decision",
+    "consequences",
+    "operationalImpact",
+    "confirmation",
+    "revisitConditions",
+    "supersedes",
+    "supersededBy"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "const": "./architecture-decision.schema.json" },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "id": { "type": "string", "pattern": "^ADR-HUB-[0-9]{4}$" },
+    "kind": { "type": "string", "const": "architecture-decision" },
+    "title": { "type": "string", "minLength": 1 },
+    "status": {
+      "type": "string",
+      "enum": ["proposed", "accepted", "rejected", "withdrawn", "superseded"]
+    },
+    "date": { "type": "string", "format": "date" },
+    "decisionClass": { "type": "string", "enum": ["A", "B"] },
+    "owner": {
+      "type": "object",
+      "required": ["repository", "role"],
+      "additionalProperties": false,
+      "properties": {
+        "repository": { "type": "string", "const": "AquilaXk/easysubway" },
+        "role": { "type": "string", "minLength": 1 }
+      }
+    },
+    "scope": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "enum": ["hub", "data", "backend", "mobile", "platform"] }
+    },
+    "contextIssue": {
+      "type": "string",
+      "pattern": "^https://github\\.com/AquilaXk/easysubway/issues/[1-9][0-9]*$"
+    },
+    "relatedIssues": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "required": ["repository", "number", "purpose"],
+        "additionalProperties": false,
+        "properties": {
+          "repository": {
+            "type": "string",
+            "enum": [
+              "AquilaXk/easysubway",
+              "AquilaXk/easysubway-data",
+              "AquilaXk/easysubway-backend",
+              "AquilaXk/easysubway-mobile",
+              "AquilaXk/easysubway-platform"
+            ]
+          },
+          "number": { "type": "integer", "minimum": 1 },
+          "purpose": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "context": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "decisionDrivers": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "consideredOptions": {
+      "type": "array",
+      "minItems": 2,
+      "items": {
+        "type": "object",
+        "required": ["id", "chosen", "summary", "pros", "cons", "risks"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "chosen": { "type": "boolean" },
+          "summary": { "type": "string", "minLength": 1 },
+          "pros": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "cons": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          },
+          "risks": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
+    "decision": {
+      "type": "object",
+      "required": [
+        "trackedHumanDocumentFormat",
+        "durableMachineFormat",
+        "humanReviewSurfaces",
+        "artifactKinds",
+        "repositoryOwners",
+        "lifecycle",
+        "contentBoundary",
+        "hubCatalog",
+        "sensitiveEvidence",
+        "childIssuePolicy",
+        "changeGrades",
+        "implementationFallbackAllowed"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "trackedHumanDocumentFormat": { "type": "string", "const": "NONE" },
+        "durableMachineFormat": { "type": "string", "const": "JSON" },
+        "humanReviewSurfaces": {
+          "type": "array",
+          "minItems": 2,
+          "maxItems": 2,
+          "uniqueItems": true,
+          "items": { "type": "string", "enum": ["github-issue", "github-pr-review"] }
+        },
+        "artifactKinds": {
+          "type": "array",
+          "minItems": 8,
+          "maxItems": 8,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": ["ADR", "DESIGN", "RUNBOOK", "PLAYBOOK", "POLICY", "GATE", "EVIDENCE", "PIR"]
+          }
+        },
+        "repositoryOwners": {
+          "type": "object",
+          "required": ["hub", "data", "backend", "mobile", "platform"],
+          "additionalProperties": false,
+          "properties": {
+            "hub": { "type": "string", "const": "AquilaXk/easysubway" },
+            "data": { "type": "string", "const": "AquilaXk/easysubway-data" },
+            "backend": { "type": "string", "const": "AquilaXk/easysubway-backend" },
+            "mobile": { "type": "string", "const": "AquilaXk/easysubway-mobile" },
+            "platform": { "type": "string", "const": "AquilaXk/easysubway-platform" }
+          }
+        },
+        "lifecycle": {
+          "type": "object",
+          "required": ["adrStatuses", "operationalStatuses", "acceptedMutationPolicy", "identifierReuseAllowed"],
+          "additionalProperties": false,
+          "properties": {
+            "adrStatuses": {
+              "type": "array",
+              "minItems": 5,
+              "maxItems": 5,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "enum": ["proposed", "accepted", "rejected", "withdrawn", "superseded"]
+              }
+            },
+            "operationalStatuses": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 4,
+              "uniqueItems": true,
+              "items": { "type": "string", "enum": ["draft", "active", "deprecated", "retired"] }
+            },
+            "acceptedMutationPolicy": { "type": "string", "const": "SUPERSEDE_ONLY" },
+            "identifierReuseAllowed": { "type": "boolean", "const": false }
+          }
+        },
+        "contentBoundary": {
+          "type": "object",
+          "required": ["humanJudgment", "machineContract", "executableProcedure", "gate", "evidence"],
+          "additionalProperties": false,
+          "properties": {
+            "humanJudgment": { "type": "string", "const": "GITHUB_ISSUE_AND_PR_REVIEW" },
+            "machineContract": { "type": "string", "const": "VERSIONED_JSON" },
+            "executableProcedure": { "type": "string", "const": "TRACKED_SCRIPT_OR_WORKFLOW" },
+            "gate": { "type": "string", "const": "MACHINE_DECISION_JSON" },
+            "evidence": { "type": "string", "const": "IMMUTABLE_RESULT_OR_DIGEST_REFERENCE" }
+          }
+        },
+        "hubCatalog": {
+          "type": "object",
+          "required": ["targetContentReplicationAllowed", "navigationReference", "releaseBinding"],
+          "additionalProperties": false,
+          "properties": {
+            "targetContentReplicationAllowed": { "type": "boolean", "const": false },
+            "navigationReference": { "type": "string", "const": "REPOSITORY_AND_PATH" },
+            "releaseBinding": { "type": "string", "const": "FULL_SHA_AND_MANIFEST_DIGEST" }
+          }
+        },
+        "sensitiveEvidence": {
+          "type": "object",
+          "required": ["trackedContentAllowed", "forbiddenClasses"],
+          "additionalProperties": false,
+          "properties": {
+            "trackedContentAllowed": { "type": "boolean", "const": false },
+            "forbiddenClasses": {
+              "type": "array",
+              "minItems": 5,
+              "maxItems": 5,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "enum": ["SECRET", "RAW_TOKEN", "PERSONAL_DATA", "PRIVATE_CONTACT", "PRIVATE_ENDPOINT_CREDENTIAL"]
+              }
+            }
+          }
+        },
+        "childIssuePolicy": {
+          "type": "object",
+          "required": ["firstChildAfter", "inventoryRequiredBefore"],
+          "additionalProperties": false,
+          "properties": {
+            "firstChildAfter": { "type": "string", "const": "ADR_HUB_0001_MERGED" },
+            "inventoryRequiredBefore": {
+              "type": "array",
+              "minItems": 6,
+              "maxItems": 6,
+              "uniqueItems": true,
+              "items": {
+                "type": "string",
+                "enum": [
+                  "SCHEMA_CATALOG_BOOTSTRAP",
+                  "ADR_MIGRATION",
+                  "OPERATIONAL_MIGRATION",
+                  "ALERT_GATE_EVIDENCE_BINDING",
+                  "DRILL_AND_PIR",
+                  "DUPLICATE_HANDOFF"
+                ]
+              }
+            }
+          }
+        },
+        "changeGrades": {
+          "type": "object",
+          "required": ["A", "B", "C"],
+          "additionalProperties": false,
+          "properties": {
+            "A": { "type": "string", "const": "FULL_ADR_AND_OPERATIONAL_IMPACT" },
+            "B": { "type": "string", "const": "ADR_WHEN_ARCHITECTURALLY_SIGNIFICANT" },
+            "C": { "type": "string", "const": "NO_ADR" }
+          }
+        },
+        "implementationFallbackAllowed": { "type": "boolean", "const": false }
+      }
+    },
+    "consequences": {
+      "type": "object",
+      "required": ["positive", "negative", "neutral", "acceptedDebt"],
+      "additionalProperties": false,
+      "properties": {
+        "positive": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "negative": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "neutral": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "acceptedDebt": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "operationalImpact": {
+      "type": "object",
+      "required": ["initialSlice", "deferredWaves"],
+      "additionalProperties": false,
+      "properties": {
+        "initialSlice": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+        "deferredWaves": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "confirmation": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["id", "method", "expected"],
+        "additionalProperties": false,
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "method": { "type": "string", "minLength": 1 },
+          "expected": { "type": "string", "minLength": 1 }
+        }
+      }
+    },
+    "revisitConditions": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "supersedes": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": { "type": "string", "pattern": "^ADR-HUB-[0-9]{4}$" }
+    },
+    "supersededBy": {
+      "oneOf": [
+        { "type": "null" },
+        { "type": "string", "pattern": "^ADR-HUB-[0-9]{4}$" }
+      ]
+    }
+  }
+}

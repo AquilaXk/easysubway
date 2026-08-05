@@ -1,11 +1,13 @@
 #!/usr/bin/env node
 import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
+import { execFileSync } from "node:child_process";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
 import { validateLedger } from "../repo/issue-migration-ledger.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
+import { isDeepStrictEqual } from "node:util";
 
 const DEFAULT_WORKSPACE_PATH = "contracts/workspaces/hub.json";
 const EXTRACTION_REPOSITORIES = {
@@ -31,7 +33,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
   if (workspace == null || typeof workspace !== "object" || Array.isArray(workspace)) {
     throw new Error(`${workspacePath}: 객체가 필요하다`);
   }
-  const required = ["contracts", "gateDirectories", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy"];
+  const required = ["contracts", "gateDirectories", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision"];
   for (const field of required) {
     if (!Object.hasOwn(workspace, field)) throw new Error(`${workspacePath}: ${field} 필수`);
   }
@@ -43,7 +45,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
       throw new Error(`${workspacePath}: gateDirectories.${ownerComponent} 필수`);
     }
   }
-  for (const field of ["contracts", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy"]) {
+  for (const field of ["contracts", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision"]) {
     if (typeof workspace[field] !== "string" || workspace[field].trim() === "") {
       throw new Error(`${workspacePath}: ${field}은 비어 있지 않은 경로가 필요하다`);
     }
@@ -59,10 +61,14 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     sourceInventory: resolveWorkspacePath(workspace.sourceInventory),
     governancePolicy: resolveWorkspacePath(workspace.governancePolicy),
     freshnessPolicy: resolveWorkspacePath(workspace.freshnessPolicy),
+    architectureDecision: resolveWorkspacePath(workspace.architectureDecision),
   };
 }
 
-export function collectContractErrors(workspacePath = DEFAULT_WORKSPACE_PATH) {
+export function collectContractErrors(
+  workspacePath = DEFAULT_WORKSPACE_PATH,
+  { previousArchitectureDecision = null } = {},
+) {
   const errors = [];
   let workspace;
   try {
@@ -94,6 +100,87 @@ export function collectContractErrors(workspacePath = DEFAULT_WORKSPACE_PATH) {
     contract("datapack/pack-app-schema-parity-allowlist.json"),
     errors,
   );
+  const architectureDecisionValid = validateJson(
+    contract("documentation/architecture-decision.schema.json"),
+    workspace.architectureDecision,
+    errors,
+  );
+  let currentArchitectureDecisions = [];
+  const currentArchitectureDecisionCandidates = new Map();
+  if (architectureDecisionValid) {
+    const currentArchitectureDecision = loadJson(workspace.architectureDecision);
+    if (currentArchitectureDecision.id !== "ADR-HUB-0001") {
+      errors.push(`${workspace.architectureDecision}: workspace architectureDecision은 ADR-HUB-0001 root여야 한다`);
+    } else {
+      currentArchitectureDecisions = validateArchitectureDecisionChain(
+        contract("documentation/architecture-decision.schema.json"),
+        workspace.architectureDecision,
+        currentArchitectureDecision,
+        errors,
+        currentArchitectureDecisionCandidates,
+      );
+    }
+  }
+  if (previousArchitectureDecision != null && currentArchitectureDecisions.length > 0) {
+    const previousArchitectureDecisions = Array.isArray(previousArchitectureDecision)
+      ? previousArchitectureDecision : [previousArchitectureDecision];
+    const previousById = new Map();
+    for (const previous of previousArchitectureDecisions) {
+      const candidates = previousById.get(previous.id) ?? [];
+      candidates.push(previous);
+      previousById.set(previous.id, candidates);
+    }
+    const previousChainIds = new Set();
+    let previousMember = previousById.get("ADR-HUB-0001")?.[0];
+    while (previousMember != null && !previousChainIds.has(previousMember.id)) {
+      previousChainIds.add(previousMember.id);
+      if (previousMember.status !== "superseded") break;
+      const successors = previousById.get(previousMember.supersededBy) ?? [];
+      if (successors.length !== 1) break;
+      [previousMember] = successors;
+    }
+    const currentById = new Map(currentArchitectureDecisions.map((member) => [member.adr.id, member]));
+    for (const [previousId, previousCandidates] of previousById) {
+      if (previousCandidates.length !== 1) {
+        errors.push(`${workspace.architectureDecision}: base ADR ${previousId} 중복`);
+        continue;
+      }
+      const [previous] = previousCandidates;
+      const currentCandidates = currentArchitectureDecisionCandidates.get(previousId) ?? [];
+      if (currentCandidates.length > 1) {
+        errors.push(`${workspace.architectureDecision}: current ADR ${previousId} 중복`);
+        continue;
+      }
+      const current = currentById.get(previousId) ?? (currentCandidates.length === 1
+        ? { path: currentCandidates[0][0], adr: currentCandidates[0][1] } : null);
+      if (current == null) {
+        if (previousChainIds.has(previousId)) {
+          errors.push(`${workspace.architectureDecision}: base ADR ${previousId}가 current chain에서 삭제되었다`);
+        } else {
+          errors.push(`${workspace.architectureDecision}: base ADR ${previousId}가 current catalog에서 삭제되었다`);
+        }
+        continue;
+      }
+      const transitionErrors = validateArchitectureDecisionTransition(previous, current.adr);
+      errors.push(...transitionErrors
+        .map((error) => `${current.path}: ${error}`));
+      if (transitionErrors.length === 0
+        && previous.status === "accepted" && current.adr.status === "superseded") {
+        const successors = currentArchitectureDecisionCandidates.get(current.adr.supersededBy) ?? [];
+        if (successors.length === 0) {
+          errors.push(`${current.path}: successor ADR 누락`);
+        } else if (successors.length > 1) {
+          errors.push(`${current.path}: successor ADR 중복`);
+        } else if (!successors[0][2]) {
+          errors.push(`${successors[0][0]}: successor ADR는 schema와 semantic 검증을 통과해야 한다`);
+        } else if (successors[0][1].status !== "accepted") {
+          errors.push(`${current.path}: accepted ADR의 direct successor는 accepted 상태여야 한다`);
+        } else if (!successors[0][1].supersedes.includes(current.adr.id)) {
+          errors.push(`${successors[0][0]}: supersedes reciprocal link가 필요하다`);
+        }
+      }
+    }
+  }
   validateJson(contract("datapack/catalog-raw-sql-tables.schema.json"), contract("datapack/catalog-raw-sql-tables.json"), errors);
   const repositorySplitIssueLedgerValid = validateJson(
     contract("repository-split-issues.schema.json"),
@@ -164,7 +251,14 @@ export function validateJson(schemaPath, valuePath, errors) {
   }
   const result = validateSchema(schema, value);
   errors.push(...result.errors.map((error) => `${valuePath}: ${error}`));
+  let semanticErrors = [];
   switch (basename(schemaPath)) {
+    case "architecture-decision.schema.json":
+      if (result.errors.length === 0) {
+        semanticErrors = validateArchitectureDecision(value);
+        errors.push(...semanticErrors.map((error) => `${valuePath}: ${error}`));
+      }
+      break;
     case "datapack-manifest.schema.json":
       validateDatapackManifest(value, valuePath, errors);
       break;
@@ -177,7 +271,289 @@ export function validateJson(schemaPath, valuePath, errors) {
     default:
       break;
   }
-  return result.errors.length === 0;
+  return result.errors.length === 0 && semanticErrors.length === 0;
+}
+
+export function validateArchitectureDecision(adr) {
+  if (adr == null || typeof adr !== "object" || Array.isArray(adr)) return [];
+  const errors = [];
+  const repositoryOwners = {
+    hub: "AquilaXk/easysubway",
+    data: "AquilaXk/easysubway-data",
+    backend: "AquilaXk/easysubway-backend",
+    mobile: "AquilaXk/easysubway-mobile",
+    platform: "AquilaXk/easysubway-platform",
+  };
+  for (const [component, repository] of Object.entries(repositoryOwners)) {
+    if (adr.decision?.repositoryOwners?.[component] !== repository) {
+      errors.push(`${component} repository owner는 ${repository}여야 한다`);
+    }
+  }
+  if ((Array.isArray(adr.supersedes) && adr.supersedes.includes(adr.id)) || adr.supersededBy === adr.id) {
+    errors.push("supersession은 자기 자신을 참조할 수 없다");
+  }
+  if (adr.status === "superseded" && adr.supersededBy == null) {
+    errors.push("superseded 상태에는 supersededBy가 필요하다");
+  }
+  if (adr.status !== "superseded" && adr.supersededBy != null) {
+    errors.push("non-superseded 상태의 supersededBy는 null이어야 한다");
+  }
+  if (adr.decision?.childIssuePolicy?.firstChildAfter !== "ADR_HUB_0001_MERGED") {
+    errors.push("첫 파생 이슈는 ADR-HUB-0001 병합 뒤에만 만들 수 있다");
+  }
+  if (adr.decision?.sensitiveEvidence?.trackedContentAllowed !== false) {
+    errors.push("sensitiveEvidence.trackedContentAllowed는 false여야 한다");
+  }
+  if (adr.id === "ADR-HUB-0001"
+    && adr.contextIssue !== "https://github.com/AquilaXk/easysubway/issues/2748") {
+    errors.push("ADR-HUB-0001 contextIssue는 Hub #2748이어야 한다");
+  }
+  if (Array.isArray(adr.consideredOptions)) {
+    const chosenCount = adr.consideredOptions.filter((option) => option?.chosen === true).length;
+    if (chosenCount !== 1) errors.push("consideredOptions에는 chosen 옵션이 정확히 하나여야 한다");
+    const optionIds = adr.consideredOptions.map((option) => option?.id);
+    if (new Set(optionIds).size !== optionIds.length) {
+      errors.push("consideredOptions의 id는 유일해야 한다");
+    }
+  }
+  return errors;
+}
+
+export function validateArchitectureDecisionTransition(previous, current) {
+  if (isDeepStrictEqual(previous, current)) return [];
+  if (previous?.status === "proposed" && current?.status !== "proposed") {
+    const statusOnly = structuredClone(current);
+    statusOnly.status = "proposed";
+    if (["accepted", "rejected", "withdrawn"].includes(current?.status)
+      && isDeepStrictEqual(previous, statusOnly)) return [];
+    return ["proposed ADR의 종결 전환은 status-only여야 한다"];
+  }
+  const terminalStatuses = new Set(["rejected", "withdrawn", "superseded"]);
+  if (terminalStatuses.has(previous?.status)) {
+    return ["종결 상태 ADR 본문은 변경할 수 없다"];
+  }
+  if (previous?.status !== "accepted") return [];
+  const allowed = structuredClone(current);
+  allowed.status = previous.status;
+  allowed.supersededBy = previous.supersededBy;
+  if (current?.status === "superseded" && current.supersededBy != null
+    && isDeepStrictEqual(previous, allowed)) return [];
+  return ["accepted ADR 본문은 in-place 변경할 수 없고 새 ADR로 supersede해야 한다"];
+}
+
+function validateArchitectureDecisionChain(schemaPath, rootPath, root, errors, candidatesById) {
+  let candidatePaths;
+  try {
+    candidatePaths = readdirSync(dirname(rootPath))
+      .filter((name) => name.endsWith(".json"))
+      .map((name) => join(dirname(rootPath), name));
+  } catch {
+    errors.push(`${rootPath}: successor ADR directory를 읽을 수 없다`);
+    return [];
+  }
+  const malformedPaths = [];
+  for (const candidatePath of candidatePaths) {
+    const namedAdr = /^ADR-[A-Z0-9-]+\.json$/.test(basename(candidatePath));
+    let candidate;
+    try {
+      candidate = loadJson(candidatePath);
+    } catch {
+      if (namedAdr) {
+        malformedPaths.push(candidatePath);
+        errors.push(`${candidatePath}: 유효한 JSON이 필요하다`);
+      }
+      continue;
+    }
+    const declaredAdr = candidate?.kind === "architecture-decision"
+      || (typeof candidate?.$schema === "string"
+        && basename(candidate.$schema) === "architecture-decision.schema.json");
+    if (candidatePath !== rootPath && !namedAdr && !declaredAdr && !/^ADR-/.test(candidate?.id)) continue;
+    const candidateErrors = [];
+    const candidateValid = candidatePath === rootPath
+      || validateJson(schemaPath, candidatePath, candidateErrors);
+    errors.push(...candidateErrors);
+    if (typeof candidate?.id !== "string") continue;
+    const candidates = candidatesById.get(candidate.id) ?? [];
+    candidates.push([candidatePath, candidate, candidateValid]);
+    candidatesById.set(candidate.id, candidates);
+  }
+  for (const [id, candidates] of candidatesById) {
+    if (candidates.length > 1) errors.push(`${rootPath}: current ADR ID 중복 (${id})`);
+  }
+  for (const candidates of candidatesById.values()) {
+    if (candidates.length !== 1 || !candidates[0][2]) continue;
+    const startPath = candidates[0][0];
+    for (const predecessorId of candidates[0][1].supersedes) {
+      const predecessors = candidatesById.get(predecessorId) ?? [];
+      if (predecessors.length !== 1 || !predecessors[0][2]
+        || predecessors[0][1].status !== "superseded"
+        || predecessors[0][1].supersededBy !== candidates[0][1].id) {
+        errors.push(`${startPath}: supersedes predecessor reciprocal link가 필요하다`);
+      }
+    }
+    const seen = new Set();
+    let currentCandidate = candidates[0];
+    while (currentCandidate[1].status === "superseded") {
+      const [currentPath, currentAdr] = currentCandidate;
+      if (seen.has(currentAdr.id)) {
+        errors.push(`${startPath}: supersession cycle을 허용하지 않는다`);
+        break;
+      }
+      seen.add(currentAdr.id);
+      const successors = candidatesById.get(currentAdr.supersededBy) ?? [];
+      if (successors.length === 0) {
+        errors.push(`${currentPath}: successor ADR 누락`);
+        break;
+      }
+      if (successors.length > 1) {
+        errors.push(`${currentPath}: successor ADR 중복`);
+        break;
+      }
+      const [successorPath, successor, successorValid] = successors[0];
+      if (!successorValid) {
+        errors.push(`${successorPath}: successor ADR는 schema와 semantic 검증을 통과해야 한다`);
+        break;
+      }
+      if (!["accepted", "superseded"].includes(successor.status)) {
+        errors.push(`${successorPath}: terminal successor ADR는 accepted 상태여야 한다`);
+        break;
+      }
+      if (!successor.supersedes.includes(currentAdr.id)) {
+        errors.push(`${successorPath}: supersedes reciprocal link가 필요하다`);
+        break;
+      }
+      currentCandidate = successors[0];
+    }
+  }
+  const members = [];
+  const visited = new Set();
+  let current = [rootPath, root];
+  while (true) {
+    const [currentPath, currentAdr] = current;
+    if (visited.has(currentAdr.id)) {
+      errors.push(`${currentPath}: supersession cycle을 허용하지 않는다`);
+      return members;
+    }
+    visited.add(currentAdr.id);
+    members.push({ path: currentPath, adr: currentAdr });
+    if (currentAdr.status !== "superseded") return members;
+    const successors = candidatesById.get(currentAdr.supersededBy) ?? [];
+    if (successors.length === 0) {
+      if (malformedPaths.length > 0) {
+        errors.push(`${currentPath}: successor ADR 판정에 유효한 JSON이 필요하다`);
+      } else {
+        errors.push(`${currentPath}: current ADR directory에 successor ADR 누락`);
+      }
+      return members;
+    }
+    if (successors.length > 1) {
+      errors.push(`${currentPath}: successor ADR 중복`);
+      return members;
+    }
+    const [successorPath, successor, successorValid] = successors[0];
+    if (!successorValid) {
+      errors.push(`${successorPath}: successor ADR는 schema와 semantic 검증을 통과해야 한다`);
+      return members;
+    }
+    if (!["accepted", "superseded"].includes(successor.status)) {
+      errors.push(`${successorPath}: terminal successor ADR는 accepted 상태여야 한다`);
+      return members;
+    }
+    if (!successor.supersedes.includes(currentAdr.id)) {
+      errors.push(`${successorPath}: supersedes reciprocal link가 필요하다`);
+      return members;
+    }
+    current = [successorPath, successor];
+  }
+}
+
+export function validateArchitectureDecisionWorkspaceTransition(previous, current) {
+  if (!Object.hasOwn(previous, "architectureDecision")) return [];
+  if (previous.architectureDecision !== current.architectureDecision) {
+    return ["workspace architectureDecision path redirect는 허용되지 않는다"];
+  }
+  return [];
+}
+
+export function loadArchitectureDecisionAtRef(workspacePath, baseRef) {
+  if (!/^[0-9a-f]{40}$/i.test(baseRef)) throw new Error("base-ref는 40자리 Git SHA여야 한다");
+  const absoluteWorkspacePath = resolve(workspacePath);
+  const workspaceRepositoryPath = relative(process.cwd(), absoluteWorkspacePath);
+  if (workspaceRepositoryPath.startsWith("..") || workspaceRepositoryPath === "") {
+    throw new Error("base-ref workspace 경로는 repository 내부여야 한다");
+  }
+  execFileSync("/usr/bin/git", ["rev-parse", "--verify", `${baseRef}^{commit}`], { stdio: "ignore" });
+  const loadAtRef = (repositoryPath, required) => {
+    const found = execFileSync("/usr/bin/git", ["ls-tree", "--name-only", baseRef, "--", repositoryPath], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    }).trim();
+    if (found === "") {
+      if (!required) return null;
+      throw new Error(`${baseRef}:${repositoryPath} 누락`);
+    }
+    const raw = execFileSync("/usr/bin/git", ["show", `${baseRef}:${repositoryPath}`], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"],
+    });
+    try {
+      return JSON.parse(raw);
+    } catch {
+      throw new Error(`${baseRef}:${repositoryPath}: 유효한 JSON이 필요하다`);
+    }
+  };
+  const previousWorkspace = loadAtRef(workspaceRepositoryPath, true);
+  const currentWorkspace = loadJson(absoluteWorkspacePath);
+  const workspaceErrors = validateArchitectureDecisionWorkspaceTransition(previousWorkspace, currentWorkspace);
+  if (workspaceErrors.length > 0) throw new Error(workspaceErrors.join("; "));
+  if (!Object.hasOwn(previousWorkspace, "architectureDecision")) return null;
+  const repositoryPath = relative(
+    "/",
+    resolve("/", dirname(workspaceRepositoryPath), previousWorkspace.architectureDecision),
+  );
+  if (repositoryPath.startsWith("..") || repositoryPath === "") {
+    throw new Error("base-ref ADR 경로는 repository 내부여야 한다");
+  }
+  const root = loadAtRef(repositoryPath, true);
+  const directory = dirname(repositoryPath);
+  const candidatesById = new Map();
+  let hasMalformedCandidate = false;
+  const candidatePaths = execFileSync("/usr/bin/git", ["ls-tree", "--name-only", directory === "." ? baseRef : `${baseRef}:${directory}`], {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "ignore"],
+  }).trim().split("\n")
+    .filter((path) => path.endsWith(".json"))
+    .map((path) => join(directory, path));
+  for (const candidatePath of candidatePaths) {
+    const namedAdr = /^ADR-[A-Z0-9-]+\.json$/.test(basename(candidatePath));
+    try {
+      const candidate = loadAtRef(candidatePath, true);
+      const declaredAdr = candidate?.kind === "architecture-decision"
+        || (typeof candidate?.$schema === "string"
+          && basename(candidate.$schema) === "architecture-decision.schema.json");
+      if (candidatePath !== repositoryPath && !namedAdr && !declaredAdr && !/^ADR-/.test(candidate?.id)) continue;
+      if (typeof candidate?.id !== "string") continue;
+      const candidates = candidatesById.get(candidate.id) ?? [];
+      candidates.push(candidate);
+      candidatesById.set(candidate.id, candidates);
+    } catch {
+      if (namedAdr) hasMalformedCandidate = true;
+    }
+  }
+  const visited = new Set();
+  let current = root;
+  while (true) {
+    if (visited.has(current.id)) throw new Error(`${baseRef}:${repositoryPath}: supersession cycle을 허용하지 않는다`);
+    visited.add(current.id);
+    if (current.status !== "superseded") return [...candidatesById.values()].flat();
+    const successors = candidatesById.get(current.supersededBy) ?? [];
+    if (successors.length === 0) {
+      if (hasMalformedCandidate) throw new Error(`${baseRef}:${repositoryPath}: successor ADR 판정에 유효한 JSON이 필요하다`);
+      throw new Error(`${baseRef}:${repositoryPath}: current ADR directory에 successor ADR 누락`);
+    }
+    if (successors.length > 1) throw new Error(`${baseRef}:${repositoryPath}: successor ADR 중복`);
+    current = successors[0];
+  }
 }
 
 export function validateSourceInventory(inventory, valuePath, errors) {
@@ -462,11 +838,22 @@ function compareText(left, right) {
 
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2);
-  if (args.length !== 2 || args[0] !== "--workspace" || args[1].trim() === "") {
-    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json>");
+  const hasWorkspace = args[0] === "--workspace" && args[1]?.trim() !== "";
+  const hasBaseRef = args.length === 4 && args[2] === "--base-ref" && args[3].trim() !== "";
+  const isCurrentOnly = args.length === 3 && args[2] === "--current-only";
+  const validArgs = hasWorkspace && (hasBaseRef || isCurrentOnly);
+  if (!validArgs) {
+    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json> (--base-ref <40-hex-sha>|--current-only)");
     process.exit(1);
   }
-  const errors = collectContractErrors(args[1]);
+  let previousArchitectureDecision = null;
+  try {
+    if (hasBaseRef) previousArchitectureDecision = loadArchitectureDecisionAtRef(args[1], args[3]);
+  } catch (error) {
+    console.error(`- ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+  const errors = collectContractErrors(args[1], { previousArchitectureDecision });
   if (errors.length) {
     console.error(errors.map((error) => `- ${error}`).join("\n"));
     process.exit(1);
