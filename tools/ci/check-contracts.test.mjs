@@ -267,6 +267,22 @@ test("documentation catalog rejects reversed local workspace mappings", () => {
   }
 });
 
+test("documentation catalog rejects ACTIVE null fragment without throwing", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  try {
+    const catalog = loadJson(fixture.catalogPath);
+    catalog.repositories[0].fragment = null;
+    writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    const errors = collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    });
+    assert.ok(errors.some((error) => error.includes("ACTIVE fragment가 필요하다")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes(fixture.repositories[0].root)));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
 test("documentation catalog rejects malformed and drifting local workspace mappings", () => {
   const cases = [
     ["malformed JSON", (fixture) => writeFileSync(fixture.fragmentWorkspacePath, "{"), "유효한 local workspace JSON"],

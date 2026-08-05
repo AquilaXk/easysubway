@@ -419,6 +419,7 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors) {
   if (roots == null) return;
   const records = [];
   for (const entry of active) {
+    if (entry.fragment == null) continue;
     const root = roots.get(entry.repository);
     if (!validateDocumentationGitRoot(root)) {
       documentationTransportError(errors, `${entry.repository} Git root가 유효하지 않다`);
