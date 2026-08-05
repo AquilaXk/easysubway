@@ -10,6 +10,13 @@ Refs #
 
 -
 
+## Documentation impact
+
+- 영향 resource ID 또는 `NONE`:
+- resourceClass:
+- documentationFamily:
+- lifecycle/evidence 영향:
+
 ## 검증
 
 - 실행한 명령과 결과:
