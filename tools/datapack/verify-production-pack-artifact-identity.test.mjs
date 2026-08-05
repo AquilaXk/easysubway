@@ -13,6 +13,8 @@ import { verifyProductionPackArtifactIdentity } from "./verify-production-pack-a
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
+// ponytail: committed fixture replay clock; release workflow keeps actual time.
+process.env.EASYSUBWAY_DATAPACK_BUILD_NOW = "2026-07-30T00:00:00.000Z";
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const env = {
   ...process.env,
