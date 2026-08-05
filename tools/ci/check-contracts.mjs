@@ -342,6 +342,7 @@ function validateDocumentationSystemCatalogSemantics(catalog, errors, label, req
 
 const DOCUMENTATION_GIT_ENV = Object.freeze({
   GIT_NO_REPLACE_OBJECTS: "1",
+  GIT_GRAFT_FILE: "/dev/null",
   GIT_NO_LAZY_FETCH: "1",
   GIT_TERMINAL_PROMPT: "0",
   GIT_LITERAL_PATHSPECS: "1",
@@ -353,6 +354,7 @@ const DOCUMENTATION_GIT_ENV = Object.freeze({
 const DOCUMENTATION_GIT_UNSET = Object.freeze(["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_QUARANTINE_PATH", "GIT_CEILING_DIRECTORIES", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"]);
 const DOCUMENTATION_GIT_MAX_BUFFER = 64 * 1024 * 1024;
 const DOCUMENTATION_FRAGMENT_MAX_RESOURCES = 4096;
+const DOCUMENTATION_MAX_TRACKED_RESOURCES = 256;
 
 function documentationGit(root, args, encoding = "buffer") {
   const env = { ...process.env, ...DOCUMENTATION_GIT_ENV };
@@ -410,7 +412,7 @@ function validateDocumentationGitRoot(root) {
   } catch { return false; }
 }
 
-function resolveDocumentationBlob(root, commit, path) {
+function resolveDocumentationBlob(root, commit, path, readBytes = true) {
   if (!/^[0-9a-f]{40}$/.test(commit) || !safeDocumentationPath(path)) return null;
   try {
     if (documentationGit(root, ["cat-file", "-t", commit], "utf8").trim() !== "commit") return null;
@@ -421,8 +423,12 @@ function resolveDocumentationBlob(root, commit, path) {
     if (match == null || match[1] === "120000" || match[2] !== "blob" || match[4] !== path) return null;
     const size = documentationGit(root, ["cat-file", "-s", match[3]], "utf8").trim();
     if (!/^\d+$/.test(size)) return null;
-    if (BigInt(size) > BigInt(DOCUMENTATION_GIT_MAX_BUFFER)) return { oid: match[3], tooLarge: true };
-    return { oid: match[3], bytes: documentationGit(root, ["cat-file", "blob", match[3]]) };
+    const byteLength = BigInt(size);
+    if (byteLength > BigInt(DOCUMENTATION_GIT_MAX_BUFFER)) return { oid: match[3], byteLength, tooLarge: true };
+    return {
+      oid: match[3], byteLength,
+      bytes: readBytes ? documentationGit(root, ["cat-file", "blob", match[3]]) : null,
+    };
   } catch { return null; }
 }
 
@@ -443,6 +449,8 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
   }
   const records = [];
   let failed = false;
+  let trackedResourceCount = 0;
+  let trackedDigestBytes = 0n;
   for (const entry of active) {
     if (entry.fragment == null) { failed = true; continue; }
     const root = roots.get(entry.repository);
@@ -508,17 +516,28 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
         documentationGit(root, ["merge-base", "--is-ancestor", fragment.gitSha, entry.fragment.gitSha]);
       }
     } catch { fragmentErrors.push("inner commit relation 불일치"); }
-    for (const record of fragment.resources ?? []) {
-      if (record.sourceSurface !== "TRACKED") continue;
+    const trackedRecords = fragment.resources.filter(({ sourceSurface }) => sourceSurface === "TRACKED");
+    trackedResourceCount += trackedRecords.length;
+    if (trackedResourceCount > DOCUMENTATION_MAX_TRACKED_RESOURCES) {
+      fragmentErrors.push("TRACKED resources는 전체 256개 이하여야 한다");
+    } else for (const record of trackedRecords) {
       const identity = /^git:([0-9a-f]{40}):([^:]+):([0-9a-f]{40}|[0-9a-f]{64})$/.exec(record.canonicalIdentity);
       const blob = identity != null && identity[1] === fragment.gitSha
-        ? resolveDocumentationBlob(root, fragment.gitSha, identity[2]) : null;
+        ? resolveDocumentationBlob(root, fragment.gitSha, identity[2], false) : null;
       if (blob?.tooLarge) {
         fragmentErrors.push("TRACKED resource blob은 64 MiB 이하여야 한다");
         continue;
       }
-      const actual = blob == null ? null : identity[3].length === 40
-        ? blob.oid : createHash("sha256").update(blob.bytes).digest("hex");
+      let actual = blob?.oid ?? null;
+      if (blob != null && identity[3].length === 64) {
+        if (trackedDigestBytes + blob.byteLength > BigInt(DOCUMENTATION_GIT_MAX_BUFFER)) {
+          fragmentErrors.push("TRACKED resource SHA-256 payload 합계는 64 MiB 이하여야 한다");
+          break;
+        }
+        trackedDigestBytes += blob.byteLength;
+        try { actual = createHash("sha256").update(documentationGit(root, ["cat-file", "blob", blob.oid])).digest("hex"); }
+        catch { actual = null; }
+      }
       if (actual !== identity?.[3]) fragmentErrors.push("TRACKED resource blob identity가 일치하지 않는다");
     }
     if (fragmentErrors.length > 0) {

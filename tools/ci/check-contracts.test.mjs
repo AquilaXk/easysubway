@@ -77,9 +77,9 @@ function bindRootDecisionSchema(directory, adr) {
   cpSync("contracts/documentation/ADR-HUB-0001-decision.schema.json", join(directory, schemaName));
 }
 
-function documentationCatalogRecord(repository, innerSha, blobSha) {
-  const resource = `${repository}:docs/resource.txt`;
-  const canonicalIdentity = `git:${innerSha}:docs/resource.txt:${blobSha}`;
+function documentationCatalogRecord(repository, innerSha, blobSha, path = "docs/resource.txt") {
+  const resource = `${repository}:${path}`;
+  const canonicalIdentity = `git:${innerSha}:${path}:${blobSha}`;
   return {
     resource, resourceClass: "CANONICAL_RESOURCE", documentationFamily: "ARCHITECTURE",
     kindCandidate: "DOCUMENTATION_RESOURCE", sourceSurface: "TRACKED", canonicalIdentity,
@@ -281,6 +281,25 @@ test("documentation catalog rejects fragment resource arrays above 4096 before i
     const errors = documentationCatalogErrors(fixture);
     assert.ok(errors.some((error) => error.includes("fragment resources는 4096개 이하여야 한다")), errors.join("\n"));
     assert.ok(errors.every((error) => !error.includes("documentation-fragment resource")), errors.join("\n"));
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog limits TRACKED resource work across ACTIVE fragments", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    const blobSha = fragment.resources[0].canonicalIdentity.split(":").at(-1);
+    fragment.resources = Array.from({ length: 257 }, (_, index) => documentationCatalogRecord(
+      fragment.repository,
+      fragment.gitSha,
+      blobSha,
+      `docs/resource-${String(index).padStart(3, "0")}.txt`,
+    ));
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    const errors = documentationCatalogErrors(fixture);
+    assert.ok(errors.some((error) => error.includes("TRACKED resources는 전체 256개 이하여야 한다")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes("TRACKED resource blob identity")), errors.join("\n"));
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
 
@@ -561,18 +580,41 @@ test("documentation catalog enforces the explicit 64 MiB blob limit", () => {
     const root = fixture.repositories[0].root;
     const resourcePath = join(root, "docs/resource.txt");
     const bindResource = (size) => {
-      writeFileSync(resourcePath, Buffer.alloc(size, "x"));
+      const bytes = Buffer.alloc(size, "x");
+      writeFileSync(resourcePath, bytes);
       fixtureGit(["add", "docs/resource.txt"], { cwd: root, stdio: "ignore" });
       fixtureGit(["commit", "-m", `resource ${size}`], { cwd: root, stdio: "ignore" });
       const innerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
       const blobSha = fixtureGit(["rev-parse", "HEAD:docs/resource.txt"], { cwd: root, encoding: "utf8" }).trim();
       const fragment = loadJson(join(root, "docs/fragment.json"));
+      fragment.resources = [fragment.resources[0]];
       rewriteDocumentationFragmentInnerCommit(fragment, innerSha, "docs/resource.txt", blobSha);
       commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+      return createHash("sha256").update(bytes).digest("hex");
     };
 
-    bindResource(64 * 1024 * 1024);
+    const largeDigest = bindResource(64 * 1024 * 1024);
     assert.deepEqual(documentationCatalogErrors(fixture), []);
+
+    const smallBytes = Buffer.from("y");
+    writeFileSync(join(root, "docs/small.txt"), smallBytes);
+    fixtureGit(["add", "docs/small.txt"], { cwd: root, stdio: "ignore" });
+    fixtureGit(["commit", "-m", "aggregate digest payload"], { cwd: root, stdio: "ignore" });
+    const innerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    fragment.gitSha = innerSha;
+    fragment.resources = [
+      documentationCatalogRecord(fragment.repository, innerSha, largeDigest),
+      documentationCatalogRecord(
+        fragment.repository,
+        innerSha,
+        createHash("sha256").update(smallBytes).digest("hex"),
+        "docs/small.txt",
+      ),
+    ];
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    assertDocumentationCatalogFailure(fixture, "TRACKED resource SHA-256 payload 합계는 64 MiB 이하여야 한다");
+
     bindResource(64 * 1024 * 1024 + 1);
     assertDocumentationCatalogFailure(fixture, "TRACKED resource blob은 64 MiB 이하여야 한다");
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
@@ -679,6 +721,16 @@ test("documentation catalog rejects missing and non-ancestor inner commits", () 
       const fragment = loadJson(join(root, "docs/fragment.json"));
       rewriteDocumentationFragmentInnerCommit(fragment, innerSha);
       commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    }],
+    ["grafted non-ancestor", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const innerSha = fixtureGit(["commit-tree", "HEAD^{tree}", "-m", "grafted inner"], { cwd: root, encoding: "utf8" }).trim();
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      rewriteDocumentationFragmentInnerCommit(fragment, innerSha);
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+      const outerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+      mkdirSync(join(root, ".git/info"), { recursive: true });
+      writeFileSync(join(root, ".git/info/grafts"), `${outerSha} ${innerSha}\n`);
     }],
   ];
   for (const [, mutate] of cases) {
