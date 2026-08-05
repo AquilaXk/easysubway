@@ -271,6 +271,19 @@ test("documentation catalog returns many malformed resource errors without throw
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
 
+test("documentation catalog rejects fragment resource arrays above 4096 before item validation", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    fragment.resources = Array.from({ length: 4097 }, () => ({}));
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    const errors = documentationCatalogErrors(fixture);
+    assert.ok(errors.some((error) => error.includes("fragment resources는 4096개 이하여야 한다")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes("documentation-fragment resource")), errors.join("\n"));
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
 test("documentation catalog rejects reversed local workspace mappings", () => {
   const fixture = createDocumentationCatalogWorkspace();
   try {

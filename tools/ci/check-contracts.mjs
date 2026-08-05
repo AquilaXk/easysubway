@@ -352,6 +352,7 @@ const DOCUMENTATION_GIT_ENV = Object.freeze({
 });
 const DOCUMENTATION_GIT_UNSET = Object.freeze(["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_QUARANTINE_PATH", "GIT_CEILING_DIRECTORIES", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"]);
 const DOCUMENTATION_GIT_MAX_BUFFER = 64 * 1024 * 1024;
+const DOCUMENTATION_FRAGMENT_MAX_RESOURCES = 4096;
 
 function documentationGit(root, args, encoding = "buffer") {
   const env = { ...process.env, ...DOCUMENTATION_GIT_ENV };
@@ -471,6 +472,11 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
     let fragment;
     try { fragment = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(fragmentBlob.bytes)); } catch {
       documentationTransportError(errors, `${entry.repository} fragment JSON이 유효하지 않다`);
+      failed = true;
+      continue;
+    }
+    if (Array.isArray(fragment?.resources) && fragment.resources.length > DOCUMENTATION_FRAGMENT_MAX_RESOURCES) {
+      documentationTransportError(errors, `${entry.repository} fragment resources는 4096개 이하여야 한다`);
       failed = true;
       continue;
     }
