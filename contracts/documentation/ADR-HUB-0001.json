@@ -85,6 +85,7 @@
       "risks": ["issue 편집으로 accepted decision의 의미가 조용히 바뀔 수 있다."]
     }
   ],
+  "decisionSchema": "./ADR-HUB-0001-decision.schema.json",
   "decision": {
     "trackedHumanDocumentFormat": "NONE",
     "durableMachineFormat": "JSON",
