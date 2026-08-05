@@ -355,6 +355,7 @@ export function validateDocumentationFragment(fragment, fragmentSchema, resource
       || !isDeepStrictEqual(resourceIds, [...new Set(resourceIds)].sort(codepointCompare))) {
     errors.push("documentation-fragment: resources는 resource ID 기준 sorted-unique여야 한다");
   }
+  const validRecords = [];
   for (const record of fragment.resources) {
     const resourceResult = validateSchema(resourceSchema, record);
     errors.push(...resourceResult.errors.map((error) => `documentation-fragment resource: ${error}`));
@@ -367,17 +368,62 @@ export function validateDocumentationFragment(fragment, fragmentSchema, resource
       });
       if (record.sourceSurface === "TRACKED") {
         const prefix = `${fragment.repository}:`;
-        const identity = /^git:[0-9a-f]{40}:([^:]+):[0-9a-f]{40,64}$/.exec(record.canonicalIdentity);
+        const identity = /^git:[0-9a-f]{40}:([^:]+):(?:[0-9a-f]{40}|[0-9a-f]{64})$/.exec(record.canonicalIdentity);
         if (!record.resource.startsWith(prefix) || identity?.[1] !== record.resource.slice(prefix.length)) {
           throw new Error("tracked fragment identity mismatch");
         }
       }
-      if (record.supersededBy === record.resource || record.supersedes.includes(record.resource)
-          || (record.status === "SUPERSEDED") !== (record.supersededBy !== null)) {
-        throw new Error("fragment lifecycle contradiction");
-      }
+      validRecords.push(record);
     } catch (error) {
       errors.push(`documentation-fragment resource: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  try {
+    validateDocumentationFragmentRelations(validRecords);
+  } catch (error) {
+    errors.push(`documentation-fragment resource: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function validateDocumentationFragmentRelations(records) {
+  const byResource = new Map(records.map((record) => [record.resource, record]));
+  for (const record of records) {
+    if (record.supersededBy === record.resource || record.supersedes.includes(record.resource)
+        || (record.status === "SUPERSEDED") !== (record.supersededBy !== null)) {
+      throw new Error("fragment lifecycle contradiction");
+    }
+    if (record.status === "INVALIDATED") {
+      const replacement = byResource.get(record.invalidatedBy);
+      if (replacement !== undefined && (replacement.resourceClass !== "EVIDENCE"
+          || ["INVALIDATED", "REVOKED"].includes(replacement.status)
+          || replacement.mutationPolicy !== "EVIDENCE_IMMUTABLE"
+          || !replacement.supersedes.includes(record.resource))) {
+        throw new Error("fragment relation contradiction");
+      }
+    }
+    if (record.status === "SUPERSEDED") {
+      const successor = byResource.get(record.supersededBy);
+      if (successor !== undefined && !successor.supersedes.includes(record.resource)) {
+        throw new Error("fragment relation contradiction");
+      }
+    }
+    for (const predecessorResource of record.supersedes) {
+      const predecessor = byResource.get(predecessorResource);
+      if (predecessor !== undefined
+          && (predecessor.status === "INVALIDATED" && predecessor.invalidatedBy !== record.resource
+            || predecessor.status !== "INVALIDATED"
+              && (predecessor.status !== "SUPERSEDED" || predecessor.supersededBy !== record.resource))) {
+        throw new Error("fragment relation contradiction");
+      }
+    }
+  }
+  for (const start of records) {
+    const seen = new Set();
+    let current = start;
+    while (current !== undefined && current.supersededBy !== null) {
+      if (seen.has(current.resource)) throw new Error("fragment supersession cycle");
+      seen.add(current.resource);
+      current = byResource.get(current.supersededBy);
     }
   }
 }

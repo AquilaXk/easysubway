@@ -43,7 +43,7 @@
                 "properties": {
                   "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
                   "path": { "type": "string", "minLength": 1 },
-                  "blobSha": { "type": "string", "pattern": "^[0-9a-f]{40,64}$" },
+                  "blobSha": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
                   "lastVerifiedAt": { "type": "string", "format": "date-time" },
                   "verificationEvidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
                 }

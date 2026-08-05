@@ -73,7 +73,7 @@ export function validateDocumentationRecord(record, { ownerRepository, gitSha, t
   if (tracked) {
     if (typeof gitSha !== "string" || !/^[0-9a-f]{40}$/.test(gitSha)) fail("invalid gitSha");
     if (record.sourceSurface !== "TRACKED" || !safeRelative(record.resource.split(":").slice(1).join(":"))) fail("invalid tracked resource");
-    if (!new RegExp(`^git:${gitSha}:([^:]+):[0-9a-f]{40,64}$`).test(record.canonicalIdentity)) fail("invalid tracked identity");
+    if (!new RegExp(`^git:${gitSha}:([^:]+):(?:[0-9a-f]{40}|[0-9a-f]{64})$`).test(record.canonicalIdentity)) fail("invalid tracked identity");
   } else if (record.sourceSurface === "TRACKED" || !/^sha256:[0-9a-f]{64}$/.test(record.canonicalIdentity)) fail("invalid non-tracked identity");
   if (record.sourceSurface === "LOCAL_ONLY" && !/^local-evidence:sha256:[0-9a-f]{64}$/.test(record.resource)) fail("invalid local resource");
   if (!safeIdentifier(record.resource)) fail("unsafe resource");

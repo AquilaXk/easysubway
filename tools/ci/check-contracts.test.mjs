@@ -211,6 +211,13 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   validateDocumentationSystemCatalog(unsafeEvidenceCatalog, catalogSchema, unsafeEvidenceErrors);
   assert.ok(unsafeEvidenceErrors.some((error) => error.includes("verificationEvidence")));
 
+  const unsupportedBlobCatalog = structuredClone(unsafeEvidenceCatalog);
+  unsupportedBlobCatalog.repositories[0].fragment.blobSha = "b".repeat(41);
+  unsupportedBlobCatalog.repositories[0].fragment.verificationEvidence = ["evidence:fixture"];
+  const unsupportedBlobErrors = [];
+  validateDocumentationSystemCatalog(unsupportedBlobCatalog, catalogSchema, unsupportedBlobErrors);
+  assert.ok(unsupportedBlobErrors.some((error) => error.includes("oneOf")), unsupportedBlobErrors.join("; "));
+
   const unsortedErrors = [];
   validateDocumentationFragment({
     $schema: "./documentation-fragment.schema.json",
@@ -267,6 +274,18 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   }, fragmentSchema, resourceSchema, trackedIdentityErrors);
   assert.ok(trackedIdentityErrors.some((error) => error.includes("tracked fragment identity mismatch")));
 
+  const unsupportedTrackedIdentity = structuredClone(trackedRecord);
+  unsupportedTrackedIdentity.resource = "AquilaXk/easysubway:docs/a.json";
+  unsupportedTrackedIdentity.canonicalIdentity = `git:${"a".repeat(40)}:docs/a.json:${"b".repeat(41)}`;
+  unsupportedTrackedIdentity.lastVerifiedIdentity = unsupportedTrackedIdentity.canonicalIdentity;
+  const unsupportedTrackedErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [unsupportedTrackedIdentity],
+  }, fragmentSchema, resourceSchema, unsupportedTrackedErrors);
+  assert.ok(unsupportedTrackedErrors.some((error) => error.includes("invalid tracked identity")));
+
   for (const mutate of [
     (record) => { record.resource = "surface:self"; record.supersedes = ["surface:self"]; },
     (record) => { record.supersededBy = "surface:successor"; },
@@ -281,6 +300,38 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     }, fragmentSchema, resourceSchema, lifecycleErrors);
     assert.ok(lifecycleErrors.some((error) => error.includes("fragment lifecycle contradiction")));
   }
+
+  const predecessor = structuredClone(crossRepositoryRecord);
+  predecessor.resource = "surface:predecessor";
+  predecessor.status = "SUPERSEDED";
+  predecessor.supersedes = [];
+  predecessor.supersededBy = "surface:successor";
+  const successor = structuredClone(crossRepositoryRecord);
+  successor.resource = "surface:successor";
+  successor.supersedes = [];
+  const reciprocalErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [predecessor, successor],
+  }, fragmentSchema, resourceSchema, reciprocalErrors);
+  assert.ok(reciprocalErrors.some((error) => error.includes("fragment relation contradiction")));
+
+  const cycleA = structuredClone(predecessor);
+  cycleA.resource = "surface:a";
+  cycleA.supersedes = ["surface:b"];
+  cycleA.supersededBy = "surface:b";
+  const cycleB = structuredClone(predecessor);
+  cycleB.resource = "surface:b";
+  cycleB.supersedes = ["surface:a"];
+  cycleB.supersededBy = "surface:a";
+  const cycleErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [cycleA, cycleB],
+  }, fragmentSchema, resourceSchema, cycleErrors);
+  assert.ok(cycleErrors.some((error) => error.includes("fragment supersession cycle")));
 });
 
 test("문서 거버넌스 계약은 successor의 자체 decision schema와 안전한 schema path만 허용한다", () => {
