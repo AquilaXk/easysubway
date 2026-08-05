@@ -45,7 +45,14 @@ function createExternalWorkspace() {
     architectureDecision: "inputs/architecture-decision.json",
   }));
   copy("contracts/documentation/ADR-HUB-0001.json", "inputs/architecture-decision.json");
+  copy("contracts/documentation/ADR-HUB-0001-decision.schema.json", "inputs/ADR-HUB-0001-decision.schema.json");
   return { directory, workspacePath };
+}
+
+function bindRootDecisionSchema(directory, adr) {
+  const schemaName = `${adr.id}-decision.schema.json`;
+  adr.decisionSchema = `./${schemaName}`;
+  cpSync("contracts/documentation/ADR-HUB-0001-decision.schema.json", join(directory, schemaName));
 }
 
 test("[gate-ownership] workspace는 legacy 경로 밖 복사 입력을 검증한다", () => {
@@ -127,27 +134,80 @@ test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => 
   assert.ok(adr.confirmation.some(({ method }) => method.endsWith("--current-only")));
 });
 
+test("문서 거버넌스 계약은 successor의 자체 decision schema와 안전한 schema path만 허용한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const rootPath = join(directory, "inputs/architecture-decision.json");
+    const root = loadJson(rootPath);
+    root.status = "superseded";
+    root.supersededBy = "ADR-HUB-0002";
+    writeFileSync(rootPath, JSON.stringify(root));
+
+    const successor = structuredClone(root);
+    successor.id = "ADR-HUB-0002";
+    successor.status = "accepted";
+    successor.supersededBy = null;
+    successor.supersedes = [root.id];
+    successor.decisionSchema = "./ADR-HUB-0002-decision.schema.json";
+    successor.decision = { policy: "successor-specific" };
+    const successorPath = join(directory, "inputs/ADR-HUB-0002.json");
+    const decisionSchemaPath = join(directory, "inputs/ADR-HUB-0002-decision.schema.json");
+    const successorDecisionSchema = {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "required": ["policy"],
+      "additionalProperties": false,
+      "properties": {
+        "policy": { "type": "string", "const": "successor-specific" }
+      }
+    };
+    writeFileSync(decisionSchemaPath, JSON.stringify(successorDecisionSchema));
+    writeFileSync(successorPath, JSON.stringify(successor));
+
+    assert.deepEqual(collectContractErrors(workspacePath), []);
+
+    for (const [name, mutate, expected] of [
+      ["missing-reference", (adr) => { delete adr.decisionSchema; }, "decisionSchema"],
+      ["missing-file", () => { rmSync(decisionSchemaPath); }, "decisionSchema ./ADR-HUB-0002-decision.schema.json 누락"],
+      ["absolute", (adr) => { adr.decisionSchema = "/tmp/decision.schema.json"; }, "repository 내부 상대 JSON path"],
+      ["escape", (adr) => { adr.decisionSchema = "../ADR-HUB-0002-decision.schema.json"; }, "repository 내부 상대 JSON path"],
+      ["malformed", () => { writeFileSync(decisionSchemaPath, "{"); }, "유효한 JSON이 필요하다"],
+      ["invalid", (adr) => { adr.decision.policy = "wrong"; }, "$.decision.policy"],
+    ]) {
+      const candidate = structuredClone(successor);
+      mutate(candidate);
+      writeFileSync(successorPath, JSON.stringify(candidate));
+      const errors = collectContractErrors(workspacePath);
+      assert.ok(errors.some((error) => error.includes("ADR-HUB-0002.json") && error.includes(expected)), name);
+      writeFileSync(decisionSchemaPath, JSON.stringify(successorDecisionSchema));
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("문서 거버넌스 계약은 대표적인 ADR 계약 위반을 거부한다", () => {
   const directory = mkdtempSync(join(tmpdir(), "architecture-decision-contract-"));
   try {
     const schemaPath = "contracts/documentation/architecture-decision.schema.json";
     const valid = loadJson("contracts/documentation/ADR-HUB-0001.json");
-    for (const [name, mutate] of [
-      ["invalid-id", (adr) => { adr.id = "ADR-DATA-0001"; }],
-      ["invalid-kind", (adr) => { adr.kind = "runbook"; }],
-      ["missing-owner", (adr) => { delete adr.owner; }],
-      ["owner-prefix-mismatch", (adr) => { adr.owner.repository = "AquilaXk/easysubway-data"; }],
-      ["invalid-status", (adr) => { adr.status = "implemented"; }],
-      ["missing-decision", (adr) => { delete adr.decision; }],
-      ["missing-context-issue", (adr) => { delete adr.contextIssue; }],
-      ["wrong-context-issue", (adr) => { adr.contextIssue = "https://github.com/AquilaXk/easysubway/issues/1"; }],
-      ["unknown-field", (adr) => { adr.futureField = true; }],
-      ["target-owner-mismatch", (adr) => { adr.decision.repositoryOwners.data = "AquilaXk/easysubway"; }],
-      ["tracked-sensitive-evidence", (adr) => { adr.decision.sensitiveEvidence.trackedContentAllowed = true; }],
-      ["malformed-supersedes", (adr) => { adr.supersedes = 1; }],
-      ["no-chosen-option", (adr) => { adr.consideredOptions.forEach((option) => { option.chosen = false; }); }],
-      ["multiple-chosen-options", (adr) => { adr.consideredOptions.forEach((option) => { option.chosen = true; }); }],
-      ["duplicate-option-id", (adr) => { adr.consideredOptions[1].id = adr.consideredOptions[0].id; }],
+    cpSync("contracts/documentation/ADR-HUB-0001-decision.schema.json", join(directory, "ADR-HUB-0001-decision.schema.json"));
+    for (const [name, mutate, expected] of [
+      ["invalid-id", (adr) => { adr.id = "ADR-DATA-0001"; }, "$.id: pattern"],
+      ["invalid-kind", (adr) => { adr.kind = "runbook"; }, "$.kind: const"],
+      ["missing-owner", (adr) => { delete adr.owner; }, "$.owner: 필수 필드 누락"],
+      ["owner-prefix-mismatch", (adr) => { adr.owner.repository = "AquilaXk/easysubway-data"; }, "$.owner.repository: const"],
+      ["invalid-status", (adr) => { adr.status = "implemented"; }, "$.status: enum"],
+      ["missing-decision", (adr) => { delete adr.decision; }, "$.decision: 필수 필드 누락"],
+      ["missing-context-issue", (adr) => { delete adr.contextIssue; }, "$.contextIssue: 필수 필드 누락"],
+      ["wrong-context-issue", (adr) => { adr.contextIssue = "https://github.com/AquilaXk/easysubway/issues/1"; }, "ADR-HUB-0001 contextIssue"],
+      ["unknown-field", (adr) => { adr.futureField = true; }, "$.futureField: 허용되지 않은 필드"],
+      ["target-owner-mismatch", (adr) => { adr.decision.repositoryOwners.data = "AquilaXk/easysubway"; }, "$.decision.repositoryOwners.data: const"],
+      ["tracked-sensitive-evidence", (adr) => { adr.decision.sensitiveEvidence.trackedContentAllowed = true; }, "$.decision.sensitiveEvidence.trackedContentAllowed: const"],
+      ["malformed-supersedes", (adr) => { adr.supersedes = 1; }, "$.supersedes: type array"],
+      ["no-chosen-option", (adr) => { adr.consideredOptions.forEach((option) => { option.chosen = false; }); }, "chosen 옵션이 정확히 하나"],
+      ["multiple-chosen-options", (adr) => { adr.consideredOptions.forEach((option) => { option.chosen = true; }); }, "chosen 옵션이 정확히 하나"],
+      ["duplicate-option-id", (adr) => { adr.consideredOptions[1].id = adr.consideredOptions[0].id; }, "id는 유일"],
     ]) {
       const candidate = structuredClone(valid);
       mutate(candidate);
@@ -156,7 +216,7 @@ test("문서 거버넌스 계약은 대표적인 ADR 계약 위반을 거부한�
       const errors = [];
 
       assert.equal(validateJson(schemaPath, candidatePath, errors), false, name);
-      assert.ok(errors.length > 0, `${name} 오류가 필요하다`);
+      assert.ok(errors.some((error) => error.includes(expected)), `${name}: ${expected}`);
     }
   } finally {
     rmSync(directory, { recursive: true, force: true });
@@ -289,6 +349,7 @@ test("문서 거버넌스 계약은 accepted ADR의 supersession successor를 fa
       const successor = structuredClone(previous);
       successor.id = "ADR-HUB-0002";
       successor.supersedes = [previous.id];
+      bindRootDecisionSchema(join(directory, "inputs"), successor);
       prepare(directory, successor);
 
       assert.ok(
@@ -315,6 +376,7 @@ test("문서 거버넌스 계약은 reciprocal successor가 있는 accepted ADR 
     const successor = structuredClone(previous);
     successor.id = "ADR-HUB-0002";
     successor.supersedes = [previous.id];
+    bindRootDecisionSchema(join(directory, "inputs"), successor);
     writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
     writeFileSync(join(directory, "inputs/unrelated-malformed.json"), "{");
 
@@ -329,6 +391,7 @@ test("문서 거버넌스 계약은 active chain 밖 ADR 후보도 검증한다"
   try {
     const candidate = loadJson(join(directory, "inputs/architecture-decision.json"));
     candidate.id = "ADR-HUB-0002";
+    bindRootDecisionSchema(join(directory, "inputs"), candidate);
     delete candidate.decision;
     writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(candidate));
     const unidentified = loadJson(join(directory, "inputs/architecture-decision.json"));
@@ -336,6 +399,7 @@ test("문서 거버넌스 계약은 active chain 밖 ADR 후보도 검증한다"
     writeFileSync(join(directory, "inputs/candidate.json"), JSON.stringify(unidentified));
     const duplicate = loadJson(join(directory, "inputs/architecture-decision.json"));
     duplicate.id = "ADR-HUB-0003";
+    bindRootDecisionSchema(join(directory, "inputs"), duplicate);
     writeFileSync(join(directory, "inputs/off-chain-a.json"), JSON.stringify(duplicate));
     writeFileSync(join(directory, "inputs/off-chain-b.json"), JSON.stringify(duplicate));
 
@@ -372,6 +436,7 @@ test("문서 거버넌스 계약은 active chain 밖 ADR lifecycle도 fail close
       writeFileSync(rootPath, JSON.stringify(root));
       const previousStandalone = structuredClone(root);
       previousStandalone.id = "ADR-HUB-0004";
+      bindRootDecisionSchema(join(directory, "inputs"), previousStandalone);
       const currentStandalone = structuredClone(previousStandalone);
       currentStandalone.status = "superseded";
       currentStandalone.supersededBy = "ADR-HUB-0005";
@@ -379,6 +444,7 @@ test("문서 거버넌스 계약은 active chain 밖 ADR lifecycle도 fail close
       const successor = structuredClone(root);
       successor.id = "ADR-HUB-0005";
       successor.supersedes = [currentStandalone.id];
+      bindRootDecisionSchema(join(directory, "inputs"), successor);
       prepare(directory, successor);
 
       const errors = collectContractErrors(workspacePath, {
@@ -398,6 +464,7 @@ test("문서 거버넌스 계약은 active chain 밖 ADR lifecycle도 fail close
     writeFileSync(rootPath, JSON.stringify(root));
     const falseClaim = structuredClone(root);
     falseClaim.id = "ADR-HUB-0010";
+    bindRootDecisionSchema(join(currentOnly.directory, "inputs"), falseClaim);
     falseClaim.status = "proposed";
     falseClaim.supersedes = [root.id];
     writeFileSync(join(currentOnly.directory, "inputs/false-claim.json"), JSON.stringify(falseClaim));
@@ -409,6 +476,7 @@ test("문서 거버넌스 계약은 active chain 밖 ADR lifecycle도 fail close
     const successorPath = join(currentOnly.directory, "inputs/off-root-b.json");
     const standalone = structuredClone(root);
     standalone.id = "ADR-HUB-0006";
+    bindRootDecisionSchema(join(currentOnly.directory, "inputs"), standalone);
     standalone.status = "superseded";
     standalone.supersededBy = "ADR-HUB-0007";
     writeFileSync(standalonePath, JSON.stringify(standalone));
@@ -417,6 +485,7 @@ test("문서 거버넌스 계약은 active chain 밖 ADR lifecycle도 fail close
 
     const successor = structuredClone(standalone);
     successor.id = "ADR-HUB-0007";
+    bindRootDecisionSchema(join(currentOnly.directory, "inputs"), successor);
     standalone.supersedes = [successor.id];
     successor.supersededBy = standalone.id;
     successor.supersedes = [standalone.id];
@@ -456,6 +525,7 @@ test("문서 거버넌스 계약은 current-only와 base 비교에서 supersessi
     writeFileSync(decisionPath, JSON.stringify(root));
     const successor = structuredClone(root);
     successor.id = "ADR-HUB-0002";
+    bindRootDecisionSchema(join(directory, "inputs"), successor);
     successor.status = "proposed";
     successor.supersededBy = null;
     successor.supersedes = [root.id];
@@ -471,6 +541,7 @@ test("문서 거버넌스 계약은 current-only와 base 비교에서 supersessi
     writeFileSync(successorPath, JSON.stringify(successor));
     const terminal = structuredClone(successor);
     terminal.id = "ADR-HUB-0003";
+    bindRootDecisionSchema(join(directory, "inputs"), terminal);
     terminal.status = "accepted";
     terminal.supersededBy = null;
     terminal.supersedes = [successor.id];
@@ -535,15 +606,18 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
   try {
     mkdirSync(join(repository, "docs"), { recursive: true });
     const root = loadJson("contracts/documentation/ADR-HUB-0001.json");
+    bindRootDecisionSchema(join(repository, "docs"), root);
     root.status = "superseded";
     root.supersededBy = "ADR-HUB-0002";
     const intermediate = structuredClone(root);
     intermediate.id = "ADR-HUB-0002";
+    bindRootDecisionSchema(join(repository, "docs"), intermediate);
     intermediate.status = "superseded";
     intermediate.supersededBy = "ADR-HUB-0003";
     intermediate.supersedes = [root.id];
     const terminal = structuredClone(intermediate);
     terminal.id = "ADR-HUB-0003";
+    bindRootDecisionSchema(join(repository, "docs"), terminal);
     terminal.status = "accepted";
     terminal.supersededBy = null;
     terminal.supersedes = [intermediate.id];
@@ -563,6 +637,7 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
       architectureDecision: "docs/ADR-HUB-0001.json",
     }));
     const rootLevel = structuredClone(root);
+    bindRootDecisionSchema(repository, rootLevel);
     rootLevel.status = "accepted";
     rootLevel.supersededBy = null;
     writeFileSync(join(repository, "ADR-HUB-0001.json"), JSON.stringify(rootLevel));
@@ -571,8 +646,10 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
     writeFileSync(join(repository, "root-workspace.json"), JSON.stringify(rootWorkspace));
     mkdirSync(join(repository, "staged"));
     const stagedRoot = structuredClone(rootLevel);
+    bindRootDecisionSchema(join(repository, "staged"), stagedRoot);
     const stagedSuccessor = structuredClone(stagedRoot);
     stagedSuccessor.id = "ADR-HUB-0002";
+    bindRootDecisionSchema(join(repository, "staged"), stagedSuccessor);
     stagedSuccessor.status = "proposed";
     stagedSuccessor.title = "base staged successor";
     stagedSuccessor.supersedes = [stagedRoot.id];
@@ -583,6 +660,7 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
     writeFileSync(join(repository, "staged-workspace.json"), JSON.stringify(stagedWorkspace));
     mkdirSync(join(repository, "malformed"));
     const malformedRoot = structuredClone(root);
+    bindRootDecisionSchema(join(repository, "malformed"), malformedRoot);
     malformedRoot.supersededBy = "ADR-HUB-0099";
     writeFileSync(join(repository, "malformed/ADR-HUB-0001.json"), JSON.stringify(malformedRoot));
     writeFileSync(join(repository, "malformed/ADR-HUB-0099.json"), "{");
