@@ -483,9 +483,10 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
       fragmentErrors.push("catalog fragment header 불일치");
     }
     try {
-      if (documentationGit(root, ["cat-file", "-t", fragment.gitSha], "utf8").trim() !== "commit"
-          || documentationGit(root, ["merge-base", "--is-ancestor", fragment.gitSha, entry.fragment.gitSha], "utf8") == null) {
+      if (documentationGit(root, ["cat-file", "-t", fragment.gitSha], "utf8").trim() !== "commit") {
         fragmentErrors.push("inner commit relation 불일치");
+      } else {
+        documentationGit(root, ["merge-base", "--is-ancestor", fragment.gitSha, entry.fragment.gitSha]);
       }
     } catch { fragmentErrors.push("inner commit relation 불일치"); }
     for (const record of fragment.resources ?? []) {
@@ -498,6 +499,7 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
       if (actual !== identity?.[3]) fragmentErrors.push("TRACKED resource blob identity가 일치하지 않는다");
     }
     if (fragmentErrors.length > 0) {
+      failed = true;
       errors.push(...fragmentErrors.map((error) => `documentation fragment transport: ${entry.repository}: ${error}`));
     } else records.push(...fragment.resources);
   }
