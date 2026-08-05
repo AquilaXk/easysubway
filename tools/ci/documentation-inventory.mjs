@@ -28,9 +28,18 @@ const NULLABLE_ENUMS = {
 const RECORD_KEYS = ["resource", "resourceClass", "documentationFamily", "kindCandidate", "sourceSurface", "canonicalIdentity", "status", "ownerRepository", "ownerIssue", "currentConsumers", "releaseReachability", "publicSurfaceReachability", "assertionState", "sensitivity", "duplicateGroup", "disposition", "deletePrerequisite", "supersedes", "supersededBy", "invalidatedBy", "invalidationReason", "invalidationEvidence", "mutationPolicy", "reviewPolicyId", "reviewTrigger", "lastVerifiedAt", "lastVerifiedIdentity", "verificationMethod", "verificationEvidence", "nextReviewAtOrSemanticExpiry", "implementationPlan", "workloadClass", "orchestrationProfile", "stateClass", "configurationDelivery", "healthContract", "availabilityContract", "securityContract", "releaseContract", "portabilityOwner", "portabilityEvidence", "portabilityGap"];
 
 function fail(message) { throw new Error(message); }
+function codepointCompare(left, right) {
+  const leftPoints = Array.from(left);
+  const rightPoints = Array.from(right);
+  for (let index = 0; index < Math.min(leftPoints.length, rightPoints.length); index += 1) {
+    const difference = leftPoints[index].codePointAt(0) - rightPoints[index].codePointAt(0);
+    if (difference !== 0) return difference;
+  }
+  return leftPoints.length - rightPoints.length;
+}
 function exactKeys(value, keys, name) {
   if (!value || typeof value !== "object" || Array.isArray(value)) fail(`${name} must be an object`);
-  if (Object.keys(value).sort().join("\0") !== [...keys].sort().join("\0")) fail(`${name} has unexpected shape`);
+  if (Object.keys(value).sort(codepointCompare).join("\0") !== [...keys].sort(codepointCompare).join("\0")) fail(`${name} has unexpected shape`);
 }
 function safeRelative(value) { return typeof value === "string" && value.length > 0 && !isAbsolute(value) && !value.split("/").includes("..") && !/[\x00-\x1f\x7f]/.test(value); }
 function safeIdentifier(value) {
@@ -42,7 +51,7 @@ function safeIdentifier(value) {
 }
 function sortedUnique(values, name) {
   if (!Array.isArray(values) || values.some((value) => !safeIdentifier(value))) fail(`${name} contains unsafe identifier`);
-  if (values.join("\0") !== [...new Set(values)].sort().join("\0")) fail(`${name} must be sorted and unique`);
+  if (values.join("\0") !== [...new Set(values)].sort(codepointCompare).join("\0")) fail(`${name} must be sorted and unique`);
 }
 function git(root, args) { return execFileSync("/usr/bin/git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }); }
 function treeEntries(root, sha) {
@@ -75,7 +84,7 @@ function validateRecord(record, repository, sha, tracked) {
     if (record.resourceClass !== "EVIDENCE" || !record.invalidatedBy || !record.invalidationReason || record.invalidationEvidence.length === 0 || record.mutationPolicy !== "EVIDENCE_IMMUTABLE") fail("invalid invalidation relation");
   } else if (record.invalidatedBy !== null || record.invalidationReason !== null || record.invalidationEvidence.length !== 0) fail("unexpected invalidation relation");
   if (["REVOKED", "INVALIDATED"].includes(record.status) && ( !["NONE", "EVIDENCE"].includes(record.releaseReachability) || record.publicSurfaceReachability.length !== 0 || record.currentConsumers.some((value) => /release|rollback|public/i.test(value)))) fail("revoked or invalidated record is reachable");
-  if (record.sourceSurface === "PUBLIC" && record.status !== "REVOKED" && (record.sensitivity !== "PUBLIC" || record.assertionState !== "CURRENTLY_IMPLEMENTED_AND_EVIDENCED")) fail("invalid public claim");
+  if ((record.sourceSurface === "PUBLIC" || record.publicSurfaceReachability.length > 0) && record.status !== "REVOKED" && (record.sensitivity !== "PUBLIC" || record.assertionState !== "CURRENTLY_IMPLEMENTED_AND_EVIDENCED")) fail("invalid public claim");
   if (record.orchestrationProfile === "KUBERNETES_ACTIVE" && record.portabilityEvidence.length === 0) fail("active Kubernetes needs evidence");
 }
 function validateRepository(entry) {
@@ -90,6 +99,7 @@ function validateRepository(entry) {
     if (rootEntries.length === 0 || rootEntries.some((item) => item.path === root && item.mode === "120000")) fail("missing or symlink discovery root");
     selected.push(...rootEntries);
   }
+  if (selected.some((item) => item.mode === "120000")) fail("symlink under discovery root");
   const blobs = selected.filter((item) => item.type === "blob" && item.mode !== "120000");
   const uniqueBlobs = new Map(blobs.map((item) => [item.path, item]));
   if (uniqueBlobs.size !== blobs.length) fail("overlapping discovery roots");
@@ -110,9 +120,8 @@ function validateRepository(entry) {
 function stable(value) {
   if (Array.isArray(value)) return value.map(stable);
   if (!value || typeof value !== "object") return value;
-  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
+  return Object.fromEntries(Object.keys(value).sort(codepointCompare).map((key) => [key, stable(value[key])]));
 }
-function codepointCompare(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
 function main() {
   const args = process.argv.slice(2);
   if (args.length !== 4 || args[0] !== "--workspace" || args[2] !== "--output") fail("usage: --workspace <file> --output <new-file>");
@@ -128,7 +137,7 @@ function main() {
   const duplicateGroups = new Map();
   for (const record of records) if (record.duplicateGroup !== null) duplicateGroups.set(record.duplicateGroup, [...(duplicateGroups.get(record.duplicateGroup) ?? []), record]);
   for (const group of duplicateGroups.values()) {
-    if (group.filter((record) => record.disposition === "RETAIN_CANONICAL").length !== 1 || group.some((record) => record.disposition !== "RETAIN_CANONICAL" && record.deletePrerequisite.length === 0)) fail("invalid duplicate group");
+    if (group.length < 2 || group.filter((record) => record.disposition === "RETAIN_CANONICAL").length !== 1 || group.some((record) => record.currentConsumers.length === 0 || record.disposition !== "RETAIN_CANONICAL" && record.deletePrerequisite.length === 0)) fail("invalid duplicate group");
   }
   const coverage = {
     documentationFamilies: Object.fromEntries(FAMILIES.map((family) => [family, records.filter((record) => record.documentationFamily === family).length])),
@@ -138,8 +147,8 @@ function main() {
   };
   const gaps = [
     ...FAMILIES.filter((family) => coverage.documentationFamilies[family] === 0).map((documentationFamily) => ({ code: "NO_DOCUMENTATION_FAMILY_RESOURCE", documentationFamily })),
-    ...[...new Set(records.flatMap((record) => record.portabilityGap))].sort().map((identity) => ({ code: "PORTABILITY_GAP", identity })),
-  ];
+    ...[...new Set(records.flatMap((record) => record.portabilityGap))].sort(codepointCompare).map((identity) => ({ code: "PORTABILITY_GAP", identity })),
+  ].sort((left, right) => codepointCompare(JSON.stringify(stable(left)), JSON.stringify(stable(right))));
   const output = stable({ schemaVersion: 1, producer: { id: "tools/ci/documentation-inventory.mjs", version: 1 }, repositories: workspace.repositories.map(({ repository, gitSha }) => ({ repository, gitSha })).sort((a, b) => codepointCompare(a.repository, b.repository)), records: records.sort((a, b) => codepointCompare(a.resource, b.resource)), coverage, gaps, gates: { duplicate: 0, invalidated: 0, portability: 0, public: 0, reachability: 0, unclassified: 0 } });
   writeFileSync(outputPath, `${JSON.stringify(output)}\n`, { encoding: "utf8", flag: "wx" });
 }

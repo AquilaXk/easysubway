@@ -22,13 +22,11 @@ function createRepository(root, index) {
   mkdirSync(join(root, "docs"));
   writeFileSync(join(root, "docs", `doc-${index}.json`), "{}\n");
   if (index === 0) writeFileSync(join(root, "docs", "duplicate.json"), "{}\n");
-  symlinkSync(`doc-${index}.json`, join(root, "docs", "linked.json"));
   run("/usr/bin/git", ["add", "."], root);
   run("/usr/bin/git", ["commit", "-qm", "fixture"], root);
   const gitSha = run("/usr/bin/git", ["rev-parse", "HEAD"], root);
   const blobOid = run("/usr/bin/git", ["rev-parse", `HEAD:docs/doc-${index}.json`], root);
   const duplicateBlobOid = index === 0 ? run("/usr/bin/git", ["rev-parse", "HEAD:docs/duplicate.json"], root) : null;
-  assert.match(run("/usr/bin/git", ["ls-tree", "HEAD", "docs/linked.json"], root), /^120000 /, "fixture symlink must be committed");
   return { gitSha, blobOid, duplicateBlobOid };
 }
 
@@ -77,8 +75,8 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "public", family: FAMILIES[6], surface: "PUBLIC", overrides: { resource: "https://public.example.invalid/release", publicSurfaceReachability: ["https://public.example.invalid/release"] } }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "local", family: FAMILIES[7], surface: "LOCAL_ONLY" }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external", family: FAMILIES[8], surface: "EXTERNAL" }),
-    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external-z", family: FAMILIES[8], surface: "EXTERNAL", overrides: { resource: "surface:z", canonicalIdentity: `sha256:${"c".repeat(64)}`, lastVerifiedIdentity: `sha256:${"c".repeat(64)}` } }),
-    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external-e", family: FAMILIES[8], surface: "EXTERNAL", overrides: { resource: "surface:é", canonicalIdentity: `sha256:${"d".repeat(64)}`, lastVerifiedIdentity: `sha256:${"d".repeat(64)}` } }),
+    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external-e000", family: FAMILIES[8], surface: "EXTERNAL", overrides: { resource: "surface:\uE000", canonicalIdentity: `sha256:${"c".repeat(64)}`, lastVerifiedIdentity: `sha256:${"c".repeat(64)}` } }),
+    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external-grinning", family: FAMILIES[8], surface: "EXTERNAL", overrides: { resource: "surface:😀", canonicalIdentity: `sha256:${"d".repeat(64)}`, lastVerifiedIdentity: `sha256:${"d".repeat(64)}` } }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "revoked", family: FAMILIES[9], surface: "PUBLIC", overrides: { status: "REVOKED", currentConsumers: [], publicSurfaceReachability: [] } }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "invalidated", family: FAMILIES[10], surface: "LOCAL_ONLY", overrides: { resourceClass: "EVIDENCE", status: "INVALIDATED", currentConsumers: [], invalidatedBy: "evidence:replacement", invalidationReason: "reason:replaced", invalidationEvidence: ["evidence:replacement"], mutationPolicy: "EVIDENCE_IMMUTABLE" } }),
   ];
@@ -88,7 +86,7 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
   const output = JSON.parse(readFileSync(join(temp, "first", "inventory.json"), "utf8"));
   assert.deepEqual(Object.keys(output), ["coverage", "gaps", "gates", "producer", "records", "repositories", "schemaVersion"]);
   assert.equal(output.records.length, 13);
-  assert.deepEqual(output.records.filter(({ resource }) => ["surface:z", "surface:é"].includes(resource)).map(({ resource }) => resource), ["surface:z", "surface:é"]);
+  assert.deepEqual(output.records.filter(({ resource }) => ["surface:\uE000", "surface:😀"].includes(resource)).map(({ resource }) => resource), ["surface:\uE000", "surface:😀"]);
   assert.deepEqual(Object.keys(output.coverage.documentationFamilies), [...FAMILIES].sort());
   assert.deepEqual(Object.keys(output.coverage.repositories), [...REPOSITORIES].sort());
   assert.deepEqual(Object.keys(output.coverage.sourceSurfaces), [...SURFACES].sort());
@@ -106,10 +104,13 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     (input) => { input.repositories[0].discoveryRoots = ["../escape"]; },
     (input) => { input.repositories[0].discoveryRoots = ["missing.json"]; },
     (input) => { input.repositories[0].records[1].deletePrerequisite = []; },
+    (input) => { input.repositories[0].records[1].duplicateGroup = null; },
+    (input) => { input.repositories[0].records[1].currentConsumers = []; },
     (input) => { input.surfaceRecords[6].invalidationEvidence = []; },
     (input) => { input.surfaceRecords[5].releaseReachability = "PUBLIC"; },
     (input) => { input.surfaceRecords[0].sensitivity = "INTERNAL"; },
     (input) => { input.surfaceRecords[0].assertionState = "REQUIRED_FINAL_PRODUCTION_BEHAVIOR"; },
+    (input) => { input.surfaceRecords[2].publicSurfaceReachability = ["https://public.example.invalid/external"]; },
     (input) => { input.surfaceRecords[0].resource = "https://public.example.invalid/release?page=1"; },
     (input) => { input.surfaceRecords[1].verificationEvidence = ["/private/evidence"]; },
     (input) => { input.repositories[0].records[0].orchestrationProfile = "KUBERNETES_ACTIVE"; },
@@ -118,5 +119,22 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     assert.notEqual(invoke(input, join(temp, `bad-${Math.random()}`)).status, 0);
   }
   assert.equal(output.records.find(({ status }) => status === "INVALIDATED").resourceClass, "EVIDENCE");
-  assert.notEqual(invoke({ ...workspace, repositories: repositories.map((entry, index) => index === 0 ? { ...entry, discoveryRoots: ["docs/linked.json"], records: [] } : entry) }, join(temp, "symlink")).status, 0, "committed symlink discovery root must fail closed");
+  const gapWorkspace = structuredClone(workspace);
+  gapWorkspace.surfaceRecords = [];
+  const gapRun = invoke(gapWorkspace, join(temp, "gaps"));
+  assert.equal(gapRun.status, 0, gapRun.stderr);
+  assert.deepEqual(JSON.parse(readFileSync(join(temp, "gaps", "inventory.json"), "utf8")).gaps.map(({ documentationFamily }) => documentationFamily), ["GOVERNANCE_EVIDENCE", "OPERATIONS_RELIABILITY", "RELEASE_CHANGE", "SECURITY_PRIVACY", "USER_SUPPORT_LEGAL_PUBLIC"]);
+  const symlinkWorkspace = structuredClone(workspace);
+  const symlinkRepository = symlinkWorkspace.repositories[0];
+  const originalSha = symlinkRepository.gitSha;
+  symlinkSync("doc-0.json", join(repositories[0].root, "docs", "linked.json"));
+  run("/usr/bin/git", ["add", "docs/linked.json"], repositories[0].root);
+  run("/usr/bin/git", ["commit", "-qm", "nested symlink"], repositories[0].root);
+  symlinkRepository.gitSha = run("/usr/bin/git", ["rev-parse", "HEAD"], repositories[0].root);
+  for (const tracked of symlinkRepository.records) {
+    tracked.canonicalIdentity = tracked.canonicalIdentity.replace(`git:${originalSha}:`, `git:${symlinkRepository.gitSha}:`);
+    tracked.lastVerifiedIdentity = tracked.canonicalIdentity;
+  }
+  assert.match(run("/usr/bin/git", ["ls-tree", "HEAD", "docs/linked.json"], repositories[0].root), /^120000 /, "nested symlink must be committed");
+  assert.notEqual(invoke(symlinkWorkspace, join(temp, "symlink")).status, 0, "committed nested symlink under discovery root must fail closed");
 });
