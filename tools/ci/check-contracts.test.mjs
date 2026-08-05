@@ -385,6 +385,7 @@ test("documentation catalog uses workspace-selected fragment schemas and sanitiz
   try {
     const contracts = join(fixture.directory, "selected-contracts");
     cpSync("contracts", contracts, { recursive: true });
+    cpSync("README.md", join(fixture.directory, "README.md"));
     mkdirSync(join(fixture.directory, "release/migrations"), { recursive: true });
     cpSync("release/migrations/repository-split-issues.json", join(fixture.directory, "release/migrations/repository-split-issues.json"));
     const workspace = loadJson(fixture.workspacePath);
@@ -854,6 +855,7 @@ test("documentation catalog CLI accepts compatibility modes and rejects malforme
       const copied = join(clone, "fixture");
       mkdirSync(copied);
       cpSync("contracts", join(clone, "contracts"), { recursive: true });
+      cpSync("README.md", join(clone, "README.md"));
       for (const name of ["hub.json", "inputs", "gates"]) cpSync(join(fixture.directory, name), join(copied, name), { recursive: true });
       mkdirSync(join(clone, "release/migrations"), { recursive: true });
       cpSync("release/migrations/repository-split-issues.json", join(clone, "release/migrations/repository-split-issues.json"));
