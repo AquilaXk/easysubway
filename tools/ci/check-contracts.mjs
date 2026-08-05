@@ -2,6 +2,7 @@
 import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, win32 } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
 import { validateLedger } from "../repo/issue-migration-ledger.mjs";
@@ -10,6 +11,7 @@ import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isDeepStrictEqual } from "node:util";
 import {
   DOCUMENTATION_REPOSITORIES,
+  validateDocumentationRelations,
   validateDocumentationRecord,
 } from "./documentation-inventory.mjs";
 
@@ -73,7 +75,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
 
 export function collectContractErrors(
   workspacePath = DEFAULT_WORKSPACE_PATH,
-  { previousArchitectureDecision = null } = {},
+  { previousArchitectureDecision = null, documentationFragmentWorkspacePath = null } = {},
 ) {
   const errors = [];
   let workspace;
@@ -113,11 +115,9 @@ export function collectContractErrors(
   );
   const documentationSystemCatalogSchema = contract("documentation/documentation-system-catalog.schema.json");
   if (validateJson(documentationSystemCatalogSchema, workspace.documentationSystemCatalog, errors)) {
-    validateDocumentationSystemCatalogSemantics(
-      loadJson(workspace.documentationSystemCatalog),
-      errors,
-      workspace.documentationSystemCatalog,
-    );
+    const catalog = loadJson(workspace.documentationSystemCatalog);
+    validateDocumentationSystemCatalogSemantics(catalog, errors, workspace.documentationSystemCatalog, false);
+    resolveActiveDocumentationFragments(catalog, documentationFragmentWorkspacePath, errors);
   }
   let currentArchitectureDecisions = [];
   const currentArchitectureDecisionCandidates = new Map();
@@ -308,13 +308,13 @@ export function validateJson(schemaPath, valuePath, errors) {
   return result.errors.length === 0 && referencedSchemaValid && semanticErrors.length === 0;
 }
 
-export function validateDocumentationSystemCatalog(catalog, schema, errors) {
+export function validateDocumentationSystemCatalog(catalog, schema, errors, { requireActiveResolution = true } = {}) {
   const result = validateSchema(schema, catalog);
   errors.push(...result.errors.map((error) => `documentation-system-catalog: ${error}`));
-  if (result.ok) validateDocumentationSystemCatalogSemantics(catalog, errors, "documentation-system-catalog");
+  if (result.ok) validateDocumentationSystemCatalogSemantics(catalog, errors, "documentation-system-catalog", requireActiveResolution);
 }
 
-function validateDocumentationSystemCatalogSemantics(catalog, errors, label) {
+function validateDocumentationSystemCatalogSemantics(catalog, errors, label, requireActiveResolution = true) {
   const expected = [...DOCUMENTATION_REPOSITORIES].sort(codepointCompare);
   const actual = catalog.repositories.map(({ repository }) => repository);
   if (!isDeepStrictEqual(actual, expected)) errors.push(`${label}: repositories는 정렬된 5개 정본 저장소와 정확히 일치해야 한다`);
@@ -326,7 +326,7 @@ function validateDocumentationSystemCatalogSemantics(catalog, errors, label) {
       errors.push(`${label}: ${entry.repository} ACTIVE fragment가 필요하다`);
       continue;
     }
-    if (entry.status === "ACTIVE") {
+    if (entry.status === "ACTIVE" && requireActiveResolution) {
       errors.push(`${label}: ${entry.repository} ACTIVE fragment resolution contract가 필요하다`);
     }
     if (entry.fragment !== null) {
@@ -334,6 +334,145 @@ function validateDocumentationSystemCatalogSemantics(catalog, errors, label) {
       if (!isCanonicalUtc(entry.fragment.lastVerifiedAt)) errors.push(`${label}: ${entry.repository} fragment lastVerifiedAt은 canonical UTC여야 한다`);
       validateDocumentationEvidence(entry.fragment.verificationEvidence, `${label}: ${entry.repository} fragment verificationEvidence`, errors);
     }
+  }
+}
+
+const DOCUMENTATION_GIT_ENV = Object.freeze({
+  GIT_NO_REPLACE_OBJECTS: "1",
+  GIT_NO_LAZY_FETCH: "1",
+  GIT_TERMINAL_PROMPT: "0",
+  GIT_LITERAL_PATHSPECS: "1",
+});
+
+function documentationGit(root, args, encoding = "buffer") {
+  return execFileSync("/usr/bin/git", ["-C", root, ...args], {
+    encoding,
+    env: { ...process.env, ...DOCUMENTATION_GIT_ENV },
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+}
+
+function documentationTransportError(errors, message) {
+  errors.push(`documentation fragment transport: ${message}`);
+}
+
+function loadDocumentationFragmentWorkspace(path, activeRepositories, errors) {
+  if (path == null) {
+    documentationTransportError(errors, "ACTIVE fragment workspace가 필요하다");
+    return null;
+  }
+  let workspace;
+  try { workspace = loadJson(path); } catch {
+    documentationTransportError(errors, "유효한 local workspace JSON이 필요하다");
+    return null;
+  }
+  if (workspace == null || typeof workspace !== "object" || Array.isArray(workspace)
+      || workspace.schemaVersion !== 1 || !Array.isArray(workspace.repositories)
+      || Object.keys(workspace).length !== 2) {
+    documentationTransportError(errors, "local workspace shape가 유효하지 않다");
+    return null;
+  }
+  const mappings = new Map();
+  for (const item of workspace.repositories) {
+    if (item == null || typeof item !== "object" || Array.isArray(item)
+        || Object.keys(item).length !== 2 || typeof item.repository !== "string"
+        || typeof item.root !== "string" || !isAbsolute(item.root) || mappings.has(item.repository)) {
+      documentationTransportError(errors, "local workspace mapping이 유효하지 않다");
+      return null;
+    }
+    mappings.set(item.repository, item.root);
+  }
+  const actual = [...mappings.keys()].sort(codepointCompare);
+  if (!isDeepStrictEqual(actual, activeRepositories)) {
+    documentationTransportError(errors, "local workspace mapping이 ACTIVE repository 집합과 일치하지 않는다");
+    return null;
+  }
+  return mappings;
+}
+
+function validateDocumentationGitRoot(root) {
+  try {
+    if (lstatSync(root).isSymbolicLink() || realpathSync(root) !== root) return false;
+    if (documentationGit(root, ["rev-parse", "--show-toplevel"], "utf8").trim() !== root) return false;
+    return documentationGit(root, ["rev-parse", "--show-object-format=storage"], "utf8").trim() === "sha1";
+  } catch { return false; }
+}
+
+function resolveDocumentationBlob(root, commit, path) {
+  if (!/^[0-9a-f]{40}$/.test(commit) || !safeDocumentationPath(path)) return null;
+  try {
+    if (documentationGit(root, ["cat-file", "-t", commit], "utf8").trim() !== "commit") return null;
+    const raw = documentationGit(root, ["ls-tree", "-z", commit, "--", path]);
+    const entries = raw.toString("utf8").split("\0").filter(Boolean);
+    if (entries.length !== 1) return null;
+    const match = /^(\d+) (\w+) ([0-9a-f]{40})\t(.+)$/.exec(entries[0]);
+    if (match == null || match[1] === "120000" || match[2] !== "blob" || match[4] !== path) return null;
+    return { oid: match[3], bytes: documentationGit(root, ["cat-file", "blob", match[3]]) };
+  } catch { return null; }
+}
+
+function resolveActiveDocumentationFragments(catalog, workspacePath, errors) {
+  const active = catalog.repositories.filter(({ status }) => status === "ACTIVE");
+  if (active.length === 0) return;
+  const repositories = active.map(({ repository }) => repository).sort(codepointCompare);
+  const roots = loadDocumentationFragmentWorkspace(workspacePath, repositories, errors);
+  if (roots == null) return;
+  const records = [];
+  for (const entry of active) {
+    const root = roots.get(entry.repository);
+    if (!validateDocumentationGitRoot(root)) {
+      documentationTransportError(errors, `${entry.repository} Git root가 유효하지 않다`);
+      continue;
+    }
+    const fragmentBlob = resolveDocumentationBlob(root, entry.fragment.gitSha, entry.fragment.path);
+    if (fragmentBlob == null) {
+      documentationTransportError(errors, `${entry.repository} fragment blob을 확인할 수 없다`);
+      continue;
+    }
+    const expectedBlob = entry.fragment.blobSha.length === 40
+      ? fragmentBlob.oid : createHash("sha256").update(fragmentBlob.bytes).digest("hex");
+    if (expectedBlob !== entry.fragment.blobSha) {
+      documentationTransportError(errors, `${entry.repository} fragment blob identity가 일치하지 않는다`);
+      continue;
+    }
+    let fragment;
+    try { fragment = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(fragmentBlob.bytes)); } catch {
+      documentationTransportError(errors, `${entry.repository} fragment JSON이 유효하지 않다`);
+      continue;
+    }
+    const fragmentErrors = [];
+    validateDocumentationFragment(
+      fragment,
+      loadJson("contracts/documentation/documentation-fragment.schema.json"),
+      loadJson("contracts/documentation/documentation-resource.schema.json"),
+      fragmentErrors,
+    );
+    if (fragment.repository !== entry.repository || fragment.status !== "ACTIVE"
+        || fragment.lastVerifiedAt !== entry.fragment.lastVerifiedAt
+        || !isDeepStrictEqual(fragment.verificationEvidence, entry.fragment.verificationEvidence)) {
+      fragmentErrors.push("catalog fragment header 불일치");
+    }
+    try {
+      if (documentationGit(root, ["cat-file", "-t", fragment.gitSha], "utf8").trim() !== "commit"
+          || documentationGit(root, ["merge-base", "--is-ancestor", fragment.gitSha, entry.fragment.gitSha], "utf8") == null) {
+        fragmentErrors.push("inner commit relation 불일치");
+      }
+    } catch { fragmentErrors.push("inner commit relation 불일치"); }
+    for (const record of fragment.resources ?? []) {
+      if (record.sourceSurface !== "TRACKED") continue;
+      const identity = /^git:([0-9a-f]{40}):([^:]+):([0-9a-f]{40}|[0-9a-f]{64})$/.exec(record.canonicalIdentity);
+      const blob = identity != null && identity[1] === fragment.gitSha
+        ? resolveDocumentationBlob(root, fragment.gitSha, identity[2]) : null;
+      const actual = blob == null ? null : identity[3].length === 40
+        ? blob.oid : createHash("sha256").update(blob.bytes).digest("hex");
+      if (actual !== identity?.[3]) fragmentErrors.push("TRACKED resource blob identity가 일치하지 않는다");
+    }
+    if (fragmentErrors.length > 0) {
+      errors.push(...fragmentErrors.map((error) => `documentation fragment transport: ${entry.repository}: ${error}`));
+    } else records.push(...fragment.resources);
+  }
+  try { validateDocumentationRelations(records); } catch {
+    documentationTransportError(errors, "ACTIVE fragment relation이 유효하지 않다");
   }
 }
 
@@ -1111,11 +1250,15 @@ function compareText(left, right) {
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2);
   const hasWorkspace = args[0] === "--workspace" && args[1]?.trim() !== "";
-  const hasBaseRef = args.length === 4 && args[2] === "--base-ref" && args[3].trim() !== "";
-  const isCurrentOnly = args.length === 3 && args[2] === "--current-only";
-  const validArgs = hasWorkspace && (hasBaseRef || isCurrentOnly);
+  const fragmentWorkspaceIndex = args.indexOf("--documentation-fragment-workspace");
+  const hasFragmentWorkspace = fragmentWorkspaceIndex === -1
+    || (fragmentWorkspaceIndex === args.length - 2 && args[fragmentWorkspaceIndex + 1].trim() !== "");
+  const contractArgs = fragmentWorkspaceIndex === -1 ? args : args.slice(0, fragmentWorkspaceIndex);
+  const hasBaseRef = contractArgs.length === 4 && contractArgs[2] === "--base-ref" && contractArgs[3].trim() !== "";
+  const isCurrentOnly = contractArgs.length === 3 && contractArgs[2] === "--current-only";
+  const validArgs = hasWorkspace && hasFragmentWorkspace && (hasBaseRef || isCurrentOnly);
   if (!validArgs) {
-    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json> (--base-ref <40-hex-sha>|--current-only)");
+    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json> (--base-ref <40-hex-sha>|--current-only) [--documentation-fragment-workspace <local-json>]");
     process.exit(1);
   }
   let previousArchitectureDecision = null;
@@ -1125,7 +1268,10 @@ if (isMainModule(import.meta.url)) {
     console.error(`- ${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
-  const errors = collectContractErrors(args[1], { previousArchitectureDecision });
+  const errors = collectContractErrors(args[1], {
+    previousArchitectureDecision,
+    documentationFragmentWorkspacePath: fragmentWorkspaceIndex === -1 ? null : args[fragmentWorkspaceIndex + 1],
+  });
   if (errors.length) {
     console.error(errors.map((error) => `- ${error}`).join("\n"));
     process.exit(1);

@@ -1,7 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import {
@@ -58,6 +59,95 @@ function bindRootDecisionSchema(directory, adr) {
   adr.decisionSchema = `./${schemaName}`;
   cpSync("contracts/documentation/ADR-HUB-0001-decision.schema.json", join(directory, schemaName));
 }
+
+function documentationCatalogRecord(repository, innerSha, blobSha) {
+  const resource = `${repository}:docs/resource.txt`;
+  const canonicalIdentity = `git:${innerSha}:docs/resource.txt:${blobSha}`;
+  return {
+    resource, resourceClass: "CANONICAL_RESOURCE", documentationFamily: "ARCHITECTURE",
+    kindCandidate: "DOCUMENTATION_RESOURCE", sourceSurface: "TRACKED", canonicalIdentity,
+    status: "ACTIVE", ownerRepository: repository, ownerIssue: null,
+    currentConsumers: ["consumer:documentation"], releaseReachability: "NONE",
+    publicSurfaceReachability: [], assertionState: "REQUIRED_FINAL_PRODUCTION_BEHAVIOR",
+    sensitivity: "INTERNAL", duplicateGroup: null, disposition: "RETAIN_CANONICAL",
+    deletePrerequisite: [], supersedes: [], supersededBy: null, invalidatedBy: null,
+    invalidationReason: null, invalidationEvidence: [], mutationPolicy: "CURRENT_STATE_WITH_CHANGE",
+    reviewPolicyId: "EVENT_ONLY", reviewTrigger: ["event:change"],
+    lastVerifiedAt: "2026-08-05T00:00:00.000Z", lastVerifiedIdentity: canonicalIdentity,
+    verificationMethod: "contract-test", verificationEvidence: ["evidence:fixture"],
+    nextReviewAtOrSemanticExpiry: null, implementationPlan: "PLAN-DOC", workloadClass: null,
+    orchestrationProfile: null, stateClass: null, configurationDelivery: null,
+    healthContract: null, availabilityContract: null, securityContract: null, releaseContract: null,
+    portabilityOwner: null, portabilityEvidence: [], portabilityGap: [],
+  };
+}
+
+function createDocumentationCatalogWorkspace() {
+  const { directory, workspacePath } = createExternalWorkspace();
+  const catalogPath = join(directory, "inputs/documentation-system-catalog.json");
+  const catalog = loadJson(catalogPath);
+  const repositories = [];
+  try {
+    for (const [index, entry] of catalog.repositories.entries()) {
+      const root = join(directory, `repository-${index}`);
+      mkdirSync(join(root, "docs"), { recursive: true });
+      for (const args of [["init"], ["config", "user.email", "test@example.com"], ["config", "user.name", "Test"]]) {
+        execFileSync("/usr/bin/git", args, { cwd: root, stdio: "ignore" });
+      }
+      writeFileSync(join(root, "docs/resource.txt"), `resource-${index}\n`);
+      execFileSync("/usr/bin/git", ["add", "."], { cwd: root, stdio: "ignore" });
+      execFileSync("/usr/bin/git", ["commit", "-m", "inner"], { cwd: root, stdio: "ignore" });
+      const innerSha = execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+      const resourceBlob = execFileSync("/usr/bin/git", ["rev-parse", "HEAD:docs/resource.txt"], { cwd: root, encoding: "utf8" }).trim();
+      const resourceDigest = createHash("sha256").update(readFileSync(join(root, "docs/resource.txt"))).digest("hex");
+      const resourceIdentity = index === 0 ? resourceBlob : resourceDigest;
+      const fragment = {
+        $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+        repository: entry.repository, gitSha: innerSha, status: "ACTIVE",
+        lastVerifiedAt: "2026-08-05T00:00:00.000Z", verificationEvidence: ["evidence:fixture"],
+        resources: [documentationCatalogRecord(entry.repository, innerSha, resourceIdentity)],
+      };
+      writeFileSync(join(root, "docs/fragment.json"), JSON.stringify(fragment));
+      execFileSync("/usr/bin/git", ["add", "."], { cwd: root, stdio: "ignore" });
+      execFileSync("/usr/bin/git", ["commit", "-m", "outer"], { cwd: root, stdio: "ignore" });
+      const outerSha = execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+      const fragmentBlob = execFileSync("/usr/bin/git", ["rev-parse", "HEAD:docs/fragment.json"], { cwd: root, encoding: "utf8" }).trim();
+      entry.status = "ACTIVE";
+      entry.fragment = {
+        gitSha: outerSha, path: "docs/fragment.json", blobSha: index === 0
+          ? fragmentBlob : createHash("sha256").update(readFileSync(join(root, "docs/fragment.json"))).digest("hex"),
+        lastVerifiedAt: fragment.lastVerifiedAt, verificationEvidence: fragment.verificationEvidence,
+      };
+      repositories.push({ repository: entry.repository, root: realpathSync(root) });
+    }
+    writeFileSync(catalogPath, JSON.stringify(catalog));
+    const fragmentWorkspacePath = join(directory, "documentation-fragment-workspace.json");
+    writeFileSync(fragmentWorkspacePath, JSON.stringify({ schemaVersion: 1, repositories }));
+    return { directory, workspacePath, fragmentWorkspacePath, catalogPath, repositories };
+  } catch (error) {
+    rmSync(directory, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+test("documentation catalog resolves exact outer and inner Git blobs", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  try {
+    assert.ok(collectContractErrors(fixture.workspacePath).some((error) => error.includes("workspace가 필요하다")));
+    assert.deepEqual(collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    }), []);
+
+    const localWorkspace = loadJson(fixture.fragmentWorkspacePath);
+    localWorkspace.repositories.pop();
+    writeFileSync(fixture.fragmentWorkspacePath, JSON.stringify(localWorkspace));
+    assert.ok(collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    }).some((error) => error.includes("mapping")));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
 
 test("[gate-ownership] workspace는 legacy 경로 밖 복사 입력을 검증한다", () => {
   const { directory, workspacePath } = createExternalWorkspace();
