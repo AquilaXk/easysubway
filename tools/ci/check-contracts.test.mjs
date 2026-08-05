@@ -27,7 +27,7 @@ import {
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
-const FIXTURE_GIT_UNSET = ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_QUARANTINE_PATH", "GIT_CEILING_DIRECTORIES"];
+const FIXTURE_GIT_UNSET = ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_QUARANTINE_PATH", "GIT_CEILING_DIRECTORIES", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"];
 
 function fixtureGit(args, options = {}) {
   const env = {
@@ -296,6 +296,7 @@ test("documentation catalog ignores inherited hostile Git environment", () => {
     GIT_CONFIG_COUNT: "1",
     GIT_CONFIG_KEY_0: "core.hooksPath",
     GIT_CONFIG_VALUE_0: join(fixture.directory, "not-a-hook-directory"),
+    GIT_GLOB_PATHSPECS: "1",
   };
   const previous = Object.fromEntries(Object.keys(hostile).map((key) => [key, process.env[key]]));
   try {
@@ -511,6 +512,29 @@ test("documentation catalog accepts TRACKED resources larger than the default ch
     rewriteDocumentationFragmentInnerCommit(fragment, innerSha, "docs/resource.txt", blobSha);
     commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
     assert.deepEqual(documentationCatalogErrors(fixture), []);
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog enforces the explicit 64 MiB blob limit", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const resourcePath = join(root, "docs/resource.txt");
+    const bindResource = (size) => {
+      writeFileSync(resourcePath, Buffer.alloc(size, "x"));
+      fixtureGit(["add", "docs/resource.txt"], { cwd: root, stdio: "ignore" });
+      fixtureGit(["commit", "-m", `resource ${size}`], { cwd: root, stdio: "ignore" });
+      const innerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+      const blobSha = fixtureGit(["rev-parse", "HEAD:docs/resource.txt"], { cwd: root, encoding: "utf8" }).trim();
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      rewriteDocumentationFragmentInnerCommit(fragment, innerSha, "docs/resource.txt", blobSha);
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    };
+
+    bindResource(64 * 1024 * 1024);
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+    bindResource(64 * 1024 * 1024 + 1);
+    assertDocumentationCatalogFailure(fixture, "TRACKED resource blob은 64 MiB 이하여야 한다");
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
 

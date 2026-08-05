@@ -350,7 +350,7 @@ const DOCUMENTATION_GIT_ENV = Object.freeze({
   GIT_CONFIG_NOSYSTEM: "1",
   GIT_ATTR_NOSYSTEM: "1",
 });
-const DOCUMENTATION_GIT_UNSET = Object.freeze(["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_QUARANTINE_PATH", "GIT_CEILING_DIRECTORIES"]);
+const DOCUMENTATION_GIT_UNSET = Object.freeze(["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_QUARANTINE_PATH", "GIT_CEILING_DIRECTORIES", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"]);
 const DOCUMENTATION_GIT_MAX_BUFFER = 64 * 1024 * 1024;
 
 function documentationGit(root, args, encoding = "buffer") {
@@ -418,6 +418,9 @@ function resolveDocumentationBlob(root, commit, path) {
     if (entries.length !== 1) return null;
     const match = /^(\d+) (\w+) ([0-9a-f]{40})\t(.+)$/.exec(entries[0]);
     if (match == null || match[1] === "120000" || match[2] !== "blob" || match[4] !== path) return null;
+    const size = documentationGit(root, ["cat-file", "-s", match[3]], "utf8").trim();
+    if (!/^\d+$/.test(size)) return null;
+    if (BigInt(size) > BigInt(DOCUMENTATION_GIT_MAX_BUFFER)) return { oid: match[3], tooLarge: true };
     return { oid: match[3], bytes: documentationGit(root, ["cat-file", "blob", match[3]]) };
   } catch { return null; }
 }
@@ -448,6 +451,11 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
       continue;
     }
     const fragmentBlob = resolveDocumentationBlob(root, entry.fragment.gitSha, entry.fragment.path);
+    if (fragmentBlob?.tooLarge) {
+      documentationTransportError(errors, `${entry.repository} fragment blob은 64 MiB 이하여야 한다`);
+      failed = true;
+      continue;
+    }
     if (fragmentBlob == null) {
       documentationTransportError(errors, `${entry.repository} fragment blob을 확인할 수 없다`);
       failed = true;
@@ -494,6 +502,10 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
       const identity = /^git:([0-9a-f]{40}):([^:]+):([0-9a-f]{40}|[0-9a-f]{64})$/.exec(record.canonicalIdentity);
       const blob = identity != null && identity[1] === fragment.gitSha
         ? resolveDocumentationBlob(root, fragment.gitSha, identity[2]) : null;
+      if (blob?.tooLarge) {
+        fragmentErrors.push("TRACKED resource blob은 64 MiB 이하여야 한다");
+        continue;
+      }
       const actual = blob == null ? null : identity[3].length === 40
         ? blob.oid : createHash("sha256").update(blob.bytes).digest("hex");
       if (actual !== identity?.[3]) fragmentErrors.push("TRACKED resource blob identity가 일치하지 않는다");
