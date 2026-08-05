@@ -172,6 +172,8 @@ test("문서 거버넌스 계약은 successor의 자체 decision schema와 안�
       ["absolute", (adr) => { adr.decisionSchema = "/tmp/decision.schema.json"; }, "repository 내부 상대 JSON path"],
       ["escape", (adr) => { adr.decisionSchema = "../ADR-HUB-0002-decision.schema.json"; }, "repository 내부 상대 JSON path"],
       ["malformed", () => { writeFileSync(decisionSchemaPath, "{"); }, "유효한 JSON이 필요하다"],
+      ["empty-schema", () => { writeFileSync(decisionSchemaPath, "{}"); }, "비어 있지 않은 required"],
+      ["array-schema", () => { writeFileSync(decisionSchemaPath, "[]"); }, "비어 있지 않은 required"],
       ["invalid", (adr) => { adr.decision.policy = "wrong"; }, "$.decision.policy"],
     ]) {
       const candidate = structuredClone(successor);

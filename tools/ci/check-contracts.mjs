@@ -303,6 +303,12 @@ function validateArchitectureDecisionSchema(adr, valuePath, errors) {
     errors.push(`${valuePath}: decisionSchema ${reference}: 유효한 JSON이 필요하다`);
     return false;
   }
+  if (schema == null || typeof schema !== "object" || Array.isArray(schema)
+      || schema.type !== "object" || !Array.isArray(schema.required) || schema.required.length === 0
+      || schema.additionalProperties !== false) {
+    errors.push(`${valuePath}: decisionSchema ${reference}: 최상위 object, 비어 있지 않은 required, additionalProperties false가 필요하다`);
+    return false;
+  }
   try {
     const result = validateSchema(schema, adr.decision);
     errors.push(...result.errors.map((error) =>
