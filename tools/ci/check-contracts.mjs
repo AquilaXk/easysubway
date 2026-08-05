@@ -390,6 +390,19 @@ export function validateDocumentationFragment(fragment, fragmentSchema, resource
 
 function validateDocumentationFragmentRelations(records) {
   const byResource = new Map(records.map((record) => [record.resource, record]));
+  const duplicateGroups = new Map();
+  for (const record of records) {
+    if (record.duplicateGroup !== null) {
+      duplicateGroups.set(record.duplicateGroup, [...(duplicateGroups.get(record.duplicateGroup) ?? []), record]);
+    }
+  }
+  for (const group of duplicateGroups.values()) {
+    if (group.filter((record) => record.disposition === "RETAIN_CANONICAL").length > 1
+        || group.some((record) => record.currentConsumers.length === 0
+          || record.disposition !== "RETAIN_CANONICAL" && record.deletePrerequisite.length === 0)) {
+      throw new Error("fragment duplicate group contradiction");
+    }
+  }
   for (const record of records) {
     if (record.supersededBy === record.resource || record.supersedes.includes(record.resource)
         || (record.status === "SUPERSEDED") !== (record.supersededBy !== null)) {

@@ -338,6 +338,43 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     lastVerifiedAt: null, verificationEvidence: [], resources: [cycleA, cycleB],
   }, fragmentSchema, resourceSchema, cycleErrors);
   assert.ok(cycleErrors.some((error) => error.includes("fragment supersession cycle")));
+
+  const duplicateCanonicalA = structuredClone(crossRepositoryRecord);
+  duplicateCanonicalA.resource = "surface:duplicate-a";
+  duplicateCanonicalA.duplicateGroup = "duplicate:fixture";
+  duplicateCanonicalA.supersedes = [];
+  const duplicateCanonicalB = structuredClone(duplicateCanonicalA);
+  duplicateCanonicalB.resource = "surface:duplicate-b";
+  const duplicateCanonicalErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA, duplicateCanonicalB],
+  }, fragmentSchema, resourceSchema, duplicateCanonicalErrors);
+  assert.ok(duplicateCanonicalErrors.some((error) => error.includes("fragment duplicate group contradiction")));
+
+  for (const mutate of [
+    (record) => { record.currentConsumers = []; },
+    (record) => { record.disposition = "MIGRATE_REFERENCE"; },
+  ]) {
+    const record = structuredClone(duplicateCanonicalA);
+    mutate(record);
+    const duplicateMemberErrors = [];
+    validateDocumentationFragment({
+      $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+      repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+      lastVerifiedAt: null, verificationEvidence: [], resources: [record],
+    }, fragmentSchema, resourceSchema, duplicateMemberErrors);
+    assert.ok(duplicateMemberErrors.some((error) => error.includes("fragment duplicate group contradiction")));
+  }
+
+  const unresolvedDuplicateErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA],
+  }, fragmentSchema, resourceSchema, unresolvedDuplicateErrors);
+  assert.deepEqual(unresolvedDuplicateErrors, []);
 });
 
 test("문서 거버넌스 계약은 successor의 자체 decision schema와 안전한 schema path만 허용한다", () => {
