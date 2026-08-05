@@ -71,7 +71,7 @@ function validateRecord(record, repository, sha, tracked) {
   if (record.ownerRepository !== repository || !REPOSITORIES.includes(repository)) fail("invalid ownerRepository");
   if (record.ownerIssue !== null && (!safeIdentifier(record.ownerIssue) || !/^https:\/\/github\.com\/AquilaXk\/(easysubway|easysubway-data|easysubway-backend|easysubway-mobile|easysubway-platform)\/issues\/\d+$/.test(record.ownerIssue))) fail("invalid ownerIssue");
   for (const field of ["currentConsumers", "publicSurfaceReachability", "deletePrerequisite", "supersedes", "invalidationEvidence", "reviewTrigger", "verificationEvidence", "portabilityEvidence", "portabilityGap"]) sortedUnique(record[field], field);
-  for (const field of ["duplicateGroup", "supersededBy", "invalidatedBy", "invalidationReason", "nextReviewAtOrSemanticExpiry", "portabilityOwner"]) if (record[field] !== null && !safeIdentifier(record[field])) fail(`invalid ${field}`);
+  for (const field of ["duplicateGroup", "supersededBy", "invalidatedBy", "invalidationReason", "nextReviewAtOrSemanticExpiry", "portabilityOwner", "healthContract", "availabilityContract", "securityContract", "releaseContract"]) if (record[field] !== null && !safeIdentifier(record[field])) fail(`invalid ${field}`);
   if (!Number.isFinite(Date.parse(record.lastVerifiedAt)) || !/^\d{4}-\d{2}-\d{2}T/.test(record.lastVerifiedAt)) fail("invalid lastVerifiedAt");
   if (record.lastVerifiedIdentity !== record.canonicalIdentity) fail("last verification identity mismatch");
   if (tracked) {
@@ -83,7 +83,7 @@ function validateRecord(record, repository, sha, tracked) {
   if (record.status === "INVALIDATED") {
     if (record.resourceClass !== "EVIDENCE" || !record.invalidatedBy || !record.invalidationReason || record.invalidationEvidence.length === 0 || record.mutationPolicy !== "EVIDENCE_IMMUTABLE") fail("invalid invalidation relation");
   } else if (record.invalidatedBy !== null || record.invalidationReason !== null || record.invalidationEvidence.length !== 0) fail("unexpected invalidation relation");
-  if (["REVOKED", "INVALIDATED"].includes(record.status) && ( !["NONE", "EVIDENCE"].includes(record.releaseReachability) || record.publicSurfaceReachability.length !== 0 || record.currentConsumers.some((value) => /release|rollback|public/i.test(value)))) fail("revoked or invalidated record is reachable");
+  if (["REVOKED", "INVALIDATED"].includes(record.status) && ( !["NONE", "EVIDENCE"].includes(record.releaseReachability) || record.publicSurfaceReachability.length !== 0 || record.currentConsumers.some((value) => !value.startsWith("evidence:")))) fail("revoked or invalidated record is reachable");
   if ((record.sourceSurface === "PUBLIC" || record.publicSurfaceReachability.length > 0) && record.status !== "REVOKED" && (record.sensitivity !== "PUBLIC" || record.assertionState !== "CURRENTLY_IMPLEMENTED_AND_EVIDENCED")) fail("invalid public claim");
   if (record.orchestrationProfile === "KUBERNETES_ACTIVE" && record.portabilityEvidence.length === 0) fail("active Kubernetes needs evidence");
 }
@@ -91,7 +91,7 @@ function validateRepository(entry) {
   exactKeys(entry, ["repository", "root", "gitSha", "discoveryRoots", "records"], "repository");
   if (!REPOSITORIES.includes(entry.repository) || typeof entry.root !== "string" || !isAbsolute(entry.root) || !/^[0-9a-f]{40}$/.test(entry.gitSha)) fail("invalid repository input");
   if (!Array.isArray(entry.discoveryRoots) || entry.discoveryRoots.length === 0 || entry.discoveryRoots.some((root) => !safeRelative(root)) || entry.discoveryRoots.join("\0") !== [...new Set(entry.discoveryRoots)].sort(codepointCompare).join("\0")) fail("invalid discovery roots");
-  try { git(entry.root, ["cat-file", "-e", `${entry.gitSha}^{commit}`]); } catch { fail("missing git commit"); }
+  try { if (git(entry.root, ["cat-file", "-t", entry.gitSha]).trim() !== "commit") fail("missing git commit"); } catch { fail("missing git commit"); }
   const entries = treeEntries(entry.root, entry.gitSha);
   const selected = [];
   for (const root of entry.discoveryRoots) {
@@ -99,8 +99,8 @@ function validateRepository(entry) {
     if (rootEntries.length === 0 || rootEntries.some((item) => item.path === root && item.mode === "120000")) fail("missing or symlink discovery root");
     selected.push(...rootEntries);
   }
-  if (selected.some((item) => item.mode === "120000")) fail("symlink under discovery root");
-  const blobs = selected.filter((item) => item.type === "blob" && item.mode !== "120000");
+  if (selected.some((item) => item.type !== "blob" || item.mode === "120000")) fail("non-blob entry under discovery root");
+  const blobs = selected;
   const uniqueBlobs = new Map(blobs.map((item) => [item.path, item]));
   if (uniqueBlobs.size !== blobs.length) fail("overlapping discovery roots");
   if (!Array.isArray(entry.records)) fail("records must be array");

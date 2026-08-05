@@ -78,13 +78,13 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     return { repository, root, gitSha, discoveryRoots: index === 0 ? ["docs/doc-0.json", "docs/duplicate.json", "docs/\uE000.json", "docs/😀.json"] : ["docs"], records };
   });
   const surfaceRecords = [
-    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "public", family: FAMILIES[6], surface: "PUBLIC", overrides: { resource: "https://public.example.invalid/release", publicSurfaceReachability: ["https://public.example.invalid/release"] } }),
+    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "public", family: FAMILIES[6], surface: "PUBLIC", overrides: { resource: "https://public.example.invalid/release", publicSurfaceReachability: ["https://public.example.invalid/release"], healthContract: "contract:health", availabilityContract: "contract:availability", securityContract: "contract:security", releaseContract: "contract:release" } }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "local", family: FAMILIES[7], surface: "LOCAL_ONLY" }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external", family: FAMILIES[8], surface: "EXTERNAL" }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external-e000", family: FAMILIES[8], surface: "EXTERNAL", overrides: { resource: "surface:\uE000", canonicalIdentity: `sha256:${"c".repeat(64)}`, lastVerifiedIdentity: `sha256:${"c".repeat(64)}` } }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "external-grinning", family: FAMILIES[8], surface: "EXTERNAL", overrides: { resource: "surface:😀", canonicalIdentity: `sha256:${"d".repeat(64)}`, lastVerifiedIdentity: `sha256:${"d".repeat(64)}` } }),
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "revoked", family: FAMILIES[9], surface: "PUBLIC", overrides: { resource: "https://public.example.invalid/revoked", canonicalIdentity: `sha256:${"f".repeat(64)}`, lastVerifiedIdentity: `sha256:${"f".repeat(64)}`, status: "REVOKED", currentConsumers: [], publicSurfaceReachability: [] } }),
-    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "invalidated", family: FAMILIES[10], surface: "LOCAL_ONLY", overrides: { resource: `local-evidence:sha256:${"e".repeat(64)}`, canonicalIdentity: `sha256:${"e".repeat(64)}`, lastVerifiedIdentity: `sha256:${"e".repeat(64)}`, resourceClass: "EVIDENCE", status: "INVALIDATED", currentConsumers: [], invalidatedBy: "evidence:replacement", invalidationReason: "reason:replaced", invalidationEvidence: ["evidence:replacement"], mutationPolicy: "EVIDENCE_IMMUTABLE" } }),
+    record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "invalidated", family: FAMILIES[10], surface: "LOCAL_ONLY", overrides: { resource: `local-evidence:sha256:${"e".repeat(64)}`, canonicalIdentity: `sha256:${"e".repeat(64)}`, lastVerifiedIdentity: `sha256:${"e".repeat(64)}`, resourceClass: "EVIDENCE", status: "INVALIDATED", currentConsumers: ["evidence:audit"], invalidatedBy: "evidence:replacement", invalidationReason: "reason:replaced", invalidationEvidence: ["evidence:replacement"], mutationPolicy: "EVIDENCE_IMMUTABLE" } }),
   ];
   const workspace = { schemaVersion: 1, repositories, surfaceRecords };
   const first = invoke(workspace, join(temp, "first"));
@@ -114,8 +114,13 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     (input) => { input.repositories[0].records[1].currentConsumers = []; },
     (input) => { input.surfaceRecords[6].invalidationEvidence = []; },
     (input) => { input.surfaceRecords[5].releaseReachability = "PUBLIC"; },
+    (input) => { input.surfaceRecords[5].currentConsumers = ["runtime:mobile"]; },
     (input) => { input.surfaceRecords[0].sensitivity = "INTERNAL"; },
     (input) => { input.surfaceRecords[0].assertionState = "REQUIRED_FINAL_PRODUCTION_BEHAVIOR"; },
+    (input) => { input.surfaceRecords[0].healthContract = {}; },
+    (input) => { input.surfaceRecords[0].availabilityContract = "/private/availability"; },
+    (input) => { input.surfaceRecords[0].securityContract = "https://public.example.invalid/security?page=1"; },
+    (input) => { input.surfaceRecords[0].releaseContract = { id: "release" }; },
     (input) => { input.surfaceRecords[2].publicSurfaceReachability = ["https://public.example.invalid/external"]; },
     (input) => { input.surfaceRecords.push(structuredClone(input.surfaceRecords[2])); },
     (input) => { input.surfaceRecords[0].resource = "https://public.example.invalid/release?page=1"; },
@@ -131,6 +136,16 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
   const gapRun = invoke(gapWorkspace, join(temp, "gaps"));
   assert.equal(gapRun.status, 0, gapRun.stderr);
   assert.deepEqual(JSON.parse(readFileSync(join(temp, "gaps", "inventory.json"), "utf8")).gaps.map(({ documentationFamily }) => documentationFamily), ["GOVERNANCE_EVIDENCE", "OPERATIONS_RELIABILITY", "RELEASE_CHANGE", "SECURITY_PRIVACY", "USER_SUPPORT_LEGAL_PUBLIC"]);
+  const tagWorkspace = structuredClone(workspace);
+  const tagRepository = tagWorkspace.repositories[1];
+  const tagOriginalSha = tagRepository.gitSha;
+  run("/usr/bin/git", ["tag", "-a", "inventory-annotated", "-m", "annotated fixture"], repositories[1].root);
+  tagRepository.gitSha = run("/usr/bin/git", ["rev-parse", "inventory-annotated"], repositories[1].root);
+  for (const tracked of tagRepository.records) {
+    tracked.canonicalIdentity = tracked.canonicalIdentity.replace(`git:${tagOriginalSha}:`, `git:${tagRepository.gitSha}:`);
+    tracked.lastVerifiedIdentity = tracked.canonicalIdentity;
+  }
+  assert.notEqual(invoke(tagWorkspace, join(temp, "annotated-tag")).status, 0, "annotated tag object must not be accepted as gitSha");
   const symlinkWorkspace = structuredClone(workspace);
   const symlinkRepository = symlinkWorkspace.repositories[0];
   const originalSha = symlinkRepository.gitSha;
@@ -145,4 +160,18 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
   }
   assert.match(run("/usr/bin/git", ["ls-tree", "HEAD", "docs/linked.json"], repositories[0].root), /^120000 /, "nested symlink must be committed");
   assert.notEqual(invoke(symlinkWorkspace, join(temp, "symlink")).status, 0, "committed nested symlink under discovery root must fail closed");
+  const gitlinkWorkspace = structuredClone(workspace);
+  const gitlinkRepository = gitlinkWorkspace.repositories[0];
+  const gitlinkOriginalSha = gitlinkRepository.gitSha;
+  run("/usr/bin/git", ["rm", "--cached", "docs/linked.json"], repositories[0].root);
+  run("/usr/bin/git", ["update-index", "--add", "--cacheinfo", `160000,${workspace.repositories[0].gitSha},docs/gitlink`], repositories[0].root);
+  run("/usr/bin/git", ["commit", "-qm", "gitlink fixture"], repositories[0].root);
+  gitlinkRepository.gitSha = run("/usr/bin/git", ["rev-parse", "HEAD"], repositories[0].root);
+  gitlinkRepository.discoveryRoots = ["docs"];
+  for (const tracked of gitlinkRepository.records) {
+    tracked.canonicalIdentity = tracked.canonicalIdentity.replace(`git:${gitlinkOriginalSha}:`, `git:${gitlinkRepository.gitSha}:`);
+    tracked.lastVerifiedIdentity = tracked.canonicalIdentity;
+  }
+  assert.match(run("/usr/bin/git", ["ls-tree", "HEAD", "docs/gitlink"], repositories[0].root), /^160000 commit /, "gitlink must be committed");
+  assert.notEqual(invoke(gitlinkWorkspace, join(temp, "gitlink")).status, 0, "gitlink under discovery root must fail closed");
 });
