@@ -353,8 +353,9 @@ const DOCUMENTATION_GIT_ENV = Object.freeze({
 });
 const DOCUMENTATION_GIT_UNSET = Object.freeze(["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_QUARANTINE_PATH", "GIT_CEILING_DIRECTORIES", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"]);
 const DOCUMENTATION_GIT_MAX_BUFFER = 64 * 1024 * 1024;
-const DOCUMENTATION_FRAGMENT_MAX_RESOURCES = 4096;
-const DOCUMENTATION_MAX_TRACKED_RESOURCES = 256;
+const DOCUMENTATION_FRAGMENT_MAX_BYTES = 1024 * 1024;
+const DOCUMENTATION_MAX_ARRAY_ITEMS = 256;
+const DOCUMENTATION_MAX_RESOURCES = 256;
 
 function documentationGit(root, args, encoding = "buffer") {
   const env = { ...process.env, ...DOCUMENTATION_GIT_ENV };
@@ -412,7 +413,10 @@ function validateDocumentationGitRoot(root) {
   } catch { return false; }
 }
 
-function resolveDocumentationBlob(root, commit, path, readBytes = true) {
+function resolveDocumentationBlob(
+  root, commit, path,
+  { readBytes = true, maxBytes = DOCUMENTATION_GIT_MAX_BUFFER } = {},
+) {
   if (!/^[0-9a-f]{40}$/.test(commit) || !safeDocumentationPath(path)) return null;
   try {
     if (documentationGit(root, ["cat-file", "-t", commit], "utf8").trim() !== "commit") return null;
@@ -424,12 +428,26 @@ function resolveDocumentationBlob(root, commit, path, readBytes = true) {
     const size = documentationGit(root, ["cat-file", "-s", match[3]], "utf8").trim();
     if (!/^\d+$/.test(size)) return null;
     const byteLength = BigInt(size);
-    if (byteLength > BigInt(DOCUMENTATION_GIT_MAX_BUFFER)) return { oid: match[3], byteLength, tooLarge: true };
+    if (byteLength > BigInt(maxBytes)) return { oid: match[3], byteLength, tooLarge: true };
     return {
       oid: match[3], byteLength,
       bytes: readBytes ? documentationGit(root, ["cat-file", "blob", match[3]]) : null,
     };
   } catch { return null; }
+}
+
+function hasOversizedDocumentationArray(value) {
+  const pending = [value];
+  while (pending.length > 0) {
+    const current = pending.pop();
+    if (Array.isArray(current)) {
+      if (current.length > DOCUMENTATION_MAX_ARRAY_ITEMS) return true;
+      for (const item of current) pending.push(item);
+    } else if (current != null && typeof current === "object") {
+      for (const item of Object.values(current)) pending.push(item);
+    }
+  }
+  return false;
 }
 
 function resolveActiveDocumentationFragments(catalog, workspacePath, errors, schemaPaths) {
@@ -447,10 +465,9 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
     documentationTransportError(errors, "fragment schema를 읽을 수 없다");
     return;
   }
-  const records = [];
+  const resolvedFragments = [];
   let failed = false;
-  let trackedResourceCount = 0;
-  let trackedDigestBytes = 0n;
+  let resourceCount = 0;
   for (const entry of active) {
     if (entry.fragment == null) { failed = true; continue; }
     const root = roots.get(entry.repository);
@@ -459,9 +476,11 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
       failed = true;
       continue;
     }
-    const fragmentBlob = resolveDocumentationBlob(root, entry.fragment.gitSha, entry.fragment.path);
+    const fragmentBlob = resolveDocumentationBlob(root, entry.fragment.gitSha, entry.fragment.path, {
+      maxBytes: DOCUMENTATION_FRAGMENT_MAX_BYTES,
+    });
     if (fragmentBlob?.tooLarge) {
-      documentationTransportError(errors, `${entry.repository} fragment blob은 64 MiB 이하여야 한다`);
+      documentationTransportError(errors, `${entry.repository} fragment blob은 1 MiB 이하여야 한다`);
       failed = true;
       continue;
     }
@@ -483,8 +502,13 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
       failed = true;
       continue;
     }
-    if (Array.isArray(fragment?.resources) && fragment.resources.length > DOCUMENTATION_FRAGMENT_MAX_RESOURCES) {
-      documentationTransportError(errors, `${entry.repository} fragment resources는 4096개 이하여야 한다`);
+    if (Array.isArray(fragment?.resources) && fragment.resources.length > DOCUMENTATION_MAX_ARRAY_ITEMS) {
+      documentationTransportError(errors, `${entry.repository} fragment resources는 256개 이하여야 한다`);
+      failed = true;
+      continue;
+    }
+    if (hasOversizedDocumentationArray(fragment)) {
+      documentationTransportError(errors, `${entry.repository} fragment 배열은 256개 항목 이하여야 한다`);
       failed = true;
       continue;
     }
@@ -504,6 +528,19 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
       for (const error of fragmentErrors) errors.push(`documentation fragment transport: ${entry.repository}: ${error}`);
       continue;
     }
+    resourceCount += fragment.resources.length;
+    if (resourceCount > DOCUMENTATION_MAX_RESOURCES) {
+      documentationTransportError(errors, `${entry.repository} resources는 전체 256개 이하여야 한다`);
+      failed = true;
+      continue;
+    }
+    resolvedFragments.push({ entry, root, fragment });
+  }
+  if (failed) return;
+  const records = [];
+  let trackedDigestBytes = 0n;
+  for (const { entry, root, fragment } of resolvedFragments) {
+    const fragmentErrors = [];
     if (fragment.repository !== entry.repository || fragment.status !== "ACTIVE"
         || fragment.lastVerifiedAt !== entry.fragment.lastVerifiedAt
         || !isDeepStrictEqual(fragment.verificationEvidence, entry.fragment.verificationEvidence)) {
@@ -517,13 +554,10 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
       }
     } catch { fragmentErrors.push("inner commit relation 불일치"); }
     const trackedRecords = fragment.resources.filter(({ sourceSurface }) => sourceSurface === "TRACKED");
-    trackedResourceCount += trackedRecords.length;
-    if (trackedResourceCount > DOCUMENTATION_MAX_TRACKED_RESOURCES) {
-      fragmentErrors.push("TRACKED resources는 전체 256개 이하여야 한다");
-    } else for (const record of trackedRecords) {
+    for (const record of trackedRecords) {
       const identity = /^git:([0-9a-f]{40}):([^:]+):([0-9a-f]{40}|[0-9a-f]{64})$/.exec(record.canonicalIdentity);
       const blob = identity != null && identity[1] === fragment.gitSha
-        ? resolveDocumentationBlob(root, fragment.gitSha, identity[2], false) : null;
+        ? resolveDocumentationBlob(root, fragment.gitSha, identity[2], { readBytes: false }) : null;
       if (blob?.tooLarge) {
         fragmentErrors.push("TRACKED resource blob은 64 MiB 이하여야 한다");
         continue;

@@ -258,12 +258,12 @@ test("documentation catalog rejects schema-invalid fragment blobs without throwi
   }
 });
 
-test("documentation catalog returns many malformed resource errors without throwing", () => {
+test("documentation catalog returns bounded malformed resource errors without throwing", () => {
   const fixture = createSingleDocumentationCatalogWorkspace();
   try {
     const root = fixture.repositories[0].root;
     const fragment = loadJson(join(root, "docs/fragment.json"));
-    fragment.resources = Array.from({ length: 4000 }, () => ({}));
+    fragment.resources = Array.from({ length: 256 }, () => ({}));
     commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
     let errors;
     assert.doesNotThrow(() => { errors = documentationCatalogErrors(fixture); });
@@ -271,35 +271,54 @@ test("documentation catalog returns many malformed resource errors without throw
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
 
-test("documentation catalog rejects fragment resource arrays above 4096 before item validation", () => {
+test("documentation catalog rejects fragment resource arrays above 256 before item validation", () => {
   const fixture = createSingleDocumentationCatalogWorkspace();
   try {
     const root = fixture.repositories[0].root;
     const fragment = loadJson(join(root, "docs/fragment.json"));
-    fragment.resources = Array.from({ length: 4097 }, () => ({}));
+    fragment.resources = Array.from({ length: 257 }, () => ({}));
     commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
     const errors = documentationCatalogErrors(fixture);
-    assert.ok(errors.some((error) => error.includes("fragment resources는 4096개 이하여야 한다")), errors.join("\n"));
+    assert.ok(errors.some((error) => error.includes("fragment resources는 256개 이하여야 한다")), errors.join("\n"));
     assert.ok(errors.every((error) => !error.includes("documentation-fragment resource")), errors.join("\n"));
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
 
-test("documentation catalog limits TRACKED resource work across ACTIVE fragments", () => {
+test("documentation catalog limits the resource union across ACTIVE fragments", () => {
+  const fixture = createDocumentationCatalogWorkspace({ activeIndexes: [0, 1] });
+  try {
+    for (const [repositoryIndex, count] of [128, 129].entries()) {
+      const root = fixture.repositories[repositoryIndex].root;
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      const base = fragment.resources[0];
+      fragment.resources = Array.from({ length: count }, (_, index) => {
+        const record = documentationExternalRecord(base, `https://example.invalid/${repositoryIndex}/${String(index).padStart(3, "0")}`);
+        record.canonicalIdentity = `sha256:${repositoryIndex}${index.toString(16).padStart(63, "0")}`;
+        record.lastVerifiedIdentity = record.canonicalIdentity;
+        return record;
+      });
+      if (repositoryIndex === 0) {
+        fragment.resources[0] = documentationCatalogRecord(
+          fragment.repository, fragment.gitSha, "0".repeat(40), "docs/missing.txt",
+        );
+      }
+      commitDocumentationCatalogFragment(fixture, repositoryIndex, JSON.stringify(fragment));
+    }
+    const errors = documentationCatalogErrors(fixture);
+    assert.ok(errors.some((error) => error.includes("resources는 전체 256개 이하여야 한다")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes("TRACKED resource blob identity")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes("ACTIVE fragment relation")), errors.join("\n"));
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog rejects oversized nested arrays before schema validation", () => {
   const fixture = createSingleDocumentationCatalogWorkspace();
   try {
     const root = fixture.repositories[0].root;
     const fragment = loadJson(join(root, "docs/fragment.json"));
-    const blobSha = fragment.resources[0].canonicalIdentity.split(":").at(-1);
-    fragment.resources = Array.from({ length: 257 }, (_, index) => documentationCatalogRecord(
-      fragment.repository,
-      fragment.gitSha,
-      blobSha,
-      `docs/resource-${String(index).padStart(3, "0")}.txt`,
-    ));
+    fragment.resources[0].currentConsumers = Array.from({ length: 257 }, (_, index) => `consumer:${index}`);
     commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
-    const errors = documentationCatalogErrors(fixture);
-    assert.ok(errors.some((error) => error.includes("TRACKED resources는 전체 256개 이하여야 한다")), errors.join("\n"));
-    assert.ok(errors.every((error) => !error.includes("TRACKED resource blob identity")), errors.join("\n"));
+    assertDocumentationCatalogFailure(fixture, "fragment 배열은 256개 항목 이하여야 한다");
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
 
@@ -617,6 +636,18 @@ test("documentation catalog enforces the explicit 64 MiB blob limit", () => {
 
     bindResource(64 * 1024 * 1024 + 1);
     assertDocumentationCatalogFailure(fixture, "TRACKED resource blob은 64 MiB 이하여야 한다");
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog enforces the 1 MiB fragment JSON limit before parsing", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = JSON.stringify(loadJson(join(root, "docs/fragment.json")));
+    commitDocumentationCatalogFragment(fixture, 0, fragment.padEnd(1024 * 1024, " "));
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+    commitDocumentationCatalogFragment(fixture, 0, fragment.padEnd(1024 * 1024 + 1, " "));
+    assertDocumentationCatalogFailure(fixture, "fragment blob은 1 MiB 이하여야 한다");
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
 
