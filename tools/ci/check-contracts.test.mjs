@@ -258,6 +258,19 @@ test("documentation catalog rejects schema-invalid fragment blobs without throwi
   }
 });
 
+test("documentation catalog returns many malformed resource errors without throwing", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    fragment.resources = Array.from({ length: 4000 }, () => ({}));
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    let errors;
+    assert.doesNotThrow(() => { errors = documentationCatalogErrors(fixture); });
+    assert.ok(errors.some((error) => error.includes("documentation-fragment resource")), errors.join("\n"));
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
 test("documentation catalog rejects reversed local workspace mappings", () => {
   const fixture = createDocumentationCatalogWorkspace();
   try {

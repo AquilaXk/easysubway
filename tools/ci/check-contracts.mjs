@@ -482,7 +482,7 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
     );
     if (fragmentErrors.length > 0) {
       failed = true;
-      errors.push(...fragmentErrors.map((error) => `documentation fragment transport: ${entry.repository}: ${error}`));
+      for (const error of fragmentErrors) errors.push(`documentation fragment transport: ${entry.repository}: ${error}`);
       continue;
     }
     if (fragment.repository !== entry.repository || fragment.status !== "ACTIVE"
@@ -512,7 +512,7 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
     }
     if (fragmentErrors.length > 0) {
       failed = true;
-      errors.push(...fragmentErrors.map((error) => `documentation fragment transport: ${entry.repository}: ${error}`));
+      for (const error of fragmentErrors) errors.push(`documentation fragment transport: ${entry.repository}: ${error}`);
     } else records.push(...fragment.resources);
   }
   if (failed) return;
