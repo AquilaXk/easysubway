@@ -20,6 +20,8 @@ import {
   validateArchitectureDecision,
   validateArchitectureDecisionTransition,
   validateArchitectureDecisionWorkspaceTransition,
+  validateDocumentationFragment,
+  validateDocumentationSystemCatalog,
   validateGateIndex,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
@@ -43,9 +45,11 @@ function createExternalWorkspace() {
     governancePolicy: "inputs/governance-policy.json",
     freshnessPolicy: "inputs/freshness-policy.json",
     architectureDecision: "inputs/architecture-decision.json",
+    documentationSystemCatalog: "inputs/documentation-system-catalog.json",
   }));
   copy("contracts/documentation/ADR-HUB-0001.json", "inputs/architecture-decision.json");
   copy("contracts/documentation/ADR-HUB-0001-decision.schema.json", "inputs/ADR-HUB-0001-decision.schema.json");
+  copy("contracts/documentation/documentation-system-catalog.json", "inputs/documentation-system-catalog.json");
   return { directory, workspacePath };
 }
 
@@ -132,6 +136,245 @@ test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => 
   ), true);
   assert.deepEqual(errors, []);
   assert.ok(adr.confirmation.some(({ method }) => method.endsWith("--current-only")));
+});
+
+test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifecycle을 fail closed한다", () => {
+  const resourceSchema = loadJson("contracts/documentation/documentation-resource.schema.json");
+  const fragmentSchema = loadJson("contracts/documentation/documentation-fragment.schema.json");
+  const catalogSchema = loadJson("contracts/documentation/documentation-system-catalog.schema.json");
+  const catalog = loadJson("contracts/documentation/documentation-system-catalog.json");
+  const errors = [];
+
+  validateDocumentationSystemCatalog(catalog, catalogSchema, errors);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(catalog.repositories.map(({ repository }) => repository), [
+    "AquilaXk/easysubway",
+    "AquilaXk/easysubway-backend",
+    "AquilaXk/easysubway-data",
+    "AquilaXk/easysubway-mobile",
+    "AquilaXk/easysubway-platform",
+  ]);
+
+  for (const [mutate, expected] of [
+    [(value) => value.repositories.pop(), /minItems 5/],
+    [(value) => value.repositories.push(structuredClone(value.repositories[0])), /maxItems 5/],
+    [(value) => { value.repositories[0].repository = "AquilaXk/unknown"; }, /enum/],
+    [(value) => { value.repositories[0].status = "ACTIVE"; }, /ACTIVE fragment가 필요하다/],
+    [(value) => { value.repositories[0].resources = []; }, /resources/],
+  ]) {
+    const invalid = structuredClone(catalog);
+    mutate(invalid);
+    const invalidErrors = [];
+    validateDocumentationSystemCatalog(invalid, catalogSchema, invalidErrors);
+    assert.ok(invalidErrors.some((error) => expected.test(error)), invalidErrors.join("; "));
+  }
+
+  const fragmentErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "ACTIVE",
+    lastVerifiedAt: "2026-08-05T00:00:00.000Z",
+    verificationEvidence: [],
+    resources: [],
+  }, fragmentSchema, resourceSchema, fragmentErrors);
+  assert.ok(fragmentErrors.some((error) => error.includes("verificationEvidence")));
+
+  const missingTimestampErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "ACTIVE",
+    lastVerifiedAt: null,
+    verificationEvidence: ["evidence:fixture"],
+    resources: [],
+  }, fragmentSchema, resourceSchema, missingTimestampErrors);
+  assert.ok(missingTimestampErrors.some((error) => error.includes("lastVerifiedAt")));
+
+  const unsafeEvidenceCatalog = structuredClone(catalog);
+  unsafeEvidenceCatalog.repositories[0] = {
+    repository: "AquilaXk/easysubway",
+    status: "ACTIVE",
+    fragment: {
+      gitSha: "a".repeat(40),
+      path: "contracts/documentation/documentation-fragment.json",
+      blobSha: "b".repeat(40),
+      lastVerifiedAt: "2026-08-05T00:00:00.000Z",
+      verificationEvidence: ["/private/owner/raw.json"],
+    },
+  };
+  const unsafeEvidenceErrors = [];
+  validateDocumentationSystemCatalog(unsafeEvidenceCatalog, catalogSchema, unsafeEvidenceErrors);
+  assert.ok(unsafeEvidenceErrors.some((error) => error.includes("verificationEvidence")));
+
+  const unsupportedBlobCatalog = structuredClone(unsafeEvidenceCatalog);
+  unsupportedBlobCatalog.repositories[0].fragment.blobSha = "b".repeat(41);
+  unsupportedBlobCatalog.repositories[0].fragment.verificationEvidence = ["evidence:fixture"];
+  const unsupportedBlobErrors = [];
+  validateDocumentationSystemCatalog(unsupportedBlobCatalog, catalogSchema, unsupportedBlobErrors);
+  assert.ok(unsupportedBlobErrors.some((error) => error.includes("oneOf")), unsupportedBlobErrors.join("; "));
+
+  const unverifiedActiveCatalog = structuredClone(unsafeEvidenceCatalog);
+  unverifiedActiveCatalog.repositories[0].fragment.verificationEvidence = ["evidence:fixture"];
+  const unverifiedActiveErrors = [];
+  validateDocumentationSystemCatalog(unverifiedActiveCatalog, catalogSchema, unverifiedActiveErrors);
+  assert.ok(unverifiedActiveErrors.some((error) => error.includes("ACTIVE fragment resolution contract")));
+
+  const unsortedErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "PROPOSED",
+    lastVerifiedAt: null,
+    verificationEvidence: [],
+    resources: [{ resource: "resource:z" }, { resource: "resource:a" }],
+  }, fragmentSchema, resourceSchema, unsortedErrors);
+  assert.ok(unsortedErrors.some((error) => error.includes("sorted-unique")));
+
+  const crossRepositoryErrors = [];
+  const canonicalIdentity = `sha256:${"c".repeat(64)}`;
+  const crossRepositoryRecord = {
+    resource: "surface:current", resourceClass: "CANONICAL_RESOURCE", documentationFamily: "ARCHITECTURE",
+    kindCandidate: "CROSS_REPOSITORY_HANDOFF", sourceSurface: "EXTERNAL", canonicalIdentity, status: "ACTIVE",
+    ownerRepository: "AquilaXk/easysubway", ownerIssue: null, currentConsumers: ["consumer:architecture"],
+    releaseReachability: "NONE", publicSurfaceReachability: [], assertionState: "REQUIRED_FINAL_PRODUCTION_BEHAVIOR",
+    sensitivity: "INTERNAL", duplicateGroup: null, disposition: "RETAIN_CANONICAL", deletePrerequisite: [],
+    supersedes: ["surface:external-predecessor"], supersededBy: null, invalidatedBy: null, invalidationReason: null,
+    invalidationEvidence: [], mutationPolicy: "CURRENT_STATE_WITH_CHANGE", reviewPolicyId: "EVENT_ONLY",
+    reviewTrigger: ["event:change"], lastVerifiedAt: "2026-08-05T00:00:00.000Z",
+    lastVerifiedIdentity: canonicalIdentity, verificationMethod: "contract-test", verificationEvidence: ["evidence:fixture"],
+    nextReviewAtOrSemanticExpiry: null, implementationPlan: "PLAN-DOC", workloadClass: null,
+    orchestrationProfile: null, stateClass: null, configurationDelivery: null, healthContract: null,
+    availabilityContract: null, securityContract: null, releaseContract: null, portabilityOwner: null,
+    portabilityEvidence: [], portabilityGap: [],
+  };
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "PROPOSED",
+    lastVerifiedAt: null,
+    verificationEvidence: [],
+    resources: [crossRepositoryRecord],
+  }, fragmentSchema, resourceSchema, crossRepositoryErrors);
+  assert.deepEqual(crossRepositoryErrors, []);
+
+  const trackedRecord = structuredClone(crossRepositoryRecord);
+  trackedRecord.resource = "AquilaXk/easysubway-mobile:docs/a.json";
+  trackedRecord.sourceSurface = "TRACKED";
+  trackedRecord.canonicalIdentity = `git:${"a".repeat(40)}:docs/b.json:${"b".repeat(40)}`;
+  trackedRecord.lastVerifiedIdentity = trackedRecord.canonicalIdentity;
+  trackedRecord.supersedes = [];
+  const trackedIdentityErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [trackedRecord],
+  }, fragmentSchema, resourceSchema, trackedIdentityErrors);
+  assert.ok(trackedIdentityErrors.some((error) => error.includes("tracked fragment identity mismatch")));
+
+  const unsupportedTrackedIdentity = structuredClone(trackedRecord);
+  unsupportedTrackedIdentity.resource = "AquilaXk/easysubway:docs/a.json";
+  unsupportedTrackedIdentity.canonicalIdentity = `git:${"a".repeat(40)}:docs/a.json:${"b".repeat(41)}`;
+  unsupportedTrackedIdentity.lastVerifiedIdentity = unsupportedTrackedIdentity.canonicalIdentity;
+  const unsupportedTrackedErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [unsupportedTrackedIdentity],
+  }, fragmentSchema, resourceSchema, unsupportedTrackedErrors);
+  assert.ok(unsupportedTrackedErrors.some((error) => error.includes("invalid tracked identity")));
+
+  for (const mutate of [
+    (record) => { record.resource = "surface:self"; record.supersedes = ["surface:self"]; },
+    (record) => { record.supersededBy = "surface:successor"; },
+  ]) {
+    const record = structuredClone(crossRepositoryRecord);
+    mutate(record);
+    const lifecycleErrors = [];
+    validateDocumentationFragment({
+      $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+      repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+      lastVerifiedAt: null, verificationEvidence: [], resources: [record],
+    }, fragmentSchema, resourceSchema, lifecycleErrors);
+    assert.ok(lifecycleErrors.some((error) => error.includes("fragment lifecycle contradiction")));
+  }
+
+  const predecessor = structuredClone(crossRepositoryRecord);
+  predecessor.resource = "surface:predecessor";
+  predecessor.status = "SUPERSEDED";
+  predecessor.supersedes = [];
+  predecessor.supersededBy = "surface:successor";
+  const successor = structuredClone(crossRepositoryRecord);
+  successor.resource = "surface:successor";
+  successor.supersedes = [];
+  const reciprocalErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [predecessor, successor],
+  }, fragmentSchema, resourceSchema, reciprocalErrors);
+  assert.ok(reciprocalErrors.some((error) => error.includes("fragment relation contradiction")));
+
+  const cycleA = structuredClone(predecessor);
+  cycleA.resource = "surface:a";
+  cycleA.supersedes = ["surface:b"];
+  cycleA.supersededBy = "surface:b";
+  const cycleB = structuredClone(predecessor);
+  cycleB.resource = "surface:b";
+  cycleB.supersedes = ["surface:a"];
+  cycleB.supersededBy = "surface:a";
+  const cycleErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [cycleA, cycleB],
+  }, fragmentSchema, resourceSchema, cycleErrors);
+  assert.ok(cycleErrors.some((error) => error.includes("fragment supersession cycle")));
+
+  const duplicateCanonicalA = structuredClone(crossRepositoryRecord);
+  duplicateCanonicalA.resource = "surface:duplicate-a";
+  duplicateCanonicalA.duplicateGroup = "duplicate:fixture";
+  duplicateCanonicalA.supersedes = [];
+  const duplicateCanonicalB = structuredClone(duplicateCanonicalA);
+  duplicateCanonicalB.resource = "surface:duplicate-b";
+  const duplicateCanonicalErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA, duplicateCanonicalB],
+  }, fragmentSchema, resourceSchema, duplicateCanonicalErrors);
+  assert.ok(duplicateCanonicalErrors.some((error) => error.includes("fragment duplicate group contradiction")));
+
+  for (const mutate of [
+    (record) => { record.currentConsumers = []; },
+    (record) => { record.disposition = "MIGRATE_REFERENCE"; },
+  ]) {
+    const record = structuredClone(duplicateCanonicalA);
+    mutate(record);
+    const duplicateMemberErrors = [];
+    validateDocumentationFragment({
+      $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+      repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+      lastVerifiedAt: null, verificationEvidence: [], resources: [record],
+    }, fragmentSchema, resourceSchema, duplicateMemberErrors);
+    assert.ok(duplicateMemberErrors.some((error) => error.includes("fragment duplicate group contradiction")));
+  }
+
+  const unresolvedDuplicateErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA],
+  }, fragmentSchema, resourceSchema, unresolvedDuplicateErrors);
+  assert.deepEqual(unresolvedDuplicateErrors, []);
 });
 
 test("문서 거버넌스 계약은 successor의 자체 decision schema와 안전한 schema path만 허용한다", () => {
@@ -642,6 +885,7 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
       governancePolicy: resolve(previousCwd, "tools/datapack/source-governance-policy.json"),
       freshnessPolicy: resolve(previousCwd, "release/product-gates/datapack-freshness-sla.json"),
       architectureDecision: "docs/ADR-HUB-0001.json",
+      documentationSystemCatalog: resolve(previousCwd, "contracts/documentation/documentation-system-catalog.json"),
     }));
     const rootLevel = structuredClone(root);
     bindRootDecisionSchema(repository, rootLevel);

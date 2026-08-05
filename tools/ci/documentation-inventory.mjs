@@ -1,31 +1,21 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { isAbsolute, resolve, win32 } from "node:path";
+import { isMainModule } from "../lib/is-main-module.mjs";
+import { validateSchema } from "./lib/json-schema-lite.mjs";
 
-const REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-data", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
-const FAMILIES = ["PRODUCT", "ARCHITECTURE", "API_CONTRACT", "DATA_KNOWLEDGE", "ENGINEERING", "QUALITY_TEST", "RELEASE_CHANGE", "OPERATIONS_RELIABILITY", "SECURITY_PRIVACY", "USER_SUPPORT_LEGAL_PUBLIC", "GOVERNANCE_EVIDENCE"];
-const SURFACES = ["TRACKED", "PUBLIC", "LOCAL_ONLY", "EXTERNAL"];
-const ENUMS = {
-  resourceClass: ["CANONICAL_RESOURCE", "HUMAN_CONTEXT", "EXECUTABLE_COMPANION", "EVIDENCE", "HUMAN_VIEW"],
-  documentationFamily: FAMILIES,
-  sourceSurface: SURFACES,
-  status: ["PROPOSED", "ACTIVE", "SUPERSEDED", "REVOKED", "HISTORICAL", "INVALIDATED"],
-  releaseReachability: ["NONE", "BUILD", "RUNTIME", "DEPLOY", "PUBLIC", "EVIDENCE"],
-  assertionState: ["CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "CURRENT_EXTERNAL_OR_DATA_BLOCKER", "REQUIRED_FINAL_PRODUCTION_BEHAVIOR", "HISTORICAL_OR_SUPERSEDED"],
-  sensitivity: ["PUBLIC", "INTERNAL", "RESTRICTED", "LOCAL_ONLY"],
-  disposition: ["RETAIN_CANONICAL", "MIGRATE_REFERENCE", "GENERATE_VIEW", "SUPERSEDE", "DELETE_AFTER_HANDOFF", "HISTORICAL"],
-  mutationPolicy: ["CURRENT_STATE_WITH_CHANGE", "DECISION_APPEND_ONLY", "EVIDENCE_IMMUTABLE", "PLAN_LIVING_BUT_NON_EVIDENCE", "GENERATED_VIEW_DERIVED"],
-  reviewPolicyId: ["EVENT_ONLY", "RELEASE_BOUND", "OPERATIONAL_CRITICAL", "OPERATIONAL_STANDARD", "DATA_FRESHNESS_BOUND", "TOOLCHAIN_BOUND"],
-  verificationMethod: ["contract-test", "runtime-check", "drill", "release-audit", "owner-review"],
-  implementationPlan: ["PLAN-DOC", "PLAN-REPO", "PLAN-JOURNEY"],
-};
-const NULLABLE_ENUMS = {
-  workloadClass: ["STATELESS_SERVICE", "ONE_SHOT_JOB", "SCHEDULED_JOB", "EXTERNAL_MANAGED_STATE"],
-  orchestrationProfile: ["COMPOSE_CURRENT", "KUBERNETES_CANDIDATE", "KUBERNETES_ACTIVE"],
-  stateClass: ["NONE", "EPHEMERAL_CACHE", "SHARED_DURABLE", "ATOMIC_RELEASE_IDENTITY"],
-  configurationDelivery: ["IMMUTABLE_ENV", "IMMUTABLE_FILE", "EXTERNAL_SECRET_REFERENCE"],
-};
-const RECORD_KEYS = ["resource", "resourceClass", "documentationFamily", "kindCandidate", "sourceSurface", "canonicalIdentity", "status", "ownerRepository", "ownerIssue", "currentConsumers", "releaseReachability", "publicSurfaceReachability", "assertionState", "sensitivity", "duplicateGroup", "disposition", "deletePrerequisite", "supersedes", "supersededBy", "invalidatedBy", "invalidationReason", "invalidationEvidence", "mutationPolicy", "reviewPolicyId", "reviewTrigger", "lastVerifiedAt", "lastVerifiedIdentity", "verificationMethod", "verificationEvidence", "nextReviewAtOrSemanticExpiry", "implementationPlan", "workloadClass", "orchestrationProfile", "stateClass", "configurationDelivery", "healthContract", "availabilityContract", "securityContract", "releaseContract", "portabilityOwner", "portabilityEvidence", "portabilityGap"];
+const RESOURCE_SCHEMA = JSON.parse(readFileSync(new URL("../../contracts/documentation/documentation-resource.schema.json", import.meta.url), "utf8"));
+export const DOCUMENTATION_REPOSITORIES = Object.freeze([...RESOURCE_SCHEMA.properties.ownerRepository.enum]);
+export const DOCUMENTATION_FAMILIES = Object.freeze([...RESOURCE_SCHEMA.properties.documentationFamily.enum]);
+export const DOCUMENTATION_RESOURCE_CLASSES = Object.freeze([...RESOURCE_SCHEMA.properties.resourceClass.enum]);
+const REPOSITORIES = DOCUMENTATION_REPOSITORIES;
+const FAMILIES = DOCUMENTATION_FAMILIES;
+const SURFACES = RESOURCE_SCHEMA.properties.sourceSurface.enum;
+const ENUM_FIELDS = ["resourceClass", "documentationFamily", "sourceSurface", "status", "releaseReachability", "assertionState", "sensitivity", "disposition", "mutationPolicy", "reviewPolicyId", "verificationMethod", "implementationPlan"];
+const NULLABLE_ENUM_FIELDS = ["workloadClass", "orchestrationProfile", "stateClass", "configurationDelivery"];
+const ENUMS = Object.fromEntries(ENUM_FIELDS.map((field) => [field, RESOURCE_SCHEMA.properties[field].enum]));
+const NULLABLE_ENUMS = Object.fromEntries(NULLABLE_ENUM_FIELDS.map((field) => [field, RESOURCE_SCHEMA.properties[field].enum.filter((value) => value !== null)]));
+const RECORD_KEYS = RESOURCE_SCHEMA.required;
 
 function fail(message) { throw new Error(message); }
 function codepointCompare(left, right) {
@@ -64,13 +54,15 @@ function treeEntries(root, sha, discoveryRoots) {
   });
 }
 function matchesRoot(path, root) { return path === root || path.startsWith(`${root}/`); }
-function validateRecord(record, repository, sha, tracked) {
+export function validateDocumentationRecord(record, { ownerRepository, gitSha, tracked }) {
+  const schemaResult = validateSchema(RESOURCE_SCHEMA, record);
+  if (!schemaResult.ok) fail(`record schema: ${schemaResult.errors.join("; ")}`);
   exactKeys(record, RECORD_KEYS, "record");
   for (const [field, values] of Object.entries(ENUMS)) if (!values.includes(record[field])) fail(`invalid ${field}`);
   for (const [field, values] of Object.entries(NULLABLE_ENUMS)) if (record[field] !== null && !values.includes(record[field])) fail(`invalid ${field}`);
   if (typeof record.kindCandidate !== "string" || !/^[A-Z][A-Z0-9_]*$/.test(record.kindCandidate)) fail("invalid kindCandidate");
-  if (record.ownerRepository !== repository || !REPOSITORIES.includes(repository)) fail("invalid ownerRepository");
-  const ownerIssuePrefix = `https://github.com/${repository}/issues/`;
+  if (record.ownerRepository !== ownerRepository || !REPOSITORIES.includes(ownerRepository)) fail("invalid ownerRepository");
+  const ownerIssuePrefix = `https://github.com/${ownerRepository}/issues/`;
   if (record.ownerIssue !== null && (!safeIdentifier(record.ownerIssue) || !record.ownerIssue.startsWith(ownerIssuePrefix) || !/^\d+$/.test(record.ownerIssue.slice(ownerIssuePrefix.length)))) fail("invalid ownerIssue");
   for (const field of ["currentConsumers", "publicSurfaceReachability", "deletePrerequisite", "supersedes", "invalidationEvidence", "reviewTrigger", "verificationEvidence", "portabilityEvidence", "portabilityGap"]) sortedUnique(record[field], field);
   if (record.assertionState === "CURRENTLY_IMPLEMENTED_AND_EVIDENCED" && record.verificationEvidence.length === 0) fail("evidenced assertion needs verification evidence");
@@ -79,8 +71,9 @@ function validateRecord(record, repository, sha, tracked) {
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(record.lastVerifiedAt) || !Number.isFinite(verifiedAt.valueOf()) || verifiedAt.toISOString() !== record.lastVerifiedAt) fail("invalid lastVerifiedAt");
   if (record.lastVerifiedIdentity !== record.canonicalIdentity) fail("last verification identity mismatch");
   if (tracked) {
+    if (typeof gitSha !== "string" || !/^[0-9a-f]{40}$/.test(gitSha)) fail("invalid gitSha");
     if (record.sourceSurface !== "TRACKED" || !safeRelative(record.resource.split(":").slice(1).join(":"))) fail("invalid tracked resource");
-    if (!new RegExp(`^git:${sha}:([^:]+):[0-9a-f]{40,64}$`).test(record.canonicalIdentity)) fail("invalid tracked identity");
+    if (!new RegExp(`^git:${gitSha}:([^:]+):(?:[0-9a-f]{40}|[0-9a-f]{64})$`).test(record.canonicalIdentity)) fail("invalid tracked identity");
   } else if (record.sourceSurface === "TRACKED" || !/^sha256:[0-9a-f]{64}$/.test(record.canonicalIdentity)) fail("invalid non-tracked identity");
   if (record.sourceSurface === "LOCAL_ONLY" && !/^local-evidence:sha256:[0-9a-f]{64}$/.test(record.resource)) fail("invalid local resource");
   if (!safeIdentifier(record.resource)) fail("unsafe resource");
@@ -90,6 +83,45 @@ function validateRecord(record, repository, sha, tracked) {
   if (["REVOKED", "INVALIDATED"].includes(record.status) && ( !["NONE", "EVIDENCE"].includes(record.releaseReachability) || record.publicSurfaceReachability.length !== 0 || record.currentConsumers.some((value) => !value.startsWith("evidence:")))) fail("revoked or invalidated record is reachable");
   if ((record.sourceSurface === "PUBLIC" || record.publicSurfaceReachability.length > 0) && record.status !== "REVOKED" && (record.sensitivity !== "PUBLIC" || record.assertionState !== "CURRENTLY_IMPLEMENTED_AND_EVIDENCED")) fail("invalid public claim");
   if (record.orchestrationProfile === "KUBERNETES_ACTIVE" && record.portabilityEvidence.length === 0) fail("active Kubernetes needs evidence");
+}
+export function validateDocumentationRelations(records) {
+  const byResource = new Map(records.map((record) => [record.resource, record]));
+  if (byResource.size !== records.length) fail("duplicate resource");
+  const duplicateGroups = new Map();
+  for (const record of records) if (record.duplicateGroup !== null) duplicateGroups.set(record.duplicateGroup, [...(duplicateGroups.get(record.duplicateGroup) ?? []), record]);
+  for (const group of duplicateGroups.values()) {
+    if (group.length < 2 || group.filter((record) => record.disposition === "RETAIN_CANONICAL").length !== 1 || group.some((record) => record.currentConsumers.length === 0 || record.disposition !== "RETAIN_CANONICAL" && record.deletePrerequisite.length === 0)) fail("invalid duplicate group");
+  }
+  for (const record of records.filter(({ status }) => status === "INVALIDATED")) {
+    const replacement = byResource.get(record.invalidatedBy);
+    if (replacement?.resourceClass !== "EVIDENCE"
+        || ["INVALIDATED", "REVOKED"].includes(replacement.status)
+        || replacement.mutationPolicy !== "EVIDENCE_IMMUTABLE"
+        || !replacement.supersedes.includes(record.resource)) fail("invalidated evidence needs reciprocal replacement");
+  }
+  for (const record of records) {
+    if (record.supersededBy === record.resource || record.supersedes.includes(record.resource)) fail("self supersession");
+    if (record.status === "SUPERSEDED") {
+      const successor = byResource.get(record.supersededBy);
+      if (!successor?.supersedes.includes(record.resource)) fail("superseded resource needs reciprocal successor");
+    } else if (record.supersededBy !== null) fail("unexpected supersededBy");
+    for (const predecessorResource of record.supersedes) {
+      const predecessor = byResource.get(predecessorResource);
+      if (predecessor == null
+          || predecessor.status === "INVALIDATED" && predecessor.invalidatedBy !== record.resource
+          || predecessor.status !== "INVALIDATED" && (predecessor.status !== "SUPERSEDED" || predecessor.supersededBy !== record.resource)) fail("supersedes needs reciprocal predecessor");
+    }
+  }
+  // ponytail: inventories are small; use graph coloring if relation volume becomes material.
+  for (const start of records) {
+    const seen = new Set();
+    let current = start;
+    while (current != null && current.supersededBy !== null) {
+      if (seen.has(current.resource)) fail("supersession cycle");
+      seen.add(current.resource);
+      current = byResource.get(current.supersededBy);
+    }
+  }
 }
 function validateRepository(entry) {
   exactKeys(entry, ["repository", "root", "gitSha", "discoveryRoots", "records"], "repository");
@@ -110,7 +142,7 @@ function validateRepository(entry) {
   if (!Array.isArray(entry.records)) fail("records must be array");
   const paths = new Set();
   for (const record of entry.records) {
-    validateRecord(record, entry.repository, entry.gitSha, true);
+    validateDocumentationRecord(record, { ownerRepository: entry.repository, gitSha: entry.gitSha, tracked: true });
     const prefix = `${entry.repository}:`;
     if (!record.resource.startsWith(prefix)) fail("tracked resource repository mismatch");
     const path = record.resource.slice(prefix.length);
@@ -137,13 +169,8 @@ function main() {
   const seen = new Set(workspace.repositories.map((entry) => entry.repository));
   if (seen.size !== REPOSITORIES.length || REPOSITORIES.some((repository) => !seen.has(repository))) fail("repository set mismatch");
   const records = workspace.repositories.flatMap(validateRepository);
-  for (const record of workspace.surfaceRecords) { validateRecord(record, record.ownerRepository, null, false); records.push(record); }
-  if (new Set(records.map((record) => record.resource)).size !== records.length) fail("duplicate resource");
-  const duplicateGroups = new Map();
-  for (const record of records) if (record.duplicateGroup !== null) duplicateGroups.set(record.duplicateGroup, [...(duplicateGroups.get(record.duplicateGroup) ?? []), record]);
-  for (const group of duplicateGroups.values()) {
-    if (group.length < 2 || group.filter((record) => record.disposition === "RETAIN_CANONICAL").length !== 1 || group.some((record) => record.currentConsumers.length === 0 || record.disposition !== "RETAIN_CANONICAL" && record.deletePrerequisite.length === 0)) fail("invalid duplicate group");
-  }
+  for (const record of workspace.surfaceRecords) { validateDocumentationRecord(record, { ownerRepository: record.ownerRepository, gitSha: null, tracked: false }); records.push(record); }
+  validateDocumentationRelations(records);
   const coverage = {
     documentationFamilies: Object.fromEntries(FAMILIES.map((family) => [family, records.filter((record) => record.documentationFamily === family).length])),
     repositories: Object.fromEntries(REPOSITORIES.map((repository) => [repository, records.filter((record) => record.ownerRepository === repository).length])),
@@ -158,4 +185,6 @@ function main() {
   writeFileSync(outputPath, `${JSON.stringify(output)}\n`, { encoding: "utf8", flag: "wx" });
 }
 
-try { main(); } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; }
+if (isMainModule(import.meta.url)) {
+  try { main(); } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; }
+}

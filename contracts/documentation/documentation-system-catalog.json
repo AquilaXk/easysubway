@@ -1,0 +1,20 @@
+{
+  "$schema": "./documentation-system-catalog.schema.json",
+  "schemaVersion": 1,
+  "status": "PROPOSED",
+  "inventoryEvidence": {
+    "normalizedSha256": "sha256:b877e8a0f5498c4b19662ca9ae84aed556c1e80f2e338f7d02ed0e597f87b133",
+    "recordCount": 34,
+    "repositoryCount": 5,
+    "documentationFamilyCount": 11,
+    "sourceSurfaceCount": 4,
+    "gaps": ["gap:kubernetes:platform-deployment-contract"]
+  },
+  "repositories": [
+    { "repository": "AquilaXk/easysubway", "status": "PROPOSED", "fragment": null },
+    { "repository": "AquilaXk/easysubway-backend", "status": "PROPOSED", "fragment": null },
+    { "repository": "AquilaXk/easysubway-data", "status": "PROPOSED", "fragment": null },
+    { "repository": "AquilaXk/easysubway-mobile", "status": "PROPOSED", "fragment": null },
+    { "repository": "AquilaXk/easysubway-platform", "status": "PROPOSED", "fragment": null }
+  ]
+}

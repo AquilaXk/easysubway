@@ -8,5 +8,6 @@
   "sourceInventory": "../../apps/mobile/assets/datapacks/source-inventory.json",
   "governancePolicy": "../../tools/datapack/source-governance-policy.json",
   "freshnessPolicy": "../../release/product-gates/datapack-freshness-sla.json",
-  "architectureDecision": "../documentation/ADR-HUB-0001.json"
+  "architectureDecision": "../documentation/ADR-HUB-0001.json",
+  "documentationSystemCatalog": "../documentation/documentation-system-catalog.json"
 }

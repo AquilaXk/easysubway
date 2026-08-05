@@ -2,12 +2,16 @@
 import { isMainModule } from "../lib/is-main-module.mjs";
 import { existsSync, lstatSync, readFileSync, readdirSync, realpathSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { basename, dirname, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve, win32 } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
 import { validateLedger } from "../repo/issue-migration-ledger.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isDeepStrictEqual } from "node:util";
+import {
+  DOCUMENTATION_REPOSITORIES,
+  validateDocumentationRecord,
+} from "./documentation-inventory.mjs";
 
 const DEFAULT_WORKSPACE_PATH = "contracts/workspaces/hub.json";
 const architectureDecisionSchemaSnapshots = new WeakMap();
@@ -34,7 +38,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
   if (workspace == null || typeof workspace !== "object" || Array.isArray(workspace)) {
     throw new Error(`${workspacePath}: 객체가 필요하다`);
   }
-  const required = ["contracts", "gateDirectories", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision"];
+  const required = ["contracts", "gateDirectories", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision", "documentationSystemCatalog"];
   for (const field of required) {
     if (!Object.hasOwn(workspace, field)) throw new Error(`${workspacePath}: ${field} 필수`);
   }
@@ -46,7 +50,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
       throw new Error(`${workspacePath}: gateDirectories.${ownerComponent} 필수`);
     }
   }
-  for (const field of ["contracts", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision"]) {
+  for (const field of ["contracts", "datapackIndex", "sourceInventory", "governancePolicy", "freshnessPolicy", "architectureDecision", "documentationSystemCatalog"]) {
     if (typeof workspace[field] !== "string" || workspace[field].trim() === "") {
       throw new Error(`${workspacePath}: ${field}은 비어 있지 않은 경로가 필요하다`);
     }
@@ -63,6 +67,7 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     governancePolicy: resolveWorkspacePath(workspace.governancePolicy),
     freshnessPolicy: resolveWorkspacePath(workspace.freshnessPolicy),
     architectureDecision: resolveWorkspacePath(workspace.architectureDecision),
+    documentationSystemCatalog: resolveWorkspacePath(workspace.documentationSystemCatalog),
   };
 }
 
@@ -106,6 +111,14 @@ export function collectContractErrors(
     workspace.architectureDecision,
     errors,
   );
+  const documentationSystemCatalogSchema = contract("documentation/documentation-system-catalog.schema.json");
+  if (validateJson(documentationSystemCatalogSchema, workspace.documentationSystemCatalog, errors)) {
+    validateDocumentationSystemCatalogSemantics(
+      loadJson(workspace.documentationSystemCatalog),
+      errors,
+      workspace.documentationSystemCatalog,
+    );
+  }
   let currentArchitectureDecisions = [];
   const currentArchitectureDecisionCandidates = new Map();
   if (architectureDecisionValid) {
@@ -293,6 +306,179 @@ export function validateJson(schemaPath, valuePath, errors) {
       break;
   }
   return result.errors.length === 0 && referencedSchemaValid && semanticErrors.length === 0;
+}
+
+export function validateDocumentationSystemCatalog(catalog, schema, errors) {
+  const result = validateSchema(schema, catalog);
+  errors.push(...result.errors.map((error) => `documentation-system-catalog: ${error}`));
+  if (result.ok) validateDocumentationSystemCatalogSemantics(catalog, errors, "documentation-system-catalog");
+}
+
+function validateDocumentationSystemCatalogSemantics(catalog, errors, label) {
+  const expected = [...DOCUMENTATION_REPOSITORIES].sort(codepointCompare);
+  const actual = catalog.repositories.map(({ repository }) => repository);
+  if (!isDeepStrictEqual(actual, expected)) errors.push(`${label}: repositories는 정렬된 5개 정본 저장소와 정확히 일치해야 한다`);
+  for (const entry of catalog.repositories) {
+    if (entry.status === "PROPOSED" && entry.fragment !== null) {
+      errors.push(`${label}: ${entry.repository} PROPOSED fragment는 null이어야 한다`);
+    }
+    if (entry.status === "ACTIVE" && entry.fragment === null) {
+      errors.push(`${label}: ${entry.repository} ACTIVE fragment가 필요하다`);
+      continue;
+    }
+    if (entry.status === "ACTIVE") {
+      errors.push(`${label}: ${entry.repository} ACTIVE fragment resolution contract가 필요하다`);
+    }
+    if (entry.fragment !== null) {
+      if (!safeDocumentationPath(entry.fragment.path)) errors.push(`${label}: ${entry.repository} fragment path가 안전하지 않다`);
+      if (!isCanonicalUtc(entry.fragment.lastVerifiedAt)) errors.push(`${label}: ${entry.repository} fragment lastVerifiedAt은 canonical UTC여야 한다`);
+      validateDocumentationEvidence(entry.fragment.verificationEvidence, `${label}: ${entry.repository} fragment verificationEvidence`, errors);
+    }
+  }
+}
+
+export function validateDocumentationFragment(fragment, fragmentSchema, resourceSchema, errors) {
+  const result = validateSchema(fragmentSchema, fragment);
+  errors.push(...result.errors.map((error) => `documentation-fragment: ${error}`));
+  if (!result.ok) return;
+  if (fragment.status === "ACTIVE") {
+    if (fragment.verificationEvidence.length === 0) {
+      errors.push("documentation-fragment: ACTIVE verificationEvidence가 필요하다");
+    }
+    if (fragment.lastVerifiedAt === null) {
+      errors.push("documentation-fragment: ACTIVE lastVerifiedAt이 필요하다");
+    }
+  }
+  validateDocumentationEvidence(fragment.verificationEvidence, "documentation-fragment: verificationEvidence", errors);
+  if (fragment.lastVerifiedAt !== null && !isCanonicalUtc(fragment.lastVerifiedAt)) {
+    errors.push("documentation-fragment: lastVerifiedAt은 canonical UTC여야 한다");
+  }
+  const resourceIds = fragment.resources.map(({ resource }) => resource);
+  if (resourceIds.some((resource) => typeof resource !== "string")
+      || !isDeepStrictEqual(resourceIds, [...new Set(resourceIds)].sort(codepointCompare))) {
+    errors.push("documentation-fragment: resources는 resource ID 기준 sorted-unique여야 한다");
+  }
+  const validRecords = [];
+  for (const record of fragment.resources) {
+    const resourceResult = validateSchema(resourceSchema, record);
+    errors.push(...resourceResult.errors.map((error) => `documentation-fragment resource: ${error}`));
+    if (!resourceResult.ok) continue;
+    try {
+      validateDocumentationRecord(record, {
+        ownerRepository: fragment.repository,
+        gitSha: fragment.gitSha,
+        tracked: record.sourceSurface === "TRACKED",
+      });
+      if (record.sourceSurface === "TRACKED") {
+        const prefix = `${fragment.repository}:`;
+        const identity = /^git:[0-9a-f]{40}:([^:]+):(?:[0-9a-f]{40}|[0-9a-f]{64})$/.exec(record.canonicalIdentity);
+        if (!record.resource.startsWith(prefix) || identity?.[1] !== record.resource.slice(prefix.length)) {
+          throw new Error("tracked fragment identity mismatch");
+        }
+      }
+      validRecords.push(record);
+    } catch (error) {
+      errors.push(`documentation-fragment resource: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  try {
+    validateDocumentationFragmentRelations(validRecords);
+  } catch (error) {
+    errors.push(`documentation-fragment resource: ${error instanceof Error ? error.message : String(error)}`);
+  }
+}
+
+function validateDocumentationFragmentRelations(records) {
+  const byResource = new Map(records.map((record) => [record.resource, record]));
+  const duplicateGroups = new Map();
+  for (const record of records) {
+    if (record.duplicateGroup !== null) {
+      duplicateGroups.set(record.duplicateGroup, [...(duplicateGroups.get(record.duplicateGroup) ?? []), record]);
+    }
+  }
+  for (const group of duplicateGroups.values()) {
+    if (group.filter((record) => record.disposition === "RETAIN_CANONICAL").length > 1
+        || group.some((record) => record.currentConsumers.length === 0
+          || record.disposition !== "RETAIN_CANONICAL" && record.deletePrerequisite.length === 0)) {
+      throw new Error("fragment duplicate group contradiction");
+    }
+  }
+  for (const record of records) {
+    if (record.supersededBy === record.resource || record.supersedes.includes(record.resource)
+        || (record.status === "SUPERSEDED") !== (record.supersededBy !== null)) {
+      throw new Error("fragment lifecycle contradiction");
+    }
+    if (record.status === "INVALIDATED") {
+      const replacement = byResource.get(record.invalidatedBy);
+      if (replacement !== undefined && (replacement.resourceClass !== "EVIDENCE"
+          || ["INVALIDATED", "REVOKED"].includes(replacement.status)
+          || replacement.mutationPolicy !== "EVIDENCE_IMMUTABLE"
+          || !replacement.supersedes.includes(record.resource))) {
+        throw new Error("fragment relation contradiction");
+      }
+    }
+    if (record.status === "SUPERSEDED") {
+      const successor = byResource.get(record.supersededBy);
+      if (successor !== undefined && !successor.supersedes.includes(record.resource)) {
+        throw new Error("fragment relation contradiction");
+      }
+    }
+    for (const predecessorResource of record.supersedes) {
+      const predecessor = byResource.get(predecessorResource);
+      if (predecessor !== undefined
+          && (predecessor.status === "INVALIDATED" && predecessor.invalidatedBy !== record.resource
+            || predecessor.status !== "INVALIDATED"
+              && (predecessor.status !== "SUPERSEDED" || predecessor.supersededBy !== record.resource))) {
+        throw new Error("fragment relation contradiction");
+      }
+    }
+  }
+  for (const start of records) {
+    const seen = new Set();
+    let current = start;
+    while (current !== undefined && current.supersededBy !== null) {
+      if (seen.has(current.resource)) throw new Error("fragment supersession cycle");
+      seen.add(current.resource);
+      current = byResource.get(current.supersededBy);
+    }
+  }
+}
+
+function safeDocumentationPath(value) {
+  return typeof value === "string" && value.length > 0
+    && !isAbsolute(value) && !win32.isAbsolute(value)
+    && !value.split(/[\\/]/).includes("..") && !/[\x00-\x1f\x7f]/.test(value);
+}
+
+function validateDocumentationEvidence(values, label, errors) {
+  if (!isDeepStrictEqual(values, [...new Set(values)].sort(codepointCompare))) {
+    errors.push(`${label}는 sorted-unique여야 한다`);
+  }
+  if (values.some((value) => !safeDocumentationIdentifier(value))) {
+    errors.push(`${label}에 안전한 identity가 필요하다`);
+  }
+}
+
+function safeDocumentationIdentifier(value) {
+  if (typeof value !== "string" || value.length === 0 || value !== value.trim()
+      || /[\x00-\x1f\x7f]/.test(value) || isAbsolute(value) || win32.isAbsolute(value)
+      || value.split(/[\\/]/).includes("..") || !value.includes(":")) return false;
+  if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
+    if (!value.startsWith("https://")) return false;
+    try {
+      const url = new URL(value);
+      return !url.username && !url.password && !url.search && !url.hash;
+    } catch {
+      return false;
+    }
+  }
+  return !value.includes("?");
+}
+
+function isCanonicalUtc(value) {
+  if (typeof value !== "string") return false;
+  const millis = Date.parse(value);
+  return Number.isFinite(millis) && new Date(millis).toISOString() === value;
 }
 
 function validateArchitectureDecisionSchema(adr, valuePath, errors) {
