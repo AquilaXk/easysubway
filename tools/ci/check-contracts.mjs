@@ -140,6 +140,7 @@ export function collectContractErrors(
     validateProductClaimCatalog(loadJson(workspace.productClaimCatalog), loadJson(productClaimCatalogSchema), errors, {
       releaseDecision: loadJson(join(workspace.gateDirectories.hub, "production-datapack-scope.json")),
       forbiddenClaims: loadJson(join(workspace.gateDirectories.hub, "forbidden-release-claims.json")),
+      publicCopy: readProductClaimReadme(join(repositoryRoot, "README.md"), errors),
     });
   }
   let currentArchitectureDecisions = [];
@@ -337,7 +338,7 @@ export function validateDocumentationSystemCatalog(catalog, schema, errors, { re
   if (result.ok) validateDocumentationSystemCatalogSemantics(catalog, errors, "documentation-system-catalog", requireActiveResolution);
 }
 
-export function validateProductClaimCatalog(catalog, schema, errors, { releaseDecision, forbiddenClaims }) {
+export function validateProductClaimCatalog(catalog, schema, errors, { releaseDecision, forbiddenClaims, publicCopy = null }) {
   const result = validateSchema(schema, catalog);
   errors.push(...result.errors.map((error) => `product-claim-catalog: ${error}`));
   if (!result.ok) return;
@@ -356,6 +357,10 @@ export function validateProductClaimCatalog(catalog, schema, errors, { releaseDe
   if (!isDeepStrictEqual(claimInventory, PRODUCT_CLAIM_INVENTORY)) {
     errors.push("product-claim-catalog: required claim inventory가 정확히 일치해야 한다");
   }
+  const releaseStatusClaim = catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS");
+  const decision = releaseDecision?.decision?.currentLaunchDecision;
+  if (releaseStatusClaim != null) validateReleaseDecisionToken("release-status claim", releaseStatusClaim.copyKo, decision, errors);
+  if (publicCopy != null) validateReleaseDecisionToken("README.md", publicCopy, decision, errors);
   for (const claim of catalog.claims) {
     for (const field of ["surface", "requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
       if (!isSortedUnique(claim[field])) errors.push(`product-claim-catalog: ${claim.claimId} ${field}는 codepoint sorted-unique여야 한다`);
@@ -370,6 +375,22 @@ export function validateProductClaimCatalog(catalog, schema, errors, { releaseDe
     if (claim.assertionState === "REQUIRED_FINAL_PRODUCTION_BEHAVIOR" && currentPublic) {
       errors.push(`product-claim-catalog: ${claim.claimId} required-final claim은 current surface를 가질 수 없다`);
     }
+  }
+}
+
+function readProductClaimReadme(path, errors) {
+  try {
+    return readFileSync(path, "utf8");
+  } catch {
+    errors.push("product-claim-catalog: README.md public surface를 읽을 수 없다");
+    return null;
+  }
+}
+
+function validateReleaseDecisionToken(surface, copy, decision, errors) {
+  const tokens = [...copy.matchAll(/(?:^|[^A-Z0-9_])(NO_GO|GO)(?=$|[^A-Z0-9_])/g)].map(([, token]) => token);
+  if (tokens.length !== 1 || tokens[0] !== decision) {
+    errors.push(`product-claim-catalog: ${surface} decision token은 currentLaunchDecision과 정확히 하나 일치해야 한다`);
   }
 }
 

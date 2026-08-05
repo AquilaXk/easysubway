@@ -1040,6 +1040,67 @@ for (const field of ["requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
   });
 }
 
+for (const [name, mutate, expected] of [
+  ["top-level GO does not leave NO_GO claim and README", (catalog) => {}, "release-status claim decision token"],
+  ["GO claim does not leave NO_GO README", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다."; }, "README.md decision token"],
+  ["missing release-status claim token", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정을 확인합니다."; }, "release-status claim decision token"],
+  ["multiple release-status claim tokens", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "GO와 NO_GO를 함께 쓰지 않습니다."; }, "release-status claim decision token"],
+  ["opposite release-status claim token", (catalog) => {}, "release-status claim decision token"],
+  ["missing README decision token", (catalog, readme) => { readme.text = "현재 출시 결정을 확인합니다."; }, "README.md decision token"],
+  ["multiple README decision tokens", (catalog, readme) => { readme.text = "GO와 NO_GO를 함께 쓰지 않습니다."; }, "README.md decision token"],
+  ["opposite README decision token", (catalog, readme) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다."; readme.text = "현재 출시 결정은 NO_GO입니다."; }, "README.md decision token"],
+]) {
+  test(`product claim catalog rejects ${name}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    const readme = { text: readFileSync("README.md", "utf8") };
+    catalog.releaseDecision = "GO";
+    const releaseDecision = loadJson("release/product-gates/production-datapack-scope.json");
+    releaseDecision.decision.currentLaunchDecision = "GO";
+    mutate(catalog, readme);
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision,
+      forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+      publicCopy: readme.text,
+    });
+    assert.ok(errors.some((error) => error.includes(expected)));
+  });
+}
+
+test("product claim catalog accepts matching GO release-status tokens", () => {
+  const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+  catalog.releaseDecision = "GO";
+  catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다.";
+  const releaseDecision = loadJson("release/product-gates/production-datapack-scope.json");
+  releaseDecision.decision.currentLaunchDecision = "GO";
+  const errors = [];
+  validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+    releaseDecision,
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+    publicCopy: "현재 출시 결정은 GO입니다.",
+  });
+  assert.deepEqual(errors, []);
+});
+
+test("product claim catalog reads the workspace README public surface", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const catalogPath = join(directory, "inputs/product-claim-catalog.json");
+    const catalog = loadJson(catalogPath);
+    catalog.releaseDecision = "GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다.";
+    writeFileSync(catalogPath, JSON.stringify(catalog));
+    const releaseDecisionPath = join(directory, "gates/hub/production-datapack-scope.json");
+    const releaseDecision = loadJson(releaseDecisionPath);
+    releaseDecision.decision.currentLaunchDecision = "GO";
+    writeFileSync(releaseDecisionPath, JSON.stringify(releaseDecision));
+
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("README.md decision token")));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
 test("repository split issue migration ledger가 계약 gate를 통과한다", () => {
   const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
 
