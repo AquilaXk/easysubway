@@ -166,8 +166,10 @@ export function collectContractErrors(
       errors.push(...transitionErrors
         .map((error) => `${current.path}: ${error}`));
       const previousDecisionSchema = architectureDecisionSchemaSnapshots.get(previous);
-      if (transitionErrors.length === 0 && previous.status !== "proposed"
-        && previousDecisionSchema !== undefined) {
+      const finalizingProposal = previous.status === "proposed"
+        && ["accepted", "rejected", "withdrawn"].includes(current.adr.status);
+      if (transitionErrors.length === 0 && previousDecisionSchema !== undefined
+        && (previous.status !== "proposed" || finalizingProposal)) {
         let currentDecisionSchema;
         try {
           currentDecisionSchema = loadJson(resolve(dirname(current.path), current.adr.decisionSchema));
@@ -176,7 +178,9 @@ export function collectContractErrors(
         }
         if (currentDecisionSchema !== undefined
           && !isDeepStrictEqual(previousDecisionSchema, currentDecisionSchema)) {
-          errors.push(`${current.path}: accepted/terminal ADR decision schema는 in-place 변경할 수 없고 새 ADR로 supersede해야 한다`);
+          errors.push(finalizingProposal
+            ? `${current.path}: proposed ADR의 종결 전환은 decision schema도 status-only여야 한다`
+            : `${current.path}: accepted/terminal ADR decision schema는 in-place 변경할 수 없고 새 ADR로 supersede해야 한다`);
         }
       }
       if (transitionErrors.length === 0

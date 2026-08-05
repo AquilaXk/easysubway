@@ -684,6 +684,18 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
       /successor ADR 판정에 유효한 JSON이 필요하다/,
     );
     const stagedBase = loadArchitectureDecisionAtRef("staged-workspace.json", baseRef);
+    const stagedDecisionSchemaPath = join(repository, "staged/ADR-HUB-0002-decision.schema.json");
+    const stagedDecisionSchema = loadJson(stagedDecisionSchemaPath);
+    stagedDecisionSchema.properties.futureField = { type: "string" };
+    writeFileSync(stagedDecisionSchemaPath, JSON.stringify(stagedDecisionSchema));
+    stagedSuccessor.status = "accepted";
+    writeFileSync(join(repository, "staged/ADR-HUB-0002.json"), JSON.stringify(stagedSuccessor));
+    assert.ok(collectContractErrors("staged-workspace.json", {
+      previousArchitectureDecision: stagedBase,
+    }).some((error) => error.includes("decision schema") && error.includes("status-only")));
+    stagedSuccessor.status = "proposed";
+    delete stagedDecisionSchema.properties.futureField;
+    writeFileSync(stagedDecisionSchemaPath, JSON.stringify(stagedDecisionSchema));
     stagedSuccessor.status = "accepted";
     stagedSuccessor.title = "mutated current successor";
     writeFileSync(join(repository, "staged/ADR-HUB-0002.json"), JSON.stringify(stagedSuccessor));
