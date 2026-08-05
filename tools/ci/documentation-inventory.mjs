@@ -1,84 +1,147 @@
-#!/usr/bin/env node
-import { existsSync, lstatSync, readFileSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
-import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { isAbsolute, resolve } from "node:path";
 
-const GIT = "/usr/bin/git";
 const REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-data", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
 const FAMILIES = ["PRODUCT", "ARCHITECTURE", "API_CONTRACT", "DATA_KNOWLEDGE", "ENGINEERING", "QUALITY_TEST", "RELEASE_CHANGE", "OPERATIONS_RELIABILITY", "SECURITY_PRIVACY", "USER_SUPPORT_LEGAL_PUBLIC", "GOVERNANCE_EVIDENCE"];
 const SURFACES = ["TRACKED", "PUBLIC", "LOCAL_ONLY", "EXTERNAL"];
-const STATUSES = ["PROPOSED", "ACTIVE", "SUPERSEDED", "REVOKED", "HISTORICAL", "INVALIDATED"];
 const ENUMS = {
-  resourceClass: ["CANONICAL_RESOURCE", "HUMAN_CONTEXT", "EXECUTABLE_COMPANION", "EVIDENCE", "HUMAN_VIEW"], documentationFamily: FAMILIES, sourceSurface: SURFACES, status: STATUSES,
-  releaseReachability: ["NONE", "BUILD", "RUNTIME", "DEPLOY", "PUBLIC", "EVIDENCE"], assertionState: ["CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "CURRENT_EXTERNAL_OR_DATA_BLOCKER", "REQUIRED_FINAL_PRODUCTION_BEHAVIOR", "HISTORICAL_OR_SUPERSEDED"],
-  sensitivity: ["PUBLIC", "INTERNAL", "RESTRICTED", "LOCAL_ONLY"], disposition: ["RETAIN_CANONICAL", "MIGRATE_REFERENCE", "GENERATE_VIEW", "SUPERSEDE", "DELETE_AFTER_HANDOFF", "HISTORICAL", "UNKNOWN_FINDING"],
-  mutationPolicy: ["CURRENT_STATE_WITH_CHANGE", "DECISION_APPEND_ONLY", "EVIDENCE_IMMUTABLE", "PLAN_LIVING_BUT_NON_EVIDENCE", "GENERATED_VIEW_DERIVED"], reviewPolicyId: ["EVENT_ONLY", "RELEASE_BOUND", "OPERATIONAL_CRITICAL", "OPERATIONAL_STANDARD", "DATA_FRESHNESS_BOUND", "TOOLCHAIN_BOUND"], verificationMethod: ["contract-test", "runtime-check", "drill", "release-audit", "owner-review"],
-  implementationPlan: ["PLAN-DOC", "PLAN-REPO", "PLAN-JOURNEY"], workloadClass: ["STATELESS_SERVICE", "ONE_SHOT_JOB", "SCHEDULED_JOB", "EXTERNAL_MANAGED_STATE"], orchestrationProfile: ["COMPOSE_CURRENT", "KUBERNETES_CANDIDATE", "KUBERNETES_ACTIVE"], stateClass: ["NONE", "EPHEMERAL_CACHE", "SHARED_DURABLE", "ATOMIC_RELEASE_IDENTITY"], configurationDelivery: ["IMMUTABLE_ENV", "IMMUTABLE_FILE", "EXTERNAL_SECRET_REFERENCE"],
+  resourceClass: ["CANONICAL_RESOURCE", "HUMAN_CONTEXT", "EXECUTABLE_COMPANION", "EVIDENCE", "HUMAN_VIEW"],
+  documentationFamily: FAMILIES,
+  sourceSurface: SURFACES,
+  status: ["PROPOSED", "ACTIVE", "SUPERSEDED", "REVOKED", "HISTORICAL", "INVALIDATED"],
+  releaseReachability: ["NONE", "BUILD", "RUNTIME", "DEPLOY", "PUBLIC", "EVIDENCE"],
+  assertionState: ["CURRENTLY_IMPLEMENTED_AND_EVIDENCED", "CURRENT_EXTERNAL_OR_DATA_BLOCKER", "REQUIRED_FINAL_PRODUCTION_BEHAVIOR", "HISTORICAL_OR_SUPERSEDED"],
+  sensitivity: ["PUBLIC", "INTERNAL", "RESTRICTED", "LOCAL_ONLY"],
+  disposition: ["RETAIN_CANONICAL", "MIGRATE_REFERENCE", "GENERATE_VIEW", "SUPERSEDE", "DELETE_AFTER_HANDOFF", "HISTORICAL"],
+  mutationPolicy: ["CURRENT_STATE_WITH_CHANGE", "DECISION_APPEND_ONLY", "EVIDENCE_IMMUTABLE", "PLAN_LIVING_BUT_NON_EVIDENCE", "GENERATED_VIEW_DERIVED"],
+  reviewPolicyId: ["EVENT_ONLY", "RELEASE_BOUND", "OPERATIONAL_CRITICAL", "OPERATIONAL_STANDARD", "DATA_FRESHNESS_BOUND", "TOOLCHAIN_BOUND"],
+  verificationMethod: ["contract-test", "runtime-check", "drill", "release-audit", "owner-review"],
+  implementationPlan: ["PLAN-DOC", "PLAN-REPO", "PLAN-JOURNEY"],
 };
-const FIELDS = ["resource", "resourceClass", "documentationFamily", "kindCandidate", "sourceSurface", "canonicalIdentity", "status", "ownerRepository", "ownerIssue", "currentConsumers", "releaseReachability", "publicSurfaceReachability", "assertionState", "sensitivity", "duplicateGroup", "disposition", "deletePrerequisite", "supersedes", "supersededBy", "invalidatedBy", "invalidationReason", "invalidationEvidence", "mutationPolicy", "reviewPolicyId", "reviewTrigger", "lastVerifiedAt", "lastVerifiedIdentity", "verificationMethod", "verificationEvidence", "nextReviewAtOrSemanticExpiry", "implementationPlan", "workloadClass", "orchestrationProfile", "stateClass", "configurationDelivery", "healthContract", "availabilityContract", "securityContract", "releaseContract", "portabilityOwner", "portabilityEvidence", "portabilityGap"];
-const ARRAY_FIELDS = new Set(["currentConsumers", "publicSurfaceReachability", "deletePrerequisite", "supersedes", "invalidationEvidence", "reviewTrigger", "verificationEvidence", "portabilityEvidence", "portabilityGap"]);
-const NULLABLE = new Set(["ownerIssue", "duplicateGroup", "supersededBy", "invalidatedBy", "invalidationReason", "nextReviewAtOrSemanticExpiry", "workloadClass", "orchestrationProfile", "stateClass", "configurationDelivery", "healthContract", "availabilityContract", "securityContract", "releaseContract", "portabilityOwner"]);
-const cmp = (a, b) => a < b ? -1 : a > b ? 1 : 0;
-const fail = (message) => { throw new Error(`documentation inventory: ${message}`); };
-const exactKeys = (value, keys, label) => { if (value == null || typeof value !== "object" || Array.isArray(value) || [...Object.keys(value)].sort(cmp).join("\0") !== [...keys].sort(cmp).join("\0")) fail(`${label} keys are invalid`); };
-const safe = (value) => typeof value === "string" && value.length > 0 && !/[\x00-\x1f\\]/.test(value) && !isAbsolute(value) && !value.includes("..") && !/(token|secret|password|credential)/i.test(value);
-const safeUrl = (value) => { try { const url = new URL(value); return url.protocol === "https:" && !url.username && !url.password && !url.search && !url.hash; } catch { return false; } };
-const sortedStrings = (value, label) => { if (!Array.isArray(value) || value.some((item) => !safe(item) && !safeUrl(item)) || value.some((item, i) => i && cmp(value[i - 1], item) >= 0)) fail(`${label} must be sorted unique sanitized identifiers`); };
-function git(root, args) { try { return execFileSync(GIT, ["-C", root, ...args], { encoding: "buffer", stdio: ["ignore", "pipe", "pipe"] }); } catch { fail(`git verification failed`); } }
-function tree(root, sha) {
-  if (!/^[0-9a-f]{40}$/.test(sha)) fail("gitSha is invalid");
-  if (!existsSync(root) || !lstatSync(root).isDirectory()) fail("repository root is invalid");
-  if (git(root, ["cat-file", "-t", sha]).toString("utf8").trim() !== "commit") fail("gitSha is not a commit");
-  const entries = new Map();
-  for (const item of git(root, ["ls-tree", "-r", "-z", sha]).toString("utf8").split("\0")) {
-    if (!item) continue; const [meta, path] = item.split("\t"); const [mode, type, oid] = meta.split(" "); entries.set(path, { mode, type, oid });
-  } return entries;
+const NULLABLE_ENUMS = {
+  workloadClass: ["STATELESS_SERVICE", "ONE_SHOT_JOB", "SCHEDULED_JOB", "EXTERNAL_MANAGED_STATE"],
+  orchestrationProfile: ["COMPOSE_CURRENT", "KUBERNETES_CANDIDATE", "KUBERNETES_ACTIVE"],
+  stateClass: ["NONE", "EPHEMERAL_CACHE", "SHARED_DURABLE", "ATOMIC_RELEASE_IDENTITY"],
+  configurationDelivery: ["IMMUTABLE_ENV", "IMMUTABLE_FILE", "EXTERNAL_SECRET_REFERENCE"],
+};
+const RECORD_KEYS = ["resource", "resourceClass", "documentationFamily", "kindCandidate", "sourceSurface", "canonicalIdentity", "status", "ownerRepository", "ownerIssue", "currentConsumers", "releaseReachability", "publicSurfaceReachability", "assertionState", "sensitivity", "duplicateGroup", "disposition", "deletePrerequisite", "supersedes", "supersededBy", "invalidatedBy", "invalidationReason", "invalidationEvidence", "mutationPolicy", "reviewPolicyId", "reviewTrigger", "lastVerifiedAt", "lastVerifiedIdentity", "verificationMethod", "verificationEvidence", "nextReviewAtOrSemanticExpiry", "implementationPlan", "workloadClass", "orchestrationProfile", "stateClass", "configurationDelivery", "healthContract", "availabilityContract", "securityContract", "releaseContract", "portabilityOwner", "portabilityEvidence", "portabilityGap"];
+
+function fail(message) { throw new Error(message); }
+function exactKeys(value, keys, name) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) fail(`${name} must be an object`);
+  if (Object.keys(value).sort().join("\0") !== [...keys].sort().join("\0")) fail(`${name} has unexpected shape`);
 }
-function validateRecord(record, tracked, repository, sha, entries) {
-  exactKeys(record, FIELDS, "record");
-  for (const [field, values] of Object.entries(ENUMS)) if (record[field] !== null && !values.includes(record[field])) fail(`${field} is invalid`);
-  if (!/^[A-Z][A-Z0-9_]*$/.test(record.kindCandidate)) fail("kindCandidate is invalid");
-  for (const field of ARRAY_FIELDS) sortedStrings(record[field], field);
-  for (const field of NULLABLE) if (record[field] !== null && (!safe(record[field]) && !safeUrl(record[field]))) fail(`${field} is invalid`);
-  if (!safe(record.resource) || !safe(record.canonicalIdentity) || record.lastVerifiedIdentity !== record.canonicalIdentity || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(record.lastVerifiedAt) || Number.isNaN(Date.parse(record.lastVerifiedAt))) fail("record identity or timestamp is invalid");
-  if (!REPOSITORIES.includes(record.ownerRepository) || (record.ownerIssue !== null && !new RegExp(`^https://github\\.com/${record.ownerRepository}/issues/\\d+$`).test(record.ownerIssue))) fail("owner is invalid");
-  if (record.status === "INVALIDATED" && record.resourceClass !== "EVIDENCE") fail("INVALIDATED requires EVIDENCE");
-  if (record.status === "UNKNOWN" || record.disposition === "UNKNOWN_FINDING") fail("unknown terminal value");
-  if (["REVOKED", "INVALIDATED"].includes(record.status) && (!["NONE", "EVIDENCE"].includes(record.releaseReachability) || record.publicSurfaceReachability.length || record.currentConsumers.some((item) => !item.startsWith("evidence:")))) fail("revoked lifecycle reachability is invalid");
-  if ((record.sourceSurface === "PUBLIC" || record.publicSurfaceReachability.length) && (record.sensitivity !== "PUBLIC" || record.assertionState !== "CURRENTLY_IMPLEMENTED_AND_EVIDENCED")) fail("public surface gate failed");
-  if (record.orchestrationProfile === "KUBERNETES_ACTIVE" && record.portabilityEvidence.length === 0) fail("KUBERNETES_ACTIVE requires portability evidence");
-  if (tracked) {
-    const prefix = `${repository}:`; if (!record.resource.startsWith(prefix)) fail("tracked resource is invalid"); const path = record.resource.slice(prefix.length); const entry = entries.get(path);
-    if (!entry || entry.mode === "120000" || entry.type !== "blob" || record.canonicalIdentity !== `git:${sha}:${path}:${entry.oid}`) fail("tracked record does not match git tree");
-  } else if (!/^sha256:[0-9a-f]{64}$/.test(record.canonicalIdentity) || (record.sourceSurface === "LOCAL_ONLY" && !/^local-evidence:sha256:[0-9a-f]{64}$/.test(record.resource))) fail("surface identity is invalid");
-}
-function stable(value) { if (Array.isArray(value)) return value.map(stable); if (value && typeof value === "object") return Object.fromEntries(Object.keys(value).sort(cmp).map((key) => [key, stable(value[key])])); return value; }
-function parseArguments(args) { if (args.length !== 4 || args[0] !== "--workspace" || args[2] !== "--output" || !isAbsolute(args[1]) || !isAbsolute(args[3])) fail("usage: documentation-inventory.mjs --workspace <local-json> --output <new-json>"); return { workspace: args[1], output: args[3] }; }
-export function generateInventory(workspace) {
-  exactKeys(workspace, ["schemaVersion", "repositories", "surfaceRecords"], "workspace"); if (workspace.schemaVersion !== 1 || !Array.isArray(workspace.repositories) || workspace.repositories.length !== 5 || !Array.isArray(workspace.surfaceRecords)) fail("workspace is invalid");
-  const records = [], seenRepositories = new Set(), trackedResources = new Set();
-  for (const entry of workspace.repositories) {
-    exactKeys(entry, ["repository", "root", "gitSha", "discoveryRoots", "records"], "repository entry");
-    if (!REPOSITORIES.includes(entry.repository) || seenRepositories.has(entry.repository) || !isAbsolute(entry.root) || !Array.isArray(entry.discoveryRoots) || !Array.isArray(entry.records)) fail("repository entry is invalid"); seenRepositories.add(entry.repository);
-    if (entry.discoveryRoots.some((root) => !safe(root)) || entry.discoveryRoots.some((root, i) => i && cmp(entry.discoveryRoots[i - 1], root) >= 0)) fail("discoveryRoots are invalid");
-    const entries = tree(entry.root, entry.gitSha); const expected = new Set();
-    for (const root of entry.discoveryRoots) {
-      const discovered = [...entries].filter(([path]) => path === root || path.startsWith(`${root}/`));
-      if (discovered.length === 0) fail("discovery root is missing");
-      for (const [path, info] of discovered) if (info.mode !== "120000" && info.type === "blob") expected.add(path);
-    }
-    for (const record of entry.records) { if (record.sourceSurface !== "TRACKED") fail("repository records must be TRACKED"); validateRecord(record, true, entry.repository, entry.gitSha, entries); const path = record.resource.slice(entry.repository.length + 1); if (trackedResources.has(record.resource) || !expected.delete(path)) fail("extra or duplicate tracked record"); trackedResources.add(record.resource); records.push(record); }
-    if (expected.size) fail("missing tracked classification");
+function safeRelative(value) { return typeof value === "string" && value.length > 0 && !isAbsolute(value) && !value.split("/").includes("..") && !/[\x00-\x1f\x7f]/.test(value); }
+function safeIdentifier(value) {
+  if (typeof value !== "string" || value.length === 0 || /[\x00-\x1f\x7f]/.test(value) || isAbsolute(value)) return false;
+  if (value.startsWith("https://")) {
+    try { const url = new URL(value); return !url.username && !url.password && !url.search && !url.hash; } catch { return false; }
   }
-  if (seenRepositories.size !== 5) fail("exactly five repositories required");
-  for (const record of workspace.surfaceRecords) { if (record.sourceSurface === "TRACKED") fail("surface record cannot be TRACKED"); validateRecord(record, false); records.push(record); }
-  const groups = new Map(); for (const record of records) if (record.duplicateGroup !== null) groups.set(record.duplicateGroup, [...(groups.get(record.duplicateGroup) ?? []), record]);
-  for (const group of groups.values()) if (group.length < 2 || group.filter(({ disposition }) => disposition === "RETAIN_CANONICAL").length !== 1 || group.some((record) => !record.currentConsumers.length || (record.disposition !== "RETAIN_CANONICAL" && !record.deletePrerequisite.length))) fail("duplicate group gate failed");
-  records.sort((a, b) => cmp(a.canonicalIdentity, b.canonicalIdentity));
-  const count = (values, key) => Object.fromEntries(values.slice().sort(cmp).map((value) => [value, records.filter((record) => record[key] === value).length]));
-  const documentationFamilies = count(FAMILIES, "documentationFamily"), repositories = Object.fromEntries(REPOSITORIES.slice().sort(cmp).map((repository) => [repository, records.filter((record) => record.ownerRepository === repository).length])), sourceSurfaces = count(SURFACES, "sourceSurface"), statuses = count(STATUSES, "status");
-  const gaps = [...FAMILIES.filter((family) => !documentationFamilies[family]).map((documentationFamily) => ({ code: "NO_DOCUMENTATION_FAMILY_RESOURCE", documentationFamily })), ...[...new Set(records.flatMap(({ portabilityGap }) => portabilityGap))].sort(cmp).map((identity) => ({ code: "PORTABILITY_GAP", identity }))].sort((a, b) => cmp(JSON.stringify(a), JSON.stringify(b)));
-  return stable({ schemaVersion: 1, producer: { id: "tools/ci/documentation-inventory.mjs", version: 1 }, repositories: workspace.repositories.map(({ repository, gitSha }) => ({ repository, gitSha })).sort((a, b) => cmp(a.repository, b.repository)), records, coverage: { documentationFamilies, repositories, sourceSurfaces, statuses }, gaps, gates: { activeUnclassified: 0, statusUnclassified: 0, ownerUnknown: 0, releaseReachabilityUnknown: 0, publicSurfaceReachabilityUnknown: 0, mutationPolicyUnknown: 0, reviewPolicyUnknown: 0, duplicateViolations: 0, sensitivityViolations: 0, kubernetesPortabilityViolations: 0 } });
+  return !value.includes("?");
 }
-function main() { const { workspace, output } = parseArguments(process.argv.slice(2)); if (existsSync(output) || !existsSync(workspace)) fail("output must be new and workspace must exist"); const result = generateInventory(JSON.parse(readFileSync(workspace, "utf8"))); writeFileSync(output, `${JSON.stringify(result)}\n`, { encoding: "utf8", flag: "wx" }); }
-if (process.argv[1] === new URL(import.meta.url).pathname) { try { main(); } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; } }
+function sortedUnique(values, name) {
+  if (!Array.isArray(values) || values.some((value) => !safeIdentifier(value))) fail(`${name} contains unsafe identifier`);
+  if (values.join("\0") !== [...new Set(values)].sort().join("\0")) fail(`${name} must be sorted and unique`);
+}
+function git(root, args) { return execFileSync("/usr/bin/git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }); }
+function treeEntries(root, sha) {
+  const raw = git(root, ["ls-tree", "-r", "-z", sha]);
+  return raw.split("\0").filter(Boolean).map((entry) => {
+    const match = /^(\d+) (\w+) ([0-9a-f]+)\t(.+)$/.exec(entry);
+    if (!match) fail("invalid git tree entry");
+    return { mode: match[1], type: match[2], oid: match[3], path: match[4] };
+  });
+}
+function matchesRoot(path, root) { return path === root || path.startsWith(`${root}/`); }
+function validateRecord(record, repository, sha, tracked) {
+  exactKeys(record, RECORD_KEYS, "record");
+  for (const [field, values] of Object.entries(ENUMS)) if (!values.includes(record[field])) fail(`invalid ${field}`);
+  for (const [field, values] of Object.entries(NULLABLE_ENUMS)) if (record[field] !== null && !values.includes(record[field])) fail(`invalid ${field}`);
+  if (typeof record.kindCandidate !== "string" || !/^[A-Z][A-Z0-9_]*$/.test(record.kindCandidate)) fail("invalid kindCandidate");
+  if (record.ownerRepository !== repository || !REPOSITORIES.includes(repository)) fail("invalid ownerRepository");
+  if (record.ownerIssue !== null && (!safeIdentifier(record.ownerIssue) || !/^https:\/\/github\.com\/AquilaXk\/(easysubway|easysubway-data|easysubway-backend|easysubway-mobile|easysubway-platform)\/issues\/\d+$/.test(record.ownerIssue))) fail("invalid ownerIssue");
+  for (const field of ["currentConsumers", "publicSurfaceReachability", "deletePrerequisite", "supersedes", "invalidationEvidence", "reviewTrigger", "verificationEvidence", "portabilityEvidence", "portabilityGap"]) sortedUnique(record[field], field);
+  for (const field of ["duplicateGroup", "supersededBy", "invalidatedBy", "invalidationReason", "nextReviewAtOrSemanticExpiry", "portabilityOwner"]) if (record[field] !== null && !safeIdentifier(record[field])) fail(`invalid ${field}`);
+  if (!Number.isFinite(Date.parse(record.lastVerifiedAt)) || !/^\d{4}-\d{2}-\d{2}T/.test(record.lastVerifiedAt)) fail("invalid lastVerifiedAt");
+  if (record.lastVerifiedIdentity !== record.canonicalIdentity) fail("last verification identity mismatch");
+  if (tracked) {
+    if (record.sourceSurface !== "TRACKED" || !safeRelative(record.resource.split(":").slice(1).join(":"))) fail("invalid tracked resource");
+    if (!new RegExp(`^git:${sha}:([^:]+):[0-9a-f]{40,64}$`).test(record.canonicalIdentity)) fail("invalid tracked identity");
+  } else if (record.sourceSurface === "TRACKED" || !/^sha256:[0-9a-f]{64}$/.test(record.canonicalIdentity)) fail("invalid non-tracked identity");
+  if (record.sourceSurface === "LOCAL_ONLY" && !/^local-evidence:sha256:[0-9a-f]{64}$/.test(record.resource)) fail("invalid local resource");
+  if (!safeIdentifier(record.resource)) fail("unsafe resource");
+  if (record.status === "INVALIDATED") {
+    if (record.resourceClass !== "EVIDENCE" || !record.invalidatedBy || !record.invalidationReason || record.invalidationEvidence.length === 0 || record.mutationPolicy !== "EVIDENCE_IMMUTABLE") fail("invalid invalidation relation");
+  } else if (record.invalidatedBy !== null || record.invalidationReason !== null || record.invalidationEvidence.length !== 0) fail("unexpected invalidation relation");
+  if (["REVOKED", "INVALIDATED"].includes(record.status) && ( !["NONE", "EVIDENCE"].includes(record.releaseReachability) || record.publicSurfaceReachability.length !== 0 || record.currentConsumers.some((value) => /release|rollback|public/i.test(value)))) fail("revoked or invalidated record is reachable");
+  if (record.sourceSurface === "PUBLIC" && record.status !== "REVOKED" && (record.sensitivity !== "PUBLIC" || record.assertionState !== "CURRENTLY_IMPLEMENTED_AND_EVIDENCED")) fail("invalid public claim");
+  if (record.orchestrationProfile === "KUBERNETES_ACTIVE" && record.portabilityEvidence.length === 0) fail("active Kubernetes needs evidence");
+}
+function validateRepository(entry) {
+  exactKeys(entry, ["repository", "root", "gitSha", "discoveryRoots", "records"], "repository");
+  if (!REPOSITORIES.includes(entry.repository) || typeof entry.root !== "string" || !isAbsolute(entry.root) || !/^[0-9a-f]{40}$/.test(entry.gitSha)) fail("invalid repository input");
+  if (!Array.isArray(entry.discoveryRoots) || entry.discoveryRoots.length === 0 || entry.discoveryRoots.some((root) => !safeRelative(root)) || entry.discoveryRoots.join("\0") !== [...new Set(entry.discoveryRoots)].sort().join("\0")) fail("invalid discovery roots");
+  try { git(entry.root, ["cat-file", "-e", `${entry.gitSha}^{commit}`]); } catch { fail("missing git commit"); }
+  const entries = treeEntries(entry.root, entry.gitSha);
+  const selected = [];
+  for (const root of entry.discoveryRoots) {
+    const rootEntries = entries.filter((item) => matchesRoot(item.path, root));
+    if (rootEntries.length === 0 || rootEntries.some((item) => item.path === root && item.mode === "120000")) fail("missing or symlink discovery root");
+    selected.push(...rootEntries);
+  }
+  const blobs = selected.filter((item) => item.type === "blob" && item.mode !== "120000");
+  const uniqueBlobs = new Map(blobs.map((item) => [item.path, item]));
+  if (uniqueBlobs.size !== blobs.length) fail("overlapping discovery roots");
+  if (!Array.isArray(entry.records)) fail("records must be array");
+  const paths = new Set();
+  for (const record of entry.records) {
+    validateRecord(record, entry.repository, entry.gitSha, true);
+    const prefix = `${entry.repository}:`;
+    if (!record.resource.startsWith(prefix)) fail("tracked resource repository mismatch");
+    const path = record.resource.slice(prefix.length);
+    const tree = uniqueBlobs.get(path);
+    if (!tree || paths.has(path) || record.canonicalIdentity !== `git:${entry.gitSha}:${path}:${tree.oid}`) fail("tracked classification mismatch");
+    paths.add(path);
+  }
+  if (paths.size !== uniqueBlobs.size) fail("missing tracked classification");
+  return entry.records;
+}
+function stable(value) {
+  if (Array.isArray(value)) return value.map(stable);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(Object.keys(value).sort().map((key) => [key, stable(value[key])]));
+}
+function codepointCompare(a, b) { return a < b ? -1 : a > b ? 1 : 0; }
+function main() {
+  const args = process.argv.slice(2);
+  if (args.length !== 4 || args[0] !== "--workspace" || args[2] !== "--output") fail("usage: --workspace <file> --output <new-file>");
+  const [workspacePath, outputPath] = [args[1], args[3]];
+  if (existsSync(outputPath)) fail("output already exists");
+  const workspace = JSON.parse(readFileSync(workspacePath, "utf8"));
+  exactKeys(workspace, ["schemaVersion", "repositories", "surfaceRecords"], "workspace");
+  if (workspace.schemaVersion !== 1 || !Array.isArray(workspace.repositories) || !Array.isArray(workspace.surfaceRecords) || workspace.repositories.length !== REPOSITORIES.length) fail("invalid workspace");
+  const seen = new Set(workspace.repositories.map((entry) => entry.repository));
+  if (seen.size !== REPOSITORIES.length || REPOSITORIES.some((repository) => !seen.has(repository))) fail("repository set mismatch");
+  const records = workspace.repositories.flatMap(validateRepository);
+  for (const record of workspace.surfaceRecords) { validateRecord(record, record.ownerRepository, null, false); records.push(record); }
+  const duplicateGroups = new Map();
+  for (const record of records) if (record.duplicateGroup !== null) duplicateGroups.set(record.duplicateGroup, [...(duplicateGroups.get(record.duplicateGroup) ?? []), record]);
+  for (const group of duplicateGroups.values()) {
+    if (group.filter((record) => record.disposition === "RETAIN_CANONICAL").length !== 1 || group.some((record) => record.disposition !== "RETAIN_CANONICAL" && record.deletePrerequisite.length === 0)) fail("invalid duplicate group");
+  }
+  const coverage = {
+    documentationFamilies: Object.fromEntries(FAMILIES.map((family) => [family, records.filter((record) => record.documentationFamily === family).length])),
+    repositories: Object.fromEntries(REPOSITORIES.map((repository) => [repository, records.filter((record) => record.ownerRepository === repository).length])),
+    sourceSurfaces: Object.fromEntries(SURFACES.map((surface) => [surface, records.filter((record) => record.sourceSurface === surface).length])),
+    statuses: Object.fromEntries(ENUMS.status.map((status) => [status, records.filter((record) => record.status === status).length])),
+  };
+  const gaps = [
+    ...FAMILIES.filter((family) => coverage.documentationFamilies[family] === 0).map((documentationFamily) => ({ code: "NO_DOCUMENTATION_FAMILY_RESOURCE", documentationFamily })),
+    ...[...new Set(records.flatMap((record) => record.portabilityGap))].sort().map((identity) => ({ code: "PORTABILITY_GAP", identity })),
+  ];
+  const output = stable({ schemaVersion: 1, producer: { id: "tools/ci/documentation-inventory.mjs", version: 1 }, repositories: workspace.repositories.map(({ repository, gitSha }) => ({ repository, gitSha })).sort((a, b) => codepointCompare(a.repository, b.repository)), records: records.sort((a, b) => codepointCompare(a.resource, b.resource)), coverage, gaps, gates: { duplicate: 0, invalidated: 0, portability: 0, public: 0, reachability: 0, unclassified: 0 } });
+  writeFileSync(outputPath, `${JSON.stringify(output)}\n`, { encoding: "utf8", flag: "wx" });
+}
+
+try { main(); } catch (error) { process.stderr.write(`${error.message}\n`); process.exitCode = 1; }
