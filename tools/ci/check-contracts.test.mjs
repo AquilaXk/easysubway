@@ -1001,6 +1001,8 @@ for (const [name, mutate, expected] of [
   ["final state on current surface", (catalog) => { catalog.claims[0].assertionState = "HISTORICAL_OR_SUPERSEDED"; }, "current public"],
   ["required-final current surface", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_JOURNEY_FINAL").surface = ["README.md"]; }, "required-final"],
   ["README scan target drift", (catalog, forbiddenClaims) => { forbiddenClaims.scanTargets = forbiddenClaims.scanTargets.filter(({ path }) => path !== "README.md"); }, "README.md scan target"],
+  ["non-array README scan target", (catalog, forbiddenClaims) => { forbiddenClaims.scanTargets = "README.md"; }, "README.md scan target"],
+  ["null or primitive README scan target", (catalog, forbiddenClaims) => { forbiddenClaims.scanTargets = [null, "README.md"]; }, "README.md scan target"],
 ]) {
   test(`product claim catalog rejects ${name}`, () => {
     const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));

@@ -359,7 +359,7 @@ function validateProductClaimReleaseAndPublicCopy(catalog, releaseDecision, forb
   if (catalog.publicCopyPolicy !== "release/product-gates/forbidden-release-claims.json") {
     errors.push("product-claim-catalog: publicCopyPolicy source가 일치해야 한다");
   }
-  if (!forbiddenClaims?.scanTargets?.some(({ path }) => path === "README.md")) {
+  if (!Array.isArray(forbiddenClaims?.scanTargets) || !forbiddenClaims.scanTargets.some((target) => target?.path === "README.md")) {
     errors.push("product-claim-catalog: publicCopyPolicy의 README.md scan target이 필요하다");
   }
 }
