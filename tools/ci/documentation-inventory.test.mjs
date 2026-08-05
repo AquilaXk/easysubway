@@ -24,6 +24,7 @@ function createRepository(root, index) {
   if (index === 0) writeFileSync(join(root, "docs", "duplicate.json"), "{}\n");
   if (index === 0) writeFileSync(join(root, "docs", "\uE000.json"), "{}\n");
   if (index === 0) writeFileSync(join(root, "docs", "😀.json"), "{}\n");
+  if (index === 4) writeFileSync(join(root, "[literal].json"), "{}\n");
   run("/usr/bin/git", ["add", "."], root);
   run("/usr/bin/git", ["commit", "-qm", "fixture"], root);
   const gitSha = run("/usr/bin/git", ["rev-parse", "HEAD"], root);
@@ -31,7 +32,8 @@ function createRepository(root, index) {
   const duplicateBlobOid = index === 0 ? run("/usr/bin/git", ["rev-parse", "HEAD:docs/duplicate.json"], root) : null;
   const puaBlobOid = index === 0 ? run("/usr/bin/git", ["rev-parse", "HEAD:docs/\uE000.json"], root) : null;
   const astralBlobOid = index === 0 ? run("/usr/bin/git", ["rev-parse", "HEAD:docs/😀.json"], root) : null;
-  return { gitSha, blobOid, duplicateBlobOid, puaBlobOid, astralBlobOid };
+  const literalBlobOid = index === 4 ? run("/usr/bin/git", ["rev-parse", "HEAD:[literal].json"], root) : null;
+  return { gitSha, blobOid, duplicateBlobOid, puaBlobOid, astralBlobOid, literalBlobOid };
 }
 
 function record({ repository, sha, path, family, surface = "TRACKED", blobOid = "a".repeat(64), overrides = {} }) {
@@ -64,7 +66,7 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
   const temp = mkdtempSync(join(tmpdir(), "documentation-inventory-"));
   const repositories = REPOSITORIES.map((repository, index) => {
     const root = join(temp, `repo-${index}`);
-    const { gitSha, blobOid, duplicateBlobOid, puaBlobOid, astralBlobOid } = createRepository(root, index);
+    const { gitSha, blobOid, duplicateBlobOid, puaBlobOid, astralBlobOid, literalBlobOid } = createRepository(root, index);
     const records = [record({ repository, sha: gitSha, blobOid, path: `docs/doc-${index}.json`, family: FAMILIES[index] })];
     if (index === 0) {
       records.push(record({
@@ -75,7 +77,8 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
       records.push(record({ repository, sha: gitSha, blobOid: astralBlobOid, path: "docs/😀.json", family: FAMILIES[0] }));
       records[0].duplicateGroup = "duplicate:product";
     }
-    return { repository, root, gitSha, discoveryRoots: index === 0 ? ["docs/doc-0.json", "docs/duplicate.json", "docs/\uE000.json", "docs/😀.json"] : ["docs"], records };
+    if (index === 4) records.push(record({ repository, sha: gitSha, blobOid: literalBlobOid, path: "[literal].json", family: FAMILIES[4] }));
+    return { repository, root, gitSha, discoveryRoots: index === 0 ? ["docs/doc-0.json", "docs/duplicate.json", "docs/\uE000.json", "docs/😀.json"] : index === 4 ? ["[literal].json", "docs"] : ["docs"], records };
   });
   const surfaceRecords = [
     record({ repository: REPOSITORIES[0], sha: repositories[0].gitSha, path: "public", family: FAMILIES[6], surface: "PUBLIC", overrides: { resource: "https://public.example.invalid/release", ownerIssue: "https://github.com/AquilaXk/easysubway/issues/2756", publicSurfaceReachability: ["https://public.example.invalid/release"], healthContract: "contract:health", availabilityContract: "contract:availability", securityContract: "contract:security", releaseContract: "contract:release" } }),
@@ -91,7 +94,7 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
   assert.equal(first.status, 0, first.stderr);
   const output = JSON.parse(readFileSync(join(temp, "first", "inventory.json"), "utf8"));
   assert.deepEqual(Object.keys(output), ["coverage", "gaps", "gates", "producer", "records", "repositories", "schemaVersion"]);
-  assert.equal(output.records.length, 15);
+  assert.equal(output.records.length, 16);
   assert.deepEqual(output.records.filter(({ resource }) => ["surface:\uE000", "surface:😀"].includes(resource)).map(({ resource }) => resource), ["surface:\uE000", "surface:😀"]);
   assert.deepEqual(Object.keys(output.coverage.documentationFamilies), [...FAMILIES].sort());
   assert.deepEqual(Object.keys(output.coverage.repositories), [...REPOSITORIES].sort());
@@ -128,6 +131,9 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     (input) => { input.surfaceRecords[1].verificationEvidence = [" http://example.invalid/evidence"]; },
     (input) => { input.surfaceRecords[0].ownerIssue = "https://github.com/AquilaXk/easysubway-mobile/issues/2756"; },
     (input) => { input.surfaceRecords[0].lastVerifiedAt = "2026-02-31T00:00:00.000Z"; },
+    (input) => { input.surfaceRecords[0].verificationEvidence = []; },
+    (input) => { input.surfaceRecords[1].verificationEvidence = ["C:\\Users\\owner\\secret.txt"]; },
+    (input) => { input.surfaceRecords[1].verificationEvidence = ["\\\\server\\share\\secret.txt"]; },
     (input) => { input.surfaceRecords[1].verificationEvidence = ["/private/evidence"]; },
     (input) => { input.repositories[0].records[0].orchestrationProfile = "KUBERNETES_ACTIVE"; },
   ]) {

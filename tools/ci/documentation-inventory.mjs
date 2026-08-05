@@ -1,6 +1,6 @@
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { isAbsolute, resolve } from "node:path";
+import { isAbsolute, resolve, win32 } from "node:path";
 
 const REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-data", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
 const FAMILIES = ["PRODUCT", "ARCHITECTURE", "API_CONTRACT", "DATA_KNOWLEDGE", "ENGINEERING", "QUALITY_TEST", "RELEASE_CHANGE", "OPERATIONS_RELIABILITY", "SECURITY_PRIVACY", "USER_SUPPORT_LEGAL_PUBLIC", "GOVERNANCE_EVIDENCE"];
@@ -41,9 +41,9 @@ function exactKeys(value, keys, name) {
   if (!value || typeof value !== "object" || Array.isArray(value)) fail(`${name} must be an object`);
   if (Object.keys(value).sort(codepointCompare).join("\0") !== [...keys].sort(codepointCompare).join("\0")) fail(`${name} has unexpected shape`);
 }
-function safeRelative(value) { return typeof value === "string" && value.length > 0 && !isAbsolute(value) && !value.split("/").includes("..") && !/[\x00-\x1f\x7f]/.test(value); }
+function safeRelative(value) { return typeof value === "string" && value.length > 0 && !isAbsolute(value) && !win32.isAbsolute(value) && !value.split("/").includes("..") && !/[\x00-\x1f\x7f]/.test(value); }
 function safeIdentifier(value) {
-  if (typeof value !== "string" || value.length === 0 || value !== value.trim() || /[\x00-\x1f\x7f]/.test(value) || isAbsolute(value)) return false;
+  if (typeof value !== "string" || value.length === 0 || value !== value.trim() || /[\x00-\x1f\x7f]/.test(value) || isAbsolute(value) || win32.isAbsolute(value)) return false;
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
     if (!value.startsWith("https://")) return false;
     try { const url = new URL(value); return !url.username && !url.password && !url.search && !url.hash; } catch { return false; }
@@ -55,8 +55,8 @@ function sortedUnique(values, name) {
   if (values.join("\0") !== [...new Set(values)].sort(codepointCompare).join("\0")) fail(`${name} must be sorted and unique`);
 }
 function git(root, args) { return execFileSync("/usr/bin/git", ["-C", root, ...args], { encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] }); }
-function treeEntries(root, sha) {
-  const raw = git(root, ["ls-tree", "-r", "-z", sha]);
+function treeEntries(root, sha, discoveryRoots) {
+  const raw = git(root, ["--literal-pathspecs", "ls-tree", "-r", "-z", sha, "--", ...discoveryRoots]);
   return raw.split("\0").filter(Boolean).map((entry) => {
     const match = /^(\d+) (\w+) ([0-9a-f]+)\t(.+)$/.exec(entry);
     if (!match) fail("invalid git tree entry");
@@ -73,6 +73,7 @@ function validateRecord(record, repository, sha, tracked) {
   const ownerIssuePrefix = `https://github.com/${repository}/issues/`;
   if (record.ownerIssue !== null && (!safeIdentifier(record.ownerIssue) || !record.ownerIssue.startsWith(ownerIssuePrefix) || !/^\d+$/.test(record.ownerIssue.slice(ownerIssuePrefix.length)))) fail("invalid ownerIssue");
   for (const field of ["currentConsumers", "publicSurfaceReachability", "deletePrerequisite", "supersedes", "invalidationEvidence", "reviewTrigger", "verificationEvidence", "portabilityEvidence", "portabilityGap"]) sortedUnique(record[field], field);
+  if (record.assertionState === "CURRENTLY_IMPLEMENTED_AND_EVIDENCED" && record.verificationEvidence.length === 0) fail("evidenced assertion needs verification evidence");
   for (const field of ["duplicateGroup", "supersededBy", "invalidatedBy", "invalidationReason", "nextReviewAtOrSemanticExpiry", "portabilityOwner", "healthContract", "availabilityContract", "securityContract", "releaseContract"]) if (record[field] !== null && !safeIdentifier(record[field])) fail(`invalid ${field}`);
   const verifiedAt = new Date(record.lastVerifiedAt);
   if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(record.lastVerifiedAt) || !Number.isFinite(verifiedAt.valueOf()) || verifiedAt.toISOString() !== record.lastVerifiedAt) fail("invalid lastVerifiedAt");
@@ -95,7 +96,7 @@ function validateRepository(entry) {
   if (!REPOSITORIES.includes(entry.repository) || typeof entry.root !== "string" || !isAbsolute(entry.root) || !/^[0-9a-f]{40}$/.test(entry.gitSha)) fail("invalid repository input");
   if (!Array.isArray(entry.discoveryRoots) || entry.discoveryRoots.length === 0 || entry.discoveryRoots.some((root) => !safeRelative(root)) || entry.discoveryRoots.join("\0") !== [...new Set(entry.discoveryRoots)].sort(codepointCompare).join("\0")) fail("invalid discovery roots");
   try { if (git(entry.root, ["cat-file", "-t", entry.gitSha]).trim() !== "commit") fail("missing git commit"); } catch { fail("missing git commit"); }
-  const entries = treeEntries(entry.root, entry.gitSha);
+  const entries = treeEntries(entry.root, entry.gitSha, entry.discoveryRoots);
   const selected = [];
   for (const root of entry.discoveryRoots) {
     const rootEntries = entries.filter((item) => matchesRoot(item.path, root));
