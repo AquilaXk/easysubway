@@ -475,11 +475,16 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
       continue;
     }
     const fragmentErrors = [];
-    validateDocumentationFragment(
-      fragment,
-      fragmentSchema, resourceSchema,
-      fragmentErrors,
-    );
+    try {
+      validateDocumentationFragment(
+        fragment,
+        fragmentSchema, resourceSchema,
+        fragmentErrors,
+      );
+    } catch {
+      documentationTransportError(errors, "fragment schema가 유효하지 않다");
+      return;
+    }
     if (fragmentErrors.length > 0) {
       failed = true;
       for (const error of fragmentErrors) errors.push(`documentation fragment transport: ${entry.repository}: ${error}`);

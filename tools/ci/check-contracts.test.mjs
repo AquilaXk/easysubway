@@ -338,12 +338,26 @@ test("documentation catalog uses workspace-selected fragment schemas and sanitiz
     writeFileSync(fixture.workspacePath, JSON.stringify(workspace));
     assert.deepEqual(documentationCatalogErrors(fixture), []);
 
-    const schemaPath = join(contracts, "documentation/documentation-fragment.schema.json");
-    for (const value of [null, "{"]) {
+    const fragmentSchemaPath = join(contracts, "documentation/documentation-fragment.schema.json");
+    const resourceSchemaPath = join(contracts, "documentation/documentation-resource.schema.json");
+    const originalFragmentSchema = readFileSync(fragmentSchemaPath);
+    const originalResourceSchema = readFileSync(resourceSchemaPath);
+    const unsupportedFragmentSchema = { ...loadJson(fragmentSchemaPath), unsupportedKeyword: true };
+    const unsupportedResourceSchema = { ...loadJson(resourceSchemaPath), unsupportedKeyword: true };
+    for (const [schemaPath, value, expected] of [
+      [fragmentSchemaPath, null, "fragment schema를 읽을 수 없다"],
+      [fragmentSchemaPath, "{", "fragment schema를 읽을 수 없다"],
+      [fragmentSchemaPath, "null", "fragment schema가 유효하지 않다"],
+      [fragmentSchemaPath, JSON.stringify(unsupportedFragmentSchema), "fragment schema가 유효하지 않다"],
+      [resourceSchemaPath, JSON.stringify(unsupportedResourceSchema), "fragment schema가 유효하지 않다"],
+    ]) {
+      writeFileSync(fragmentSchemaPath, originalFragmentSchema);
+      writeFileSync(resourceSchemaPath, originalResourceSchema);
       if (value === null) rmSync(schemaPath);
       else writeFileSync(schemaPath, value);
-      const errors = documentationCatalogErrors(fixture);
-      assert.ok(errors.some((error) => error.includes("fragment schema를 읽을 수 없다")), errors.join("\n"));
+      let errors;
+      assert.doesNotThrow(() => { errors = documentationCatalogErrors(fixture); });
+      assert.ok(errors.some((error) => error.includes(expected)), errors.join("\n"));
       assert.ok(errors.every((error) => !error.includes(schemaPath)), errors.join("\n"));
     }
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
