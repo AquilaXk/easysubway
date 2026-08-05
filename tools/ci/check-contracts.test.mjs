@@ -990,6 +990,56 @@ test("product claim catalog validates current release decision and public claim 
   assert.ok(schemaErrors.some((error) => error.includes("허용되지 않은 필드")));
 });
 
+for (const [name, mutate, expected] of [
+  ["required inventory deletion", (catalog) => { catalog.claims = catalog.claims.filter(({ claimId }) => claimId !== "PRODUCT_CLAIM_VISION"); }, "inventory"],
+  ["required inventory addition", (catalog) => { catalog.claims.push({ ...structuredClone(catalog.claims.at(-1)), claimId: "PRODUCT_CLAIM_EXTRA", topic: "VISION" }); }, "inventory"],
+  ["required inventory topic binding", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_VISION").topic = "PRIVACY"; }, "inventory"],
+  ["duplicate claim ID", (catalog) => { catalog.claims[1].claimId = catalog.claims[0].claimId; }, "claimId"],
+  ["unsorted claim ID", (catalog) => { [catalog.claims[0], catalog.claims[1]] = [catalog.claims[1], catalog.claims[0]]; }, "claimId"],
+  ["duplicate surface", (catalog) => { catalog.claims[0].surface = ["README.md", "README.md"]; }, "surface"],
+  ["unsorted review trigger", (catalog) => { catalog.claims[0].reviewTrigger = ["z", "a"]; }, "reviewTrigger"],
+  ["final state on current surface", (catalog) => { catalog.claims[0].assertionState = "HISTORICAL_OR_SUPERSEDED"; }, "current public"],
+  ["required-final current surface", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_JOURNEY_FINAL").surface = ["README.md"]; }, "required-final"],
+  ["README scan target drift", (catalog, forbiddenClaims) => { forbiddenClaims.scanTargets = forbiddenClaims.scanTargets.filter(({ path }) => path !== "README.md"); }, "README.md scan target"],
+]) {
+  test(`product claim catalog rejects ${name}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    const forbiddenClaims = loadJson("release/product-gates/forbidden-release-claims.json");
+    mutate(catalog, forbiddenClaims);
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+      forbiddenClaims,
+    });
+    assert.ok(errors.some((error) => error.includes(expected)));
+  });
+}
+
+for (const field of ["requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
+  test(`product claim catalog rejects duplicate ${field}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    const claim = catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_ANONYMOUS_REPORT");
+    claim[field] = [claim[field][0], claim[field][0]];
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+      forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+    });
+    assert.ok(errors.some((error) => error.includes(field)));
+  });
+
+  test(`product claim catalog rejects unsorted ${field}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_ANONYMOUS_REPORT")[field] = ["z", "a"];
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+      forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+    });
+    assert.ok(errors.some((error) => error.includes(field)));
+  });
+}
+
 test("repository split issue migration ledger가 계약 gate를 통과한다", () => {
   const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
 

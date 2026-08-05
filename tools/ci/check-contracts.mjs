@@ -23,6 +23,18 @@ const EXTRACTION_REPOSITORIES = {
   backend: "AquilaXk/easysubway-backend",
   mobile: "AquilaXk/easysubway-mobile",
 };
+const PRODUCT_CLAIM_INVENTORY = [
+  "PRODUCT_CLAIM_ACCESSIBILITY_PILOT:ACCESSIBILITY_PILOT",
+  "PRODUCT_CLAIM_ANONYMOUS_REPORT:ANONYMOUS_REPORT",
+  "PRODUCT_CLAIM_JOURNEY_CURRENT:JOURNEY",
+  "PRODUCT_CLAIM_JOURNEY_FINAL:JOURNEY",
+  "PRODUCT_CLAIM_OFFLINE_MAP_AND_STATION:OFFLINE_MAP_AND_STATION",
+  "PRODUCT_CLAIM_PRIVACY:PRIVACY",
+  "PRODUCT_CLAIM_PRODUCT_PRINCIPLE:PRODUCT_PRINCIPLE",
+  "PRODUCT_CLAIM_PROVENANCE:PROVENANCE",
+  "PRODUCT_CLAIM_RELEASE_STATUS:RELEASE_STATUS",
+  "PRODUCT_CLAIM_VISION:VISION",
+];
 
 export function loadJson(path) {
   return JSON.parse(readFileSync(path, "utf8"));
@@ -340,6 +352,10 @@ export function validateProductClaimCatalog(catalog, schema, errors, { releaseDe
   }
   const claimIds = catalog.claims.map(({ claimId }) => claimId);
   if (!isSortedUnique(claimIds)) errors.push("product-claim-catalog: claimId는 codepoint sorted-unique여야 한다");
+  const claimInventory = catalog.claims.map(({ claimId, topic }) => `${claimId}:${topic}`);
+  if (!isDeepStrictEqual(claimInventory, PRODUCT_CLAIM_INVENTORY)) {
+    errors.push("product-claim-catalog: required claim inventory가 정확히 일치해야 한다");
+  }
   for (const claim of catalog.claims) {
     for (const field of ["surface", "requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
       if (!isSortedUnique(claim[field])) errors.push(`product-claim-catalog: ${claim.claimId} ${field}는 codepoint sorted-unique여야 한다`);

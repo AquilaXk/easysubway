@@ -41,16 +41,17 @@ test("mobile release claim scan rejects README offline Journey claims", async ()
   await cp(path.join(root, "apps/mobile/lib"), path.join(tmp, "apps/mobile/lib"), { recursive: true });
   await cp(path.join(root, "apps/mobile/release"), path.join(tmp, "apps/mobile/release"), { recursive: true });
   await cp(path.join(root, "release/product-gates"), path.join(tmp, "release/product-gates"), { recursive: true });
-  await writeFile(path.join(tmp, "README.md"), "길찾기도 기기 안에서 끝납니다\n");
-
-  await assert.rejects(
-    execFileAsync(process.execPath, [
-      path.join(root, "tools/ci/check-mobile-release-claims.mjs"),
-      "--root",
-      tmp,
-    ], { cwd: root }),
-    /README\.md contains forbidden release claim: 길찾기도 기기 안에서 끝납니다/,
-  );
+  for (const phrase of ["길찾기도 기기 안에서 끝납니다", "오프라인 길찾기", "인터넷 없이도 길찾기"]) {
+    await writeFile(path.join(tmp, "README.md"), `${phrase}\n`);
+    await assert.rejects(
+      execFileAsync(process.execPath, [
+        path.join(root, "tools/ci/check-mobile-release-claims.mjs"),
+        "--root",
+        tmp,
+      ], { cwd: root }),
+      new RegExp(`README\\.md contains forbidden release claim: ${phrase}`),
+    );
+  }
 });
 
 test("mobile release claim scan rejects incomplete Play launch identities", async () => {
