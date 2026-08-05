@@ -283,6 +283,21 @@ test("documentation catalog rejects ACTIVE null fragment without throwing", () =
   }
 });
 
+test("documentation catalog ignores inherited hostile Git environment", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  const previous = process.env.GIT_DIR;
+  try {
+    process.env.GIT_DIR = join(fixture.directory, "not-a-git-dir");
+    assert.deepEqual(collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    }), []);
+  } finally {
+    if (previous === undefined) delete process.env.GIT_DIR;
+    else process.env.GIT_DIR = previous;
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
 test("documentation catalog rejects malformed and drifting local workspace mappings", () => {
   const cases = [
     ["malformed JSON", (fixture) => writeFileSync(fixture.fragmentWorkspacePath, "{"), "유효한 local workspace JSON"],

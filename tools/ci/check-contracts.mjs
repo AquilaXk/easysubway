@@ -117,7 +117,10 @@ export function collectContractErrors(
   if (validateJson(documentationSystemCatalogSchema, workspace.documentationSystemCatalog, errors)) {
     const catalog = loadJson(workspace.documentationSystemCatalog);
     validateDocumentationSystemCatalogSemantics(catalog, errors, workspace.documentationSystemCatalog, false);
-    resolveActiveDocumentationFragments(catalog, documentationFragmentWorkspacePath, errors);
+    resolveActiveDocumentationFragments(catalog, documentationFragmentWorkspacePath, errors, {
+      fragmentSchema: contract("documentation/documentation-fragment.schema.json"),
+      resourceSchema: contract("documentation/documentation-resource.schema.json"),
+    });
   }
   let currentArchitectureDecisions = [];
   const currentArchitectureDecisionCandidates = new Map();
@@ -342,12 +345,20 @@ const DOCUMENTATION_GIT_ENV = Object.freeze({
   GIT_NO_LAZY_FETCH: "1",
   GIT_TERMINAL_PROMPT: "0",
   GIT_LITERAL_PATHSPECS: "1",
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_SYSTEM: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_ATTR_NOSYSTEM: "1",
 });
+const DOCUMENTATION_GIT_UNSET = Object.freeze(["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_QUARANTINE_PATH", "GIT_CEILING_DIRECTORIES"]);
+const DOCUMENTATION_GIT_MAX_BUFFER = 64 * 1024 * 1024;
 
 function documentationGit(root, args, encoding = "buffer") {
+  const env = { ...process.env, ...DOCUMENTATION_GIT_ENV };
+  for (const key of DOCUMENTATION_GIT_UNSET) delete env[key];
   return execFileSync("/usr/bin/git", ["-C", root, ...args], {
     encoding,
-    env: { ...process.env, ...DOCUMENTATION_GIT_ENV },
+    env, maxBuffer: DOCUMENTATION_GIT_MAX_BUFFER,
     stdio: ["ignore", "pipe", "pipe"],
   });
 }
@@ -411,44 +422,58 @@ function resolveDocumentationBlob(root, commit, path) {
   } catch { return null; }
 }
 
-function resolveActiveDocumentationFragments(catalog, workspacePath, errors) {
+function resolveActiveDocumentationFragments(catalog, workspacePath, errors, schemaPaths) {
   const active = catalog.repositories.filter(({ status }) => status === "ACTIVE");
   if (active.length === 0) return;
   const repositories = active.map(({ repository }) => repository).sort(codepointCompare);
   const roots = loadDocumentationFragmentWorkspace(workspacePath, repositories, errors);
   if (roots == null) return;
+  let fragmentSchema;
+  let resourceSchema;
+  try {
+    fragmentSchema = loadJson(schemaPaths.fragmentSchema);
+    resourceSchema = loadJson(schemaPaths.resourceSchema);
+  } catch {
+    documentationTransportError(errors, "fragment schema를 읽을 수 없다");
+    return;
+  }
   const records = [];
+  let failed = false;
   for (const entry of active) {
-    if (entry.fragment == null) continue;
+    if (entry.fragment == null) { failed = true; continue; }
     const root = roots.get(entry.repository);
     if (!validateDocumentationGitRoot(root)) {
       documentationTransportError(errors, `${entry.repository} Git root가 유효하지 않다`);
+      failed = true;
       continue;
     }
     const fragmentBlob = resolveDocumentationBlob(root, entry.fragment.gitSha, entry.fragment.path);
     if (fragmentBlob == null) {
       documentationTransportError(errors, `${entry.repository} fragment blob을 확인할 수 없다`);
+      failed = true;
       continue;
     }
     const expectedBlob = entry.fragment.blobSha.length === 40
       ? fragmentBlob.oid : createHash("sha256").update(fragmentBlob.bytes).digest("hex");
     if (expectedBlob !== entry.fragment.blobSha) {
       documentationTransportError(errors, `${entry.repository} fragment blob identity가 일치하지 않는다`);
+      failed = true;
       continue;
     }
     let fragment;
     try { fragment = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(fragmentBlob.bytes)); } catch {
       documentationTransportError(errors, `${entry.repository} fragment JSON이 유효하지 않다`);
+      failed = true;
       continue;
     }
     const fragmentErrors = [];
     validateDocumentationFragment(
       fragment,
-      loadJson("contracts/documentation/documentation-fragment.schema.json"),
-      loadJson("contracts/documentation/documentation-resource.schema.json"),
+      fragmentSchema, resourceSchema,
       fragmentErrors,
     );
     if (fragmentErrors.length > 0) {
+      failed = true;
       errors.push(...fragmentErrors.map((error) => `documentation fragment transport: ${entry.repository}: ${error}`));
       continue;
     }
@@ -476,6 +501,7 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors) {
       errors.push(...fragmentErrors.map((error) => `documentation fragment transport: ${entry.repository}: ${error}`));
     } else records.push(...fragment.resources);
   }
+  if (failed) return;
   try { validateDocumentationRelations(records); } catch {
     documentationTransportError(errors, "ACTIVE fragment relation이 유효하지 않다");
   }
