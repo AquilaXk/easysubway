@@ -701,6 +701,14 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
       baseChain.map(({ id }) => id),
       ["ADR-HUB-0001", "ADR-HUB-0002", "ADR-HUB-0003"],
     );
+    const terminalDecisionSchemaPath = join(repository, "docs/ADR-HUB-0003-decision.schema.json");
+    const terminalDecisionSchema = loadJson(terminalDecisionSchemaPath);
+    terminalDecisionSchema.properties.futureField = { type: "string" };
+    writeFileSync(terminalDecisionSchemaPath, JSON.stringify(terminalDecisionSchema));
+    assert.ok(collectContractErrors("workspace.json", { previousArchitectureDecision: baseChain })
+      .some((error) => error.includes("decision schema") && error.includes("in-place")));
+    delete terminalDecisionSchema.properties.futureField;
+    writeFileSync(terminalDecisionSchemaPath, JSON.stringify(terminalDecisionSchema));
     rmSync(join(repository, "docs/ADR-HUB-0002.json"));
     assert.ok(collectContractErrors("workspace.json", { previousArchitectureDecision: baseChain })
       .some((error) => error.includes("base ADR ADR-HUB-0002가 current chain에서 삭제되었다")));

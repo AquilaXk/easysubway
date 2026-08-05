@@ -10,6 +10,7 @@ import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isDeepStrictEqual } from "node:util";
 
 const DEFAULT_WORKSPACE_PATH = "contracts/workspaces/hub.json";
+const architectureDecisionSchemaSnapshots = new WeakMap();
 const EXTRACTION_REPOSITORIES = {
   data: "AquilaXk/easysubway-data",
   platform: "AquilaXk/easysubway-platform",
@@ -164,6 +165,20 @@ export function collectContractErrors(
       const transitionErrors = validateArchitectureDecisionTransition(previous, current.adr);
       errors.push(...transitionErrors
         .map((error) => `${current.path}: ${error}`));
+      const previousDecisionSchema = architectureDecisionSchemaSnapshots.get(previous);
+      if (transitionErrors.length === 0 && previous.status !== "proposed"
+        && previousDecisionSchema !== undefined) {
+        let currentDecisionSchema;
+        try {
+          currentDecisionSchema = loadJson(resolve(dirname(current.path), current.adr.decisionSchema));
+        } catch {
+          currentDecisionSchema = undefined;
+        }
+        if (currentDecisionSchema !== undefined
+          && !isDeepStrictEqual(previousDecisionSchema, currentDecisionSchema)) {
+          errors.push(`${current.path}: accepted/terminal ADR decision schema는 in-place 변경할 수 없고 새 ADR로 supersede해야 한다`);
+        }
+      }
       if (transitionErrors.length === 0
         && previous.status === "accepted" && current.adr.status === "superseded") {
         const successors = currentArchitectureDecisionCandidates.get(current.adr.supersededBy) ?? [];
@@ -573,19 +588,35 @@ export function loadArchitectureDecisionAtRef(workspacePath, baseRef) {
     .map((path) => join(directory, path));
   for (const candidatePath of candidatePaths) {
     const namedAdr = /^ADR-[A-Z0-9-]+\.json$/.test(basename(candidatePath));
+    let candidate;
     try {
-      const candidate = loadAtRef(candidatePath, true);
-      const declaredAdr = candidate?.kind === "architecture-decision"
-        || (typeof candidate?.$schema === "string"
-          && basename(candidate.$schema) === "architecture-decision.schema.json");
-      if (candidatePath !== repositoryPath && !namedAdr && !declaredAdr && !/^ADR-/.test(candidate?.id)) continue;
-      if (typeof candidate?.id !== "string") continue;
-      const candidates = candidatesById.get(candidate.id) ?? [];
-      candidates.push(candidate);
-      candidatesById.set(candidate.id, candidates);
+      candidate = loadAtRef(candidatePath, true);
     } catch {
       if (namedAdr) hasMalformedCandidate = true;
+      continue;
     }
+    const declaredAdr = candidate?.kind === "architecture-decision"
+      || (typeof candidate?.$schema === "string"
+        && basename(candidate.$schema) === "architecture-decision.schema.json");
+    if (candidatePath !== repositoryPath && !namedAdr && !declaredAdr && !/^ADR-/.test(candidate?.id)) continue;
+    if (typeof candidate?.id !== "string") continue;
+    if (typeof candidate.decisionSchema === "string") {
+      const expectedReference = `./${candidate.id}-decision.schema.json`;
+      if (candidate.decisionSchema !== expectedReference) {
+        throw new Error(`${baseRef}:${candidatePath}: decisionSchema는 ${expectedReference}여야 한다`);
+      }
+      const decisionSchemaPath = relative(
+        "/",
+        resolve("/", dirname(candidatePath), candidate.decisionSchema),
+      );
+      if (decisionSchemaPath.startsWith("..") || decisionSchemaPath === "") {
+        throw new Error(`${baseRef}:${candidatePath}: decisionSchema 경로는 repository 내부여야 한다`);
+      }
+      architectureDecisionSchemaSnapshots.set(candidate, loadAtRef(decisionSchemaPath, true));
+    }
+    const candidates = candidatesById.get(candidate.id) ?? [];
+    candidates.push(candidate);
+    candidatesById.set(candidate.id, candidates);
   }
   const visited = new Set();
   let current = root;
