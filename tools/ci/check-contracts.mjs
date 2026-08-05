@@ -137,11 +137,15 @@ export function collectContractErrors(
   }
   const productClaimCatalogSchema = contract("documentation/product-claim-catalog.schema.json");
   if (validateJson(productClaimCatalogSchema, workspace.productClaimCatalog, errors)) {
-    validateProductClaimCatalog(loadJson(workspace.productClaimCatalog), loadJson(productClaimCatalogSchema), errors, {
-      releaseDecision: loadJson(join(workspace.gateDirectories.hub, "production-datapack-scope.json")),
-      forbiddenClaims: loadJson(join(workspace.gateDirectories.hub, "forbidden-release-claims.json")),
-      publicCopy: readProductClaimReadme(join(repositoryRoot, "README.md"), errors),
-    });
+    const releaseDecision = loadProductClaimInput(join(workspace.gateDirectories.hub, "production-datapack-scope.json"), "production-datapack-scope", errors);
+    const forbiddenClaims = loadProductClaimInput(join(workspace.gateDirectories.hub, "forbidden-release-claims.json"), "forbidden-release-claims", errors);
+    if (releaseDecision != null && forbiddenClaims != null) {
+      validateProductClaimCatalog(loadJson(workspace.productClaimCatalog), loadJson(productClaimCatalogSchema), errors, {
+        releaseDecision,
+        forbiddenClaims,
+        publicCopy: readProductClaimReadme(join(repositoryRoot, "README.md"), errors),
+      });
+    }
   }
   let currentArchitectureDecisions = [];
   const currentArchitectureDecisionCandidates = new Map();
@@ -383,6 +387,17 @@ function readProductClaimReadme(path, errors) {
     return readFileSync(path, "utf8");
   } catch {
     errors.push("product-claim-catalog: README.md public surface를 읽을 수 없다");
+    return null;
+  }
+}
+
+function loadProductClaimInput(path, label, errors) {
+  try {
+    const value = loadJson(path);
+    if (value == null || typeof value !== "object" || Array.isArray(value)) throw new Error();
+    return value;
+  } catch {
+    errors.push(`product-claim-catalog: ${label} input이 유효한 JSON object여야 한다`);
     return null;
   }
 }

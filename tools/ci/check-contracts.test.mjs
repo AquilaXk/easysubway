@@ -1101,6 +1101,28 @@ test("product claim catalog reads the workspace README public surface", () => {
   }
 });
 
+for (const [label, filename, mutate] of [
+  ["production-datapack-scope", "production-datapack-scope.json", (path) => rmSync(path)],
+  ["production-datapack-scope", "production-datapack-scope.json", (path) => writeFileSync(path, "{")],
+  ["production-datapack-scope", "production-datapack-scope.json", (path) => writeFileSync(path, "[]")],
+  ["forbidden-release-claims", "forbidden-release-claims.json", (path) => rmSync(path)],
+  ["forbidden-release-claims", "forbidden-release-claims.json", (path) => writeFileSync(path, "{")],
+  ["forbidden-release-claims", "forbidden-release-claims.json", (path) => writeFileSync(path, "[]")],
+]) {
+  test(`product claim catalog sanitizes invalid ${label} input`, () => {
+    const { directory, workspacePath } = createExternalWorkspace();
+    try {
+      mutate(join(directory, "gates/hub", filename));
+      let errors;
+      assert.doesNotThrow(() => { errors = collectContractErrors(workspacePath); });
+      assert.ok(errors.some((error) => error.includes(`product-claim-catalog: ${label} input이 유효한 JSON object여야 한다`)));
+      assert.ok(errors.every((error) => !error.includes(directory)));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+
 test("repository split issue migration ledger가 계약 gate를 통과한다", () => {
   const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
 
