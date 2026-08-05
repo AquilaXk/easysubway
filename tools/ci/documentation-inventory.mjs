@@ -43,7 +43,7 @@ function exactKeys(value, keys, name) {
 }
 function safeRelative(value) { return typeof value === "string" && value.length > 0 && !isAbsolute(value) && !win32.isAbsolute(value) && !value.split("/").includes("..") && !/[\x00-\x1f\x7f]/.test(value); }
 function safeIdentifier(value) {
-  if (typeof value !== "string" || value.length === 0 || value !== value.trim() || /[\x00-\x1f\x7f]/.test(value) || isAbsolute(value) || win32.isAbsolute(value)) return false;
+  if (typeof value !== "string" || value.length === 0 || value !== value.trim() || /[\x00-\x1f\x7f]/.test(value) || isAbsolute(value) || win32.isAbsolute(value) || value.split(/[\\/]/).includes("..")) return false;
   if (/^[a-z][a-z0-9+.-]*:\/\//i.test(value)) {
     if (!value.startsWith("https://")) return false;
     try { const url = new URL(value); return !url.username && !url.password && !url.search && !url.hash; } catch { return false; }

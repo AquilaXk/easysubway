@@ -134,6 +134,8 @@ test("문서 인벤토리: 5개 저장소·11개 군·4개 surface를 결정적�
     (input) => { input.surfaceRecords[0].verificationEvidence = []; },
     (input) => { input.surfaceRecords[1].verificationEvidence = ["C:\\Users\\owner\\secret.txt"]; },
     (input) => { input.surfaceRecords[1].verificationEvidence = ["\\\\server\\share\\secret.txt"]; },
+    (input) => { input.surfaceRecords[1].verificationEvidence = ["../private/evidence"]; },
+    (input) => { input.surfaceRecords[1].verificationEvidence = ["..\\private\\evidence"]; },
     (input) => { input.surfaceRecords[1].verificationEvidence = ["/private/evidence"]; },
     (input) => { input.repositories[0].records[0].orchestrationProfile = "KUBERNETES_ACTIVE"; },
   ]) {
