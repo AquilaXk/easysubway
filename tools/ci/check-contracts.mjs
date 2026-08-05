@@ -382,7 +382,7 @@ function loadDocumentationFragmentWorkspace(path, activeRepositories, errors) {
     }
     mappings.set(item.repository, item.root);
   }
-  const actual = [...mappings.keys()].sort(codepointCompare);
+  const actual = [...mappings.keys()];
   if (!isDeepStrictEqual(actual, activeRepositories)) {
     documentationTransportError(errors, "local workspace mapping이 ACTIVE repository 집합과 일치하지 않는다");
     return null;
@@ -447,6 +447,10 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors) {
       loadJson("contracts/documentation/documentation-resource.schema.json"),
       fragmentErrors,
     );
+    if (fragmentErrors.length > 0) {
+      errors.push(...fragmentErrors.map((error) => `documentation fragment transport: ${entry.repository}: ${error}`));
+      continue;
+    }
     if (fragment.repository !== entry.repository || fragment.status !== "ACTIVE"
         || fragment.lastVerifiedAt !== entry.fragment.lastVerifiedAt
         || !isDeepStrictEqual(fragment.verificationEvidence, entry.fragment.verificationEvidence)) {

@@ -130,6 +130,18 @@ function createDocumentationCatalogWorkspace() {
   }
 }
 
+function replaceDocumentationCatalogFragment(fixture, index, value) {
+  const root = fixture.repositories[index].root;
+  writeFileSync(join(root, "docs/fragment.json"), value);
+  execFileSync("/usr/bin/git", ["add", "."], { cwd: root, stdio: "ignore" });
+  execFileSync("/usr/bin/git", ["commit", "-m", "invalid fragment"], { cwd: root, stdio: "ignore" });
+  const catalog = loadJson(fixture.catalogPath);
+  const fragment = catalog.repositories[index].fragment;
+  fragment.gitSha = execFileSync("/usr/bin/git", ["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  fragment.blobSha = execFileSync("/usr/bin/git", ["rev-parse", "HEAD:docs/fragment.json"], { cwd: root, encoding: "utf8" }).trim();
+  writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+}
+
 test("documentation catalog resolves exact outer and inner Git blobs", () => {
   const fixture = createDocumentationCatalogWorkspace();
   try {
@@ -140,6 +152,34 @@ test("documentation catalog resolves exact outer and inner Git blobs", () => {
 
     const localWorkspace = loadJson(fixture.fragmentWorkspacePath);
     localWorkspace.repositories.pop();
+    writeFileSync(fixture.fragmentWorkspacePath, JSON.stringify(localWorkspace));
+    assert.ok(collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    }).some((error) => error.includes("mapping")));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog rejects schema-invalid fragment blobs without throwing", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  try {
+    replaceDocumentationCatalogFragment(fixture, 0, "null");
+    const errors = collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    });
+    assert.ok(errors.some((error) => error.includes("documentation-fragment")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes(fixture.repositories[0].root)));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog rejects reversed local workspace mappings", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  try {
+    const localWorkspace = loadJson(fixture.fragmentWorkspacePath);
+    localWorkspace.repositories.reverse();
     writeFileSync(fixture.fragmentWorkspacePath, JSON.stringify(localWorkspace));
     assert.ok(collectContractErrors(fixture.workspacePath, {
       documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
