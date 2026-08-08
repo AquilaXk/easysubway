@@ -1,0 +1,167 @@
+name: Generic Mobile Consumer Bundle Publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  publish:
+    name: Publish Generic Mobile Consumer Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main dispatch
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "This workflow may only be dispatched from main."
+            exit 1
+          fi
+
+      - name: Checkout dispatch revision
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 24.19.0
+
+      - name: Build and validate closed bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          output_directory="release-artifacts/mobile-contracts"
+          bundle="${output_directory}/generic-mobile-consumer-bundle-v1.json"
+          comparison_bundle="${output_directory}/generic-mobile-consumer-bundle-v1.comparison.json"
+          receipt="${output_directory}/generic-mobile-consumer-publication-receipt-v1.json"
+          mkdir -p "${output_directory}"
+          node tools/repo/build-generic-mobile-consumer-bundle.mjs --producer-sha 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3 --output "${bundle}"
+          node tools/repo/build-generic-mobile-consumer-bundle.mjs --producer-sha 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3 --output "${comparison_bundle}"
+          cmp -- "${bundle}" "${comparison_bundle}"
+          rm -- "${comparison_bundle}"
+          node tools/repo/write-generic-mobile-consumer-bundle-receipt.mjs --bundle "${bundle}" --output "${receipt}"
+          test -f "${bundle}" && test ! -L "${bundle}"
+          test -f "${receipt}" && test ! -L "${receipt}"
+
+      - name: Upload closed mobile consumer bundle
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: easysubway-generic-mobile-consumer-bundle-1.0.0-604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3
+          path: |
+            release-artifacts/mobile-contracts/generic-mobile-consumer-bundle-v1.json
+            release-artifacts/mobile-contracts/generic-mobile-consumer-publication-receipt-v1.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+      - name: Fetch and validate artifact metadata
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_id="${{ steps.upload.outputs.artifact-id }}"
+          artifact_digest="${{ steps.upload.outputs.artifact-digest }}"
+          if [[ ! "${artifact_id}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "artifact-id is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${artifact_digest}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "artifact-digest is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${GITHUB_RUN_ID}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "workflow-run-id is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${GITHUB_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "workflow-head-sha is invalid" >&2
+            exit 1
+          fi
+          metadata="release-artifacts/mobile-contracts/generic-mobile-consumer-bundle-artifact-metadata.json"
+          gh api --method GET "repos/${GITHUB_REPOSITORY}/actions/artifacts/${artifact_id}" > "${metadata}"
+          test -f "${metadata}" && test ! -L "${metadata}"
+          node tools/repo/write-generic-mobile-consumer-bundle-receipt.mjs --artifact-metadata "${metadata}" --artifact-id "${artifact_id}" --artifact-digest "${artifact_digest}" --workflow-run-id "${GITHUB_RUN_ID}" --repository-id "${GITHUB_REPOSITORY_ID}" --head-sha "${GITHUB_SHA}"
+
+      - name: Reject preexisting artifact download path
+        shell: bash
+        run: |
+          set -euo pipefail
+          download_directory="${RUNNER_TEMP}/easysubway-generic-mobile-consumer-bundle-download-${GITHUB_RUN_ID}"
+          if [[ -e "${download_directory}" || -L "${download_directory}" ]]; then
+            echo "artifact download path already exists" >&2
+            exit 1
+          fi
+
+      - name: Download exact artifact ID
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          artifact-ids: ${{ steps.upload.outputs.artifact-id }}
+          path: ${{ runner.temp }}/easysubway-generic-mobile-consumer-bundle-download-${{ github.run_id }}
+
+      - name: Verify downloaded artifact bytes
+        shell: bash
+        run: |
+          set -euo pipefail
+          download_directory="${RUNNER_TEMP}/easysubway-generic-mobile-consumer-bundle-download-${GITHUB_RUN_ID}"
+          mapfile -t entries < <(find "${download_directory}" -mindepth 1 -printf '%P\n' | LC_ALL=C sort)
+          if [[ "${#entries[@]}" -ne 2 ]]; then
+            echo "downloaded artifact file count is invalid" >&2
+            exit 1
+          fi
+          if [[ "${entries[0]}" != "generic-mobile-consumer-bundle-v1.json" ]]; then
+            echo "downloaded bundle filename is invalid" >&2
+            exit 1
+          fi
+          if [[ "${entries[1]}" != "generic-mobile-consumer-publication-receipt-v1.json" ]]; then
+            echo "downloaded receipt filename is invalid" >&2
+            exit 1
+          fi
+          for entry in "${entries[@]}"; do
+            test -f "${download_directory}/${entry}"
+            test ! -L "${download_directory}/${entry}"
+          done
+          cmp -- "release-artifacts/mobile-contracts/generic-mobile-consumer-bundle-v1.json" "${download_directory}/generic-mobile-consumer-bundle-v1.json"
+          cmp -- "release-artifacts/mobile-contracts/generic-mobile-consumer-publication-receipt-v1.json" "${download_directory}/generic-mobile-consumer-publication-receipt-v1.json"
+
+      - name: Validate and log artifact locator
+        shell: bash
+        run: |
+          set -euo pipefail
+          artifact_id="${{ steps.upload.outputs.artifact-id }}"
+          artifact_digest="${{ steps.upload.outputs.artifact-digest }}"
+          artifact_url="${{ steps.upload.outputs.artifact-url }}"
+          if [[ ! "${artifact_id}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "artifact-id is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${artifact_digest}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "artifact-digest is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${GITHUB_RUN_ID}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "workflow-run-id is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${GITHUB_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "workflow-head-sha is invalid" >&2
+            exit 1
+          fi
+          expected_artifact_url="https://github.com/AquilaXk/easysubway/actions/runs/${GITHUB_RUN_ID}/artifacts/${artifact_id}"
+          if [[ "${artifact_url}" != "${expected_artifact_url}" ]]; then
+            echo "artifact-url is invalid" >&2
+            exit 1
+          fi
+          echo "workflow-path=.github/workflows/generic-mobile-consumer-bundle-publish.yml"
+          echo "workflow-run-id=${GITHUB_RUN_ID}"
+          echo "workflow-head-sha=${GITHUB_SHA}"
+          echo "artifact-id=${artifact_id}"
+          echo "artifact-name=easysubway-generic-mobile-consumer-bundle-1.0.0-604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3"
+          echo "artifact-digest=${artifact_digest}"
+          echo "artifact-url=${artifact_url}"
+          echo "retention-days=90"
