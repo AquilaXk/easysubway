@@ -35,7 +35,7 @@
           "activeConsumers": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
           "releaseReachability": { "enum": ["CURRENT", "NOT_CURRENT"] },
           "handoffState": { "enum": ["NOT_APPLICABLE", "PENDING", "VERIFIED"] },
-          "handoffEvidence": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["kind", "reference", "identity", "conclusion"], "properties": { "kind": { "enum": ["PLANNED_REFERENCE", "IMMUTABLE_TARGET", "TARGET_CONSUMER", "TARGET_TERMINAL_GATE", "SYSTEM_TERMINAL_GATE"] }, "reference": { "type": "string", "minLength": 1 }, "identity": { "type": ["string", "null"] }, "conclusion": { "enum": ["NOT_APPLICABLE", "SUCCESS", "FAILURE"] } } } },
+          "handoffEvidence": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["kind", "reference", "identity", "conclusion"], "properties": { "kind": { "enum": ["PLANNED_REFERENCE", "IMMUTABLE_TARGET", "TARGET_CONSUMER", "TARGET_TERMINAL_GATE", "SYSTEM_TERMINAL_GATE", "TARGET_SCHEDULED_GATE", "TARGET_MANUAL_GATE", "TARGET_NOTIFICATION_EVIDENCE"] }, "reference": { "type": "string", "minLength": 1 }, "identity": { "type": ["string", "null"] }, "conclusion": { "enum": ["NOT_APPLICABLE", "SUCCESS", "FAILURE"] } } } },
           "plannedAction": { "enum": ["RETAIN", "DELETE_AFTER_HANDOFF", "ARCHIVE_NONEXECUTABLE", "DISABLE_AFTER_TARGET", "REMOVE_FALLBACK"] },
           "executionEligibility": { "type": "boolean" },
           "reviewTrigger": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },

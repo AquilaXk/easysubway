@@ -1421,6 +1421,75 @@ test("repository contraction inventory는 #2731 P1 fallback required-set과 폐�
   }
 });
 
+test("repository contraction inventory는 expiry alert duplicate gate handoff를 폐쇄형으로 강제한다", () => {
+  const inventory = loadJson("release/migrations/repository-contraction-inventory.json");
+  const entry = inventory.entries.find((candidate) => candidate.resourceId === "data-datapack-expiry-alert");
+  assert.deepEqual(
+    [entry?.repository, entry?.path, entry?.selector, entry?.classification, entry?.targetOwner, entry?.plannedAction,
+      entry?.fallbackExposure, entry?.fallbackRemovalOwner, entry?.fallbackVerification, entry?.fallbackVerificationState],
+    ["AquilaXk/easysubway", ".github/workflows/datapack-expiry-alert.yml", "scheduled/manual expiry alert jobs and Slack notification",
+      "DUPLICATE_GATE_DISABLE_AFTER_TARGET", "data", "DISABLE_AFTER_TARGET", "NONE", null, [], "NOT_APPLICABLE"],
+  );
+
+  const missing = structuredClone(inventory);
+  missing.entries = missing.entries.filter((candidate) => candidate.resourceId !== entry.resourceId);
+  assert.ok(validateRepositoryContractionInventory(missing).some((error) => error.includes("known duplicate gate required-set 누락")));
+
+  const renamed = structuredClone(inventory);
+  renamed.entries.find((candidate) => candidate.resourceId === entry.resourceId).selector = "renamed";
+  assert.ok(validateRepositoryContractionInventory(renamed).some((error) => error.includes("known duplicate gate exact repository/path/selector 불일치")));
+
+  const fallbackMisclassification = structuredClone(inventory);
+  const fallback = fallbackMisclassification.entries.find((candidate) => candidate.resourceId === entry.resourceId);
+  fallback.classification = "TARGET_FALLBACK_REMOVE";
+  fallback.plannedAction = "REMOVE_FALLBACK";
+  assert.ok(validateRepositoryContractionInventory(fallbackMisclassification)
+    .some((error) => error.includes("known duplicate gate classification/target/action 불일치")));
+
+  const revision = "c".repeat(40);
+  const verified = () => ({
+    ...structuredClone(entry),
+    handoffState: "VERIFIED",
+    executionEligibility: true,
+    handoffEvidence: [
+      { kind: "IMMUTABLE_TARGET", reference: `https://github.com/AquilaXk/easysubway-data/commit/${revision}`, identity: revision, conclusion: "NOT_APPLICABLE" },
+      { kind: "TARGET_CONSUMER", reference: `https://github.com/AquilaXk/easysubway-data/blob/${revision}/.github/workflows/datapack-expiry-alert.yml`, identity: revision, conclusion: "NOT_APPLICABLE" },
+      { kind: "TARGET_TERMINAL_GATE", reference: "https://github.com/AquilaXk/easysubway-data/actions/runs/1", identity: revision, conclusion: "SUCCESS" },
+      { kind: "SYSTEM_TERMINAL_GATE", reference: "https://github.com/AquilaXk/easysubway/actions/runs/2", identity: revision, conclusion: "SUCCESS" },
+      { kind: "TARGET_SCHEDULED_GATE", reference: "https://github.com/AquilaXk/easysubway-data/actions/runs/3", identity: revision, conclusion: "SUCCESS" },
+      { kind: "TARGET_MANUAL_GATE", reference: "https://github.com/AquilaXk/easysubway-data/actions/runs/4", identity: revision, conclusion: "SUCCESS" },
+      { kind: "TARGET_NOTIFICATION_EVIDENCE", reference: "https://github.com/AquilaXk/easysubway-data/actions/runs/3/artifacts/6", identity: revision, conclusion: "SUCCESS" },
+    ],
+  });
+  const fullyVerified = structuredClone(inventory);
+  Object.assign(fullyVerified.entries.find((candidate) => candidate.resourceId === entry.resourceId), verified());
+  assert.deepEqual(validateRepositoryContractionInventory(fullyVerified), []);
+
+  for (const [mutate, expected] of [
+    [(candidate) => { candidate.handoffEvidence = candidate.handoffEvidence.filter((item) => item.kind !== "TARGET_SCHEDULED_GATE"); }, "scheduled/manual/notification evidence"],
+    [(candidate) => { candidate.handoffEvidence = candidate.handoffEvidence.filter((item) => item.kind !== "TARGET_MANUAL_GATE"); }, "scheduled/manual/notification evidence"],
+    [(candidate) => { candidate.handoffEvidence = candidate.handoffEvidence.filter((item) => item.kind !== "TARGET_NOTIFICATION_EVIDENCE"); }, "scheduled/manual/notification evidence"],
+    [(candidate) => { candidate.handoffEvidence.push(structuredClone(candidate.handoffEvidence.find((item) => item.kind === "TARGET_SCHEDULED_GATE"))); }, "handoff evidence kind 중복"],
+    [(candidate) => { candidate.handoffEvidence.find((item) => item.kind === "TARGET_MANUAL_GATE").conclusion = "FAILURE"; }, "scheduled/manual/notification evidence"],
+    [(candidate) => { candidate.handoffEvidence.find((item) => item.kind === "TARGET_SCHEDULED_GATE").reference = "https://github.com/AquilaXk/easysubway/actions/runs/3"; }, "scheduled/manual/notification evidence"],
+    [(candidate) => { candidate.handoffEvidence.find((item) => item.kind === "TARGET_MANUAL_GATE").reference = "https://github.com/AquilaXk/easysubway-data/actions/runs/3"; }, "scheduled/manual/notification evidence"],
+    [(candidate) => { candidate.handoffEvidence.find((item) => item.kind === "TARGET_NOTIFICATION_EVIDENCE").identity = "d".repeat(40); }, "scheduled/manual/notification evidence"],
+    [(candidate) => { candidate.handoffEvidence.find((item) => item.kind === "TARGET_NOTIFICATION_EVIDENCE").reference = "https://github.com/AquilaXk/easysubway-data/actions/runs/5"; }, "scheduled/manual/notification evidence"],
+    [(candidate) => { candidate.handoffEvidence.find((item) => item.kind === "TARGET_NOTIFICATION_EVIDENCE").reference = "https://github.com/AquilaXk/easysubway-data/actions/runs/5/artifacts/6"; }, "scheduled/manual/notification evidence"],
+  ]) {
+    const candidate = structuredClone(fullyVerified);
+    mutate(candidate.entries.find((item) => item.resourceId === entry.resourceId));
+    assert.ok(validateRepositoryContractionInventory(candidate).some((error) => error.includes(expected)), expected);
+  }
+
+  const fakeTypedEvidence = structuredClone(inventory);
+  fakeTypedEvidence.entries.find((candidate) => candidate.resourceId === "backend-ci-build").handoffEvidence.push(
+    { kind: "TARGET_SCHEDULED_GATE", reference: "https://github.com/AquilaXk/easysubway-data/actions/runs/7", identity: revision, conclusion: "SUCCESS" },
+  );
+  assert.ok(validateRepositoryContractionInventory(fakeTypedEvidence)
+    .some((error) => error.includes("data-datapack-expiry-alert에만 허용된다")));
+});
+
 test("repository contraction inventory는 F3 terminal gate와 예약된 F4 Platform rollback binding을 강제한다", () => {
   const inventory = loadJson("release/migrations/repository-contraction-inventory.json");
   const revision = "a".repeat(40);

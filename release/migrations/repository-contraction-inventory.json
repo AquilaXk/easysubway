@@ -244,6 +244,44 @@
       "repository": "AquilaXk/easysubway"
     },
     {
+      "resourceId": "data-datapack-expiry-alert",
+      "path": ".github/workflows/datapack-expiry-alert.yml",
+      "selector": "scheduled/manual expiry alert jobs and Slack notification",
+      "kind": "WORKFLOW",
+      "classification": "DUPLICATE_GATE_DISABLE_AFTER_TARGET",
+      "hubOwner": "hub",
+      "targetOwner": "data",
+      "targetOutput": "Data immutable datapack expiry alert evidence and notification",
+      "activeConsumers": [
+        "Hub datapack expiry alert workflow"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-data/pull/55",
+          "identity": null,
+          "conclusion": "NOT_APPLICABLE"
+        }
+      ],
+      "plannedAction": "DISABLE_AFTER_TARGET",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target expiry alert verification"
+      ],
+      "fallbackExposure": "NONE",
+      "fallbackRemovalOwner": null,
+      "fallbackVerification": [],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "rollbackTargetRepository": null,
+      "rollbackApprovalEvidence": null,
+      "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "NOT_APPLICABLE",
+      "repository": "AquilaXk/easysubway"
+    },
+    {
       "resourceId": "mobile-release-artifacts",
       "path": ".github/workflows/release-artifacts.yml",
       "selector": "Android artifact build job",

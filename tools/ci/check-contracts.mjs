@@ -365,6 +365,9 @@ const KNOWN_FALLBACK_SURFACES = new Map([
   ["platform-compose-route-v2-gateway", ["AquilaXk/easysubway-platform", "infra/docker-compose.yml", "route-v2-gateway"]],
 ]);
 const KNOWN_FORBIDDEN_FALLBACK_RESOURCE_IDS = new Set(KNOWN_FALLBACK_SURFACES.keys());
+const KNOWN_DUPLICATE_GATE_SURFACES = new Map([
+  ["data-datapack-expiry-alert", ["AquilaXk/easysubway", ".github/workflows/datapack-expiry-alert.yml", "scheduled/manual expiry alert jobs and Slack notification"]],
+]);
 
 export function validateRepositoryContractionInventory(inventory, repositoryRoot = process.cwd()) {
   const errors = [];
@@ -378,6 +381,11 @@ export function validateRepositoryContractionInventory(inventory, repositoryRoot
     const requiredSurface = KNOWN_FALLBACK_SURFACES.get(entry.resourceId);
     if (requiredSurface != null && (entry.repository !== requiredSurface[0] || entry.path !== requiredSurface[1] || entry.selector !== requiredSurface[2])) {
       errors.push(`${entry.resourceId}: known fallback exact repository/path/selector 불일치`);
+    }
+    const duplicateGateSurface = KNOWN_DUPLICATE_GATE_SURFACES.get(entry.resourceId);
+    if (duplicateGateSurface != null && (entry.repository !== duplicateGateSurface[0]
+        || entry.path !== duplicateGateSurface[1] || entry.selector !== duplicateGateSurface[2])) {
+      errors.push(`${entry.resourceId}: known duplicate gate exact repository/path/selector 불일치`);
     }
     const surface = `${entry.repository}\u0000${entry.path}`;
     const selectors = selectorsBySurface.get(surface) ?? [];
@@ -408,6 +416,10 @@ export function validateRepositoryContractionInventory(inventory, repositoryRoot
     }
     if (entry.plannedAction !== rule.plannedAction) {
       errors.push(`${entry.resourceId}: ${entry.classification} plannedAction 불일치`);
+    }
+    if (duplicateGateSurface != null && (entry.classification !== "DUPLICATE_GATE_DISABLE_AFTER_TARGET"
+        || entry.targetOwner !== "data" || entry.plannedAction !== "DISABLE_AFTER_TARGET")) {
+      errors.push(`${entry.resourceId}: known duplicate gate classification/target/action 불일치`);
     }
     if (entry.classification === "TARGET_FALLBACK_REMOVE"
         && (entry.repository !== EXTRACTION_REPOSITORIES[entry.targetOwner]
@@ -462,6 +474,9 @@ export function validateRepositoryContractionInventory(inventory, repositoryRoot
   for (const resourceId of KNOWN_FALLBACK_SURFACES.keys()) {
     if (!resourceIds.has(resourceId)) errors.push(`${resourceId}: known fallback required-set 누락`);
   }
+  for (const resourceId of KNOWN_DUPLICATE_GATE_SURFACES.keys()) {
+    if (!resourceIds.has(resourceId)) errors.push(`${resourceId}: known duplicate gate required-set 누락`);
+  }
   for (const [surface, selectors] of selectorsBySurface) {
     if (selectors.length < 2) continue;
     if (selectors.some((selector) => typeof selector !== "string" || selector.trim() === "")) {
@@ -487,6 +502,7 @@ function validateInventoryBaseHead(inventory, errors, repositoryRoot) {
 function validateHandoffEvidence(entry, errors) {
   const evidence = entry.handoffEvidence ?? [];
   const kinds = new Set();
+  const expiryAlertEvidenceKinds = new Set(["TARGET_SCHEDULED_GATE", "TARGET_MANUAL_GATE", "TARGET_NOTIFICATION_EVIDENCE"]);
   for (const item of evidence) {
     if (kinds.has(item.kind)) errors.push(`${entry.resourceId}: handoff evidence kind 중복`);
     kinds.add(item.kind);
@@ -496,8 +512,11 @@ function validateHandoffEvidence(entry, errors) {
     if (["PLANNED_REFERENCE", "IMMUTABLE_TARGET", "TARGET_CONSUMER"].includes(item.kind) && item.conclusion !== "NOT_APPLICABLE") {
       errors.push(`${entry.resourceId}: non-gate handoff conclusion은 NOT_APPLICABLE여야 한다`);
     }
-    if (["TARGET_TERMINAL_GATE", "SYSTEM_TERMINAL_GATE"].includes(item.kind) && item.conclusion !== "SUCCESS") {
+    if (["TARGET_TERMINAL_GATE", "SYSTEM_TERMINAL_GATE", ...expiryAlertEvidenceKinds].includes(item.kind) && item.conclusion !== "SUCCESS") {
       errors.push(`${entry.resourceId}: terminal gate conclusion은 SUCCESS여야 한다`);
+    }
+    if (expiryAlertEvidenceKinds.has(item.kind) && entry.resourceId !== "data-datapack-expiry-alert") {
+      errors.push(`${entry.resourceId}: expiry alert handoff evidence는 data-datapack-expiry-alert에만 허용된다`);
     }
   }
   if (entry.handoffState !== "VERIFIED" && !entry.executionEligibility) return;
@@ -515,6 +534,24 @@ function validateHandoffEvidence(entry, errors) {
       || !isSystemTerminalGateReference(systemTerminal.reference) || systemTerminal.identity !== immutableRevision || systemTerminal.conclusion !== "SUCCESS"
       || evidence.some((item) => ["PLANNED_REFERENCE", "IMMUTABLE_TARGET", "TARGET_CONSUMER"].includes(item.kind) && item.conclusion !== "NOT_APPLICABLE")) {
     errors.push(`${entry.resourceId}: VERIFIED/execution handoff에는 exact target/system terminal gate evidence가 필요하다`);
+  }
+  if (entry.resourceId === "data-datapack-expiry-alert") {
+    const scheduled = evidence.find((item) => item.kind === "TARGET_SCHEDULED_GATE");
+    const manual = evidence.find((item) => item.kind === "TARGET_MANUAL_GATE");
+    const notification = evidence.find((item) => item.kind === "TARGET_NOTIFICATION_EVIDENCE");
+    const dataRepository = "AquilaXk/easysubway-data";
+    const targetRun = new RegExp(`^https://github\\.com/${dataRepository}/actions/runs/\\d+$`);
+    const notificationArtifact = new RegExp(`^https://github\\.com/${dataRepository}/actions/runs/\\d+/artifacts/\\d+$`);
+    const notificationRun = typeof notification?.reference === "string"
+      ? notification.reference.replace(/\/artifacts\/\d+$/, "")
+      : "";
+    if (scheduled == null || manual == null || notification == null
+        || scheduled.identity !== immutableRevision || manual.identity !== immutableRevision || notification.identity !== immutableRevision
+        || !targetRun.test(scheduled.reference) || !targetRun.test(manual.reference) || !notificationArtifact.test(notification.reference)
+        || scheduled.reference === manual.reference || ![scheduled.reference, manual.reference].includes(notificationRun)
+        || scheduled.conclusion !== "SUCCESS" || manual.conclusion !== "SUCCESS" || notification.conclusion !== "SUCCESS") {
+      errors.push(`${entry.resourceId}: VERIFIED/execution handoff에는 exact scheduled/manual/notification evidence가 필요하다`);
+    }
   }
 }
 
