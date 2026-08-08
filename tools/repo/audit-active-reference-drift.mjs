@@ -184,9 +184,9 @@ export function extractReferences(text, source) {
         target: { repository: match[1], type: match[2] === "pull" ? "PR" : "ISSUE", number: Number(match[3]) },
       };
     };
-    for (const match of line.matchAll(/\[[^\]]*\]\((https:\/\/github\.com\/[^\s)]+)\)/g)) {
-      const parsed = parseUrl(match[1]);
-      if (parsed != null) add(match.index, match.index + match[0].length, match[1], parsed.target);
+    for (const link of markdownGitHubLinkSpans(line)) {
+      const parsed = parseUrl(link.url);
+      if (parsed != null) add(link.start, link.end, link.url, parsed.target);
     }
     for (const match of line.matchAll(/https:\/\/github\.com\/[^\s)]+/g)) {
       const parsed = parseUrl(match[0]);
@@ -203,6 +203,32 @@ export function extractReferences(text, source) {
     }
   }
   return references;
+}
+
+function markdownGitHubLinkSpans(line) {
+  const links = [];
+  let labelStart = -1;
+  let urlStart = -1;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (urlStart !== -1) {
+      if (character === ")") {
+        links.push({ start: labelStart, end: index + 1, url: line.slice(urlStart, index) });
+        labelStart = -1;
+        urlStart = -1;
+      }
+      continue;
+    }
+    if (character === "[") {
+      labelStart = index;
+      continue;
+    }
+    if (labelStart !== -1 && character === "]") {
+      if (line[index + 1] === "(" && line.startsWith("https://github.com/", index + 2)) urlStart = index + 2;
+      else labelStart = -1;
+    }
+  }
+  return links;
 }
 
 function contentClassForPath(path, knownBinaryExtensions) {

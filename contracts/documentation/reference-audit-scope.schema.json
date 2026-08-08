@@ -22,8 +22,8 @@
       "type": "object", "additionalProperties": false,
       "required": ["knownBinaryExtensions", "bareReferenceExtensions"],
       "properties": {
-        "knownBinaryExtensions": { "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": { "type": "string" } },
-        "bareReferenceExtensions": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "type": "string" } }
+        "knownBinaryExtensions": { "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": { "enum": [".gz", ".png"] } },
+        "bareReferenceExtensions": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "enum": [".json", ".md", ".yaml", ".yml"] } }
       }
     },
     "githubDiscovery": {

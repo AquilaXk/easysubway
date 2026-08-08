@@ -338,6 +338,17 @@ test("fragment-suffixed canonical Markdown label preserves displayed title witho
   assert.equal(references[0].displayedTitle, "exact title");
 });
 
+test("Markdown GitHub links use a bounded forward scan after many unmatched brackets", () => {
+  const source = { kind: "PATH", repository: "AquilaXk/easysubway", path: "README.md", blobSha: "a".repeat(40) };
+  const auditor = readFileSync(resolve(projectRoot(), "tools/repo/audit-active-reference-drift.mjs"), "utf8");
+  assert.doesNotMatch(auditor, /\\\[\[\^\\\]\]\*\\\]\\\(/);
+  const unmatched = "[".repeat(5_000);
+  const references = extractReferences(`${unmatched}[AquilaXk/easysubway#9 — exact](https://github.com/AquilaXk/easysubway/issues/9#discussion)`, source);
+  assert.equal(references.length, 1);
+  assert.equal(references[0].displayedTitle, "exact");
+  assert.deepEqual(references[0].target, { repository: "AquilaXk/easysubway", type: "ISSUE", number: 9 });
+});
+
 test("bare references are limited to structured text paths while explicit references remain auditable", () => {
   const css = { kind: "PATH", repository: "AquilaXk/easysubway", path: "assets/theme.css", blobSha: "a".repeat(40) };
   const sql = { ...css, path: "db/V1__schema.sql" };
