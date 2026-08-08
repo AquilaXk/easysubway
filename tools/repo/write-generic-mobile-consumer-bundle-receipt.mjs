@@ -19,7 +19,7 @@ const expectedResources = [
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const canonicalJson = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonicalJson).join(",")}]`;
-  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`;
+  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(",")}}`; // NOSONAR: canonical JSON requires raw locale-independent JavaScript string ordering.
   return JSON.stringify(value);
 };
 const exactKeys = (value, keys, label) => {
