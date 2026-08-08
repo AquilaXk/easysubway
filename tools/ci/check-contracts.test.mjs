@@ -47,6 +47,27 @@ function fixtureGit(args, options = {}) {
   });
 }
 
+function initializeHubInventoryFixtureRepository(directory) {
+  fixtureGit(["init"], { cwd: directory, stdio: "ignore" });
+  fixtureGit(["config", "user.email", "test@example.com"], { cwd: directory, stdio: "ignore" });
+  fixtureGit(["config", "user.name", "Test"], { cwd: directory, stdio: "ignore" });
+  fixtureGit(["remote", "add", "origin", "https://github.com/AquilaXk/easysubway.git"], {
+    cwd: directory,
+    stdio: "ignore",
+  });
+  fixtureGit(["add", "README.md"], { cwd: directory, stdio: "ignore" });
+  fixtureGit(["commit", "-m", "inventory base"], { cwd: directory, stdio: "ignore" });
+  const inventoryBaseHead = fixtureGit(["rev-parse", "HEAD"], {
+    cwd: directory,
+    encoding: "utf8",
+  }).trim();
+  const inventoryPath = join(directory, "release/migrations/repository-contraction-inventory.json");
+  const inventory = loadJson(inventoryPath);
+  inventory.inventoryBaseHead = inventoryBaseHead;
+  writeFileSync(inventoryPath, JSON.stringify(inventory));
+  return inventoryBaseHead;
+}
+
 function createExternalWorkspace() {
   const directory = mkdtempSync(join(tmpdir(), "gate-ownership-workspace-"));
   mkdirSync(join(directory, "inputs"), { recursive: true });
@@ -392,6 +413,7 @@ test("documentation catalog uses workspace-selected fragment schemas and sanitiz
     const contracts = join(fixture.directory, "selected-contracts");
     cpSync("contracts", contracts, { recursive: true });
     cpSync("README.md", join(fixture.directory, "README.md"));
+    initializeHubInventoryFixtureRepository(fixture.directory);
     const workspace = loadJson(fixture.workspacePath);
     workspace.contracts = "selected-contracts";
     writeFileSync(fixture.workspacePath, JSON.stringify(workspace));
@@ -855,7 +877,6 @@ test("documentation catalog CLI accepts compatibility modes and rejects malforme
     assert.doesNotThrow(() => run(valid));
     const clone = mkdtempSync(join(tmpdir(), "documentation-catalog-cli-"));
     try {
-      fixtureGit(["init", clone], { stdio: "ignore" });
       const copied = join(clone, "fixture");
       mkdirSync(copied);
       cpSync("contracts", join(clone, "contracts"), { recursive: true });
@@ -865,12 +886,11 @@ test("documentation catalog CLI accepts compatibility modes and rejects malforme
       cpSync("release/migrations/repository-split-issues.json", join(clone, "release/migrations/repository-split-issues.json"));
       cpSync("release/migrations/repository-contraction-inventory.json", join(clone, "release/migrations/repository-contraction-inventory.json"));
       cpSync("release/migrations/repository-split-issues-amendments.json", join(clone, "release/migrations/repository-split-issues-amendments.json"));
+      initializeHubInventoryFixtureRepository(clone);
       const clonedWorkspacePath = join(copied, "hub.json");
       const clonedWorkspace = loadJson(clonedWorkspacePath);
       clonedWorkspace.contracts = "../contracts";
       writeFileSync(clonedWorkspacePath, JSON.stringify(clonedWorkspace));
-      fixtureGit(["config", "user.email", "test@example.com"], { cwd: clone, stdio: "ignore" });
-      fixtureGit(["config", "user.name", "Test"], { cwd: clone, stdio: "ignore" });
       fixtureGit(["add", "fixture"], { cwd: clone, stdio: "ignore" });
       fixtureGit(["commit", "-m", "CLI fixture"], { cwd: clone, stdio: "ignore" });
       const baseRef = fixtureGit(["rev-parse", "HEAD"], { cwd: clone, encoding: "utf8" }).trim();
