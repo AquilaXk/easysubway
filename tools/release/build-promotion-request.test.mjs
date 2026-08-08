@@ -1,25 +1,43 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { createHash, createSign, generateKeyPairSync } from "node:crypto";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, unlinkSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
+import { canonicalJson, withoutSignature } from "../datapack/lib/manifest-validation.mjs";
 
 const script = path.resolve("tools/release/build-promotion-request.mjs");
+const candidateVerifier = path.resolve("tools/release/verify-promotion-candidate-root.mjs");
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
+const { privateKey, publicKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
+const signingPublicKey = publicKey.export({ type: "spki", format: "pem" });
 
-test("candidate run과 별도 promotion run을 canonical request로 발행한다", () => {
+// Break caught: accepting one candidate, a stale inventory, or a different run identity
+// would let promotion proceed without proving three byte-identical rebuilds.
+test("세 data 후보의 raw inventory와 component identity를 묶어 parity evidence와 request를 발행한다", () => {
   const fixture = createFixture();
   try {
     const result = run(fixture);
     assert.equal(result.status, 0, result.stderr);
+    const evidenceBytes = readFileSync(fixture.evidenceOutput);
+    const evidence = JSON.parse(evidenceBytes);
+    assert.deepEqual(evidence, {
+      schemaVersion: 1,
+      artifactKind: "datapack-rebuild-parity-evidence",
+      selectedCandidateWorkflowRunId: "123",
+      candidates: fixture.components,
+      artifactInventorySha256: sha256(fixture.inventoryBytes),
+      contractVersion: "datapack-rebuild-parity-v1",
+      issueRef: "AquilaXk/easysubway#2705",
+    });
     const request = JSON.parse(readFileSync(fixture.output));
     assert.deepEqual(request, {
       schemaVersion: 1,
       artifactKind: "datapack-promotion-request",
-      candidate: fixture.component,
+      candidate: fixture.components[0],
       compatibilityEvidenceSha256: sha256(fixture.compatibilityBytes),
+      rebuildParityEvidenceSha256: sha256(evidenceBytes),
       requestedBy: "AquilaXk",
       approval: {
         workflowRunId: "456",
@@ -28,62 +46,159 @@ test("candidate run과 별도 promotion run을 canonical request로 발행한다
         approvalEvidenceSha256: sha256(fixture.approvalBytes),
       },
       contractVersion: "datapack-promotion-v1",
-      issueRef: "AquilaXk/easysubway#2699",
+      issueRef: "AquilaXk/easysubway#2705",
     });
-    assert.equal(readFileSync(fixture.output, "utf8"), `${JSON.stringify(request, null, 2)}\n`);
   } finally {
     fixture.cleanup();
   }
 });
 
-test("입력 hash, approval, output, symlink, run 경계를 fail closed한다", () => {
-  const cases = [
+test("candidate root의 symlink·실제 inventory drift·identity·approval·compatibility를 fail closed한다", () => {
+  for (const mutate of [
     (fixture) => {
-      fixture.component.artifactInventorySha256 = "0".repeat(64);
-      writeFileSync(fixture.componentPath, JSON.stringify(fixture.component));
+      const component = path.join(fixture.roots[1], "data-component-manifest.json");
+      unlinkSync(component);
+      symlinkSync(path.join(fixture.roots[0], "data-component-manifest.json"), component);
     },
-    (fixture) => writeApproval(fixture, [{
-      state: "approved",
+    (fixture) => writeFileSync(path.join(fixture.roots[2], "artifact.bin"), "drift"),
+    (fixture) => {
+      const manifest = path.join(fixture.roots[0], "catalog", "current.json");
+      writeFileSync(manifest, JSON.stringify({ ...JSON.parse(readFileSync(manifest)), signature: { algorithm: "rsa-sha256-manifest-v2", value: "bad" } }));
+    },
+    (fixture) => rewriteComponent(fixture, 0, { manifestSha256: "e".repeat(64) }),
+    (fixture) => writeFileSync(path.join(fixture.roots[0], "current.provenance.json"), JSON.stringify({ schemaVersion: 1, artifactKind: "datapack-field-provenance", candidateBuild: { sourceSnapshotSetHash: "f".repeat(64) } })),
+    (fixture) => rewriteComponent(fixture, 1, { dataVersion: "other" }),
+    (fixture) => { fixture.candidateHeadShas[1] = "f".repeat(40); },
+    (fixture) => { fixture.candidateWorkflowRunIds[2] = "999"; },
+    (fixture) => { fixture.selectedCandidateWorkflowRunId = "999"; },
+    (fixture) => writeFileSync(fixture.approvalPath, JSON.stringify([{
+      ...approvedReview(),
       environments: [{ name: "datapack-promotion" }, { name: "other" }],
-      user: { login: "AquilaXk" },
-    }]),
-    (fixture) => writeApproval(fixture, [approvedReview(), approvedReview()]),
-    (fixture) => writeFileSync(fixture.output, "sentinel"),
+    }])),
+    (fixture) => writeFileSync(fixture.approvalPath, JSON.stringify([approvedReview(), approvedReview()])),
     (fixture) => {
       const link = `${fixture.compatibilityPath}.link`;
       symlinkSync(fixture.compatibilityPath, link);
       fixture.compatibilityPath = link;
     },
-    (fixture) => writeCompatibility(fixture, { ...fixture.compatibility, decision: "NO_GO" }),
-    (fixture) => writeCompatibility(fixture, { ...fixture.compatibility, extra: true }),
+    (fixture) => writeFileSync(fixture.compatibilityPath, JSON.stringify({ ...compatibilityValue(fixture.components[0]), decision: "NO_GO" })),
+    (fixture) => writeFileSync(fixture.compatibilityPath, JSON.stringify({ ...compatibilityValue(fixture.components[0]), extra: true })),
     (fixture) => { fixture.workflowRunId = "0"; },
-  ];
-  for (const mutate of cases) assertRejectedWithoutOutputDamage(mutate);
+    (fixture) => writeFileSync(fixture.output, "sentinel"),
+    (fixture) => writeFileSync(fixture.evidenceOutput, "evidence-sentinel"),
+  ]) assertRejectedWithoutOutputDamage(mutate);
 });
 
-test("inventory는 non-empty sorted unique safe POSIX path만 허용한다", () => {
-  const cases = [
-    [],
-    [entry("b.bin"), entry("a.bin")],
-    [entry("a.bin"), entry("a.bin")],
-    [entry("/absolute.bin")],
-    [entry("nested\\windows.bin")],
-    [entry("nested/../escape.bin")],
-    [{ ...entry("a.bin"), extra: true }],
-  ];
-  for (const entries of cases) {
-    assertRejectedWithoutOutputDamage((fixture) => replaceInventory(fixture, entries));
+test("candidate signature validation key가 없으면 fail closed한다", () => {
+  for (const env of [
+    { EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: "" },
+    { EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: "" },
+  ]) {
+    const fixture = createFixture();
+    try {
+      assert.notEqual(run(fixture, env).status, 0);
+    } finally {
+      fixture.cleanup();
+    }
   }
+});
+
+test("standalone candidate verifier는 approved build spec source snapshot set에 결속한다", () => {
+  const fixture = createFixture();
+  try {
+    const approvedSpec = file(fixture.root, "approved-build-spec.json", JSON.stringify({
+      sourceSnapshotSetHash: "c".repeat(64),
+      builderGitSha: "a".repeat(40),
+    }));
+    assert.equal(runCandidateVerifier(fixture, approvedSpec).status, 0);
+    const differentSpec = file(fixture.root, "different-build-spec.json", JSON.stringify({
+      sourceSnapshotSetHash: "d".repeat(64),
+      builderGitSha: "a".repeat(40),
+    }));
+    const result = runCandidateVerifier(fixture, differentSpec);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /candidate source snapshot set hash does not match build spec/);
+    const differentBuilderSpec = file(fixture.root, "different-builder-build-spec.json", JSON.stringify({
+      sourceSnapshotSetHash: "c".repeat(64),
+      builderGitSha: "b".repeat(40),
+    }));
+    const builderResult = runCandidateVerifier(fixture, differentBuilderSpec);
+    assert.notEqual(builderResult.status, 0);
+    assert.match(builderResult.stderr, /candidate builder git SHA does not match build spec/);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("manifest declared pack 누락과 undeclared sqlite pack을 fail closed한다", () => {
+  for (const mutate of [
+    (fixture) => fixture.roots.forEach((root) => unlinkSync(path.join(root, "catalog/capital-v1.sqlite.gz"))),
+    (fixture) => fixture.roots.forEach((root) => file(root, "catalog/extra.sqlite.gz", "extra")),
+  ]) {
+    const fixture = createFixture();
+    try {
+      mutate(fixture);
+      refreshCandidateMetadata(fixture);
+      assert.notEqual(run(fixture).status, 0);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+});
+
+test("signed manifest와 다른 declared pack bytes를 fail closed한다", () => {
+  const fixture = createFixture();
+  try {
+    fixture.roots.forEach((root) => file(root, "catalog/capital-v1.sqlite.gz", "replaced"));
+    refreshCandidateMetadata(fixture);
+    assert.notEqual(run(fixture).status, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("duplicate candidate run IDs는 identity 검증 뒤 parity set에서 거부한다", () => {
+  const fixture = createFixture();
+  try {
+    rewriteComponent(fixture, 2, { workflowRunId: "124" });
+    fixture.candidateWorkflowRunIds[2] = "124";
+    const result = run(fixture);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /candidate parity is invalid/);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("candidate inventory는 safe POSIX path와 exact fields만 허용한다", () => {
+  for (const entries of [
+    [],
+    [{ path: "z.bin", sizeBytes: 1, sha256: "d".repeat(64) }, { path: "a.bin", sizeBytes: 1, sha256: "d".repeat(64) }],
+    [{ path: "artifact.bin", sizeBytes: 1, sha256: "d".repeat(64) }, { path: "artifact.bin", sizeBytes: 1, sha256: "d".repeat(64) }],
+    [{ path: "/absolute.bin", sizeBytes: 1, sha256: "d".repeat(64) }],
+    [{ path: "nested\\windows.bin", sizeBytes: 1, sha256: "d".repeat(64) }],
+    [{ path: "nested/../escape.bin", sizeBytes: 1, sha256: "d".repeat(64) }],
+    [{ path: "artifact.bin", sizeBytes: 1, sha256: "d".repeat(64), extra: true }],
+  ]) assertRejectedWithoutOutputDamage((fixture) => {
+    for (const candidateRoot of fixture.roots) {
+      writeFileSync(candidateRoot + "/data-artifact-inventory.json", JSON.stringify({
+        schemaVersion: 1,
+        artifactKind: "datapack-candidate-inventory",
+        entries,
+      }));
+    }
+  });
 });
 
 function assertRejectedWithoutOutputDamage(mutate) {
   const fixture = createFixture();
   try {
     mutate(fixture);
-    const prior = exists(fixture.output) ? readFileSync(fixture.output, "utf8") : null;
+    const priorEvidence = exists(fixture.evidenceOutput) ? readFileSync(fixture.evidenceOutput, "utf8") : null;
+    const priorRequest = exists(fixture.output) ? readFileSync(fixture.output, "utf8") : null;
     assert.notEqual(run(fixture).status, 0);
-    if (prior == null) assert.equal(exists(fixture.output), false);
-    else assert.equal(readFileSync(fixture.output, "utf8"), prior);
+    assert.equal(priorEvidence == null ? exists(fixture.evidenceOutput) : readFileSync(fixture.evidenceOutput, "utf8"), priorEvidence ?? false);
+    assert.equal(priorRequest == null ? exists(fixture.output) : readFileSync(fixture.output, "utf8"), priorRequest ?? false);
   } finally {
     fixture.cleanup();
   }
@@ -91,106 +206,150 @@ function assertRejectedWithoutOutputDamage(mutate) {
 
 function createFixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "promotion-build-"));
-  const inventory = inventoryValue();
-  const inventoryBytes = Buffer.from(JSON.stringify(inventory));
-  const component = componentValue(sha256(inventoryBytes));
-  const compatibility = compatibilityValue(component);
+  const roots = ["123", "124", "125"].map((workflowRunId, index) => {
+    const candidateRoot = path.join(root, `candidate-${index + 1}`);
+    file(candidateRoot, "artifact.bin", "artifact");
+    file(candidateRoot, "catalog/capital-v1.sqlite.gz", "pack");
+    const provenance = { schemaVersion: 1, artifactKind: "datapack-field-provenance", candidateBuild: { sourceSnapshotSetHash: "c".repeat(64) } };
+    file(candidateRoot, "current.provenance.json", JSON.stringify(provenance));
+    const manifestBytes = Buffer.from(JSON.stringify(productionManifest(readFileSync(path.join(candidateRoot, "catalog/capital-v1.sqlite.gz")))));
+    file(candidateRoot, "catalog/current.json", manifestBytes);
+    const inventoryBytes = Buffer.from(JSON.stringify(inventoryValue(candidateRoot)));
+    const component = componentValue(workflowRunId, sha256(inventoryBytes), sha256(manifestBytes));
+    file(candidateRoot, "data-component-manifest.json", JSON.stringify(component));
+    file(candidateRoot, "data-artifact-inventory.json", inventoryBytes);
+    return { root: candidateRoot, component, inventoryBytes };
+  });
+  const components = roots.map(({ component }) => component);
+  const inventoryBytes = roots[0].inventoryBytes;
+  const compatibility = compatibilityValue(components[0]);
   const compatibilityBytes = Buffer.from(JSON.stringify(compatibility));
   const approvalBytes = Buffer.from(JSON.stringify([approvedReview()]));
   return {
     root,
-    component,
-    componentPath: file(root, "component.json", JSON.stringify(component)),
-    inventoryPath: file(root, "inventory.json", inventoryBytes),
-    compatibility,
+    roots: roots.map(({ root: candidateRoot }) => candidateRoot),
+    components,
+    inventoryBytes,
     compatibilityPath: file(root, "compatibility.json", compatibilityBytes),
     compatibilityBytes,
     approvalPath: file(root, "approvals.json", approvalBytes),
     approvalBytes,
+    selectedCandidateWorkflowRunId: "123",
+    candidateWorkflowRunIds: ["123", "124", "125"],
+    candidateHeadShas: ["a".repeat(40), "a".repeat(40), "a".repeat(40)],
     workflowRunId: "456",
+    evidenceOutput: path.join(root, "rebuild-parity-evidence.json"),
     output: path.join(root, "request.json"),
     cleanup: () => rmSync(root, { recursive: true, force: true }),
   };
 }
 
-function replaceInventory(fixture, entries) {
-  const bytes = Buffer.from(JSON.stringify(inventoryValue(entries)));
-  writeFileSync(fixture.inventoryPath, bytes);
-  fixture.component.artifactInventorySha256 = sha256(bytes);
-  writeFileSync(fixture.componentPath, JSON.stringify(fixture.component));
+function rewriteComponent(fixture, index, patch) {
+  fixture.components[index] = { ...fixture.components[index], ...patch };
+  writeFileSync(path.join(fixture.roots[index], "data-component-manifest.json"), JSON.stringify(fixture.components[index]));
 }
 
-function writeApproval(fixture, reviews) {
-  writeFileSync(fixture.approvalPath, JSON.stringify(reviews));
-}
-
-function writeCompatibility(fixture, value) {
-  writeFileSync(fixture.compatibilityPath, JSON.stringify(value));
+function refreshCandidateMetadata(fixture) {
+  fixture.components = fixture.roots.map((root, index) => {
+    const inventoryBytes = Buffer.from(JSON.stringify(inventoryValue(root)));
+    const component = componentValue(
+      fixture.candidateWorkflowRunIds[index], sha256(inventoryBytes),
+      sha256(readFileSync(path.join(root, "catalog/current.json"))),
+    );
+    writeFileSync(path.join(root, "data-artifact-inventory.json"), inventoryBytes);
+    writeFileSync(path.join(root, "data-component-manifest.json"), JSON.stringify(component));
+    return component;
+  });
+  writeFileSync(fixture.compatibilityPath, JSON.stringify(compatibilityValue(fixture.components[0])));
 }
 
 function approvedReview() {
   return { state: "approved", environments: [{ name: "datapack-promotion" }], user: { login: "AquilaXk" } };
 }
 
-function inventoryValue(entries = [entry("artifact.bin")]) {
-  return { schemaVersion: 1, artifactKind: "datapack-candidate-inventory", entries };
-}
-
-function entry(artifactPath) {
-  return { path: artifactPath, sizeBytes: 1, sha256: "d".repeat(64) };
-}
-
-function componentValue(inventorySha256) {
+function inventoryValue(root) {
+  const entries = ["artifact.bin", "catalog/current.json", "current.provenance.json", "catalog/capital-v1.sqlite.gz", "catalog/extra.sqlite.gz"]
+    .filter((entry) => exists(path.join(root, entry))).sort().map((entry) => {
+    const bytes = readFileSync(path.join(root, entry));
+    return { path: entry, sizeBytes: bytes.length, sha256: sha256(bytes) };
+  });
   return {
     schemaVersion: 1,
-    component: "data",
-    repository: "AquilaXk/easysubway",
-    gitSha: "a".repeat(40),
-    workflowRunId: "123",
-    dataVersion: "1",
-    releaseSequence: 1,
-    manifestSha256: "b".repeat(64),
-    provenance: { sourceSnapshotSetHash: "c".repeat(64) },
-    artifactInventorySha256: inventorySha256,
-    contractVersion: "datapack-contract-v3",
-    issueRef: "AquilaXk/easysubway#2699",
+    artifactKind: "datapack-candidate-inventory",
+    entries,
   };
+}
+
+function componentValue(workflowRunId, artifactInventorySha256, manifestSha256) {
+  return {
+    schemaVersion: 1, component: "data", repository: "AquilaXk/easysubway-data", gitSha: "a".repeat(40),
+    workflowRunId, dataVersion: "1", releaseSequence: 1, manifestSha256,
+    provenance: { sourceSnapshotSetHash: "c".repeat(64) }, artifactInventorySha256,
+    contractVersion: "datapack-contract-v3", issueRef: "AquilaXk/easysubway#2705",
+  };
+}
+
+function productionManifest(packBytes) {
+  const manifest = {
+    manifestVersion: 2, channel: "production", releaseSequence: 1,
+    publishedAt: "2026-07-30T00:00:00.000Z", expiresAt: "2026-08-01T00:00:00.000Z",
+    keyId: "production-v1", ttlSeconds: 3600, activePack: { id: "capital", version: "1" },
+    packs: [{
+      id: "capital", version: "1", artifactKind: "production", url: "https://datapack.example.org/catalog/capital-v1.sqlite.gz",
+      sha256: sha256(packBytes), sqliteSha256: "b".repeat(64), sizeBytes: packBytes.length,
+      signature: { algorithm: "rsa-sha256-pack-manifest-v2", value: "x" }, schemaVersion: "1",
+      sourceInventory: [{ id: "source", owner: "owner", url: "https://data.example.org/source", license: "open", licenseStatus: "redistributable", redistributionAllowed: true, updateFrequency: "daily", updatedAt: "2026-07-30T00:00:00.000Z", fields: ["stations"], coverageScope: { regionIds: ["capital"], operatorIds: ["operator"], sourceDomains: ["data.example.org"] } }],
+      regionalQualityMetrics: { stationCount: 1, edgeCount: 1, facilityCoverageRatio: 1, requiredFacilityEvidenceCoverageRatio: 1, strictRouteEligibleFacilityRatio: 1, operationalKnownRatio: 1, freshnessValidRatio: 1, fieldVerifiedPathwayRatio: 1, unknownAccessibilityRatio: 0, unknownEdgeRatioByProfile: { wheelchair: 0, stroller: 0, lowMobility: 0 } },
+      representativeRouteRegressions: [], representativeRouteRegressionSignature: { algorithm: "sha256-route-regression-v1", value: "d".repeat(64) },
+      requiredTables: ["stations", "station_lines", "network_edges", "facilities", "station_facility_evidence"], minimumTableRows: { stations: 1, station_lines: 1, network_edges: 1, facilities: 1, station_facility_evidence: 1 },
+    }],
+  };
+  manifest.signature = { algorithm: "rsa-sha256-manifest-v2", value: createSign("RSA-SHA256").update(canonicalJson(withoutSignature(manifest))).sign(privateKey).toString("base64url") };
+  return manifest;
 }
 
 function compatibilityValue(component) {
-  return {
-    schemaVersion: 1,
-    artifactKind: "datapack-mobile-compatibility-evidence",
-    decision: "PASS",
-    candidate: structuredClone(component),
-  };
+  return { schemaVersion: 1, artifactKind: "datapack-mobile-compatibility-evidence", decision: "PASS", candidate: structuredClone(component) };
 }
 
 function file(root, name, value) {
   const target = path.join(root, name);
+  mkdirSync(path.dirname(target), { recursive: true });
   writeFileSync(target, value);
   return target;
 }
 
 function exists(target) {
-  try {
-    readFileSync(target);
-    return true;
-  } catch {
-    return false;
-  }
+  try { readFileSync(target); return true; } catch { return false; }
 }
 
-function run(fixture) {
+function run(fixture, env = {}) {
   return spawnSync(process.execPath, [
     script,
-    "--component", fixture.componentPath,
-    "--inventory", fixture.inventoryPath,
-    "--compatibility-evidence", fixture.compatibilityPath,
-    "--requested-by", "AquilaXk",
-    "--approval-evidence", fixture.approvalPath,
-    "--workflow-run-id", fixture.workflowRunId,
-    "--issue-ref", "AquilaXk/easysubway#2699",
+    "--candidate-root-1", fixture.roots[0], "--candidate-root-2", fixture.roots[1], "--candidate-root-3", fixture.roots[2],
+    "--candidate-workflow-run-id-1", fixture.candidateWorkflowRunIds[0], "--candidate-workflow-run-id-2", fixture.candidateWorkflowRunIds[1], "--candidate-workflow-run-id-3", fixture.candidateWorkflowRunIds[2],
+    "--candidate-head-sha-1", fixture.candidateHeadShas[0], "--candidate-head-sha-2", fixture.candidateHeadShas[1], "--candidate-head-sha-3", fixture.candidateHeadShas[2],
+    "--selected-candidate-workflow-run-id", fixture.selectedCandidateWorkflowRunId,
+    "--compatibility-evidence", fixture.compatibilityPath, "--requested-by", "AquilaXk",
+    "--approval-evidence", fixture.approvalPath, "--workflow-run-id", fixture.workflowRunId,
+    "--issue-ref", "AquilaXk/easysubway#2705", "--rebuild-parity-evidence-output", fixture.evidenceOutput,
     "--output", fixture.output,
-  ], { encoding: "utf8" });
+  ], { encoding: "utf8", env: { ...process.env, EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: signingPublicKey, EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: "production-v1", ...env } });
+}
+
+function runCandidateVerifier(fixture, buildSpec) {
+  return spawnSync(process.execPath, [
+    candidateVerifier,
+    "--root", fixture.roots[0],
+    "--workflow-run-id", fixture.candidateWorkflowRunIds[0],
+    "--git-sha", fixture.candidateHeadShas[0],
+    "--build-spec", buildSpec,
+  ], {
+    encoding: "utf8",
+    env: {
+      ...process.env,
+      EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: signingPublicKey,
+      EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: "production-v1",
+    },
+  });
 }

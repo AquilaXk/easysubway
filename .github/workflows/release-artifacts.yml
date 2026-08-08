@@ -110,28 +110,36 @@ jobs:
           node-version: "24"
       - name: Data Pack Mobile Compatibility / Validate candidate run and artifact
         env:
-          GH_TOKEN: ${{ github.token }}
+          EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
           CANDIDATE_RUN_ID: ${{ inputs.datapack_candidate_run_id }}
         run: |
           set -euo pipefail
-          [[ "${CANDIDATE_RUN_ID}" =~ ^[1-9][0-9]*$ ]]
-          metadata="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_RUN_ID}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_sha, .path] | @tsv')"
+          data_repository="AquilaXk/easysubway-data"
+          if [[ ! "${CANDIDATE_RUN_ID}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "candidate run ID must be a positive decimal" >&2
+            exit 1
+          fi
+          metadata="$(GH_TOKEN="${EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN}" gh api "repos/${data_repository}/actions/runs/${CANDIDATE_RUN_ID}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_sha, .path] | @tsv')"
           IFS=$'\t' read -r run_id conclusion repository head_repository event head_sha workflow_path_raw <<< "${metadata}"
           workflow_path="${workflow_path_raw%@*}"
-          [[ "${run_id}" == "${CANDIDATE_RUN_ID}" && "${conclusion}" == "success" \
-            && "${repository}" == "${GITHUB_REPOSITORY}" && "${head_repository}" == "${GITHUB_REPOSITORY}" \
-            && "${event}" == "workflow_dispatch" && "${head_sha}" =~ ^[a-f0-9]{40}$ \
-            && "${workflow_path}" == ".github/workflows/datapack-release.yml" ]]
+          if [[ "${run_id}" != "${CANDIDATE_RUN_ID}" || "${conclusion}" != "success" \
+            || "${repository}" != "${data_repository}" || "${head_repository}" != "${data_repository}" \
+            || "${event}" != "workflow_dispatch" || ! "${head_sha}" =~ ^[a-f0-9]{40}$ \
+            || "${workflow_path}" != ".github/workflows/datapack-release.yml" ]]; then
+            echo "candidate must be a successful easysubway-data workflow_dispatch Data Pack Release run" >&2
+            exit 1
+          fi
           echo "CANDIDATE_HEAD_SHA=${head_sha}" >> "${GITHUB_ENV}"
-          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_RUN_ID}/artifacts?name=easysubway-datapack-candidate-${CANDIDATE_RUN_ID}&per_page=100" > "${RUNNER_TEMP}/candidate-artifacts.json"
+          GH_TOKEN="${EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN}" gh api "repos/${data_repository}/actions/runs/${CANDIDATE_RUN_ID}/artifacts?name=easysubway-datapack-candidate-${CANDIDATE_RUN_ID}&per_page=100" > "${RUNNER_TEMP}/candidate-artifacts.json"
           node tools/ci/require-workflow-artifact.mjs "${RUNNER_TEMP}/candidate-artifacts.json" "easysubway-datapack-candidate-${CANDIDATE_RUN_ID}" "${CANDIDATE_RUN_ID}" "${head_sha}"
       - name: Data Pack Mobile Compatibility / Download candidate
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
+          repository: AquilaXk/easysubway-data
           name: easysubway-datapack-candidate-${{ inputs.datapack_candidate_run_id }}
           path: ${{ runner.temp }}/candidate
           run-id: ${{ inputs.datapack_candidate_run_id }}
-          github-token: ${{ github.token }}
+          github-token: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
       - name: Data Pack Mobile Compatibility / Build evidence
         run: node tools/release/build-datapack-mobile-compatibility-evidence.mjs --component "${RUNNER_TEMP}/candidate/data-component-manifest.json" --manifest "${RUNNER_TEMP}/candidate/catalog/current.json" --matrix contracts/datapack/compatibility-matrix.json --pubspec apps/mobile/pubspec.yaml --output "${RUNNER_TEMP}/compatibility-evidence.json"
       - name: Data Pack Mobile Compatibility / Upload evidence
