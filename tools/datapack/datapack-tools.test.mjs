@@ -187,6 +187,11 @@ const productionEnv = {
   EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: testPublicKeyPem,
   EASYSUBWAY_DATAPACK_PRODUCTION_FIXTURE_VALIDATION_ONLY: "true",
 };
+const candidateReplayEnv = {
+  ...productionEnv,
+  // ponytail: committed fixture replay clock; release workflow keeps actual time.
+  EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-30T00:00:00.000Z",
+};
 
 test("데이터팩 생성기는 TEST_ONLY admission fixture를 build input으로 거부한다", async (context) => {
   const outputDir = await mkdtemp(path.join(tmpdir(), "easysubway-itx-test-only-"));
@@ -17966,7 +17971,7 @@ test("official OD fare release candidate는 승인된 두 방향 quote와 proven
     await execFileAsync(
       process.execPath,
       ["tools/datapack/build-datapack.mjs", "--build-spec", "tools/datapack/release/candidate-build-spec.json", "--output", outputDir],
-      { cwd: root, env: productionEnv },
+      { cwd: root, env: candidateReplayEnv },
     );
     const database = new DatabaseSync(path.join(outputDir, "catalog/capital-v1.sqlite"));
     let rows;
@@ -18019,7 +18024,7 @@ test("official OD fare release candidate는 승인 quote 순서에 의존하지 
       "tools/datapack/build-datapack.mjs",
       "--build-spec", buildSpecPath,
       "--output", path.join(workspace, "output"),
-    ], { cwd: root, env: productionEnv });
+    ], { cwd: root, env: candidateReplayEnv });
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }
@@ -18088,7 +18093,7 @@ test("official OD fare release candidate는 admission과 다른 quote set eviden
       execFileAsync(
         process.execPath,
         ["tools/datapack/build-datapack.mjs", "--build-spec", buildSpecPath, "--output", path.join(workspace, "output")],
-        { cwd: root, env: productionEnv },
+        { cwd: root, env: candidateReplayEnv },
       ),
       /officialOdFareEvidence.quoteSetHash must match admission/,
     );

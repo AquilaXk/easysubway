@@ -1706,6 +1706,25 @@ test("기본 PR 템플릿은 등급 안내와 최소 섹션을 포함한다", ()
   assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
 });
 
+test("PR template documentation impact proposal은 default full short에서 같은 판정 필드를 유지한다", () => {
+  const sections = [
+    ".github/pull_request_template.md",
+    ".github/PULL_REQUEST_TEMPLATE/full.md",
+    ".github/PULL_REQUEST_TEMPLATE/short.md",
+  ].map((path) => {
+    const template = read(path);
+    const start = template.indexOf("## Documentation impact");
+    assert.notEqual(start, -1);
+    const end = template.indexOf("\n## ", start + 1);
+    return template.slice(start, end === -1 ? undefined : end).trim();
+  });
+  assert.deepEqual(sections, [sections[0], sections[0], sections[0]]);
+  assert.match(sections[0], /영향 resource ID 또는 `NONE`/);
+  assert.match(sections[0], /resourceClass/);
+  assert.match(sections[0], /documentationFamily/);
+  assert.match(sections[0], /lifecycle\/evidence 영향/);
+});
+
 test("이슈 템플릿은 에이전트 서술 없이 개발자 판단 정보를 수집한다", () => {
   const templates = [
     read(".github/ISSUE_TEMPLATE/bug_report.yml"),

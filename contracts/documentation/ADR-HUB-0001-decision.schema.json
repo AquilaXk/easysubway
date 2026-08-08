@@ -1,0 +1,262 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "easysubway/contracts/documentation/ADR-HUB-0001-decision",
+  "title": "ADR-HUB-0001 decision policy",
+  "type": "object",
+  "required": [
+    "trackedHumanDocumentFormat",
+    "durableMachineFormat",
+    "humanReviewSurfaces",
+    "artifactKinds",
+    "repositoryOwners",
+    "lifecycle",
+    "contentBoundary",
+    "hubCatalog",
+    "sensitiveEvidence",
+    "childIssuePolicy",
+    "changeGrades",
+    "implementationFallbackAllowed"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "trackedHumanDocumentFormat": {
+      "const": "NONE"
+    },
+    "durableMachineFormat": {
+      "const": "JSON"
+    },
+    "humanReviewSurfaces": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "github-issue",
+          "github-pr-review"
+        ]
+      }
+    },
+    "artifactKinds": {
+      "type": "array",
+      "minItems": 8,
+      "maxItems": 8,
+      "uniqueItems": true,
+      "items": {
+        "enum": [
+          "ADR",
+          "DESIGN",
+          "RUNBOOK",
+          "PLAYBOOK",
+          "POLICY",
+          "GATE",
+          "EVIDENCE",
+          "PIR"
+        ]
+      }
+    },
+    "repositoryOwners": {
+      "type": "object",
+      "required": [
+        "hub",
+        "data",
+        "backend",
+        "mobile",
+        "platform"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "hub": {
+          "const": "AquilaXk/easysubway"
+        },
+        "data": {
+          "const": "AquilaXk/easysubway-data"
+        },
+        "backend": {
+          "const": "AquilaXk/easysubway-backend"
+        },
+        "mobile": {
+          "const": "AquilaXk/easysubway-mobile"
+        },
+        "platform": {
+          "const": "AquilaXk/easysubway-platform"
+        }
+      }
+    },
+    "lifecycle": {
+      "type": "object",
+      "required": [
+        "adrStatuses",
+        "operationalStatuses",
+        "acceptedMutationPolicy",
+        "identifierReuseAllowed"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "adrStatuses": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "proposed",
+              "accepted",
+              "rejected",
+              "withdrawn",
+              "superseded"
+            ]
+          }
+        },
+        "operationalStatuses": {
+          "type": "array",
+          "minItems": 4,
+          "maxItems": 4,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "draft",
+              "active",
+              "deprecated",
+              "retired"
+            ]
+          }
+        },
+        "acceptedMutationPolicy": {
+          "const": "SUPERSEDE_ONLY"
+        },
+        "identifierReuseAllowed": {
+          "const": false
+        }
+      }
+    },
+    "contentBoundary": {
+      "type": "object",
+      "required": [
+        "humanJudgment",
+        "machineContract",
+        "executableProcedure",
+        "gate",
+        "evidence"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "humanJudgment": {
+          "const": "GITHUB_ISSUE_AND_PR_REVIEW"
+        },
+        "machineContract": {
+          "const": "VERSIONED_JSON"
+        },
+        "executableProcedure": {
+          "const": "TRACKED_SCRIPT_OR_WORKFLOW"
+        },
+        "gate": {
+          "const": "MACHINE_DECISION_JSON"
+        },
+        "evidence": {
+          "const": "IMMUTABLE_RESULT_OR_DIGEST_REFERENCE"
+        }
+      }
+    },
+    "hubCatalog": {
+      "type": "object",
+      "required": [
+        "targetContentReplicationAllowed",
+        "navigationReference",
+        "releaseBinding"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "targetContentReplicationAllowed": {
+          "const": false
+        },
+        "navigationReference": {
+          "const": "REPOSITORY_AND_PATH"
+        },
+        "releaseBinding": {
+          "const": "FULL_SHA_AND_MANIFEST_DIGEST"
+        }
+      }
+    },
+    "sensitiveEvidence": {
+      "type": "object",
+      "required": [
+        "trackedContentAllowed",
+        "forbiddenClasses"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "trackedContentAllowed": {
+          "const": false
+        },
+        "forbiddenClasses": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "SECRET",
+              "RAW_TOKEN",
+              "PERSONAL_DATA",
+              "PRIVATE_CONTACT",
+              "PRIVATE_ENDPOINT_CREDENTIAL"
+            ]
+          }
+        }
+      }
+    },
+    "childIssuePolicy": {
+      "type": "object",
+      "required": [
+        "firstChildAfter",
+        "inventoryRequiredBefore"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "firstChildAfter": {
+          "const": "ADR_HUB_0001_MERGED"
+        },
+        "inventoryRequiredBefore": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "uniqueItems": true,
+          "items": {
+            "enum": [
+              "SCHEMA_CATALOG_BOOTSTRAP",
+              "ADR_MIGRATION",
+              "OPERATIONAL_MIGRATION",
+              "ALERT_GATE_EVIDENCE_BINDING",
+              "DRILL_AND_PIR",
+              "DUPLICATE_HANDOFF"
+            ]
+          }
+        }
+      }
+    },
+    "changeGrades": {
+      "type": "object",
+      "required": [
+        "A",
+        "B",
+        "C"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "A": {
+          "const": "FULL_ADR_AND_OPERATIONAL_IMPACT"
+        },
+        "B": {
+          "const": "ADR_WHEN_ARCHITECTURALLY_SIGNIFICANT"
+        },
+        "C": {
+          "const": "NO_ADR"
+        }
+      }
+    },
+    "implementationFallbackAllowed": {
+      "const": false
+    }
+  }
+}

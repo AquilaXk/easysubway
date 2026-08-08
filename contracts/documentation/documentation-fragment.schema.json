@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "easysubway/contracts/documentation/documentation-fragment",
+  "title": "EasySubway target documentation fragment",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "repository", "gitSha", "status", "lastVerifiedAt", "verificationEvidence", "resources"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "const": "./documentation-fragment.schema.json" },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "repository": { "type": "string", "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-data", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "status": { "type": "string", "enum": ["PROPOSED", "ACTIVE"] },
+    "lastVerifiedAt": { "type": ["string", "null"] },
+    "verificationEvidence": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
+    "resources": { "type": "array", "items": { "type": "object" } }
+  }
+}

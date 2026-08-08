@@ -16,6 +16,9 @@
         "/largeScreenScreenshotTargets",
         "/appContentDeclarations/reviewerAccessNotesKo"
       ]
+    },
+    {
+      "path": "README.md"
     }
   ],
   "forbiddenClaimsKo": [
@@ -27,6 +30,9 @@
     "실시간 보장",
     "항상 정확",
     "실시간 길찾기 정확 보장",
+    "길찾기도 기기 안에서 끝납니다",
+    "오프라인 길찾기",
+    "인터넷 없이도 길찾기",
     "장애인"
   ],
   "allowedPhrasesKo": [
