@@ -24,6 +24,7 @@ import {
   validateDocumentationFragment,
   validateDocumentationSystemCatalog,
   validateGateIndex,
+  validateProductClaimCatalog,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
@@ -64,10 +65,12 @@ function createExternalWorkspace() {
     freshnessPolicy: "inputs/freshness-policy.json",
     architectureDecision: "inputs/architecture-decision.json",
     documentationSystemCatalog: "inputs/documentation-system-catalog.json",
+    productClaimCatalog: "inputs/product-claim-catalog.json",
   }));
   copy("contracts/documentation/ADR-HUB-0001.json", "inputs/architecture-decision.json");
   copy("contracts/documentation/ADR-HUB-0001-decision.schema.json", "inputs/ADR-HUB-0001-decision.schema.json");
   copy("contracts/documentation/documentation-system-catalog.json", "inputs/documentation-system-catalog.json");
+  copy("contracts/documentation/product-claim-catalog.json", "inputs/product-claim-catalog.json");
   return { directory, workspacePath };
 }
 
@@ -382,6 +385,7 @@ test("documentation catalog uses workspace-selected fragment schemas and sanitiz
   try {
     const contracts = join(fixture.directory, "selected-contracts");
     cpSync("contracts", contracts, { recursive: true });
+    cpSync("README.md", join(fixture.directory, "README.md"));
     mkdirSync(join(fixture.directory, "release/migrations"), { recursive: true });
     cpSync("release/migrations/repository-split-issues.json", join(fixture.directory, "release/migrations/repository-split-issues.json"));
     const workspace = loadJson(fixture.workspacePath);
@@ -851,6 +855,7 @@ test("documentation catalog CLI accepts compatibility modes and rejects malforme
       const copied = join(clone, "fixture");
       mkdirSync(copied);
       cpSync("contracts", join(clone, "contracts"), { recursive: true });
+      cpSync("README.md", join(clone, "README.md"));
       for (const name of ["hub.json", "inputs", "gates"]) cpSync(join(fixture.directory, name), join(copied, name), { recursive: true });
       mkdirSync(join(clone, "release/migrations"), { recursive: true });
       cpSync("release/migrations/repository-split-issues.json", join(clone, "release/migrations/repository-split-issues.json"));
@@ -955,6 +960,184 @@ test("[gate-ownership] check-contracts CLI는 정확한 workspace 인자만 허�
     assert.throws(() => run(args), /사용법/);
   }
 });
+
+test("product claim catalog validates current release decision and public claim semantics", () => {
+  const schema = loadJson("contracts/documentation/product-claim-catalog.schema.json");
+  const catalog = loadJson("contracts/documentation/product-claim-catalog.json");
+  const errors = [];
+  validateProductClaimCatalog(catalog, schema, errors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.deepEqual(errors, []);
+
+  const invalid = structuredClone(catalog);
+  invalid.releaseDecision = "GO";
+  invalid.claims.find(({ assertionState }) => assertionState === "CURRENTLY_IMPLEMENTED_AND_EVIDENCED").requiredEvidence = [];
+  const invalidErrors = [];
+  validateProductClaimCatalog(invalid, schema, invalidErrors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.ok(invalidErrors.some((error) => error.includes("releaseDecision")));
+  assert.ok(invalidErrors.some((error) => error.includes("requiredEvidence")));
+
+  const schemaInvalid = structuredClone(catalog);
+  schemaInvalid.unexpected = true;
+  const schemaErrors = [];
+  validateProductClaimCatalog(schemaInvalid, schema, schemaErrors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.ok(schemaErrors.some((error) => error.includes("허용되지 않은 필드")));
+});
+
+for (const [name, mutate, expected] of [
+  ["required inventory deletion", (catalog) => { catalog.claims = catalog.claims.filter(({ claimId }) => claimId !== "PRODUCT_CLAIM_VISION"); }, "inventory"],
+  ["required inventory addition", (catalog) => { catalog.claims.push({ ...structuredClone(catalog.claims.at(-1)), claimId: "PRODUCT_CLAIM_EXTRA", topic: "VISION" }); }, "inventory"],
+  ["required inventory topic binding", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_VISION").topic = "PRIVACY"; }, "inventory"],
+  ["duplicate claim ID", (catalog) => { catalog.claims[1].claimId = catalog.claims[0].claimId; }, "claimId"],
+  ["unsorted claim ID", (catalog) => { [catalog.claims[0], catalog.claims[1]] = [catalog.claims[1], catalog.claims[0]]; }, "claimId"],
+  ["duplicate surface", (catalog) => { catalog.claims[0].surface = ["README.md", "README.md"]; }, "surface"],
+  ["unsorted review trigger", (catalog) => { catalog.claims[0].reviewTrigger = ["z", "a"]; }, "reviewTrigger"],
+  ["final state on current surface", (catalog) => { catalog.claims[0].assertionState = "HISTORICAL_OR_SUPERSEDED"; }, "current public"],
+  ["required-final current surface", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_JOURNEY_FINAL").surface = ["README.md"]; }, "required-final"],
+  ["README scan target drift", (catalog, forbiddenClaims) => { forbiddenClaims.scanTargets = forbiddenClaims.scanTargets.filter(({ path }) => path !== "README.md"); }, "README.md scan target"],
+  ["non-array README scan target", (catalog, forbiddenClaims) => { forbiddenClaims.scanTargets = "README.md"; }, "README.md scan target"],
+  ["null or primitive README scan target", (catalog, forbiddenClaims) => { forbiddenClaims.scanTargets = [null, "README.md"]; }, "README.md scan target"],
+]) {
+  test(`product claim catalog rejects ${name}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    const forbiddenClaims = loadJson("release/product-gates/forbidden-release-claims.json");
+    mutate(catalog, forbiddenClaims);
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+      forbiddenClaims,
+    });
+    assert.ok(errors.some((error) => error.includes(expected)));
+  });
+}
+
+test("product claim catalog rejects empty forbiddenWhen", () => {
+  const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+  const claim = catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_ANONYMOUS_REPORT");
+  claim.forbiddenWhen = [];
+  const errors = [];
+  validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.ok(errors.some((error) => error.includes("forbiddenWhen")));
+});
+
+for (const field of ["requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
+  test(`product claim catalog rejects duplicate ${field}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    const claim = catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_ANONYMOUS_REPORT");
+    claim[field] = [claim[field][0], claim[field][0]];
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+      forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+    });
+    assert.ok(errors.some((error) => error.includes(field)));
+  });
+
+  test(`product claim catalog rejects unsorted ${field}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_ANONYMOUS_REPORT")[field] = ["z", "a"];
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+      forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+    });
+    assert.ok(errors.some((error) => error.includes(field)));
+  });
+}
+
+for (const [name, mutate, expected] of [
+  ["top-level GO does not leave NO_GO claim and README", (catalog) => {}, "release-status claim decision token"],
+  ["GO claim does not leave NO_GO README", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다."; }, "README.md decision token"],
+  ["missing release-status claim token", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정을 확인합니다."; }, "release-status claim decision token"],
+  ["multiple release-status claim tokens", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "GO와 NO_GO를 함께 쓰지 않습니다."; }, "release-status claim decision token"],
+  ["opposite release-status claim token", (catalog) => {}, "release-status claim decision token"],
+  ["missing README decision token", (catalog, readme) => { readme.text = "현재 출시 결정을 확인합니다."; }, "README.md decision token"],
+  ["multiple README decision tokens", (catalog, readme) => { readme.text = "GO와 NO_GO를 함께 쓰지 않습니다."; }, "README.md decision token"],
+  ["opposite README decision token", (catalog, readme) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다."; readme.text = "현재 출시 결정은 NO_GO입니다."; }, "README.md decision token"],
+]) {
+  test(`product claim catalog rejects ${name}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    const readme = { text: readFileSync("README.md", "utf8") };
+    catalog.releaseDecision = "GO";
+    const releaseDecision = loadJson("release/product-gates/production-datapack-scope.json");
+    releaseDecision.decision.currentLaunchDecision = "GO";
+    mutate(catalog, readme);
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision,
+      forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+      publicCopy: readme.text,
+    });
+    assert.ok(errors.some((error) => error.includes(expected)));
+  });
+}
+
+test("product claim catalog accepts matching GO release-status tokens", () => {
+  const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+  catalog.releaseDecision = "GO";
+  catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다.";
+  const releaseDecision = loadJson("release/product-gates/production-datapack-scope.json");
+  releaseDecision.decision.currentLaunchDecision = "GO";
+  const errors = [];
+  validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+    releaseDecision,
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+    publicCopy: "현재 출시 결정은 GO입니다.",
+  });
+  assert.deepEqual(errors, []);
+});
+
+test("product claim catalog reads the workspace README public surface", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const catalogPath = join(directory, "inputs/product-claim-catalog.json");
+    const catalog = loadJson(catalogPath);
+    catalog.releaseDecision = "GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다.";
+    writeFileSync(catalogPath, JSON.stringify(catalog));
+    const releaseDecisionPath = join(directory, "gates/hub/production-datapack-scope.json");
+    const releaseDecision = loadJson(releaseDecisionPath);
+    releaseDecision.decision.currentLaunchDecision = "GO";
+    writeFileSync(releaseDecisionPath, JSON.stringify(releaseDecision));
+
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("README.md decision token")));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+for (const [label, filename, mutate] of [
+  ["production-datapack-scope", "production-datapack-scope.json", (path) => rmSync(path)],
+  ["production-datapack-scope", "production-datapack-scope.json", (path) => writeFileSync(path, "{")],
+  ["production-datapack-scope", "production-datapack-scope.json", (path) => writeFileSync(path, "[]")],
+  ["forbidden-release-claims", "forbidden-release-claims.json", (path) => rmSync(path)],
+  ["forbidden-release-claims", "forbidden-release-claims.json", (path) => writeFileSync(path, "{")],
+  ["forbidden-release-claims", "forbidden-release-claims.json", (path) => writeFileSync(path, "[]")],
+]) {
+  test(`product claim catalog sanitizes invalid ${label} input`, () => {
+    const { directory, workspacePath } = createExternalWorkspace();
+    try {
+      mutate(join(directory, "gates/hub", filename));
+      let errors;
+      assert.doesNotThrow(() => { errors = collectContractErrors(workspacePath); });
+      assert.ok(errors.some((error) => error.includes(`product-claim-catalog: ${label} input이 유효한 JSON object여야 한다`)));
+      assert.ok(errors.every((error) => !error.includes(directory)));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
 
 test("repository split issue migration ledger가 계약 gate를 통과한다", () => {
   const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
@@ -1723,6 +1906,7 @@ test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 
       freshnessPolicy: resolve(previousCwd, "release/product-gates/datapack-freshness-sla.json"),
       architectureDecision: "docs/ADR-HUB-0001.json",
       documentationSystemCatalog: resolve(previousCwd, "contracts/documentation/documentation-system-catalog.json"),
+      productClaimCatalog: resolve(previousCwd, "contracts/documentation/product-claim-catalog.json"),
     }));
     const rootLevel = structuredClone(root);
     bindRootDecisionSchema(repository, rootLevel);
