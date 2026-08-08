@@ -20997,6 +20997,14 @@ test("documentation reference audit evidence workflow는 current main의 sanitiz
   assert.match(workflow, /EVIDENCE_DIR="audit-evidence"/);
   assert.match(workflow, /REPORT_PATH="\$\{EVIDENCE_DIR\}\/reference-audit-report\.json"/);
   assert.doesNotMatch(workflow, /REPORT_PATH="\$\{RUNNER_TEMP\}/);
+  assert.match(
+    workflow,
+    /rm --recursive --force -- "\$\{EVIDENCE_DIR\}"\n\s+mkdir --parents -- "\$\{EVIDENCE_DIR\}"/,
+  );
+  assert.match(
+    workflow,
+    /OBSERVED_AT="\$\(date --utc \+"%Y-%m-%dT%H:%M:%S\.000Z"\)"/,
+  );
   assert.match(workflow, /node tools\/repo\/audit-active-reference-drift\.mjs/);
   for (const input of [
     "--scope contracts/documentation/reference-audit-scope.json",

@@ -45,7 +45,8 @@ jobs:
           EVIDENCE_DIR="audit-evidence"
           REPORT_PATH="${EVIDENCE_DIR}/reference-audit-report.json"
           OBSERVED_AT="$(date --utc +"%Y-%m-%dT%H:%M:%S.000Z")"
-          mkdir --parents "${EVIDENCE_DIR}"
+          rm --recursive --force -- "${EVIDENCE_DIR}"
+          mkdir --parents -- "${EVIDENCE_DIR}"
           test ! -e "${REPORT_PATH}"
           node tools/repo/audit-active-reference-drift.mjs \
             --scope contracts/documentation/reference-audit-scope.json \
