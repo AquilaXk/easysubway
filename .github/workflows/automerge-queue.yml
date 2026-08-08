@@ -4,8 +4,8 @@ name: Automerge Queue
 # automerge 라벨이 붙은 PR을 생성순으로 한 번에 하나만 처리한다:
 # head PR에 auto-merge를 예약하고 BEHIND면 update-branch 한다.
 # 병합이 일어나면 push 이벤트가 이 워크플로우를 다시 실행해 다음 PR을 처리한다.
-# 라벨은 merge-workflow 규약 4단계(코드리뷰 게이트) 완료 후에만 붙인다.
-# 코디네이터는 review 객체가 없는 PR을 큐에서 제외해 규약을 재검증한다.
+# 라벨은 merge-workflow 규약 4단계(단일 discovery Review 게이트) 완료 후에만 붙인다.
+# fix/rebase는 discovery Review를 무효화하지 않으며 current-head CI·thread·exact-head gate가 delivery를 보호한다.
 # labeled 이벤트의 라벨 검색 인덱싱 지연(빈 큐 오검출)은 이벤트 PR 직접 합류 + REST 재확인으로 보정한다 (#2010).
 
 on:
@@ -107,25 +107,79 @@ jobs:
 
           for pr_number in ${queue}; do
             state=$(gh pr view "${pr_number}" --repo "${REPO}" \
-              --json mergeStateStatus,reviews,statusCheckRollup)
+              --json mergeStateStatus,headRefOid,statusCheckRollup)
             merge_state=$(jq -r '.mergeStateStatus' <<<"${state}")
-            review_count=$(jq -r '.reviews | length' <<<"${state}")
+            head=$(jq -r '.headRefOid' <<<"${state}")
+            reviews=$(gh api --paginate --slurp "repos/${REPO}/pulls/${pr_number}/reviews")
+            review_gate=$(jq -r '
+              def is_coderabbit:
+                .author_association == "NONE" and
+                .user.login == "coderabbitai[bot]" and
+                .user.id == 136622811 and
+                .user.type == "Bot";
+              def is_trusted_human:
+                . as $review |
+                (["OWNER", "MEMBER", "COLLABORATOR"] | index($review.author_association)) != null;
+              [flatten[]
+                | select(.user != null)
+                | select(is_trusted_human or is_coderabbit)]
+              | group_by(.user.id)
+              | map(sort_by(.submitted_at, .id) | last) as $latest
+              | ($latest | length > 0) and
+                all($latest[]; .state != "CHANGES_REQUESTED") and
+                any($latest[];
+                  ((.state == "APPROVED" and is_trusted_human) or
+                    (.state == "COMMENTED" and
+                      (is_coderabbit or
+                        ((.body // "" | startswith("**Actionable comments posted: ")) and
+                          (.body // "" | contains("<!-- Review source: Codex CLI fallback; canonical visible structure:")))))))
+            ' <<<"${reviews}")
+            threads=$(gh api graphql --paginate --slurp \
+              -f query='query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
+                repository(owner: $owner, name: $name) {
+                  pullRequest(number: $number) {
+                    reviewThreads(first: 100, after: $endCursor) {
+                      nodes { isResolved }
+                      pageInfo { hasNextPage endCursor }
+                    }
+                  }
+                }
+              }' \
+              -F owner="${REPO%%/*}" \
+              -F name="${REPO##*/}" \
+              -F number="${pr_number}")
+            unresolved_threads=$(jq -r \
+              '[flatten[] | .data.repository.pullRequest.reviewThreads.nodes[]?
+                | select(.isResolved == false)] | length' <<<"${threads}")
             failed_required=$(jq -r --argjson required "${required_checks}" \
               '[.statusCheckRollup[]?
                 | select(($required | index(.name? // .context?)) != null)
                 | select(((.conclusion? // .state?) // "") as $c
                   | $c == "FAILURE" or $c == "ERROR")] | length' <<<"${state}")
 
-            echo "PR #${pr_number}: mergeStateStatus=${merge_state}, reviews=${review_count}, failedRequiredChecks=${failed_required}"
+            echo "PR #${pr_number}: mergeStateStatus=${merge_state}, reviewGate=${review_gate}, unresolvedThreads=${unresolved_threads}, failedRequiredChecks=${failed_required}"
 
-            if [ "${review_count}" -eq 0 ]; then
-              derail "${pr_number}" "GitHub PR Review 객체가 없습니다 (merge-workflow 규약 4단계 코드리뷰 게이트 미충족)."
+            if [ "${review_gate}" != "true" ]; then
+              derail "${pr_number}" "지원되는 단일 discovery Review가 없거나 active change request가 있습니다."
+              continue
+            fi
+
+            if [ "${unresolved_threads}" -gt 0 ]; then
+              derail "${pr_number}" "미해결 Review thread가 ${unresolved_threads}개 있습니다."
               continue
             fi
 
             if [ "${merge_state}" = "DIRTY" ]; then
               derail "${pr_number}" "main과 충돌(DIRTY) 상태입니다. 충돌 해결이 필요합니다."
               continue
+            fi
+
+            if [ "${merge_state}" = "BEHIND" ]; then
+              gh api --method PUT "repos/${REPO}/pulls/${pr_number}/update-branch" \
+                -H "Accept: application/vnd.github+json" \
+                -f expected_head_sha="${head}"
+              echo "큐 head PR #${pr_number}: exact head ${head}에서 base 갱신 완료 — current-head CI 뒤 재처리한다."
+              exit 0
             fi
 
             if [ "${failed_required}" -gt 0 ]; then
@@ -135,13 +189,8 @@ jobs:
 
             # 여기부터 큐 head 확정 — 한 번에 하나만 처리한다.
             gh pr merge "${pr_number}" --repo "${REPO}" --squash --auto \
+              --match-head-commit "${head}" \
               || echo "::warning::PR #${pr_number} auto-merge 예약 실패 — 다음 트리거에서 재시도한다."
-
-            if [ "${merge_state}" = "BEHIND" ]; then
-              gh api --method PUT "repos/${REPO}/pulls/${pr_number}/update-branch" \
-                -H "Accept: application/vnd.github+json" \
-                || echo "::warning::PR #${pr_number} update-branch 실패(transient 가능) — 다음 트리거에서 재시도한다."
-            fi
 
             echo "큐 head PR #${pr_number} 처리 완료 — 필수 체크 통과 시 auto-merge가 병합한다."
             exit 0
