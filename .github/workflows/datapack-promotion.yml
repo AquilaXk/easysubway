@@ -7,6 +7,14 @@ on:
         description: Successful Data Pack Release candidate run ID
         required: true
         type: string
+      rebuildCandidateRunId2:
+        description: Second successful Data Pack Release candidate run ID
+        required: true
+        type: string
+      rebuildCandidateRunId3:
+        description: Third successful Data Pack Release candidate run ID
+        required: true
+        type: string
       compatibilityEvidenceRunId:
         description: Workflow run ID containing compatibility evidence
         required: true
@@ -44,76 +52,85 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Data Pack Promotion / Validate candidate producer run
+      - name: Data Pack Promotion / Validate candidate producer runs
         env:
           CANDIDATE_RUN_ID: ${{ inputs.candidateRunId }}
+          REBUILD_CANDIDATE_RUN_ID_2: ${{ inputs.rebuildCandidateRunId2 }}
+          REBUILD_CANDIDATE_RUN_ID_3: ${{ inputs.rebuildCandidateRunId3 }}
+          EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
         run: |
           set -euo pipefail
-          candidate_run_id="${CANDIDATE_RUN_ID}"
-          if [[ ! "${candidate_run_id}" =~ ^[1-9][0-9]*$ ]]; then
-            echo "candidateRunId must be a positive decimal run ID" >&2
+          data_repository="AquilaXk/easysubway-data"
+          run_ids=("${CANDIDATE_RUN_ID}" "${REBUILD_CANDIDATE_RUN_ID_2}" "${REBUILD_CANDIDATE_RUN_ID_3}")
+          if [[ "${run_ids[0]}" == "${run_ids[1]}" || "${run_ids[0]}" == "${run_ids[2]}" || "${run_ids[1]}" == "${run_ids[2]}" ]]; then
+            echo "candidate run IDs must be distinct" >&2
             exit 1
           fi
-          candidate_metadata="$(gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${candidate_run_id}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_sha, .path] | @tsv')"
-          IFS=$'\t' read -r actual_run_id conclusion repository head_repository event head_sha workflow_path_raw <<< "${candidate_metadata}"
-          workflow_path="${workflow_path_raw%@*}"
-          if [[ "${actual_run_id}" != "${candidate_run_id}" || "${conclusion}" != "success" \
-            || "${repository}" != "${GITHUB_REPOSITORY}" || "${head_repository}" != "${GITHUB_REPOSITORY}" \
-            || "${event}" != "workflow_dispatch" || ! "${head_sha}" =~ ^[a-f0-9]{40}$ \
-            || "${workflow_path}" != ".github/workflows/datapack-release.yml" ]]; then
-            echo "candidate run must be a successful same-repository workflow_dispatch Data Pack Release run" >&2
-            exit 1
-          fi
-          echo "CANDIDATE_HEAD_SHA=${head_sha}" >> "${GITHUB_ENV}"
+          for index in "${!run_ids[@]}"; do
+            candidate_run_id="${run_ids[index]}"
+            if [[ ! "${candidate_run_id}" =~ ^[1-9][0-9]*$ ]]; then
+              echo "candidate run IDs must be distinct positive decimals" >&2
+              exit 1
+            fi
+            candidate_metadata="$(GH_TOKEN="${EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN}" gh api "repos/${data_repository}/actions/runs/${candidate_run_id}" --jq '[.id, .conclusion, .repository.full_name, .head_repository.full_name, .event, .head_sha, .path] | @tsv')"
+            IFS=$'\t' read -r actual_run_id conclusion repository head_repository event head_sha workflow_path_raw <<< "${candidate_metadata}"
+            workflow_path="${workflow_path_raw%@*}"
+            if [[ "${actual_run_id}" != "${candidate_run_id}" || "${conclusion}" != "success" \
+              || "${repository}" != "${data_repository}" || "${head_repository}" != "${data_repository}" \
+              || "${event}" != "workflow_dispatch" || ! "${head_sha}" =~ ^[a-f0-9]{40}$ \
+              || "${workflow_path}" != ".github/workflows/datapack-release.yml" ]]; then
+              echo "candidate runs must be successful easysubway-data workflow_dispatch Data Pack Release runs" >&2
+              exit 1
+            fi
+            echo "CANDIDATE_$((index + 1))_HEAD_SHA=${head_sha}" >> "${GITHUB_ENV}"
+          done
 
       - name: Data Pack Promotion / Validate candidate artifact metadata
         env:
           CANDIDATE_RUN_ID: ${{ inputs.candidateRunId }}
+          REBUILD_CANDIDATE_RUN_ID_2: ${{ inputs.rebuildCandidateRunId2 }}
+          REBUILD_CANDIDATE_RUN_ID_3: ${{ inputs.rebuildCandidateRunId3 }}
+          EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
         run: |
           set -euo pipefail
-          candidate_artifacts="${RUNNER_TEMP}/candidate-artifacts.json"
-          candidate_artifact_name="easysubway-datapack-candidate-${CANDIDATE_RUN_ID}"
-          gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${CANDIDATE_RUN_ID}/artifacts?name=${candidate_artifact_name}&per_page=100" > "${candidate_artifacts}"
-          node tools/ci/require-workflow-artifact.mjs \
-            "${candidate_artifacts}" "${candidate_artifact_name}" "${CANDIDATE_RUN_ID}" "${CANDIDATE_HEAD_SHA}"
+          data_repository="AquilaXk/easysubway-data"
+          run_ids=("${CANDIDATE_RUN_ID}" "${REBUILD_CANDIDATE_RUN_ID_2}" "${REBUILD_CANDIDATE_RUN_ID_3}")
+          head_shas=("${CANDIDATE_1_HEAD_SHA}" "${CANDIDATE_2_HEAD_SHA}" "${CANDIDATE_3_HEAD_SHA}")
+          for index in "${!run_ids[@]}"; do
+            candidate_run_id="${run_ids[index]}"
+            candidate_artifacts="${RUNNER_TEMP}/candidate-$((index + 1))-artifacts.json"
+            candidate_artifact_name="easysubway-datapack-candidate-${candidate_run_id}"
+            GH_TOKEN="${EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN}" gh api "repos/${data_repository}/actions/runs/${candidate_run_id}/artifacts?name=${candidate_artifact_name}&per_page=100" > "${candidate_artifacts}"
+            node tools/ci/require-workflow-artifact.mjs \
+              "${candidate_artifacts}" "${candidate_artifact_name}" "${candidate_run_id}" "${head_shas[index]}"
+          done
 
-      - name: Data Pack Promotion / Download exact candidate artifact
+      - name: Data Pack Promotion / Download selected candidate artifact
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
+          repository: AquilaXk/easysubway-data
           name: easysubway-datapack-candidate-${{ inputs.candidateRunId }}
-          path: ${{ runner.temp }}/candidate
+          path: ${{ runner.temp }}/candidate-1
           run-id: ${{ inputs.candidateRunId }}
-          github-token: ${{ github.token }}
+          github-token: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
 
-      - name: Data Pack Promotion / Rebuild exact candidate metadata
-        env:
-          EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM }}
-          EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID }}
-        run: |
-          set -euo pipefail
-          candidate_root="${RUNNER_TEMP}/candidate"
-          component_manifest="${candidate_root}/data-component-manifest.json"
-          artifact_inventory="${candidate_root}/data-artifact-inventory.json"
-          for metadata in "${component_manifest}" "${artifact_inventory}"; do
-            [[ -f "${metadata}" && ! -L "${metadata}" && -s "${metadata}" ]]
-          done
-          original_component_manifest="${RUNNER_TEMP}/candidate-original-component-manifest.json"
-          original_artifact_inventory="${RUNNER_TEMP}/candidate-original-artifact-inventory.json"
-          mv "${component_manifest}" "${original_component_manifest}"
-          mv "${artifact_inventory}" "${original_artifact_inventory}"
-          node tools/datapack/build-data-component-manifest.mjs \
-            --root "${candidate_root}" \
-            --manifest "${candidate_root}/catalog/current.json" \
-            --provenance "${candidate_root}/current.provenance.json" \
-            --repository "${GITHUB_REPOSITORY}" \
-            --git-sha "${CANDIDATE_HEAD_SHA}" \
-            --workflow-run-id "${CANDIDATE_RUN_ID}" \
-            --contract-version "datapack-contract-v3" \
-            --issue-ref "AquilaXk/easysubway#2699" \
-            --inventory-output "${artifact_inventory}" \
-            --output "${component_manifest}"
-          cmp -s "${component_manifest}" "${original_component_manifest}"
-          cmp -s "${artifact_inventory}" "${original_artifact_inventory}"
+      - name: Data Pack Promotion / Download second rebuild candidate artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          repository: AquilaXk/easysubway-data
+          name: easysubway-datapack-candidate-${{ inputs.rebuildCandidateRunId2 }}
+          path: ${{ runner.temp }}/candidate-2
+          run-id: ${{ inputs.rebuildCandidateRunId2 }}
+          github-token: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
+
+      - name: Data Pack Promotion / Download third rebuild candidate artifact
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          repository: AquilaXk/easysubway-data
+          name: easysubway-datapack-candidate-${{ inputs.rebuildCandidateRunId3 }}
+          path: ${{ runner.temp }}/candidate-3
+          run-id: ${{ inputs.rebuildCandidateRunId3 }}
+          github-token: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
 
       - name: Data Pack Promotion / Validate compatibility evidence artifact
         env:
@@ -155,9 +172,11 @@ jobs:
           compatibility_root="${RUNNER_TEMP}/compatibility"
           shopt -s dotglob nullglob
           entries=("${compatibility_root}"/*)
-          [[ "${#entries[@]}" == "1" ]]
-          [[ "${entries[0]}" == "${compatibility_root}/compatibility-evidence.json" ]]
-          [[ -f "${entries[0]}" && ! -L "${entries[0]}" && -s "${entries[0]}" ]]
+          if [[ "${#entries[@]}" != "1" || "${entries[0]}" != "${compatibility_root}/compatibility-evidence.json" \
+            || ! -f "${entries[0]}" || -L "${entries[0]}" || ! -s "${entries[0]}" ]]; then
+            echo "compatibility evidence must contain exactly one regular non-empty file" >&2
+            exit 1
+          fi
 
       - name: Data Pack Promotion / Capture environment approvals
         run: gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/approvals" > "${RUNNER_TEMP}/promotion-approvals.json"
@@ -165,29 +184,46 @@ jobs:
       - name: Data Pack Promotion / Build and validate promotion request
         env:
           ISSUE_REF: ${{ inputs.issueRef }}
+          CANDIDATE_RUN_ID: ${{ inputs.candidateRunId }}
+          REBUILD_CANDIDATE_RUN_ID_2: ${{ inputs.rebuildCandidateRunId2 }}
+          REBUILD_CANDIDATE_RUN_ID_3: ${{ inputs.rebuildCandidateRunId3 }}
+          EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM }}
+          EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: ${{ secrets.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID }}
         run: |
           set -euo pipefail
           promotion_request="${RUNNER_TEMP}/promotion-request.json"
+          rebuild_parity_evidence="${RUNNER_TEMP}/rebuild-parity-evidence.json"
           node tools/release/build-promotion-request.mjs \
-            --component "${RUNNER_TEMP}/candidate/data-component-manifest.json" \
-            --inventory "${RUNNER_TEMP}/candidate/data-artifact-inventory.json" \
+            --candidate-root-1 "${RUNNER_TEMP}/candidate-1" \
+            --candidate-root-2 "${RUNNER_TEMP}/candidate-2" \
+            --candidate-root-3 "${RUNNER_TEMP}/candidate-3" \
+            --candidate-workflow-run-id-1 "${CANDIDATE_RUN_ID}" \
+            --candidate-workflow-run-id-2 "${REBUILD_CANDIDATE_RUN_ID_2}" \
+            --candidate-workflow-run-id-3 "${REBUILD_CANDIDATE_RUN_ID_3}" \
+            --candidate-head-sha-1 "${CANDIDATE_1_HEAD_SHA}" \
+            --candidate-head-sha-2 "${CANDIDATE_2_HEAD_SHA}" \
+            --candidate-head-sha-3 "${CANDIDATE_3_HEAD_SHA}" \
+            --selected-candidate-workflow-run-id "${CANDIDATE_RUN_ID}" \
             --compatibility-evidence "${RUNNER_TEMP}/compatibility/compatibility-evidence.json" \
             --requested-by "${GITHUB_ACTOR}" \
             --approval-evidence "${RUNNER_TEMP}/promotion-approvals.json" \
             --workflow-run-id "${GITHUB_RUN_ID}" \
             --issue-ref "${ISSUE_REF}" \
+            --rebuild-parity-evidence-output "${rebuild_parity_evidence}" \
             --output "${promotion_request}"
           node tools/release/validate-promotion-request.mjs \
             --request "${promotion_request}" \
-            --component "${RUNNER_TEMP}/candidate/data-component-manifest.json" \
-            --inventory "${RUNNER_TEMP}/candidate/data-artifact-inventory.json" \
+            --component "${RUNNER_TEMP}/candidate-1/data-component-manifest.json" \
+            --inventory "${RUNNER_TEMP}/candidate-1/data-artifact-inventory.json" \
             --compatibility-evidence "${RUNNER_TEMP}/compatibility/compatibility-evidence.json" \
+            --rebuild-parity-evidence "${rebuild_parity_evidence}" \
             --approval-evidence "${RUNNER_TEMP}/promotion-approvals.json" \
             --workflow-run-id "${GITHUB_RUN_ID}"
           mkdir -p "${RUNNER_TEMP}/promotion-artifact"
           cp "${promotion_request}" "${RUNNER_TEMP}/promotion-artifact/promotion-request.json"
           cp "${RUNNER_TEMP}/promotion-approvals.json" "${RUNNER_TEMP}/promotion-artifact/promotion-approvals.json"
           cp "${RUNNER_TEMP}/compatibility/compatibility-evidence.json" "${RUNNER_TEMP}/promotion-artifact/compatibility-evidence.json"
+          cp "${rebuild_parity_evidence}" "${RUNNER_TEMP}/promotion-artifact/rebuild-parity-evidence.json"
 
       - name: Data Pack Promotion / Attest promotion request
         uses: actions/attest@508db95dd578ae2727ebd6217d5ba78e4fbda05d
@@ -202,5 +238,6 @@ jobs:
             ${{ runner.temp }}/promotion-artifact/promotion-request.json
             ${{ runner.temp }}/promotion-artifact/promotion-approvals.json
             ${{ runner.temp }}/promotion-artifact/compatibility-evidence.json
+            ${{ runner.temp }}/promotion-artifact/rebuild-parity-evidence.json
           if-no-files-found: error
           retention-days: 14

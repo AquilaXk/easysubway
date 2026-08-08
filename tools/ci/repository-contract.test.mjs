@@ -881,19 +881,18 @@ function assertActionsEnvSecretPolicy(file, source) {
       "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
     ]),
     ".github/workflows/datapack-release.yml": new Set([
+      "EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN",
       "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
-      "EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM",
       "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
-      "EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY",
       "EASYSUBWAY_SOURCE_RAW_PURGE_ATTESTATION_PUBLIC_KEY_SHA256",
-      "DATA_GO_KR_SERVICE_KEY",
-      "KRIC_SERVICE_KEY",
     ]),
     ".github/workflows/datapack-promotion.yml": new Set([
+      "EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN",
       "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
       "EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM",
     ]),
     ".github/workflows/release-artifacts.yml": new Set([
+      "EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN",
       "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
       "EASYSUBWAY_ANDROID_STORE_PASSWORD",
       "EASYSUBWAY_ANDROID_KEY_ALIAS",
@@ -1434,6 +1433,37 @@ test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터
   assert.deepEqual(JSON.parse(fallbackMatch[1]), REQUIRED_STATUS_CHECK_CONTEXTS);
 });
 
+test("automerge 큐는 frozen discovery 리뷰와 current-head delivery gate를 분리한다", () => {
+  const coordinator = read(".github/workflows/automerge-queue.yml");
+
+  assert.match(coordinator, /--json mergeStateStatus,headRefOid,statusCheckRollup/);
+  assert.match(coordinator, /gh api --paginate --slurp "repos\/\$\{REPO\}\/pulls\/\$\{pr_number\}\/reviews"/);
+  assert.doesNotMatch(coordinator, /\.commit_id == \$head/);
+  assert.match(coordinator, /\["OWNER", "MEMBER", "COLLABORATOR"\]/);
+  assert.match(coordinator, /\*\*Actionable comments posted: /);
+  assert.match(coordinator, /<!-- Review source: Codex CLI fallback; canonical visible structure:/);
+  assert.match(coordinator, /\.author_association == "NONE"/);
+  assert.match(coordinator, /\.user\.login == "coderabbitai\[bot\]"/);
+  assert.match(coordinator, /\.user\.id == 136622811/);
+  assert.match(coordinator, /\.user\.type == "Bot"/);
+  assert.match(coordinator, /group_by\(\.user\.id\)/);
+  assert.match(coordinator, /\.state != "CHANGES_REQUESTED"/);
+  assert.match(coordinator, /\.state == "APPROVED"/);
+  assert.match(coordinator, /\.state == "COMMENTED"/);
+  assert.match(coordinator, /reviewThreads\(first: 100, after: \$endCursor\)/);
+  assert.match(coordinator, /unresolved_threads/);
+  assert.match(coordinator, /\[ "\$\{unresolved_threads\}" -gt 0 \]/);
+  assert.match(coordinator, /--match-head-commit "\$\{head\}"/);
+  assert.match(coordinator, /-f expected_head_sha="\$\{head\}"/);
+  assert.ok(
+    coordinator.indexOf('if [ "${merge_state}" = "BEHIND" ]')
+      < coordinator.indexOf('if [ "${failed_required}" -gt 0 ]'),
+    "BEHIND PR must refresh its exact head before stale required failures are judged",
+  );
+  assert.doesNotMatch(coordinator, /reviews\.length/);
+  assert.doesNotMatch(coordinator, /review_count/);
+});
+
 test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const androidJob = jobBlock(workflow, "android", "notify-slack-ci-failure");
@@ -1707,6 +1737,25 @@ test("기본 PR 템플릿은 등급 안내와 최소 섹션을 포함한다", ()
   assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
 });
 
+test("PR template documentation impact proposal은 default full short에서 같은 판정 필드를 유지한다", () => {
+  const sections = [
+    ".github/pull_request_template.md",
+    ".github/PULL_REQUEST_TEMPLATE/full.md",
+    ".github/PULL_REQUEST_TEMPLATE/short.md",
+  ].map((path) => {
+    const template = read(path);
+    const start = template.indexOf("## Documentation impact");
+    assert.notEqual(start, -1);
+    const end = template.indexOf("\n## ", start + 1);
+    return template.slice(start, end === -1 ? undefined : end).trim();
+  });
+  assert.deepEqual(sections, [sections[0], sections[0], sections[0]]);
+  assert.match(sections[0], /영향 resource ID 또는 `NONE`/);
+  assert.match(sections[0], /resourceClass/);
+  assert.match(sections[0], /documentationFamily/);
+  assert.match(sections[0], /lifecycle\/evidence 영향/);
+});
+
 test("이슈 템플릿은 에이전트 서술 없이 개발자 판단 정보를 수집한다", () => {
   const templates = [
     read(".github/ISSUE_TEMPLATE/bug_report.yml"),
@@ -1883,6 +1932,8 @@ test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관�
   const script = read("scripts/github/sync-actions-env-secret.sh");
   const cdWorkflow = read(".github/workflows/cd.yml");
   const datapackReleaseWorkflow = read(".github/workflows/datapack-release.yml");
+  const datapackPromotionWorkflow = read(".github/workflows/datapack-promotion.yml");
+  const releaseArtifactsWorkflow = read(".github/workflows/release-artifacts.yml");
 
   assert.match(script, /readonly SECRET_NAME="EASYSUBWAY_ENV"/);
   assert.doesNotMatch(script, /EASYSUBWAY_ACTIONS_ENV_SECRET_NAME/);
@@ -1893,12 +1944,15 @@ test("GitHub Actions 환경값은 dotenv secret과 provider key overlay로 관�
   assert.match(cdWorkflow, /drop_topis_key/);
   assert.match(cdWorkflow, /!\(\$1 in drop\)/);
   assert.match(cdWorkflow, /tail -c 1 "\$\{env_file\}"/);
-  assert.match(datapackReleaseWorkflow, /drop_topis_key/);
-  assert.match(datapackReleaseWorkflow, /drop_data_go_key/);
-  assert.match(datapackReleaseWorkflow, /drop_kric_key/);
-  assert.match(datapackReleaseWorkflow, /KRIC_SERVICE_KEY_SECRET: \$\{\{ secrets\.KRIC_SERVICE_KEY \}\}/);
+  assert.match(datapackReleaseWorkflow, /drop\["EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY"\] = 1/);
+  assert.match(datapackReleaseWorkflow, /drop\["DATA_GO_KR_SERVICE_KEY"\] = 1/);
+  assert.match(datapackReleaseWorkflow, /drop\["KRIC_SERVICE_KEY"\] = 1/);
+  assert.doesNotMatch(datapackReleaseWorkflow, /secrets\.(EASYSUBWAY_SEOUL_TOPIS_SERVICE_KEY|DATA_GO_KR_SERVICE_KEY|KRIC_SERVICE_KEY|EASYSUBWAY_DATAPACK_SIGNING_PRIVATE_KEY_PEM)/);
   assert.match(datapackReleaseWorkflow, /!\(\$1 in drop\)/);
   assert.match(datapackReleaseWorkflow, /tail -c 1 "\$\{env_file\}"/);
+  assert.match(datapackReleaseWorkflow, /secrets\.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN/);
+  assert.match(datapackPromotionWorkflow, /secrets\.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN/);
+  assert.match(releaseArtifactsWorkflow, /secrets\.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN/);
   assert.match(cdWorkflow, /tools\/ci\/validate-deployment-env\.sh "\$\{EASYSUBWAY_ENV_FILE\}"/);
 
   for (const file of workflowFiles()) {
@@ -8673,7 +8727,8 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
   assert.match(datapackWorkflow, /publish_result=/);
   assert.match(datapackWorkflow, /remote_publish_ready=/);
   assert.match(datapackWorkflow, /EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_RESULT=success/);
-  assert.match(datapackWorkflow, /EASYSUBWAY_DATAPACK_REMOTE_PUBLISH_RESULT=blocked-strict-coverage/);
+  assert.doesNotMatch(datapackWorkflow, /blocked-strict-coverage/);
+  assert.match(datapackWorkflow, /Data Pack Release \/ Validate attested production candidate policies/);
   assert.match(datapackWorkflow, /remotePublishEnabled !== "false" && remotePublishReady !== "true"/);
   assert.match(datapackWorkflow, /publishResult = remotePublishResult \|\| "failed"/);
   assert.match(datapackWorkflow, /remote_publish_enabled=\$\{remotePublishEnabled \|\| "unknown"\}/);
@@ -8827,7 +8882,7 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   const manifestIndex = workflow.indexOf("Data Pack Release / Stage manifest");
   const itxContractValidationIndex = workflow.indexOf("Data Pack Release / Validate ITX-청춘 coverage contract");
   const sourceFreshnessIndex = workflow.indexOf("Data Pack Release / Validate source snapshot freshness");
-  const accessibilitySourceCoverageIndex = workflow.indexOf("Data Pack Release / Validate accessibility source coverage");
+  const productionCandidatePolicyIndex = workflow.indexOf("Data Pack Release / Validate attested production candidate policies");
   const evidenceBundleIndex = workflow.indexOf("Data Pack Release / Write release evidence bundle");
   const jobEnvBlock = workflow.match(/\n    env:\n[\s\S]*?\n\n    steps:/)?.[0] ?? "";
 
@@ -8839,8 +8894,8 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.match(workflow, /Data Pack Release \/ Configure temp directories/);
   assert.ok(itxContractValidationIndex >= 0, "ITX coverage contract validation step must exist");
   assert.ok(sourceFreshnessIndex >= 0, "source snapshot freshness step must exist");
-  assert.ok(accessibilitySourceCoverageIndex > sourceFreshnessIndex, "accessibility source coverage must run after source freshness");
-  assert.match(workflow, /Data Pack Release \/ Validate accessibility source coverage[\s\S]*?evaluation_at="\$\(date -u \+%Y-%m-%dT%H:%M:%S\.000Z\)"[\s\S]*?build-accessibility-source-coverage-report\.mjs[\s\S]*?--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"[\s\S]*?--manifest-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"[\s\S]*?--bundled-index "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"[\s\S]*?--bundled-root "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}"[\s\S]*?--inventory tools\/datapack\/source-inventory\.json[\s\S]*?--source-snapshots tools\/datapack\/release\/source-snapshots\.json[\s\S]*?--evaluation-at "\$\{evaluation_at\}"[\s\S]*?--output "\$\{EASYSUBWAY_ACCESSIBILITY_SOURCE_COVERAGE_REPORT\}"/);
+  assert.ok(productionCandidatePolicyIndex > sourceFreshnessIndex, "attested production candidate policies must run after source freshness");
+  assert.doesNotMatch(workflow, /Data Pack Release \/ Validate accessibility source coverage/);
   assert.ok(
     itxContractValidationIndex < evidenceBundleIndex,
     "ITX coverage contract must be validated before release evidence is hashed",
@@ -8850,23 +8905,13 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.match(workflow, /EASYSUBWAY_DATAPACK_OUTPUT=\$\{\{ runner\.temp \}\}\/easysubway-datapacks/);
   assert.match(workflow, /EASYSUBWAY_DATAPACK_STAGE=\$\{\{ runner\.temp \}\}\/easysubway-datapack-stage/);
   assert.match(workflow, /EASYSUBWAY_DATAPACK_PUBLISH_PLAN=\$\{\{ runner\.temp \}\}\/easysubway-datapack-stage\/publish-plan\.json/);
-  assert.match(workflow, /EASYSUBWAY_DATAPACK_IMPORTED_FIXTURE=\$\{\{ runner\.temp \}\}\/easysubway-production-source-fixture\.json/);
-  assert.match(workflow, /EASYSUBWAY_DATAPACK_PRODUCTION_REVIEWED_FIXTURE=\$\{\{ runner\.temp \}\}\/easysubway-reviewed-production-source-fixture\.json/);
-  assert.match(workflow, /EASYSUBWAY_DATAPACK_PRODUCTION_GATE_OUTPUT=\$\{\{ runner\.temp \}\}\/easysubway-production-gate/);
-  assert.match(workflow, /EASYSUBWAY_DATAPACK_PRODUCTION_GATE_REPORT=\$\{\{ runner\.temp \}\}\/easysubway-production-gate-validation\.log/);
+  assert.doesNotMatch(workflow, /EASYSUBWAY_DATAPACK_(IMPORTED_FIXTURE|PRODUCTION_REVIEWED_FIXTURE|PRODUCTION_GATE_OUTPUT|PRODUCTION_GATE_REPORT)/);
   assert.match(workflow, /EASYSUBWAY_ROUTE_MAP_AUDIT_REPORT=\$\{\{ runner\.temp \}\}\/easysubway-datapack-stage\/route-map-audit\.json/);
   assert.match(workflow, /Data Pack Release \/ Prepare release fixture/);
   assert.match(workflow, /id: release-fixture/);
-  assert.match(workflow, /tools\/datapack\/import-official-sources\.mjs/);
-  assert.match(workflow, /--input tools\/datapack\/inputs\/capital-pilot-production-source-input\.json/);
-  assert.match(workflow, /build_fixture="\$\{EASYSUBWAY_DATAPACK_REVIEWED_FIXTURE\}"/);
-  assert.match(workflow, /const spec=JSON\.parse\(fs\.readFileSync\(process\.env\.EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH/);
-  assert.match(workflow, /process\.stdout\.write\(spec\.fixturePath\)/);
-  assert.match(workflow, /remote_publish_ready=true/);
-  assert.match(workflow, /remote_publish_ready=\$\{remote_publish_ready\}/);
-  assert.match(workflow, /verified \(ENTRY\|EXIT\|TRANSFER\) coverage gap/);
-  assert.match(workflow, /blocked-strict-coverage/);
-  assert.match(workflow, /EASYSUBWAY_DATAPACK_BUILD_FIXTURE=\$\{build_fixture\}/);
+  assert.doesNotMatch(workflow, /tools\/datapack\/import-official-sources\.mjs/);
+  assert.match(workflow, /remote_publish_ready=false/);
+  assert.match(workflow, /EASYSUBWAY_DATAPACK_BUILD_FIXTURE=\$\{EASYSUBWAY_DATAPACK_REVIEWED_FIXTURE\}/);
   assert.match(workflow, /tools\/datapack\/apply-admin-review-overrides\.mjs/);
   assert.match(workflow, /Data Pack Release \/ Audit route map coordinate coverage/);
   assert.match(workflow, /node tools\/route-map\/audit-route-map\.mjs/);
@@ -8910,7 +8955,6 @@ test("데이터팩 workflow는 pack 검증 이후 manifest 배포 순서를 강�
   assert.ok(routeMapAuditIndex > prepareIndex, "workflow must audit reviewed route map coordinates after release fixture preparation");
   assert.ok(buildIndex > routeMapAuditIndex, "workflow must build data packs after route map coordinate audit");
   assert.ok(validateIndex >= 0, "workflow must validate generated data packs");
-  assert.ok(accessibilitySourceCoverageIndex > validateIndex, "accessibility source coverage must validate the generated manifest");
   assert.ok(packIndex > validateIndex, "workflow must stage pack files after validation");
   assert.ok(verifyIndex > packIndex, "workflow must verify staged pack checksums before manifest staging");
   assert.ok(manifestIndex > verifyIndex, "workflow must stage manifest after pack checksum verification");
@@ -8950,7 +8994,8 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   const workflow = read(".github/workflows/datapack-release.yml");
   const releaseEvidenceBundleSchema = readJson("tools/datapack/schema/release-evidence-bundle.schema.json");
 
-  assert.match(workflow, /mode:[\s\S]*options:\s*\[exploratory, release-candidate, production-publish/);
+  assert.match(workflow, /mode:[\s\S]*options:\s*\[exploratory, production-publish, rollback, rollout-update\]/);
+  assert.doesNotMatch(workflow, /release-candidate/);
   assert.match(workflow, /schedule:[\s\S]*cron: "17 18 \* \* \*"/);
   assert.match(workflow, /release\/product-gates\/datapack-freshness-sla\.json/);
   // 입력 표면은 modeArgs 단일 JSON으로 통합됨(#1694 C0). 게이트 관련 인자는 parse 스텝(id: args)이 outputs로 펼친다.
@@ -8962,7 +9007,8 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /steps\.args\.outputs\.releaseRequestPath/);
   assert.match(workflow, /production-datapack/);
   assert.match(workflow, /Data Pack Release \/ Validate release mode inputs/);
-  assert.match(workflow, /release-candidate\|production-publish/);
+  assert.match(workflow, /Data Pack Release \/ Require release operation environment[\s\S]*?REMOTE_PUBLISH_ENABLED: \$\{\{ steps\.remote-publish-env\.outputs\.enabled \}\}[\s\S]*?REMOTE_PUBLISH_ENABLED\}" != "true"[\s\S]*?exit 1/);
+  assert.match(workflow, /if \[\[ "\$\{mode\}" == "production-publish" \]\]; then/);
   assert.match(workflow, /release mode cannot use --allow-gaps/);
   assert.match(workflow, /release mode cannot use fixture input/);
   assert.match(workflow, /release request approver must differ from requester/);
@@ -8999,6 +9045,41 @@ test("데이터팩 release workflow는 production publish hard gate를 강제한
   assert.match(workflow, /throw new Error\(`buildSpec\.\$\{field\} must be sha256`\)/);
   assert.match(workflow, /--require-pass/);
   assert.match(workflow, /--verify-only/);
+  const productionStep = (name) => {
+    const marker = `      - name: Data Pack Release / ${name}\n`;
+    const start = workflow.indexOf(marker);
+    assert.notEqual(start, -1, `${name} step must exist`);
+    const end = workflow.indexOf("\n      - name: ", start + marker.length);
+    return { start, text: workflow.slice(start, end === -1 ? workflow.length : end) };
+  };
+  const freshness = productionStep("Validate source snapshot freshness");
+  const candidatePolicy = productionStep("Validate attested production candidate policies");
+  const evidenceValidation = productionStep("Validate release evidence bundle");
+  const publish = productionStep("Publish staged data packs to object storage");
+  assert.ok(
+    freshness.start < candidatePolicy.start
+      && candidatePolicy.start < evidenceValidation.start
+      && evidenceValidation.start < publish.start,
+    "production gates must run freshness → candidate policy → evidence validation → publish",
+  );
+  for (const [name, step] of [
+    ["freshness", freshness],
+    ["candidate policy", candidatePolicy],
+    ["publish", publish],
+  ]) {
+    assert.match(step.text, /if: \$\{\{ steps\.release-mode\.outputs\.mode == 'production-publish'/, `${name} must be production-only`);
+    assert.match(step.text, /set -euo pipefail/, `${name} must propagate failures`);
+  }
+  assert.match(evidenceValidation.text, /if: \$\{\{ steps\.release-mode\.outputs\.is-pointer-only != 'true' \}\}/);
+  assert.match(evidenceValidation.text, /if \[\[ "\$\{EASYSUBWAY_DATAPACK_RELEASE_MODE\}" == "production-publish" \]\]; then/);
+  assert.match(evidenceValidation.text, /set -euo pipefail/, "evidence validation must propagate failures");
+  assert.match(evidenceValidation.text, /--require-pass/, "evidence validation must require PASS");
+  assert.match(publish.text, /--require-pass/, "publish must revalidate PASS evidence");
+  assert.match(freshness.text, /validate-source-snapshot-freshness\.mjs/);
+  assert.match(candidatePolicy.text, /validate-datapack\.mjs/);
+  assert.match(candidatePolicy.text, /--require-production/);
+  assert.match(candidatePolicy.text, /manifest channel must match targetChannel/);
+  assert.match(candidatePolicy.text, /check-manifest-acceptance-floor\.mjs/);
   const nodeTerminatorIndents = workflow
     .split("\n")
     .filter((line) => /^\s*NODE$/.test(line))
@@ -10485,7 +10566,7 @@ test("데이터팩 manifest 수락 정책은 v1 봉투 차단과 절대 순번 �
   const workflow = read(".github/workflows/datapack-release.yml");
   assert.match(
     workflow,
-    /node tools\/datapack\/check-manifest-acceptance-floor\.mjs \\\n\s+--manifest "\$\{EASYSUBWAY_DATAPACK_OUTPUT\}\/current\.json"/,
+    /node tools\/datapack\/check-manifest-acceptance-floor\.mjs \\\n\s+--manifest "\$\{EASYSUBWAY_DATAPACK_STAGE\}\/catalog\/current\.json"/,
   );
   const floorGate = read("tools/datapack/check-manifest-acceptance-floor.mjs");
   assert.match(floorGate, /sequence < floor/);
@@ -14259,14 +14340,11 @@ test("데이터팩 release workflow는 관리자 검수 override를 다음 pack 
   const datapackTest = read("tools/datapack/datapack-tools.test.mjs");
 
   assert.match(workflow, /EASYSUBWAY_DATAPACK_REVIEWED_FIXTURE=/);
-  assert.match(workflow, /EASYSUBWAY_DATAPACK_IMPORTED_FIXTURE=/);
-  assert.match(workflow, /EASYSUBWAY_DATAPACK_PRODUCTION_REVIEWED_FIXTURE=/);
+  assert.doesNotMatch(workflow, /EASYSUBWAY_DATAPACK_IMPORTED_FIXTURE|EASYSUBWAY_DATAPACK_PRODUCTION_REVIEWED_FIXTURE/);
   assert.match(workflow, /EASYSUBWAY_DATAPACK_BUILD_FIXTURE/);
-  assert.match(workflow, /tools\/datapack\/import-official-sources\.mjs/);
-  assert.match(workflow, /tools\/datapack\/inputs\/capital-pilot-production-source-input\.json/);
+  assert.doesNotMatch(workflow, /tools\/datapack\/import-official-sources\.mjs/);
   assert.match(workflow, /tools\/datapack\/apply-admin-review-overrides\.mjs/);
   assert.match(workflow, /--fixture tools\/datapack\/fixtures\/catalog-fixture\.json/);
-  assert.match(workflow, /--fixture "\$\{EASYSUBWAY_DATAPACK_IMPORTED_FIXTURE\}"/);
   assert.match(workflow, /--overrides tools\/datapack\/fixtures\/admin-review-overrides\.json/);
   assert.match(workflow, /--fixture "\$\{EASYSUBWAY_DATAPACK_BUILD_FIXTURE\}"/);
   assert.doesNotMatch(workflow, /transit_master_overrides/);

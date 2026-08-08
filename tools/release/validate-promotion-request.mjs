@@ -12,7 +12,11 @@ const componentKeys = [
 ];
 const requestKeys = [
   "schemaVersion", "artifactKind", "candidate", "compatibilityEvidenceSha256", "requestedBy",
-  "approval", "contractVersion", "issueRef",
+  "rebuildParityEvidenceSha256", "approval", "contractVersion", "issueRef",
+];
+const rebuildParityEvidenceKeys = [
+  "schemaVersion", "artifactKind", "selectedCandidateWorkflowRunId", "candidates",
+  "artifactInventorySha256", "contractVersion", "issueRef",
 ];
 
 export const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -44,12 +48,12 @@ export function exactKeys(value, keys, label) {
 export function validateComponent(value) {
   exactKeys(value, componentKeys, "component");
   if (value.schemaVersion !== 1 || value.component !== "data"
-    || value.repository !== "AquilaXk/easysubway" || !sha40(value.gitSha)
+    || value.repository !== "AquilaXk/easysubway-data" || !sha40(value.gitSha)
     || !positiveDecimal(value.workflowRunId) || !text(value.dataVersion)
     || !Number.isInteger(value.releaseSequence) || value.releaseSequence < 1
     || !sha64(value.manifestSha256) || !sha64(value.artifactInventorySha256)
     || value.contractVersion !== "datapack-contract-v3"
-    || value.issueRef !== "AquilaXk/easysubway#2699") {
+    || value.issueRef !== "AquilaXk/easysubway#2705") {
     throw new Error("component is invalid");
   }
   exactKeys(value.provenance, ["sourceSnapshotSetHash"], "component.provenance");
@@ -57,6 +61,10 @@ export function validateComponent(value) {
     throw new Error("component provenance is invalid");
   }
   return value;
+}
+
+export function validatePromotionCandidate(value) {
+  return validateComponent(value);
 }
 
 export function validateInventory(value) {
@@ -109,6 +117,39 @@ export function reviewerFromApproval(bytes) {
   return selected[0].user.login;
 }
 
+export function validateRebuildParityEvidence(value) {
+  exactKeys(value, rebuildParityEvidenceKeys, "rebuild parity evidence");
+  if (value.schemaVersion !== 1 || value.artifactKind !== "datapack-rebuild-parity-evidence"
+    || !positiveDecimal(value.selectedCandidateWorkflowRunId)
+    || !Array.isArray(value.candidates) || value.candidates.length !== 3
+    || !sha64(value.artifactInventorySha256)
+    || value.contractVersion !== "datapack-rebuild-parity-v1"
+    || value.issueRef !== "AquilaXk/easysubway#2705") {
+    throw new Error("rebuild parity evidence is invalid");
+  }
+
+  let previousRunId = null;
+  let baseline = null;
+  let selected = null;
+  for (const candidate of value.candidates) {
+    validatePromotionCandidate(candidate);
+    if (candidate.artifactInventorySha256 !== value.artifactInventorySha256
+      || (previousRunId != null && BigInt(previousRunId) >= BigInt(candidate.workflowRunId))) {
+      throw new Error("rebuild parity evidence is invalid");
+    }
+    const identity = { ...candidate };
+    delete identity.workflowRunId;
+    if (baseline != null && !isDeepStrictEqual(identity, baseline)) {
+      throw new Error("rebuild parity evidence is invalid");
+    }
+    baseline ??= identity;
+    if (candidate.workflowRunId === value.selectedCandidateWorkflowRunId) selected = candidate;
+    previousRunId = candidate.workflowRunId;
+  }
+  if (!selected) throw new Error("rebuild parity evidence is invalid");
+  return selected;
+}
+
 export function validateRequest({
   request,
   component,
@@ -116,18 +157,23 @@ export function validateRequest({
   inventoryBytes,
   compatibility,
   compatibilityBytes,
+  rebuildParityEvidence,
+  rebuildParityEvidenceBytes,
   approvalBytes,
   workflowRunId,
 }) {
-  validateComponent(component);
+  validatePromotionCandidate(component);
   validateInventory(inventory);
   validateCompatibilityEvidence(compatibility, component);
+  const selectedCandidate = validateRebuildParityEvidence(rebuildParityEvidence);
   exactKeys(request, requestKeys, "request");
   if (request.schemaVersion !== 1 || request.artifactKind !== "datapack-promotion-request"
     || !isDeepStrictEqual(request.candidate, component)
     || request.compatibilityEvidenceSha256 !== hash(compatibilityBytes)
+    || request.rebuildParityEvidenceSha256 !== hash(rebuildParityEvidenceBytes)
     || !text(request.requestedBy) || request.contractVersion !== "datapack-promotion-v1"
-    || request.issueRef !== "AquilaXk/easysubway#2699") {
+    || request.issueRef !== "AquilaXk/easysubway#2705"
+    || !isDeepStrictEqual(component, selectedCandidate)) {
     throw new Error("request is invalid");
   }
 
@@ -185,7 +231,7 @@ function sha40(value) {
 async function main() {
   const args = parseArgs(process.argv.slice(2), [
     "request", "component", "inventory", "compatibility-evidence", "approval-evidence",
-    "workflow-run-id",
+    "rebuild-parity-evidence", "workflow-run-id",
   ]);
   const [request] = await regularJson(args.get("request"), "--request");
   const [component] = await regularJson(args.get("component"), "--component");
@@ -193,6 +239,10 @@ async function main() {
   const [compatibility, compatibilityBytes] = await regularJson(
     args.get("compatibility-evidence"),
     "--compatibility-evidence",
+  );
+  const [rebuildParityEvidence, rebuildParityEvidenceBytes] = await regularJson(
+    args.get("rebuild-parity-evidence"),
+    "--rebuild-parity-evidence",
   );
   const approvalBytes = await regularBytes(args.get("approval-evidence"), "--approval-evidence");
   validateRequest({
@@ -202,6 +252,8 @@ async function main() {
     inventoryBytes,
     compatibility,
     compatibilityBytes,
+    rebuildParityEvidence,
+    rebuildParityEvidenceBytes,
     approvalBytes,
     workflowRunId: args.get("workflow-run-id"),
   });

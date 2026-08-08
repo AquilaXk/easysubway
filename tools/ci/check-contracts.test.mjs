@@ -1,11 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import {
   collectContractErrors,
+  loadArchitectureDecisionAtRef,
   loadWorkspace,
   loadJson,
   validateCompatibilityMatrixPayload,
@@ -15,10 +17,34 @@ import {
   validateSourceInventory,
   validateSourceGovernanceContracts,
   validateBoundariesPayload,
+  validateRepositorySplitIssueAmendments,
   validateRepositorySplitIssueLedger,
+  validateArchitectureDecision,
+  validateArchitectureDecisionTransition,
+  validateArchitectureDecisionWorkspaceTransition,
+  validateDocumentationFragment,
+  validateDocumentationSystemCatalog,
   validateGateIndex,
+  validateProductClaimCatalog,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
+
+const FIXTURE_GIT_UNSET = ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_QUARANTINE_PATH", "GIT_CEILING_DIRECTORIES", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"];
+
+function fixtureGit(args, options = {}) {
+  const env = {
+    ...process.env,
+    GIT_CONFIG_GLOBAL: "/dev/null",
+    GIT_CONFIG_SYSTEM: "/dev/null",
+    GIT_CONFIG_NOSYSTEM: "1",
+  };
+  for (const key of FIXTURE_GIT_UNSET) delete env[key];
+  const command = args[0] === "init" ? ["init", "--template=", ...args.slice(1)] : args;
+  return execFileSync("/usr/bin/git", ["-c", "commit.gpgSign=false", "-c", "core.hooksPath=/dev/null", ...command], {
+    ...options,
+    env,
+  });
+}
 
 function createExternalWorkspace() {
   const directory = mkdtempSync(join(tmpdir(), "gate-ownership-workspace-"));
@@ -38,9 +64,845 @@ function createExternalWorkspace() {
     sourceInventory: "inputs/source-inventory.json",
     governancePolicy: "inputs/governance-policy.json",
     freshnessPolicy: "inputs/freshness-policy.json",
+    architectureDecision: "inputs/architecture-decision.json",
+    documentationSystemCatalog: "inputs/documentation-system-catalog.json",
+    productClaimCatalog: "inputs/product-claim-catalog.json",
   }));
+  copy("contracts/documentation/ADR-HUB-0001.json", "inputs/architecture-decision.json");
+  copy("contracts/documentation/ADR-HUB-0001-decision.schema.json", "inputs/ADR-HUB-0001-decision.schema.json");
+  copy("contracts/documentation/documentation-system-catalog.json", "inputs/documentation-system-catalog.json");
+  copy("contracts/documentation/product-claim-catalog.json", "inputs/product-claim-catalog.json");
   return { directory, workspacePath };
 }
+
+function bindRootDecisionSchema(directory, adr) {
+  const schemaName = `${adr.id}-decision.schema.json`;
+  adr.decisionSchema = `./${schemaName}`;
+  cpSync("contracts/documentation/ADR-HUB-0001-decision.schema.json", join(directory, schemaName));
+}
+
+function documentationCatalogRecord(repository, innerSha, blobSha, path = "docs/resource.txt") {
+  const resource = `${repository}:${path}`;
+  const canonicalIdentity = `git:${innerSha}:${path}:${blobSha}`;
+  return {
+    resource, resourceClass: "CANONICAL_RESOURCE", documentationFamily: "ARCHITECTURE",
+    kindCandidate: "DOCUMENTATION_RESOURCE", sourceSurface: "TRACKED", canonicalIdentity,
+    status: "ACTIVE", ownerRepository: repository, ownerIssue: null,
+    currentConsumers: ["consumer:documentation"], releaseReachability: "NONE",
+    publicSurfaceReachability: [], assertionState: "REQUIRED_FINAL_PRODUCTION_BEHAVIOR",
+    sensitivity: "INTERNAL", duplicateGroup: null, disposition: "RETAIN_CANONICAL",
+    deletePrerequisite: [], supersedes: [], supersededBy: null, invalidatedBy: null,
+    invalidationReason: null, invalidationEvidence: [], mutationPolicy: "CURRENT_STATE_WITH_CHANGE",
+    reviewPolicyId: "EVENT_ONLY", reviewTrigger: ["event:change"],
+    lastVerifiedAt: "2026-08-05T00:00:00.000Z", lastVerifiedIdentity: canonicalIdentity,
+    verificationMethod: "contract-test", verificationEvidence: ["evidence:fixture"],
+    nextReviewAtOrSemanticExpiry: null, implementationPlan: "PLAN-DOC", workloadClass: null,
+    orchestrationProfile: null, stateClass: null, configurationDelivery: null,
+    healthContract: null, availabilityContract: null, securityContract: null, releaseContract: null,
+    portabilityOwner: null, portabilityEvidence: [], portabilityGap: [],
+  };
+}
+
+function createDocumentationCatalogWorkspace({ activeIndexes = null } = {}) {
+  const { directory, workspacePath } = createExternalWorkspace();
+  const catalogPath = join(directory, "inputs/documentation-system-catalog.json");
+  const catalog = loadJson(catalogPath);
+  const active = activeIndexes ?? catalog.repositories.map((_, index) => index);
+  const repositories = [];
+  try {
+    for (const [index, entry] of catalog.repositories.entries()) {
+      if (!active.includes(index)) {
+        entry.status = "PROPOSED";
+        entry.fragment = null;
+        continue;
+      }
+      const root = join(directory, `repository-${index}`);
+      mkdirSync(join(root, "docs"), { recursive: true });
+      for (const args of [["init"], ["config", "user.email", "test@example.com"], ["config", "user.name", "Test"]]) {
+        fixtureGit(args, { cwd: root, stdio: "ignore" });
+      }
+      writeFileSync(join(root, "docs/resource.txt"), `resource-${index}\n`);
+      fixtureGit(["add", "."], { cwd: root, stdio: "ignore" });
+      fixtureGit(["commit", "-m", "inner"], { cwd: root, stdio: "ignore" });
+      const innerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+      const resourceBlob = fixtureGit(["rev-parse", "HEAD:docs/resource.txt"], { cwd: root, encoding: "utf8" }).trim();
+      const resourceDigest = createHash("sha256").update(readFileSync(join(root, "docs/resource.txt"))).digest("hex");
+      const resourceIdentity = index === 0 ? resourceBlob : resourceDigest;
+      const fragment = {
+        $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+        repository: entry.repository, gitSha: innerSha, status: "ACTIVE",
+        lastVerifiedAt: "2026-08-05T00:00:00.000Z", verificationEvidence: ["evidence:fixture"],
+        resources: [documentationCatalogRecord(entry.repository, innerSha, resourceIdentity)],
+      };
+      writeFileSync(join(root, "docs/fragment.json"), JSON.stringify(fragment));
+      fixtureGit(["add", "."], { cwd: root, stdio: "ignore" });
+      fixtureGit(["commit", "-m", "outer"], { cwd: root, stdio: "ignore" });
+      const outerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+      const fragmentBlob = fixtureGit(["rev-parse", "HEAD:docs/fragment.json"], { cwd: root, encoding: "utf8" }).trim();
+      entry.status = "ACTIVE";
+      entry.fragment = {
+        gitSha: outerSha, path: "docs/fragment.json", blobSha: index === 0
+          ? fragmentBlob : createHash("sha256").update(readFileSync(join(root, "docs/fragment.json"))).digest("hex"),
+        lastVerifiedAt: fragment.lastVerifiedAt, verificationEvidence: fragment.verificationEvidence,
+      };
+      repositories.push({ repository: entry.repository, root: realpathSync(root) });
+    }
+    writeFileSync(catalogPath, JSON.stringify(catalog));
+    const fragmentWorkspacePath = join(directory, "documentation-fragment-workspace.json");
+    writeFileSync(fragmentWorkspacePath, JSON.stringify({ schemaVersion: 1, repositories }));
+    return { directory, workspacePath, fragmentWorkspacePath, catalogPath, repositories };
+  } catch (error) {
+    rmSync(directory, { recursive: true, force: true });
+    throw error;
+  }
+}
+
+function createSingleDocumentationCatalogWorkspace() {
+  return createDocumentationCatalogWorkspace({ activeIndexes: [0] });
+}
+
+function documentationCatalogErrors(fixture) {
+  return collectContractErrors(fixture.workspacePath, {
+    documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+  });
+}
+
+function assertDocumentationCatalogFailure(fixture, expected) {
+  const errors = documentationCatalogErrors(fixture);
+  assert.ok(errors.some((error) => error.includes(expected)), errors.join("\n"));
+  for (const { root } of fixture.repositories) assert.ok(errors.every((error) => !error.includes(root)), errors.join("\n"));
+}
+
+function updateDocumentationCatalogWorkspace(fixture, mutate) {
+  const workspace = loadJson(fixture.fragmentWorkspacePath);
+  mutate(workspace);
+  writeFileSync(fixture.fragmentWorkspacePath, JSON.stringify(workspace));
+}
+
+function commitDocumentationCatalogFragment(fixture, index, value, mutateCatalog = () => {}) {
+  const root = fixture.repositories[index].root;
+  writeFileSync(join(root, "docs/fragment.json"), value);
+  fixtureGit(["add", "."], { cwd: root, stdio: "ignore" });
+  fixtureGit(["commit", "-m", "mutate fragment"], { cwd: root, stdio: "ignore" });
+  const catalog = loadJson(fixture.catalogPath);
+  const fragment = catalog.repositories[index].fragment;
+  fragment.gitSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+  fragment.blobSha = fixtureGit(["rev-parse", "HEAD:docs/fragment.json"], { cwd: root, encoding: "utf8" }).trim();
+  mutateCatalog(catalog.repositories[index]);
+  writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+}
+
+function rebindDocumentationCatalogFragment(fixture, index, path, blobSha) {
+  const root = fixture.repositories[index].root;
+  const catalog = loadJson(fixture.catalogPath);
+  catalog.repositories[index].fragment = {
+    ...catalog.repositories[index].fragment,
+    gitSha: fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim(),
+    path,
+    blobSha,
+  };
+  writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+}
+
+function rewriteDocumentationFragmentInnerCommit(fragment, innerSha, resourcePath = "docs/resource.txt", blobSha = null) {
+  const record = fragment.resources[0];
+  const identity = blobSha ?? record.canonicalIdentity.split(":").at(-1);
+  record.resource = `${fragment.repository}:${resourcePath}`;
+  record.canonicalIdentity = `git:${innerSha}:${resourcePath}:${identity}`;
+  record.lastVerifiedIdentity = record.canonicalIdentity;
+  fragment.gitSha = innerSha;
+}
+
+function documentationExternalRecord(record, resource) {
+  const output = structuredClone(record);
+  output.resource = resource;
+  output.sourceSurface = "EXTERNAL";
+  output.canonicalIdentity = `sha256:${"a".repeat(64)}`;
+  output.lastVerifiedIdentity = output.canonicalIdentity;
+  return output;
+}
+
+function commitDocumentationCatalogResources(fixture, index, mutate) {
+  const root = fixture.repositories[index].root;
+  const fragment = loadJson(join(root, "docs/fragment.json"));
+  mutate(fragment.resources);
+  commitDocumentationCatalogFragment(fixture, index, JSON.stringify(fragment));
+}
+
+test("documentation catalog resolves exact outer and inner Git blobs", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  try {
+    assert.ok(collectContractErrors(fixture.workspacePath).some((error) => error.includes("workspace가 필요하다")));
+    assert.deepEqual(collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    }), []);
+
+    const localWorkspace = loadJson(fixture.fragmentWorkspacePath);
+    localWorkspace.repositories.pop();
+    writeFileSync(fixture.fragmentWorkspacePath, JSON.stringify(localWorkspace));
+    assert.ok(collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    }).some((error) => error.includes("mapping")));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog rejects schema-invalid fragment blobs without throwing", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  try {
+    commitDocumentationCatalogFragment(fixture, 0, "null");
+    const errors = collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    });
+    assert.ok(errors.some((error) => error.includes("documentation-fragment")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes(fixture.repositories[0].root)));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog returns bounded malformed resource errors without throwing", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    fragment.resources = Array.from({ length: 256 }, () => ({}));
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    let errors;
+    assert.doesNotThrow(() => { errors = documentationCatalogErrors(fixture); });
+    assert.ok(errors.some((error) => error.includes("documentation-fragment resource")), errors.join("\n"));
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog rejects fragment resource arrays above 256 before item validation", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    fragment.resources = Array.from({ length: 257 }, () => ({}));
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    const errors = documentationCatalogErrors(fixture);
+    assert.ok(errors.some((error) => error.includes("fragment resources는 256개 이하여야 한다")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes("documentation-fragment resource")), errors.join("\n"));
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog limits the resource union across ACTIVE fragments", () => {
+  const fixture = createDocumentationCatalogWorkspace({ activeIndexes: [0, 1] });
+  try {
+    for (const [repositoryIndex, count] of [128, 129].entries()) {
+      const root = fixture.repositories[repositoryIndex].root;
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      const base = fragment.resources[0];
+      fragment.resources = Array.from({ length: count }, (_, index) => {
+        const record = documentationExternalRecord(base, `https://example.invalid/${repositoryIndex}/${String(index).padStart(3, "0")}`);
+        record.canonicalIdentity = `sha256:${repositoryIndex}${index.toString(16).padStart(63, "0")}`;
+        record.lastVerifiedIdentity = record.canonicalIdentity;
+        return record;
+      });
+      if (repositoryIndex === 0) {
+        fragment.resources[0] = documentationCatalogRecord(
+          fragment.repository, fragment.gitSha, "0".repeat(40), "docs/missing.txt",
+        );
+      }
+      commitDocumentationCatalogFragment(fixture, repositoryIndex, JSON.stringify(fragment));
+    }
+    const errors = documentationCatalogErrors(fixture);
+    assert.ok(errors.some((error) => error.includes("resources는 전체 256개 이하여야 한다")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes("TRACKED resource blob identity")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes("ACTIVE fragment relation")), errors.join("\n"));
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog rejects oversized nested arrays before schema validation", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    fragment.resources[0].currentConsumers = Array.from({ length: 257 }, (_, index) => `consumer:${index}`);
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    assertDocumentationCatalogFailure(fixture, "fragment 배열은 256개 항목 이하여야 한다");
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog rejects reversed local workspace mappings", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  try {
+    const localWorkspace = loadJson(fixture.fragmentWorkspacePath);
+    localWorkspace.repositories.reverse();
+    writeFileSync(fixture.fragmentWorkspacePath, JSON.stringify(localWorkspace));
+    assert.ok(collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    }).some((error) => error.includes("mapping")));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog rejects ACTIVE null fragment without throwing", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  try {
+    const catalog = loadJson(fixture.catalogPath);
+    catalog.repositories[0].fragment = null;
+    writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    const errors = collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    });
+    assert.ok(errors.some((error) => error.includes("ACTIVE fragment가 필요하다")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes(fixture.repositories[0].root)));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog ignores inherited hostile Git environment", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  const hostile = {
+    GIT_DIR: join(fixture.directory, "not-a-git-dir"),
+    GIT_OBJECT_DIRECTORY: join(fixture.directory, "not-an-object-directory"),
+    GIT_CONFIG_COUNT: "1",
+    GIT_CONFIG_KEY_0: "core.hooksPath",
+    GIT_CONFIG_VALUE_0: join(fixture.directory, "not-a-hook-directory"),
+    GIT_GLOB_PATHSPECS: "1",
+  };
+  const previous = Object.fromEntries(Object.keys(hostile).map((key) => [key, process.env[key]]));
+  try {
+    Object.assign(process.env, hostile);
+    assert.deepEqual(collectContractErrors(fixture.workspacePath, {
+      documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
+    }), []);
+  } finally {
+    for (const [key, value] of Object.entries(previous)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog uses workspace-selected fragment schemas and sanitizes schema failures", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const contracts = join(fixture.directory, "selected-contracts");
+    cpSync("contracts", contracts, { recursive: true });
+    cpSync("README.md", join(fixture.directory, "README.md"));
+    mkdirSync(join(fixture.directory, "release/migrations"), { recursive: true });
+    cpSync("release/migrations/repository-split-issues.json", join(fixture.directory, "release/migrations/repository-split-issues.json"));
+    cpSync("release/migrations/repository-split-issues-amendments.json", join(fixture.directory, "release/migrations/repository-split-issues-amendments.json"));
+    const workspace = loadJson(fixture.workspacePath);
+    workspace.contracts = "selected-contracts";
+    writeFileSync(fixture.workspacePath, JSON.stringify(workspace));
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+
+    const fragmentSchemaPath = join(contracts, "documentation/documentation-fragment.schema.json");
+    const resourceSchemaPath = join(contracts, "documentation/documentation-resource.schema.json");
+    const originalFragmentSchema = readFileSync(fragmentSchemaPath);
+    const originalResourceSchema = readFileSync(resourceSchemaPath);
+    const unsupportedFragmentSchema = { ...loadJson(fragmentSchemaPath), unsupportedKeyword: true };
+    const unsupportedResourceSchema = { ...loadJson(resourceSchemaPath), unsupportedKeyword: true };
+    for (const [schemaPath, value, expected] of [
+      [fragmentSchemaPath, null, "fragment schema를 읽을 수 없다"],
+      [fragmentSchemaPath, "{", "fragment schema를 읽을 수 없다"],
+      [fragmentSchemaPath, "null", "fragment schema가 유효하지 않다"],
+      [fragmentSchemaPath, JSON.stringify(unsupportedFragmentSchema), "fragment schema가 유효하지 않다"],
+      [resourceSchemaPath, JSON.stringify(unsupportedResourceSchema), "fragment schema가 유효하지 않다"],
+    ]) {
+      writeFileSync(fragmentSchemaPath, originalFragmentSchema);
+      writeFileSync(resourceSchemaPath, originalResourceSchema);
+      if (value === null) rmSync(schemaPath);
+      else writeFileSync(schemaPath, value);
+      let errors;
+      assert.doesNotThrow(() => { errors = documentationCatalogErrors(fixture); });
+      assert.ok(errors.some((error) => error.includes(expected)), errors.join("\n"));
+      assert.ok(errors.every((error) => !error.includes(schemaPath)), errors.join("\n"));
+    }
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog fixtures ignore hostile global Git config", () => {
+  const directory = mkdtempSync(join(tmpdir(), "documentation-git-config-"));
+  const configPath = join(directory, "global-config");
+  const previous = process.env.GIT_CONFIG_GLOBAL;
+  writeFileSync(configPath, "[");
+  try {
+    process.env.GIT_CONFIG_GLOBAL = configPath;
+    const fixture = createSingleDocumentationCatalogWorkspace();
+    try { assert.deepEqual(documentationCatalogErrors(fixture), []); }
+    finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  } finally {
+    if (previous === undefined) delete process.env.GIT_CONFIG_GLOBAL;
+    else process.env.GIT_CONFIG_GLOBAL = previous;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog rejects malformed and drifting local workspace mappings", () => {
+  const cases = [
+    ["malformed JSON", (fixture) => writeFileSync(fixture.fragmentWorkspacePath, "{"), "유효한 local workspace JSON"],
+    ["invalid shape", (fixture) => writeFileSync(fixture.fragmentWorkspacePath, JSON.stringify({ schemaVersion: 2, repositories: [] })), "shape"],
+    ["relative root", (fixture) => updateDocumentationCatalogWorkspace(fixture, (workspace) => { workspace.repositories[0].root = "relative"; }), "mapping"],
+    ["duplicate mapping", (fixture) => updateDocumentationCatalogWorkspace(fixture, (workspace) => { workspace.repositories.push(structuredClone(workspace.repositories[0])); }), "mapping"],
+    ["unknown mapping", (fixture) => updateDocumentationCatalogWorkspace(fixture, (workspace) => { workspace.repositories[0].repository = "unknown/repository"; }), "mapping"],
+    ["missing mapping", (fixture) => updateDocumentationCatalogWorkspace(fixture, (workspace) => { workspace.repositories.pop(); }), "mapping"],
+  ];
+  for (const [, mutate, expected] of cases) {
+    const fixture = createDocumentationCatalogWorkspace();
+    try {
+      mutate(fixture);
+      assertDocumentationCatalogFailure(fixture, expected);
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+});
+
+test("documentation catalog rejects unsafe Git roots and missing outer objects without local path leaks", () => {
+  const cases = [
+    ["non-Git root", (fixture) => {
+      const root = join(fixture.directory, "not-a-git-root");
+      mkdirSync(root);
+      updateDocumentationCatalogWorkspace(fixture, (workspace) => { workspace.repositories[0].root = root; });
+    }, "Git root"],
+    ["nested root", (fixture) => {
+      const root = join(fixture.repositories[0].root, "nested");
+      mkdirSync(root);
+      updateDocumentationCatalogWorkspace(fixture, (workspace) => { workspace.repositories[0].root = root; });
+    }, "Git root"],
+    ["symlink root", (fixture) => {
+      const link = join(fixture.directory, "root-link");
+      symlinkSync(fixture.repositories[0].root, link);
+      updateDocumentationCatalogWorkspace(fixture, (workspace) => { workspace.repositories[0].root = link; });
+    }, "Git root"],
+    ["missing outer SHA", (fixture) => {
+      const catalog = loadJson(fixture.catalogPath);
+      catalog.repositories[0].fragment.gitSha = "f".repeat(40);
+      writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    }, "fragment blob"],
+    ["missing outer path", (fixture) => {
+      const catalog = loadJson(fixture.catalogPath);
+      catalog.repositories[0].fragment.path = "docs/missing.json";
+      writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    }, "fragment blob"],
+  ];
+  for (const [, mutate, expected] of cases) {
+    const fixture = createDocumentationCatalogWorkspace();
+    try {
+      mutate(fixture);
+      assertDocumentationCatalogFailure(fixture, expected);
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+});
+
+test("documentation catalog treats metacharacter paths literally and rejects malformed fragment bytes", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    const metacharacterPath = "docs/[fragment]*?.json";
+    writeFileSync(join(root, metacharacterPath), JSON.stringify(fragment));
+    fixtureGit(["add", "."], { cwd: root, stdio: "ignore" });
+    fixtureGit(["commit", "-m", "literal path"], { cwd: root, stdio: "ignore" });
+    const catalog = loadJson(fixture.catalogPath);
+    catalog.repositories[0].fragment.gitSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    catalog.repositories[0].fragment.path = metacharacterPath;
+    catalog.repositories[0].fragment.blobSha = fixtureGit(["rev-parse", `HEAD:${metacharacterPath}`], { cwd: root, encoding: "utf8" }).trim();
+    writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+
+  for (const [label, value, expected] of [
+    ["invalid UTF-8", Buffer.from([0xc3, 0x28]), "fragment JSON"],
+    ["invalid JSON", "{", "fragment JSON"],
+    ["schema invalid", "null", "documentation-fragment"],
+  ]) {
+    const invalid = createDocumentationCatalogWorkspace();
+    try {
+      commitDocumentationCatalogFragment(invalid, 0, value);
+      assertDocumentationCatalogFailure(invalid, expected);
+    } finally { rmSync(invalid.directory, { recursive: true, force: true }); }
+  }
+});
+
+test("documentation catalog rejects fragment header and TRACKED identity drift", () => {
+  const cases = [
+    ["SHA-1 fragment identity", (fixture) => {
+      const catalog = loadJson(fixture.catalogPath);
+      catalog.repositories[0].fragment.blobSha = "0".repeat(40);
+      writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    }, "fragment blob identity"],
+    ["SHA-256 fragment identity", (fixture) => {
+      const catalog = loadJson(fixture.catalogPath);
+      catalog.repositories[1].fragment.blobSha = "0".repeat(64);
+      writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    }, "fragment blob identity"],
+    ["repository header", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      fragment.repository = fixture.repositories[1].repository;
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    }, "invalid ownerRepository"],
+    ["status header", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      fragment.status = "PROPOSED";
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    }, "catalog fragment header"],
+    ["lastVerifiedAt header", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      fragment.lastVerifiedAt = "2026-08-06T00:00:00.000Z";
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    }, "catalog fragment header"],
+    ["verificationEvidence header", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      fragment.verificationEvidence = ["evidence:other"];
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    }, "catalog fragment header"],
+    ["TRACKED resource SHA-1", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      fragment.resources[0].canonicalIdentity = fragment.resources[0].canonicalIdentity.replace(/:[0-9a-f]{40}$/, `:${"0".repeat(40)}`);
+      fragment.resources[0].lastVerifiedIdentity = fragment.resources[0].canonicalIdentity;
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    }, "TRACKED resource blob identity"],
+    ["TRACKED resource SHA-256", (fixture) => {
+      const root = fixture.repositories[1].root;
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      fragment.resources[0].canonicalIdentity = fragment.resources[0].canonicalIdentity.replace(/:[0-9a-f]{64}$/, `:${"0".repeat(64)}`);
+      fragment.resources[0].lastVerifiedIdentity = fragment.resources[0].canonicalIdentity;
+      commitDocumentationCatalogFragment(fixture, 1, JSON.stringify(fragment));
+    }, "TRACKED resource blob identity"],
+  ];
+  for (const [, mutate, expected] of cases) {
+    const fixture = createDocumentationCatalogWorkspace();
+    try {
+      mutate(fixture);
+      assertDocumentationCatalogFailure(fixture, expected);
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+});
+
+test("documentation catalog accepts TRACKED resources larger than the default child-process buffer", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const resourcePath = join(root, "docs/resource.txt");
+    writeFileSync(resourcePath, "x".repeat(1024 * 1024 + 1));
+    fixtureGit(["add", "docs/resource.txt"], { cwd: root, stdio: "ignore" });
+    fixtureGit(["commit", "-m", "large resource"], { cwd: root, stdio: "ignore" });
+    const innerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const blobSha = fixtureGit(["rev-parse", "HEAD:docs/resource.txt"], { cwd: root, encoding: "utf8" }).trim();
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    rewriteDocumentationFragmentInnerCommit(fragment, innerSha, "docs/resource.txt", blobSha);
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog enforces the explicit 64 MiB blob limit", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const resourcePath = join(root, "docs/resource.txt");
+    const bindResource = (size) => {
+      const bytes = Buffer.alloc(size, "x");
+      writeFileSync(resourcePath, bytes);
+      fixtureGit(["add", "docs/resource.txt"], { cwd: root, stdio: "ignore" });
+      fixtureGit(["commit", "-m", `resource ${size}`], { cwd: root, stdio: "ignore" });
+      const innerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+      const blobSha = fixtureGit(["rev-parse", "HEAD:docs/resource.txt"], { cwd: root, encoding: "utf8" }).trim();
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      fragment.resources = [fragment.resources[0]];
+      rewriteDocumentationFragmentInnerCommit(fragment, innerSha, "docs/resource.txt", blobSha);
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+      return createHash("sha256").update(bytes).digest("hex");
+    };
+
+    const largeDigest = bindResource(64 * 1024 * 1024);
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+
+    const smallBytes = Buffer.from("y");
+    writeFileSync(join(root, "docs/small.txt"), smallBytes);
+    fixtureGit(["add", "docs/small.txt"], { cwd: root, stdio: "ignore" });
+    fixtureGit(["commit", "-m", "aggregate digest payload"], { cwd: root, stdio: "ignore" });
+    const innerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    fragment.gitSha = innerSha;
+    fragment.resources = [
+      documentationCatalogRecord(fragment.repository, innerSha, largeDigest),
+      documentationCatalogRecord(
+        fragment.repository,
+        innerSha,
+        createHash("sha256").update(smallBytes).digest("hex"),
+        "docs/small.txt",
+      ),
+    ];
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    assertDocumentationCatalogFailure(fixture, "TRACKED resource SHA-256 payload 합계는 64 MiB 이하여야 한다");
+
+    bindResource(64 * 1024 * 1024 + 1);
+    assertDocumentationCatalogFailure(fixture, "TRACKED resource blob은 64 MiB 이하여야 한다");
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog enforces the 1 MiB fragment JSON limit before parsing", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = JSON.stringify(loadJson(join(root, "docs/fragment.json")));
+    commitDocumentationCatalogFragment(fixture, 0, fragment.padEnd(1024 * 1024, " "));
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+    commitDocumentationCatalogFragment(fixture, 0, fragment.padEnd(1024 * 1024 + 1, " "));
+    assertDocumentationCatalogFailure(fixture, "fragment blob은 1 MiB 이하여야 한다");
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog does not validate global relations after a fragment transport failure", () => {
+  const fixture = createDocumentationCatalogWorkspace();
+  try {
+    const fragment = loadJson(join(fixture.repositories[0].root, "docs/fragment.json"));
+    fragment.status = "PROPOSED";
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    commitDocumentationCatalogResources(fixture, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:duplicate"); });
+    commitDocumentationCatalogResources(fixture, 2, (records) => { records[0] = documentationExternalRecord(records[0], "external:duplicate"); });
+    const errors = documentationCatalogErrors(fixture);
+    assert.ok(errors.some((error) => error.includes("catalog fragment header 불일치")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes("ACTIVE fragment relation")), errors.join("\n"));
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog validates global relations across two ACTIVE fragments", () => {
+  const cases = [
+    ["duplicate resource", (fixture) => {
+      commitDocumentationCatalogResources(fixture, 0, (records) => { records[0] = documentationExternalRecord(records[0], "external:duplicate"); });
+      commitDocumentationCatalogResources(fixture, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:duplicate"); });
+    }],
+    ["invalid duplicate group", (fixture) => {
+      commitDocumentationCatalogResources(fixture, 0, (records) => { records[0] = documentationExternalRecord(records[0], "external:solo"); records[0].duplicateGroup = "group:solo"; });
+    }],
+    ["missing supersession reciprocal", (fixture) => {
+      commitDocumentationCatalogResources(fixture, 0, (records) => { records[0] = documentationExternalRecord(records[0], "external:old"); records[0].status = "SUPERSEDED"; records[0].supersededBy = "external:new"; });
+      commitDocumentationCatalogResources(fixture, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:new"); });
+    }],
+    ["missing invalidation reciprocal", (fixture) => {
+      commitDocumentationCatalogResources(fixture, 0, (records) => {
+        records[0] = documentationExternalRecord(records[0], "external:invalidated");
+        Object.assign(records[0], { resourceClass: "EVIDENCE", status: "INVALIDATED", invalidatedBy: "external:replacement", invalidationReason: "reason:test", invalidationEvidence: ["evidence:test"], mutationPolicy: "EVIDENCE_IMMUTABLE", releaseReachability: "EVIDENCE", currentConsumers: ["evidence:test"] });
+      });
+      commitDocumentationCatalogResources(fixture, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:replacement"); });
+    }],
+    ["supersession cycle", (fixture) => {
+      commitDocumentationCatalogResources(fixture, 0, (records) => { records[0] = documentationExternalRecord(records[0], "external:a"); records[0].status = "SUPERSEDED"; records[0].supersededBy = "external:b"; records[0].supersedes = ["external:b"]; });
+      commitDocumentationCatalogResources(fixture, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:b"); records[0].status = "SUPERSEDED"; records[0].supersededBy = "external:a"; records[0].supersedes = ["external:a"]; });
+    }],
+  ];
+  for (const [, mutate] of cases) {
+    const fixture = createDocumentationCatalogWorkspace({ activeIndexes: [0, 1] });
+    try {
+      mutate(fixture);
+      assertDocumentationCatalogFailure(fixture, "ACTIVE fragment relation");
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+
+  const valid = createDocumentationCatalogWorkspace({ activeIndexes: [0, 1] });
+  try {
+    commitDocumentationCatalogResources(valid, 0, (records) => { records[0] = documentationExternalRecord(records[0], "external:old"); records[0].status = "SUPERSEDED"; records[0].supersededBy = "external:new"; });
+    commitDocumentationCatalogResources(valid, 1, (records) => { records[0] = documentationExternalRecord(records[0], "external:new"); records[0].supersedes = ["external:old"]; });
+    assert.deepEqual(documentationCatalogErrors(valid), []);
+  } finally { rmSync(valid.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog rejects non-blob outer fragment paths", () => {
+  const cases = [
+    ["symlink", (fixture) => {
+      const root = fixture.repositories[0].root;
+      rmSync(join(root, "docs/fragment.json"));
+      symlinkSync("resource.txt", join(root, "docs/fragment.json"));
+      fixtureGit(["add", "-A"], { cwd: root, stdio: "ignore" });
+      fixtureGit(["commit", "-m", "symlink fragment"], { cwd: root, stdio: "ignore" });
+      rebindDocumentationCatalogFragment(fixture, 0, "docs/fragment.json", "0".repeat(40));
+    }],
+    ["tree", (fixture) => {
+      const root = fixture.repositories[0].root;
+      rebindDocumentationCatalogFragment(fixture, 0, "docs", "0".repeat(40));
+    }],
+    ["gitlink", (fixture) => {
+      const root = fixture.repositories[0].root;
+      rmSync(join(root, "docs/fragment.json"));
+      fixtureGit(["rm", "--cached", "docs/fragment.json"], { cwd: root, stdio: "ignore" });
+      fixtureGit(["update-index", "--add", "--cacheinfo", `160000,${"1".repeat(40)},docs/fragment.json`], { cwd: root, stdio: "ignore" });
+      fixtureGit(["commit", "-m", "gitlink fragment"], { cwd: root, stdio: "ignore" });
+      rebindDocumentationCatalogFragment(fixture, 0, "docs/fragment.json", "0".repeat(40));
+    }],
+  ];
+  for (const [, mutate] of cases) {
+    const fixture = createSingleDocumentationCatalogWorkspace();
+    try {
+      mutate(fixture);
+      assertDocumentationCatalogFailure(fixture, "fragment blob");
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+});
+
+test("documentation catalog rejects missing and non-ancestor inner commits", () => {
+  const cases = [
+    ["missing", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      rewriteDocumentationFragmentInnerCommit(fragment, "f".repeat(40));
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    }],
+    ["non-ancestor", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const innerSha = fixtureGit(["commit-tree", "HEAD^{tree}", "-m", "orphan inner"], { cwd: root, encoding: "utf8" }).trim();
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      rewriteDocumentationFragmentInnerCommit(fragment, innerSha);
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    }],
+    ["grafted non-ancestor", (fixture) => {
+      const root = fixture.repositories[0].root;
+      const innerSha = fixtureGit(["commit-tree", "HEAD^{tree}", "-m", "grafted inner"], { cwd: root, encoding: "utf8" }).trim();
+      const fragment = loadJson(join(root, "docs/fragment.json"));
+      rewriteDocumentationFragmentInnerCommit(fragment, innerSha);
+      commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+      const outerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+      mkdirSync(join(root, ".git/info"), { recursive: true });
+      writeFileSync(join(root, ".git/info/grafts"), `${outerSha} ${innerSha}\n`);
+    }],
+  ];
+  for (const [, mutate] of cases) {
+    const fixture = createSingleDocumentationCatalogWorkspace();
+    try {
+      mutate(fixture);
+      assertDocumentationCatalogFailure(fixture, "inner commit relation");
+    } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+  }
+});
+
+test("documentation catalog rejects missing and symlink TRACKED resources", () => {
+  const missing = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = missing.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    rewriteDocumentationFragmentInnerCommit(fragment, fragment.gitSha, "docs/missing.txt", "0".repeat(40));
+    commitDocumentationCatalogFragment(missing, 0, JSON.stringify(fragment));
+    assertDocumentationCatalogFailure(missing, "TRACKED resource blob identity");
+  } finally { rmSync(missing.directory, { recursive: true, force: true }); }
+
+  const symlink = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = symlink.repositories[0].root;
+    rmSync(join(root, "docs/resource.txt"));
+    symlinkSync("fragment.json", join(root, "docs/resource.txt"));
+    fixtureGit(["add", "-A"], { cwd: root, stdio: "ignore" });
+    fixtureGit(["commit", "-m", "symlink resource inner"], { cwd: root, stdio: "ignore" });
+    const innerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    rewriteDocumentationFragmentInnerCommit(fragment, innerSha);
+    commitDocumentationCatalogFragment(symlink, 0, JSON.stringify(fragment));
+    assertDocumentationCatalogFailure(symlink, "TRACKED resource blob identity");
+  } finally { rmSync(symlink.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog ignores local Git replacement objects", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const goodOuter = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const goodBlob = fixtureGit(["rev-parse", "HEAD:docs/fragment.json"], { cwd: root, encoding: "utf8" }).trim();
+    writeFileSync(join(root, "docs/fragment.json"), "null");
+    fixtureGit(["add", "."], { cwd: root, stdio: "ignore" });
+    fixtureGit(["commit", "-m", "bad outer"], { cwd: root, stdio: "ignore" });
+    const badOuter = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    fixtureGit(["replace", badOuter, goodOuter], { cwd: root, stdio: "ignore" });
+    const catalog = loadJson(fixture.catalogPath);
+    catalog.repositories[0].fragment.gitSha = badOuter;
+    catalog.repositories[0].fragment.blobSha = goodBlob;
+    writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    assertDocumentationCatalogFailure(fixture, "fragment blob identity");
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog rejects SHA-256 Git roots when local Git supports them", (t) => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = join(fixture.directory, "sha256-root");
+    try {
+      fixtureGit(["init", "--object-format=sha256", root], { encoding: "utf8", stdio: "pipe" });
+    } catch (error) {
+      t.skip(`fixed /usr/bin/git init --object-format=sha256 unavailable: ${error instanceof Error ? error.message : String(error)}`);
+      return;
+    }
+    updateDocumentationCatalogWorkspace(fixture, (workspace) => { workspace.repositories[0].root = realpathSync(root); });
+    assertDocumentationCatalogFailure(fixture, "Git root");
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog CLI accepts compatibility modes and rejects malformed optional pairs", () => {
+  const run = (args, cwd = process.cwd()) => execFileSync(process.execPath, [resolve("tools/ci/check-contracts.mjs"), ...args], {
+    cwd, encoding: "utf8", stdio: "pipe",
+  });
+  const proposed = createExternalWorkspace();
+  try {
+    assert.doesNotThrow(() => run(["--workspace", proposed.workspacePath, "--current-only"]));
+  } finally { rmSync(proposed.directory, { recursive: true, force: true }); }
+
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const valid = ["--workspace", fixture.workspacePath, "--current-only", "--documentation-fragment-workspace", fixture.fragmentWorkspacePath];
+    assert.doesNotThrow(() => run(valid));
+    const clone = mkdtempSync(join(tmpdir(), "documentation-catalog-cli-"));
+    try {
+      fixtureGit(["init", clone], { stdio: "ignore" });
+      const copied = join(clone, "fixture");
+      mkdirSync(copied);
+      cpSync("contracts", join(clone, "contracts"), { recursive: true });
+      cpSync("README.md", join(clone, "README.md"));
+      for (const name of ["hub.json", "inputs", "gates"]) cpSync(join(fixture.directory, name), join(copied, name), { recursive: true });
+      mkdirSync(join(clone, "release/migrations"), { recursive: true });
+      cpSync("release/migrations/repository-split-issues.json", join(clone, "release/migrations/repository-split-issues.json"));
+      cpSync("release/migrations/repository-split-issues-amendments.json", join(clone, "release/migrations/repository-split-issues-amendments.json"));
+      const clonedWorkspacePath = join(copied, "hub.json");
+      const clonedWorkspace = loadJson(clonedWorkspacePath);
+      clonedWorkspace.contracts = "../contracts";
+      writeFileSync(clonedWorkspacePath, JSON.stringify(clonedWorkspace));
+      fixtureGit(["config", "user.email", "test@example.com"], { cwd: clone, stdio: "ignore" });
+      fixtureGit(["config", "user.name", "Test"], { cwd: clone, stdio: "ignore" });
+      fixtureGit(["add", "fixture"], { cwd: clone, stdio: "ignore" });
+      fixtureGit(["commit", "-m", "CLI fixture"], { cwd: clone, stdio: "ignore" });
+      const baseRef = fixtureGit(["rev-parse", "HEAD"], { cwd: clone, encoding: "utf8" }).trim();
+      assert.doesNotThrow(() => run([
+        "--workspace", "fixture/hub.json", "--base-ref", baseRef,
+        "--documentation-fragment-workspace", fixture.fragmentWorkspacePath,
+      ], clone));
+    } finally { rmSync(clone, { recursive: true, force: true }); }
+    for (const args of [
+      valid.slice(0, -1),
+      ["--workspace", fixture.workspacePath, "--documentation-fragment-workspace", fixture.fragmentWorkspacePath, "--current-only"],
+      [...valid, "--documentation-fragment-workspace", fixture.fragmentWorkspacePath],
+      [...valid, "extra"],
+    ]) assert.throws(() => run(args), /사용법/);
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
+test("documentation catalog redacts real Git object diagnostics", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const marker = "RAW-FRAGMENT-BYTES-MUST-NOT-LEAK";
+    writeFileSync(join(root, "docs/fragment.json"), marker);
+    fixtureGit(["add", "."], { cwd: root, stdio: "ignore" });
+    fixtureGit(["commit", "-m", "bad bytes"], { cwd: root, stdio: "ignore" });
+    const badSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    const catalog = loadJson(fixture.catalogPath);
+    catalog.repositories[0].fragment.gitSha = badSha;
+    catalog.repositories[0].fragment.blobSha = "0".repeat(40);
+    writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    const errors = documentationCatalogErrors(fixture).join("\n");
+    assert.match(errors, /fragment blob identity/);
+    for (const secret of [root, badSha, marker]) assert.ok(!errors.includes(secret), errors);
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
 
 test("[gate-ownership] workspace는 legacy 경로 밖 복사 입력을 검증한다", () => {
   const { directory, workspacePath } = createExternalWorkspace();
@@ -79,20 +941,22 @@ test("[gate-ownership] workspace는 필수 키 누락을 fail closed한다", () 
 });
 
 test("[gate-ownership] check-contracts CLI는 정확한 workspace 인자만 허용한다", () => {
-  const run = (args) => execFileSync("node", ["tools/ci/check-contracts.mjs", ...args], {
+  const run = (args) => execFileSync(process.execPath, ["tools/ci/check-contracts.mjs", ...args], {
     encoding: "utf8",
     stdio: "pipe",
   });
 
   const { directory, workspacePath } = createExternalWorkspace();
   try {
-    assert.doesNotThrow(() => run(["--workspace", workspacePath]));
+    assert.doesNotThrow(() => run(["--workspace", workspacePath, "--current-only"]));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
   for (const args of [
     [],
     ["--workspace"],
+    ["--workspace", "contracts/workspaces/hub.json"],
+    ["--workspace", "contracts/workspaces/hub.json", "--current-only", "extra"],
     ["--unexpected", "--workspace", "contracts/workspaces/hub.json"],
     ["--workspace", "contracts/workspaces/hub.json", "--workspace", "contracts/workspaces/hub.json"],
   ]) {
@@ -100,10 +964,1096 @@ test("[gate-ownership] check-contracts CLI는 정확한 workspace 인자만 허�
   }
 });
 
+test("product claim catalog validates current release decision and public claim semantics", () => {
+  const schema = loadJson("contracts/documentation/product-claim-catalog.schema.json");
+  const catalog = loadJson("contracts/documentation/product-claim-catalog.json");
+  const errors = [];
+  validateProductClaimCatalog(catalog, schema, errors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.deepEqual(errors, []);
+
+  const invalid = structuredClone(catalog);
+  invalid.releaseDecision = "GO";
+  invalid.claims.find(({ assertionState }) => assertionState === "CURRENTLY_IMPLEMENTED_AND_EVIDENCED").requiredEvidence = [];
+  const invalidErrors = [];
+  validateProductClaimCatalog(invalid, schema, invalidErrors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.ok(invalidErrors.some((error) => error.includes("releaseDecision")));
+  assert.ok(invalidErrors.some((error) => error.includes("requiredEvidence")));
+
+  const schemaInvalid = structuredClone(catalog);
+  schemaInvalid.unexpected = true;
+  const schemaErrors = [];
+  validateProductClaimCatalog(schemaInvalid, schema, schemaErrors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.ok(schemaErrors.some((error) => error.includes("허용되지 않은 필드")));
+});
+
+for (const [name, mutate, expected] of [
+  ["required inventory deletion", (catalog) => { catalog.claims = catalog.claims.filter(({ claimId }) => claimId !== "PRODUCT_CLAIM_VISION"); }, "inventory"],
+  ["required inventory addition", (catalog) => { catalog.claims.push({ ...structuredClone(catalog.claims.at(-1)), claimId: "PRODUCT_CLAIM_EXTRA", topic: "VISION" }); }, "inventory"],
+  ["required inventory topic binding", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_VISION").topic = "PRIVACY"; }, "inventory"],
+  ["duplicate claim ID", (catalog) => { catalog.claims[1].claimId = catalog.claims[0].claimId; }, "claimId"],
+  ["unsorted claim ID", (catalog) => { [catalog.claims[0], catalog.claims[1]] = [catalog.claims[1], catalog.claims[0]]; }, "claimId"],
+  ["duplicate surface", (catalog) => { catalog.claims[0].surface = ["README.md", "README.md"]; }, "surface"],
+  ["unsorted review trigger", (catalog) => { catalog.claims[0].reviewTrigger = ["z", "a"]; }, "reviewTrigger"],
+  ["final state on current surface", (catalog) => { catalog.claims[0].assertionState = "HISTORICAL_OR_SUPERSEDED"; }, "current public"],
+  ["required-final current surface", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_JOURNEY_FINAL").surface = ["README.md"]; }, "required-final"],
+  ["README scan target drift", (catalog, forbiddenClaims) => { forbiddenClaims.scanTargets = forbiddenClaims.scanTargets.filter(({ path }) => path !== "README.md"); }, "README.md scan target"],
+  ["non-array README scan target", (catalog, forbiddenClaims) => { forbiddenClaims.scanTargets = "README.md"; }, "README.md scan target"],
+  ["null or primitive README scan target", (catalog, forbiddenClaims) => { forbiddenClaims.scanTargets = [null, "README.md"]; }, "README.md scan target"],
+]) {
+  test(`product claim catalog rejects ${name}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    const forbiddenClaims = loadJson("release/product-gates/forbidden-release-claims.json");
+    mutate(catalog, forbiddenClaims);
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+      forbiddenClaims,
+    });
+    assert.ok(errors.some((error) => error.includes(expected)));
+  });
+}
+
+test("product claim catalog rejects empty forbiddenWhen", () => {
+  const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+  const claim = catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_ANONYMOUS_REPORT");
+  claim.forbiddenWhen = [];
+  const errors = [];
+  validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+    releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+  });
+  assert.ok(errors.some((error) => error.includes("forbiddenWhen")));
+});
+
+for (const field of ["requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
+  test(`product claim catalog rejects duplicate ${field}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    const claim = catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_ANONYMOUS_REPORT");
+    claim[field] = [claim[field][0], claim[field][0]];
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+      forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+    });
+    assert.ok(errors.some((error) => error.includes(field)));
+  });
+
+  test(`product claim catalog rejects unsorted ${field}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_ANONYMOUS_REPORT")[field] = ["z", "a"];
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision: loadJson("release/product-gates/production-datapack-scope.json"),
+      forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+    });
+    assert.ok(errors.some((error) => error.includes(field)));
+  });
+}
+
+for (const [name, mutate, expected] of [
+  ["top-level GO does not leave NO_GO claim and README", (catalog) => {}, "release-status claim decision token"],
+  ["GO claim does not leave NO_GO README", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다."; }, "README.md decision token"],
+  ["missing release-status claim token", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정을 확인합니다."; }, "release-status claim decision token"],
+  ["multiple release-status claim tokens", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "GO와 NO_GO를 함께 쓰지 않습니다."; }, "release-status claim decision token"],
+  ["opposite release-status claim token", (catalog) => {}, "release-status claim decision token"],
+  ["missing README decision token", (catalog, readme) => { readme.text = "현재 출시 결정을 확인합니다."; }, "README.md decision token"],
+  ["multiple README decision tokens", (catalog, readme) => { readme.text = "GO와 NO_GO를 함께 쓰지 않습니다."; }, "README.md decision token"],
+  ["opposite README decision token", (catalog, readme) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다."; readme.text = "현재 출시 결정은 NO_GO입니다."; }, "README.md decision token"],
+]) {
+  test(`product claim catalog rejects ${name}`, () => {
+    const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+    const readme = { text: readFileSync("README.md", "utf8") };
+    catalog.releaseDecision = "GO";
+    const releaseDecision = loadJson("release/product-gates/production-datapack-scope.json");
+    releaseDecision.decision.currentLaunchDecision = "GO";
+    mutate(catalog, readme);
+    const errors = [];
+    validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+      releaseDecision,
+      forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+      publicCopy: readme.text,
+    });
+    assert.ok(errors.some((error) => error.includes(expected)));
+  });
+}
+
+test("product claim catalog accepts matching GO release-status tokens", () => {
+  const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+  catalog.releaseDecision = "GO";
+  catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다.";
+  const releaseDecision = loadJson("release/product-gates/production-datapack-scope.json");
+  releaseDecision.decision.currentLaunchDecision = "GO";
+  const errors = [];
+  validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+    releaseDecision,
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+    publicCopy: "현재 출시 결정은 GO입니다.",
+  });
+  assert.deepEqual(errors, []);
+});
+
+test("product claim catalog reads the workspace README public surface", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const catalogPath = join(directory, "inputs/product-claim-catalog.json");
+    const catalog = loadJson(catalogPath);
+    catalog.releaseDecision = "GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다.";
+    writeFileSync(catalogPath, JSON.stringify(catalog));
+    const releaseDecisionPath = join(directory, "gates/hub/production-datapack-scope.json");
+    const releaseDecision = loadJson(releaseDecisionPath);
+    releaseDecision.decision.currentLaunchDecision = "GO";
+    writeFileSync(releaseDecisionPath, JSON.stringify(releaseDecision));
+
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("README.md decision token")));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+for (const [label, filename, mutate] of [
+  ["production-datapack-scope", "production-datapack-scope.json", (path) => rmSync(path)],
+  ["production-datapack-scope", "production-datapack-scope.json", (path) => writeFileSync(path, "{")],
+  ["production-datapack-scope", "production-datapack-scope.json", (path) => writeFileSync(path, "[]")],
+  ["forbidden-release-claims", "forbidden-release-claims.json", (path) => rmSync(path)],
+  ["forbidden-release-claims", "forbidden-release-claims.json", (path) => writeFileSync(path, "{")],
+  ["forbidden-release-claims", "forbidden-release-claims.json", (path) => writeFileSync(path, "[]")],
+]) {
+  test(`product claim catalog sanitizes invalid ${label} input`, () => {
+    const { directory, workspacePath } = createExternalWorkspace();
+    try {
+      mutate(join(directory, "gates/hub", filename));
+      let errors;
+      assert.doesNotThrow(() => { errors = collectContractErrors(workspacePath); });
+      assert.ok(errors.some((error) => error.includes(`product-claim-catalog: ${label} input이 유효한 JSON object여야 한다`)));
+      assert.ok(errors.every((error) => !error.includes(directory)));
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+}
+
 test("repository split issue migration ledger가 계약 gate를 통과한다", () => {
   const errors = collectContractErrors().filter((error) => error.includes("repository-split-issues"));
 
   assert.deepEqual(errors, []);
+});
+
+test("contract gate는 post-snapshot amendments의 disposition↔lifecycle 결속을 검증한다", () => {
+  const ledger = loadJson("release/migrations/repository-split-issues.json");
+  const amendments = loadJson("release/migrations/repository-split-issues-amendments.json");
+  const keepHubWithTargetUrl = structuredClone(amendments);
+  keepHubWithTargetUrl.amendments[1].targetUrl = "https://github.com/AquilaXk/easysubway-mobile/issues/45";
+  const duplicatedSnapshotIssue = structuredClone(amendments);
+  duplicatedSnapshotIssue.amendments[1].sourceIssue = 2690;
+
+  assert.deepEqual(validateRepositorySplitIssueAmendments(amendments, ledger), []);
+  assert.deepEqual(validateRepositorySplitIssueAmendments(keepHubWithTargetUrl, ledger), [
+    "amendments[1].execution: KEEP_HUB은 targetUrl과 transferredAt이 null이어야 함",
+  ]);
+  assert.deepEqual(validateRepositorySplitIssueAmendments(duplicatedSnapshotIssue, ledger), [
+    "amendments[1].sourceIssue: snapshot ledger와 중복",
+  ]);
+});
+
+test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => {
+  const errors = [];
+  const adr = loadJson("contracts/documentation/ADR-HUB-0001.json");
+
+  assert.equal(validateJson(
+    "contracts/documentation/architecture-decision.schema.json",
+    "contracts/documentation/ADR-HUB-0001.json",
+    errors,
+  ), true);
+  assert.deepEqual(errors, []);
+  assert.ok(adr.confirmation.some(({ method }) => method.endsWith("--current-only")));
+});
+
+test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifecycle을 fail closed한다", () => {
+  const resourceSchema = loadJson("contracts/documentation/documentation-resource.schema.json");
+  const fragmentSchema = loadJson("contracts/documentation/documentation-fragment.schema.json");
+  const catalogSchema = loadJson("contracts/documentation/documentation-system-catalog.schema.json");
+  const catalog = loadJson("contracts/documentation/documentation-system-catalog.json");
+  const errors = [];
+
+  validateDocumentationSystemCatalog(catalog, catalogSchema, errors);
+  assert.deepEqual(errors, []);
+  assert.deepEqual(catalog.repositories.map(({ repository }) => repository), [
+    "AquilaXk/easysubway",
+    "AquilaXk/easysubway-backend",
+    "AquilaXk/easysubway-data",
+    "AquilaXk/easysubway-mobile",
+    "AquilaXk/easysubway-platform",
+  ]);
+
+  for (const [mutate, expected] of [
+    [(value) => value.repositories.pop(), /minItems 5/],
+    [(value) => value.repositories.push(structuredClone(value.repositories[0])), /maxItems 5/],
+    [(value) => { value.repositories[0].repository = "AquilaXk/unknown"; }, /enum/],
+    [(value) => { value.repositories[0].status = "ACTIVE"; }, /ACTIVE fragment가 필요하다/],
+    [(value) => { value.repositories[0].resources = []; }, /resources/],
+  ]) {
+    const invalid = structuredClone(catalog);
+    mutate(invalid);
+    const invalidErrors = [];
+    validateDocumentationSystemCatalog(invalid, catalogSchema, invalidErrors);
+    assert.ok(invalidErrors.some((error) => expected.test(error)), invalidErrors.join("; "));
+  }
+
+  const fragmentErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "ACTIVE",
+    lastVerifiedAt: "2026-08-05T00:00:00.000Z",
+    verificationEvidence: [],
+    resources: [],
+  }, fragmentSchema, resourceSchema, fragmentErrors);
+  assert.ok(fragmentErrors.some((error) => error.includes("verificationEvidence")));
+
+  const missingTimestampErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "ACTIVE",
+    lastVerifiedAt: null,
+    verificationEvidence: ["evidence:fixture"],
+    resources: [],
+  }, fragmentSchema, resourceSchema, missingTimestampErrors);
+  assert.ok(missingTimestampErrors.some((error) => error.includes("lastVerifiedAt")));
+
+  const unsafeEvidenceCatalog = structuredClone(catalog);
+  unsafeEvidenceCatalog.repositories[0] = {
+    repository: "AquilaXk/easysubway",
+    status: "ACTIVE",
+    fragment: {
+      gitSha: "a".repeat(40),
+      path: "contracts/documentation/documentation-fragment.json",
+      blobSha: "b".repeat(40),
+      lastVerifiedAt: "2026-08-05T00:00:00.000Z",
+      verificationEvidence: ["/private/owner/raw.json"],
+    },
+  };
+  const unsafeEvidenceErrors = [];
+  validateDocumentationSystemCatalog(unsafeEvidenceCatalog, catalogSchema, unsafeEvidenceErrors);
+  assert.ok(unsafeEvidenceErrors.some((error) => error.includes("verificationEvidence")));
+
+  const unsupportedBlobCatalog = structuredClone(unsafeEvidenceCatalog);
+  unsupportedBlobCatalog.repositories[0].fragment.blobSha = "b".repeat(41);
+  unsupportedBlobCatalog.repositories[0].fragment.verificationEvidence = ["evidence:fixture"];
+  const unsupportedBlobErrors = [];
+  validateDocumentationSystemCatalog(unsupportedBlobCatalog, catalogSchema, unsupportedBlobErrors);
+  assert.ok(unsupportedBlobErrors.some((error) => error.includes("oneOf")), unsupportedBlobErrors.join("; "));
+
+  const unverifiedActiveCatalog = structuredClone(unsafeEvidenceCatalog);
+  unverifiedActiveCatalog.repositories[0].fragment.verificationEvidence = ["evidence:fixture"];
+  const unverifiedActiveErrors = [];
+  validateDocumentationSystemCatalog(unverifiedActiveCatalog, catalogSchema, unverifiedActiveErrors);
+  assert.ok(unverifiedActiveErrors.some((error) => error.includes("ACTIVE fragment resolution contract")));
+
+  const unsortedErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "PROPOSED",
+    lastVerifiedAt: null,
+    verificationEvidence: [],
+    resources: [{ resource: "resource:z" }, { resource: "resource:a" }],
+  }, fragmentSchema, resourceSchema, unsortedErrors);
+  assert.ok(unsortedErrors.some((error) => error.includes("sorted-unique")));
+
+  const crossRepositoryErrors = [];
+  const canonicalIdentity = `sha256:${"c".repeat(64)}`;
+  const crossRepositoryRecord = {
+    resource: "surface:current", resourceClass: "CANONICAL_RESOURCE", documentationFamily: "ARCHITECTURE",
+    kindCandidate: "CROSS_REPOSITORY_HANDOFF", sourceSurface: "EXTERNAL", canonicalIdentity, status: "ACTIVE",
+    ownerRepository: "AquilaXk/easysubway", ownerIssue: null, currentConsumers: ["consumer:architecture"],
+    releaseReachability: "NONE", publicSurfaceReachability: [], assertionState: "REQUIRED_FINAL_PRODUCTION_BEHAVIOR",
+    sensitivity: "INTERNAL", duplicateGroup: null, disposition: "RETAIN_CANONICAL", deletePrerequisite: [],
+    supersedes: ["surface:external-predecessor"], supersededBy: null, invalidatedBy: null, invalidationReason: null,
+    invalidationEvidence: [], mutationPolicy: "CURRENT_STATE_WITH_CHANGE", reviewPolicyId: "EVENT_ONLY",
+    reviewTrigger: ["event:change"], lastVerifiedAt: "2026-08-05T00:00:00.000Z",
+    lastVerifiedIdentity: canonicalIdentity, verificationMethod: "contract-test", verificationEvidence: ["evidence:fixture"],
+    nextReviewAtOrSemanticExpiry: null, implementationPlan: "PLAN-DOC", workloadClass: null,
+    orchestrationProfile: null, stateClass: null, configurationDelivery: null, healthContract: null,
+    availabilityContract: null, securityContract: null, releaseContract: null, portabilityOwner: null,
+    portabilityEvidence: [], portabilityGap: [],
+  };
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json",
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway",
+    gitSha: "a".repeat(40),
+    status: "PROPOSED",
+    lastVerifiedAt: null,
+    verificationEvidence: [],
+    resources: [crossRepositoryRecord],
+  }, fragmentSchema, resourceSchema, crossRepositoryErrors);
+  assert.deepEqual(crossRepositoryErrors, []);
+
+  const trackedRecord = structuredClone(crossRepositoryRecord);
+  trackedRecord.resource = "AquilaXk/easysubway-mobile:docs/a.json";
+  trackedRecord.sourceSurface = "TRACKED";
+  trackedRecord.canonicalIdentity = `git:${"a".repeat(40)}:docs/b.json:${"b".repeat(40)}`;
+  trackedRecord.lastVerifiedIdentity = trackedRecord.canonicalIdentity;
+  trackedRecord.supersedes = [];
+  const trackedIdentityErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [trackedRecord],
+  }, fragmentSchema, resourceSchema, trackedIdentityErrors);
+  assert.ok(trackedIdentityErrors.some((error) => error.includes("tracked fragment identity mismatch")));
+
+  const unsupportedTrackedIdentity = structuredClone(trackedRecord);
+  unsupportedTrackedIdentity.resource = "AquilaXk/easysubway:docs/a.json";
+  unsupportedTrackedIdentity.canonicalIdentity = `git:${"a".repeat(40)}:docs/a.json:${"b".repeat(41)}`;
+  unsupportedTrackedIdentity.lastVerifiedIdentity = unsupportedTrackedIdentity.canonicalIdentity;
+  const unsupportedTrackedErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [unsupportedTrackedIdentity],
+  }, fragmentSchema, resourceSchema, unsupportedTrackedErrors);
+  assert.ok(unsupportedTrackedErrors.some((error) => error.includes("invalid tracked identity")));
+
+  for (const mutate of [
+    (record) => { record.resource = "surface:self"; record.supersedes = ["surface:self"]; },
+    (record) => { record.supersededBy = "surface:successor"; },
+  ]) {
+    const record = structuredClone(crossRepositoryRecord);
+    mutate(record);
+    const lifecycleErrors = [];
+    validateDocumentationFragment({
+      $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+      repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+      lastVerifiedAt: null, verificationEvidence: [], resources: [record],
+    }, fragmentSchema, resourceSchema, lifecycleErrors);
+    assert.ok(lifecycleErrors.some((error) => error.includes("fragment lifecycle contradiction")));
+  }
+
+  const predecessor = structuredClone(crossRepositoryRecord);
+  predecessor.resource = "surface:predecessor";
+  predecessor.status = "SUPERSEDED";
+  predecessor.supersedes = [];
+  predecessor.supersededBy = "surface:successor";
+  const successor = structuredClone(crossRepositoryRecord);
+  successor.resource = "surface:successor";
+  successor.supersedes = [];
+  const reciprocalErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [predecessor, successor],
+  }, fragmentSchema, resourceSchema, reciprocalErrors);
+  assert.ok(reciprocalErrors.some((error) => error.includes("fragment relation contradiction")));
+
+  const cycleA = structuredClone(predecessor);
+  cycleA.resource = "surface:a";
+  cycleA.supersedes = ["surface:b"];
+  cycleA.supersededBy = "surface:b";
+  const cycleB = structuredClone(predecessor);
+  cycleB.resource = "surface:b";
+  cycleB.supersedes = ["surface:a"];
+  cycleB.supersededBy = "surface:a";
+  const cycleErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [cycleA, cycleB],
+  }, fragmentSchema, resourceSchema, cycleErrors);
+  assert.ok(cycleErrors.some((error) => error.includes("fragment supersession cycle")));
+
+  const duplicateCanonicalA = structuredClone(crossRepositoryRecord);
+  duplicateCanonicalA.resource = "surface:duplicate-a";
+  duplicateCanonicalA.duplicateGroup = "duplicate:fixture";
+  duplicateCanonicalA.supersedes = [];
+  const duplicateCanonicalB = structuredClone(duplicateCanonicalA);
+  duplicateCanonicalB.resource = "surface:duplicate-b";
+  const duplicateCanonicalErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA, duplicateCanonicalB],
+  }, fragmentSchema, resourceSchema, duplicateCanonicalErrors);
+  assert.ok(duplicateCanonicalErrors.some((error) => error.includes("fragment duplicate group contradiction")));
+
+  for (const mutate of [
+    (record) => { record.currentConsumers = []; },
+    (record) => { record.disposition = "MIGRATE_REFERENCE"; },
+  ]) {
+    const record = structuredClone(duplicateCanonicalA);
+    mutate(record);
+    const duplicateMemberErrors = [];
+    validateDocumentationFragment({
+      $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+      repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+      lastVerifiedAt: null, verificationEvidence: [], resources: [record],
+    }, fragmentSchema, resourceSchema, duplicateMemberErrors);
+    assert.ok(duplicateMemberErrors.some((error) => error.includes("fragment duplicate group contradiction")));
+  }
+
+  const unresolvedDuplicateErrors = [];
+  validateDocumentationFragment({
+    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA],
+  }, fragmentSchema, resourceSchema, unresolvedDuplicateErrors);
+  assert.deepEqual(unresolvedDuplicateErrors, []);
+});
+
+test("문서 거버넌스 계약은 successor의 자체 decision schema와 안전한 schema path만 허용한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const rootPath = join(directory, "inputs/architecture-decision.json");
+    const root = loadJson(rootPath);
+    root.status = "superseded";
+    root.supersededBy = "ADR-HUB-0002";
+    writeFileSync(rootPath, JSON.stringify(root));
+
+    const successor = structuredClone(root);
+    successor.id = "ADR-HUB-0002";
+    successor.status = "accepted";
+    successor.supersededBy = null;
+    successor.supersedes = [root.id];
+    successor.decisionSchema = "./ADR-HUB-0002-decision.schema.json";
+    successor.decision = { policy: "successor-specific" };
+    const successorPath = join(directory, "inputs/ADR-HUB-0002.json");
+    const decisionSchemaPath = join(directory, "inputs/ADR-HUB-0002-decision.schema.json");
+    const successorDecisionSchema = {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "required": ["policy"],
+      "additionalProperties": false,
+      "properties": {
+        "policy": { "type": "string", "const": "successor-specific" }
+      }
+    };
+    writeFileSync(decisionSchemaPath, JSON.stringify(successorDecisionSchema));
+    writeFileSync(successorPath, JSON.stringify(successor));
+
+    assert.deepEqual(collectContractErrors(workspacePath), []);
+
+    for (const [name, mutate, expected] of [
+      ["missing-reference", (adr) => { delete adr.decisionSchema; }, "decisionSchema"],
+      ["missing-file", () => { rmSync(decisionSchemaPath); }, "decisionSchema ./ADR-HUB-0002-decision.schema.json 누락"],
+      ["absolute", (adr) => { adr.decisionSchema = "/tmp/decision.schema.json"; }, "repository 내부 상대 JSON path"],
+      ["escape", (adr) => { adr.decisionSchema = "../ADR-HUB-0002-decision.schema.json"; }, "repository 내부 상대 JSON path"],
+      ["symlink", () => {
+        rmSync(decisionSchemaPath);
+        symlinkSync("ADR-HUB-0001-decision.schema.json", decisionSchemaPath);
+      }, "symlink"],
+      ["malformed", () => { writeFileSync(decisionSchemaPath, "{"); }, "유효한 JSON이 필요하다"],
+      ["empty-schema", () => { writeFileSync(decisionSchemaPath, "{}"); }, "비어 있지 않은 required"],
+      ["array-schema", () => { writeFileSync(decisionSchemaPath, "[]"); }, "비어 있지 않은 required"],
+      ["invalid", (adr) => { adr.decision.policy = "wrong"; }, "$.decision.policy"],
+    ]) {
+      const candidate = structuredClone(successor);
+      mutate(candidate);
+      writeFileSync(successorPath, JSON.stringify(candidate));
+      const errors = collectContractErrors(workspacePath);
+      assert.ok(errors.some((error) => error.includes("ADR-HUB-0002.json") && error.includes(expected)), name);
+      rmSync(decisionSchemaPath, { force: true });
+      writeFileSync(decisionSchemaPath, JSON.stringify(successorDecisionSchema));
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 대표적인 ADR 계약 위반을 거부한다", () => {
+  const directory = mkdtempSync(join(tmpdir(), "architecture-decision-contract-"));
+  try {
+    const schemaPath = "contracts/documentation/architecture-decision.schema.json";
+    const valid = loadJson("contracts/documentation/ADR-HUB-0001.json");
+    cpSync("contracts/documentation/ADR-HUB-0001-decision.schema.json", join(directory, "ADR-HUB-0001-decision.schema.json"));
+    for (const [name, mutate, expected] of [
+      ["invalid-id", (adr) => { adr.id = "ADR-DATA-0001"; }, "$.id: pattern"],
+      ["invalid-kind", (adr) => { adr.kind = "runbook"; }, "$.kind: const"],
+      ["missing-owner", (adr) => { delete adr.owner; }, "$.owner: 필수 필드 누락"],
+      ["owner-prefix-mismatch", (adr) => { adr.owner.repository = "AquilaXk/easysubway-data"; }, "$.owner.repository: const"],
+      ["invalid-status", (adr) => { adr.status = "implemented"; }, "$.status: enum"],
+      ["missing-decision", (adr) => { delete adr.decision; }, "$.decision: 필수 필드 누락"],
+      ["missing-context-issue", (adr) => { delete adr.contextIssue; }, "$.contextIssue: 필수 필드 누락"],
+      ["wrong-context-issue", (adr) => { adr.contextIssue = "https://github.com/AquilaXk/easysubway/issues/1"; }, "ADR-HUB-0001 contextIssue"],
+      ["unknown-field", (adr) => { adr.futureField = true; }, "$.futureField: 허용되지 않은 필드"],
+      ["target-owner-mismatch", (adr) => { adr.decision.repositoryOwners.data = "AquilaXk/easysubway"; }, "$.decision.repositoryOwners.data: const"],
+      ["tracked-sensitive-evidence", (adr) => { adr.decision.sensitiveEvidence.trackedContentAllowed = true; }, "$.decision.sensitiveEvidence.trackedContentAllowed: const"],
+      ["malformed-supersedes", (adr) => { adr.supersedes = 1; }, "$.supersedes: type array"],
+      ["no-chosen-option", (adr) => { adr.consideredOptions.forEach((option) => { option.chosen = false; }); }, "chosen 옵션이 정확히 하나"],
+      ["multiple-chosen-options", (adr) => { adr.consideredOptions.forEach((option) => { option.chosen = true; }); }, "chosen 옵션이 정확히 하나"],
+      ["duplicate-option-id", (adr) => { adr.consideredOptions[1].id = adr.consideredOptions[0].id; }, "id는 유일"],
+    ]) {
+      const candidate = structuredClone(valid);
+      mutate(candidate);
+      const candidatePath = join(directory, `${name}.json`);
+      writeFileSync(candidatePath, JSON.stringify(candidate));
+      const errors = [];
+
+      assert.equal(validateJson(schemaPath, candidatePath, errors), false, name);
+      assert.ok(errors.some((error) => error.includes(expected)), `${name}: ${expected}`);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 자기 supersession과 참조 없는 superseded 상태를 거부한다", () => {
+  const valid = loadJson("contracts/documentation/ADR-HUB-0001.json");
+  const selfSupersession = structuredClone(valid);
+  selfSupersession.supersedes = [selfSupersession.id];
+  const missingReference = structuredClone(valid);
+  missingReference.status = "superseded";
+  const prematureReference = structuredClone(valid);
+  prematureReference.supersededBy = "ADR-HUB-0002";
+
+  assert.ok(validateArchitectureDecision(selfSupersession).some((error) => error.includes("자기 자신")));
+  assert.ok(validateArchitectureDecision(missingReference).some((error) => error.includes("supersededBy")));
+  assert.ok(validateArchitectureDecision(prematureReference).some((error) => error.includes("non-superseded")));
+});
+
+test("문서 거버넌스 계약은 target owner, 민감 evidence, 첫 파생 이슈 정책을 fail closed한다", () => {
+  const adr = loadJson("contracts/documentation/ADR-HUB-0001.json");
+  const invalidOwner = structuredClone(adr);
+  invalidOwner.decision.repositoryOwners.data = "AquilaXk/easysubway";
+  const invalidEvidence = structuredClone(adr);
+  invalidEvidence.decision.sensitiveEvidence.trackedContentAllowed = true;
+  const invalidChildGate = structuredClone(adr);
+  invalidChildGate.decision.childIssuePolicy.firstChildAfter = "BEFORE_ADR_HUB_0001_MERGED";
+
+  assert.ok(validateArchitectureDecision(invalidOwner).some((error) => error.includes("repository owner")));
+  assert.ok(validateArchitectureDecision(invalidEvidence).some((error) => error.includes("trackedContentAllowed")));
+  assert.ok(validateArchitectureDecision(invalidChildGate).some((error) => error.includes("첫 파생 이슈")));
+});
+
+test("문서 거버넌스 계약은 raw evidence payload 필드를 integrated gate에서 거부한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const decisionPath = join(directory, "inputs/architecture-decision.json");
+    const decision = loadJson(decisionPath);
+    decision.confirmation[0].rawEvidence = { token: "synthetic-test-value" };
+    writeFileSync(decisionPath, JSON.stringify(decision));
+
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("rawEvidence: 허용되지 않은 필드")));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 accepted ADR 본문의 in-place 변경을 거부한다", () => {
+  const accepted = loadJson("contracts/documentation/ADR-HUB-0001.json");
+  accepted.status = "accepted";
+  const modified = structuredClone(accepted);
+  modified.title = "조용히 바뀐 결정";
+
+  assert.ok(validateArchitectureDecisionTransition(accepted, modified).some((error) => error.includes("in-place")));
+  assert.deepEqual(validateArchitectureDecisionTransition(accepted, accepted), []);
+
+  const proposed = structuredClone(accepted);
+  proposed.status = "proposed";
+  const acceptedWithChange = structuredClone(accepted);
+  acceptedWithChange.title = "accept와 함께 바뀐 결정";
+  assert.ok(validateArchitectureDecisionTransition(proposed, acceptedWithChange).some((error) => error.includes("status-only")));
+  assert.deepEqual(validateArchitectureDecisionTransition(proposed, accepted), []);
+
+  const superseded = structuredClone(accepted);
+  superseded.status = "superseded";
+  superseded.supersededBy = "ADR-HUB-0002";
+  assert.deepEqual(validateArchitectureDecisionTransition(accepted, superseded), []);
+
+  for (const status of ["rejected", "withdrawn", "superseded"]) {
+    const terminal = structuredClone(superseded);
+    terminal.status = status;
+    if (status !== "superseded") terminal.supersededBy = null;
+    const changed = structuredClone(terminal);
+    changed.title = "종결 뒤 바뀐 결정";
+    assert.ok(validateArchitectureDecisionTransition(terminal, changed)
+      .some((error) => error.includes("종결 상태")), status);
+  }
+});
+
+test("문서 거버넌스 계약은 workspace gate에서 base revision 상태 전이를 비교한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const decisionPath = join(directory, "inputs/architecture-decision.json");
+    const previous = loadJson(decisionPath);
+    const current = structuredClone(previous);
+    current.status = "accepted";
+    current.title = "accept와 함께 바뀐 결정";
+    writeFileSync(decisionPath, JSON.stringify(current));
+
+    assert.ok(collectContractErrors(workspacePath, { previousArchitectureDecision: previous })
+      .some((error) => error.includes("status-only")));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 accepted ADR의 supersession successor를 fail closed한다", () => {
+  const cases = [
+    ["missing", () => {}, "current ADR directory에 successor ADR 누락"],
+    ["malformed", (directory) => { writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), "{"); }, "유효한 JSON"],
+    ["duplicate", (directory, successor) => {
+      writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
+      writeFileSync(join(directory, "inputs/duplicate.json"), JSON.stringify(successor));
+    }, "successor ADR 중복"],
+    ["invalid", (directory, successor) => {
+      successor.decision.repositoryOwners.data = "AquilaXk/easysubway";
+      writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
+    }, "successor ADR는 schema와 semantic 검증을 통과해야 한다"],
+    ["missing-supersedes", (directory, successor) => {
+      delete successor.supersedes;
+      writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
+    }, "$.supersedes: 필수 필드 누락"],
+    ["non-reciprocal", (directory, successor) => {
+      successor.supersedes = [];
+      writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
+    }, "supersedes reciprocal link가 필요하다"],
+  ];
+
+  for (const [name, prepare, expected] of cases) {
+    const { directory, workspacePath } = createExternalWorkspace();
+    try {
+      const decisionPath = join(directory, "inputs/architecture-decision.json");
+      const previous = loadJson(decisionPath);
+      previous.status = "accepted";
+      const current = structuredClone(previous);
+      current.status = "superseded";
+      current.supersededBy = "ADR-HUB-0002";
+      writeFileSync(decisionPath, JSON.stringify(current));
+      const successor = structuredClone(previous);
+      successor.id = "ADR-HUB-0002";
+      successor.supersedes = [previous.id];
+      bindRootDecisionSchema(join(directory, "inputs"), successor);
+      prepare(directory, successor);
+
+      assert.ok(
+        collectContractErrors(workspacePath, { previousArchitectureDecision: previous })
+          .some((error) => error.includes(expected)),
+        `${name}: ${expected}`,
+      );
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+});
+
+test("문서 거버넌스 계약은 reciprocal successor가 있는 accepted ADR supersession을 허용한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const decisionPath = join(directory, "inputs/architecture-decision.json");
+    const previous = loadJson(decisionPath);
+    previous.status = "accepted";
+    const current = structuredClone(previous);
+    current.status = "superseded";
+    current.supersededBy = "ADR-HUB-0002";
+    writeFileSync(decisionPath, JSON.stringify(current));
+    const successor = structuredClone(previous);
+    successor.id = "ADR-HUB-0002";
+    successor.supersedes = [previous.id];
+    bindRootDecisionSchema(join(directory, "inputs"), successor);
+    writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(successor));
+    writeFileSync(join(directory, "inputs/unrelated-malformed.json"), "{");
+
+    assert.deepEqual(collectContractErrors(workspacePath, { previousArchitectureDecision: previous }), []);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 active chain 밖 ADR 후보도 검증한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const candidate = loadJson(join(directory, "inputs/architecture-decision.json"));
+    candidate.id = "ADR-HUB-0002";
+    bindRootDecisionSchema(join(directory, "inputs"), candidate);
+    delete candidate.decision;
+    writeFileSync(join(directory, "inputs/ADR-HUB-0002.json"), JSON.stringify(candidate));
+    const unidentified = loadJson(join(directory, "inputs/architecture-decision.json"));
+    delete unidentified.id;
+    writeFileSync(join(directory, "inputs/candidate.json"), JSON.stringify(unidentified));
+    const duplicate = loadJson(join(directory, "inputs/architecture-decision.json"));
+    duplicate.id = "ADR-HUB-0003";
+    bindRootDecisionSchema(join(directory, "inputs"), duplicate);
+    writeFileSync(join(directory, "inputs/off-chain-a.json"), JSON.stringify(duplicate));
+    writeFileSync(join(directory, "inputs/off-chain-b.json"), JSON.stringify(duplicate));
+
+    const errors = collectContractErrors(workspacePath);
+    assert.ok(errors.some((error) => (
+      error.includes("ADR-HUB-0002.json") && error.includes("$.decision: 필수 필드 누락")
+    )));
+    assert.ok(errors.some((error) => (
+      error.includes("candidate.json") && error.includes("$.id: 필수 필드 누락")
+    )));
+    assert.ok(errors.some((error) => error.includes("current ADR ID 중복")));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 active chain 밖 ADR lifecycle도 fail closed한다", () => {
+  for (const [name, prepare, expected] of [
+    ["missing", () => {}, "successor ADR 누락"],
+    ["invalid", (directory, successor) => {
+      delete successor.decision;
+      writeFileSync(join(directory, "inputs/off-chain-successor.json"), JSON.stringify(successor));
+    }, "successor ADR는 schema와 semantic 검증을 통과해야 한다"],
+    ["non-reciprocal", (directory, successor) => {
+      successor.supersedes = [];
+      writeFileSync(join(directory, "inputs/off-chain-successor.json"), JSON.stringify(successor));
+    }, "supersedes reciprocal link가 필요하다"],
+  ]) {
+    const { directory, workspacePath } = createExternalWorkspace();
+    try {
+      const rootPath = join(directory, "inputs/architecture-decision.json");
+      const root = loadJson(rootPath);
+      root.status = "accepted";
+      writeFileSync(rootPath, JSON.stringify(root));
+      const previousStandalone = structuredClone(root);
+      previousStandalone.id = "ADR-HUB-0004";
+      bindRootDecisionSchema(join(directory, "inputs"), previousStandalone);
+      const currentStandalone = structuredClone(previousStandalone);
+      currentStandalone.status = "superseded";
+      currentStandalone.supersededBy = "ADR-HUB-0005";
+      writeFileSync(join(directory, "inputs/off-chain.json"), JSON.stringify(currentStandalone));
+      const successor = structuredClone(root);
+      successor.id = "ADR-HUB-0005";
+      successor.supersedes = [currentStandalone.id];
+      bindRootDecisionSchema(join(directory, "inputs"), successor);
+      prepare(directory, successor);
+
+      const errors = collectContractErrors(workspacePath, {
+        previousArchitectureDecision: [structuredClone(root), previousStandalone],
+      });
+      assert.ok(errors.some((error) => error.includes(expected)), `${name}: ${expected}`);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  }
+
+  const currentOnly = createExternalWorkspace();
+  try {
+    const rootPath = join(currentOnly.directory, "inputs/architecture-decision.json");
+    const root = loadJson(rootPath);
+    root.status = "accepted";
+    writeFileSync(rootPath, JSON.stringify(root));
+    const falseClaim = structuredClone(root);
+    falseClaim.id = "ADR-HUB-0010";
+    bindRootDecisionSchema(join(currentOnly.directory, "inputs"), falseClaim);
+    falseClaim.status = "proposed";
+    falseClaim.supersedes = [root.id];
+    writeFileSync(join(currentOnly.directory, "inputs/false-claim.json"), JSON.stringify(falseClaim));
+    assert.ok(collectContractErrors(currentOnly.workspacePath)
+      .some((error) => error.includes("supersedes predecessor reciprocal link가 필요하다")));
+    rmSync(join(currentOnly.directory, "inputs/false-claim.json"));
+
+    const standalonePath = join(currentOnly.directory, "inputs/off-root-a.json");
+    const successorPath = join(currentOnly.directory, "inputs/off-root-b.json");
+    const standalone = structuredClone(root);
+    standalone.id = "ADR-HUB-0006";
+    bindRootDecisionSchema(join(currentOnly.directory, "inputs"), standalone);
+    standalone.status = "superseded";
+    standalone.supersededBy = "ADR-HUB-0007";
+    writeFileSync(standalonePath, JSON.stringify(standalone));
+    assert.ok(collectContractErrors(currentOnly.workspacePath)
+      .some((error) => error.includes("off-root-a.json") && error.includes("successor ADR 누락")));
+
+    const successor = structuredClone(standalone);
+    successor.id = "ADR-HUB-0007";
+    bindRootDecisionSchema(join(currentOnly.directory, "inputs"), successor);
+    standalone.supersedes = [successor.id];
+    successor.supersededBy = standalone.id;
+    successor.supersedes = [standalone.id];
+    writeFileSync(standalonePath, JSON.stringify(standalone));
+    writeFileSync(successorPath, JSON.stringify(successor));
+    assert.ok(collectContractErrors(currentOnly.workspacePath)
+      .some((error) => error.includes("supersession cycle")));
+  } finally {
+    rmSync(currentOnly.directory, { recursive: true, force: true });
+  }
+
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const root = loadJson(join(directory, "inputs/architecture-decision.json"));
+    for (const [id, status] of [["ADR-HUB-0008", "proposed"], ["ADR-HUB-0009", "accepted"]]) {
+      const deleted = structuredClone(root);
+      deleted.id = id;
+      deleted.status = status;
+      assert.ok(collectContractErrors(workspacePath, {
+        previousArchitectureDecision: [root, deleted],
+      }).some((error) => error.includes(`base ADR ${id}가 current catalog에서 삭제되었다`)));
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 current-only와 base 비교에서 supersession chain을 검증한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const decisionPath = join(directory, "inputs/architecture-decision.json");
+    const root = loadJson(decisionPath);
+    const previousRoot = structuredClone(root);
+    previousRoot.status = "accepted";
+    root.status = "superseded";
+    root.supersededBy = "ADR-HUB-0002";
+    writeFileSync(decisionPath, JSON.stringify(root));
+    const successor = structuredClone(root);
+    successor.id = "ADR-HUB-0002";
+    bindRootDecisionSchema(join(directory, "inputs"), successor);
+    successor.status = "proposed";
+    successor.supersededBy = null;
+    successor.supersedes = [root.id];
+    const successorPath = join(directory, "inputs/ADR-HUB-0002.json");
+    writeFileSync(successorPath, JSON.stringify(successor));
+
+    assert.ok(collectContractErrors(workspacePath).some((error) => (
+      error.includes("successor ADR는 accepted 상태여야 한다")
+    )));
+
+    successor.status = "superseded";
+    successor.supersededBy = "ADR-HUB-0003";
+    writeFileSync(successorPath, JSON.stringify(successor));
+    const terminal = structuredClone(successor);
+    terminal.id = "ADR-HUB-0003";
+    bindRootDecisionSchema(join(directory, "inputs"), terminal);
+    terminal.status = "accepted";
+    terminal.supersededBy = null;
+    terminal.supersedes = [successor.id];
+    const terminalPath = join(directory, "inputs/ADR-HUB-0003.json");
+    writeFileSync(terminalPath, JSON.stringify(terminal));
+    assert.deepEqual(collectContractErrors(workspacePath), []);
+
+    writeFileSync(join(directory, "inputs/ADR-HUB-0001-duplicate.json"), JSON.stringify(root));
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("current ADR ID 중복")));
+    rmSync(join(directory, "inputs/ADR-HUB-0001-duplicate.json"));
+
+    assert.ok(collectContractErrors(workspacePath, {
+      previousArchitectureDecision: [previousRoot, previousRoot],
+    }).some((error) => error.includes("base ADR ADR-HUB-0001 중복")));
+
+    assert.ok(collectContractErrors(workspacePath, {
+      previousArchitectureDecision: [previousRoot],
+    }).some((error) => error.includes("direct successor는 accepted")));
+
+    terminal.supersedes = [];
+    writeFileSync(terminalPath, JSON.stringify(terminal));
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("reciprocal link")));
+    terminal.supersedes = [successor.id];
+    writeFileSync(terminalPath, JSON.stringify(terminal));
+
+    writeFileSync(join(directory, "inputs/ADR-HUB-0003-duplicate.json"), JSON.stringify(terminal));
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("successor ADR 중복")));
+    rmSync(join(directory, "inputs/ADR-HUB-0003-duplicate.json"));
+
+    root.supersedes = [terminal.id];
+    terminal.status = "superseded";
+    terminal.supersededBy = root.id;
+    writeFileSync(decisionPath, JSON.stringify(root));
+    writeFileSync(terminalPath, JSON.stringify(terminal));
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("supersession cycle")));
+    root.supersedes = [];
+    terminal.status = "accepted";
+    terminal.supersededBy = null;
+    writeFileSync(decisionPath, JSON.stringify(root));
+    writeFileSync(terminalPath, JSON.stringify(terminal));
+
+    successor.status = "accepted";
+    successor.supersededBy = null;
+    writeFileSync(successorPath, JSON.stringify(successor));
+    rmSync(terminalPath);
+    const previousSuccessor = structuredClone(successor);
+    previousSuccessor.title = "base revision successor";
+    successor.title = "current revision successor";
+    writeFileSync(successorPath, JSON.stringify(successor));
+
+    assert.ok(collectContractErrors(workspacePath, {
+      previousArchitectureDecision: [structuredClone(root), previousSuccessor],
+    }).some((error) => error.includes("in-place")));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 base-ref에서 전체 supersession chain을 읽는다", () => {
+  const repository = mkdtempSync(join(tmpdir(), "architecture-chain-git-"));
+  const previousCwd = process.cwd();
+  try {
+    mkdirSync(join(repository, "docs"), { recursive: true });
+    const root = loadJson("contracts/documentation/ADR-HUB-0001.json");
+    bindRootDecisionSchema(join(repository, "docs"), root);
+    root.status = "superseded";
+    root.supersededBy = "ADR-HUB-0002";
+    const intermediate = structuredClone(root);
+    intermediate.id = "ADR-HUB-0002";
+    bindRootDecisionSchema(join(repository, "docs"), intermediate);
+    intermediate.status = "superseded";
+    intermediate.supersededBy = "ADR-HUB-0003";
+    intermediate.supersedes = [root.id];
+    const terminal = structuredClone(intermediate);
+    terminal.id = "ADR-HUB-0003";
+    bindRootDecisionSchema(join(repository, "docs"), terminal);
+    terminal.status = "accepted";
+    terminal.supersededBy = null;
+    terminal.supersedes = [intermediate.id];
+    writeFileSync(join(repository, "docs/ADR-HUB-0001.json"), JSON.stringify(root));
+    writeFileSync(join(repository, "docs/ADR-HUB-0002.json"), JSON.stringify(intermediate));
+    writeFileSync(join(repository, "docs/ADR-HUB-0003.json"), JSON.stringify(terminal));
+    writeFileSync(join(repository, "docs/non-adr.json"), JSON.stringify({ id: "fixture-id", kind: "fixture" }));
+    mkdirSync(join(repository, "docs/nested"));
+    writeFileSync(join(repository, "docs/nested/duplicate.json"), JSON.stringify(intermediate));
+    writeFileSync(join(repository, "workspace.json"), JSON.stringify({
+      contracts: resolve(previousCwd, "contracts"),
+      gateDirectories: { hub: resolve(previousCwd, "release/product-gates"), mobile: resolve(previousCwd, "apps/mobile/release") },
+      datapackIndex: resolve(previousCwd, "apps/mobile/assets/datapacks/index.json"),
+      sourceInventory: resolve(previousCwd, "apps/mobile/assets/datapacks/source-inventory.json"),
+      governancePolicy: resolve(previousCwd, "tools/datapack/source-governance-policy.json"),
+      freshnessPolicy: resolve(previousCwd, "release/product-gates/datapack-freshness-sla.json"),
+      architectureDecision: "docs/ADR-HUB-0001.json",
+      documentationSystemCatalog: resolve(previousCwd, "contracts/documentation/documentation-system-catalog.json"),
+      productClaimCatalog: resolve(previousCwd, "contracts/documentation/product-claim-catalog.json"),
+    }));
+    const rootLevel = structuredClone(root);
+    bindRootDecisionSchema(repository, rootLevel);
+    rootLevel.status = "accepted";
+    rootLevel.supersededBy = null;
+    writeFileSync(join(repository, "ADR-HUB-0001.json"), JSON.stringify(rootLevel));
+    const rootWorkspace = loadJson(join(repository, "workspace.json"));
+    rootWorkspace.architectureDecision = "ADR-HUB-0001.json";
+    writeFileSync(join(repository, "root-workspace.json"), JSON.stringify(rootWorkspace));
+    mkdirSync(join(repository, "staged"));
+    const stagedRoot = structuredClone(rootLevel);
+    bindRootDecisionSchema(join(repository, "staged"), stagedRoot);
+    const stagedSuccessor = structuredClone(stagedRoot);
+    stagedSuccessor.id = "ADR-HUB-0002";
+    bindRootDecisionSchema(join(repository, "staged"), stagedSuccessor);
+    stagedSuccessor.status = "proposed";
+    stagedSuccessor.title = "base staged successor";
+    stagedSuccessor.supersedes = [stagedRoot.id];
+    writeFileSync(join(repository, "staged/ADR-HUB-0001.json"), JSON.stringify(stagedRoot));
+    writeFileSync(join(repository, "staged/ADR-HUB-0002.json"), JSON.stringify(stagedSuccessor));
+    const stagedWorkspace = structuredClone(rootWorkspace);
+    stagedWorkspace.architectureDecision = "staged/ADR-HUB-0001.json";
+    writeFileSync(join(repository, "staged-workspace.json"), JSON.stringify(stagedWorkspace));
+    mkdirSync(join(repository, "malformed"));
+    const malformedRoot = structuredClone(root);
+    bindRootDecisionSchema(join(repository, "malformed"), malformedRoot);
+    malformedRoot.supersededBy = "ADR-HUB-0099";
+    writeFileSync(join(repository, "malformed/ADR-HUB-0001.json"), JSON.stringify(malformedRoot));
+    writeFileSync(join(repository, "malformed/ADR-HUB-0099.json"), "{");
+    const malformedWorkspace = structuredClone(rootWorkspace);
+    malformedWorkspace.architectureDecision = "malformed/ADR-HUB-0001.json";
+    writeFileSync(join(repository, "malformed-workspace.json"), JSON.stringify(malformedWorkspace));
+    for (const args of [["init"], ["config", "user.email", "test@example.com"], ["config", "user.name", "Test"], ["add", "."], ["commit", "-m", "base"]]) {
+      fixtureGit(args, { cwd: repository, stdio: "ignore" });
+    }
+    const baseRef = fixtureGit(["rev-parse", "HEAD"], { cwd: repository, encoding: "utf8" }).trim();
+
+    process.chdir(repository);
+    assert.deepEqual(
+      loadArchitectureDecisionAtRef("root-workspace.json", baseRef).map(({ id }) => id),
+      ["ADR-HUB-0001"],
+    );
+    assert.throws(
+      () => loadArchitectureDecisionAtRef("malformed-workspace.json", baseRef),
+      /successor ADR 판정에 유효한 JSON이 필요하다/,
+    );
+    const stagedBase = loadArchitectureDecisionAtRef("staged-workspace.json", baseRef);
+    const stagedDecisionSchemaPath = join(repository, "staged/ADR-HUB-0002-decision.schema.json");
+    const stagedDecisionSchema = loadJson(stagedDecisionSchemaPath);
+    stagedDecisionSchema.properties.futureField = { type: "string" };
+    writeFileSync(stagedDecisionSchemaPath, JSON.stringify(stagedDecisionSchema));
+    stagedSuccessor.status = "accepted";
+    writeFileSync(join(repository, "staged/ADR-HUB-0002.json"), JSON.stringify(stagedSuccessor));
+    assert.ok(collectContractErrors("staged-workspace.json", {
+      previousArchitectureDecision: stagedBase,
+    }).some((error) => error.includes("decision schema") && error.includes("status-only")));
+    stagedSuccessor.status = "proposed";
+    delete stagedDecisionSchema.properties.futureField;
+    writeFileSync(stagedDecisionSchemaPath, JSON.stringify(stagedDecisionSchema));
+    stagedSuccessor.status = "accepted";
+    stagedSuccessor.title = "mutated current successor";
+    writeFileSync(join(repository, "staged/ADR-HUB-0002.json"), JSON.stringify(stagedSuccessor));
+    assert.ok(collectContractErrors("staged-workspace.json", {
+      previousArchitectureDecision: stagedBase,
+    }).some((error) => error.includes("status-only")));
+    stagedRoot.status = "superseded";
+    stagedRoot.supersededBy = stagedSuccessor.id;
+    writeFileSync(join(repository, "staged/ADR-HUB-0001.json"), JSON.stringify(stagedRoot));
+    assert.ok(collectContractErrors("staged-workspace.json", {
+      previousArchitectureDecision: stagedBase,
+    }).some((error) => error.includes("status-only")));
+    const baseChain = loadArchitectureDecisionAtRef("workspace.json", baseRef);
+    assert.deepEqual(
+      baseChain.map(({ id }) => id),
+      ["ADR-HUB-0001", "ADR-HUB-0002", "ADR-HUB-0003"],
+    );
+    const terminalDecisionSchemaPath = join(repository, "docs/ADR-HUB-0003-decision.schema.json");
+    const terminalDecisionSchema = loadJson(terminalDecisionSchemaPath);
+    terminalDecisionSchema.properties.futureField = { type: "string" };
+    writeFileSync(terminalDecisionSchemaPath, JSON.stringify(terminalDecisionSchema));
+    assert.ok(collectContractErrors("workspace.json", { previousArchitectureDecision: baseChain })
+      .some((error) => error.includes("decision schema") && error.includes("in-place")));
+    delete terminalDecisionSchema.properties.futureField;
+    writeFileSync(terminalDecisionSchemaPath, JSON.stringify(terminalDecisionSchema));
+    rmSync(join(repository, "docs/ADR-HUB-0002.json"));
+    assert.ok(collectContractErrors("workspace.json", { previousArchitectureDecision: baseChain })
+      .some((error) => error.includes("base ADR ADR-HUB-0002가 current chain에서 삭제되었다")));
+  } finally {
+    process.chdir(previousCwd);
+    rmSync(repository, { recursive: true, force: true });
+  }
+});
+
+test("문서 거버넌스 계약은 workspace ADR path redirect를 거부한다", () => {
+  assert.ok(validateArchitectureDecisionWorkspaceTransition(
+    { architectureDecision: "../documentation/ADR-HUB-0001.json" },
+    { architectureDecision: "../documentation/ADR-HUB-0002.json" },
+  ).some((error) => error.includes("path redirect")));
+});
+
+test("문서 거버넌스 계약은 PR·push base와 dispatch current-only CI 경로를 분리한다", () => {
+  const validatorSource = readFileSync("tools/ci/check-contracts.mjs", "utf8");
+  assert.doesNotMatch(validatorSource, /execFileSync\("git"/);
+  assert.match(validatorSource, /execFileSync\("\/usr\/bin\/git"/);
+  const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
+  assert.match(workflow,
+    /Repository CI \/ Validate PR contract transitions[\s\S]{0,400}github\.event_name == 'pull_request'[\s\S]{0,400}--base-ref "\$\{BASE_REF\}"/);
+  assert.match(workflow,
+    /Repository CI \/ Validate push contract transitions[\s\S]{0,400}github\.event_name == 'push'[\s\S]{0,400}github\.event\.before[\s\S]{0,400}--base-ref "\$\{BASE_REF\}"/);
+  assert.match(workflow,
+    /Repository CI \/ Validate current contracts[\s\S]{0,400}github\.event_name == 'workflow_dispatch'[\s\S]{0,400}--current-only/);
+});
+
+test("문서 거버넌스 계약은 workspace가 지정한 잘못된 ADR을 contract gate에서 거부한다", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const decisionPath = join(directory, "inputs/architecture-decision.json");
+    const decision = loadJson(decisionPath);
+    delete decision.decision;
+    writeFileSync(decisionPath, JSON.stringify(decision));
+
+    assert.ok(collectContractErrors(workspacePath).some((error) => (
+      error.includes("architecture-decision.json: $.decision: 필수 필드 누락")
+    )));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("contract gate의 ledger semantic path는 valid APPROVED와 TRANSFERRED를 허용한다", () => {

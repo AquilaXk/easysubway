@@ -13,6 +13,8 @@ import { verifyProductionPackArtifactIdentity } from "./verify-production-pack-a
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
+// ponytail: committed fixture replay clock; release workflow keeps actual time.
+process.env.EASYSUBWAY_DATAPACK_BUILD_NOW = "2026-07-30T00:00:00.000Z";
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const env = {
   ...process.env,
@@ -418,7 +420,10 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       "tools/datapack/build-datapack.mjs",
       "--build-spec", earlySpecPath,
       "--output", earlyOutputDir,
-    ], { cwd: root, env });
+    ], {
+      cwd: root,
+      env: { ...env, EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-31T23:59:59.000Z" },
+    });
     const earlyManifest = JSON.parse(await readFile(path.join(earlyOutputDir, "current.json"), "utf8"));
     assert.equal(earlyManifest.expiresAt, "2026-08-01T00:00:00.000Z");
 
