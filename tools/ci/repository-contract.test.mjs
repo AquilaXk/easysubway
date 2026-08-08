@@ -1434,6 +1434,37 @@ test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터
   assert.deepEqual(JSON.parse(fallbackMatch[1]), REQUIRED_STATUS_CHECK_CONTEXTS);
 });
 
+test("automerge 큐는 frozen discovery 리뷰와 current-head delivery gate를 분리한다", () => {
+  const coordinator = read(".github/workflows/automerge-queue.yml");
+
+  assert.match(coordinator, /--json mergeStateStatus,headRefOid,statusCheckRollup/);
+  assert.match(coordinator, /gh api --paginate --slurp "repos\/\$\{REPO\}\/pulls\/\$\{pr_number\}\/reviews"/);
+  assert.doesNotMatch(coordinator, /\.commit_id == \$head/);
+  assert.match(coordinator, /\["OWNER", "MEMBER", "COLLABORATOR"\]/);
+  assert.match(coordinator, /\*\*Actionable comments posted: /);
+  assert.match(coordinator, /<!-- Review source: Codex CLI fallback; canonical visible structure:/);
+  assert.match(coordinator, /\.author_association == "NONE"/);
+  assert.match(coordinator, /\.user\.login == "coderabbitai\[bot\]"/);
+  assert.match(coordinator, /\.user\.id == 136622811/);
+  assert.match(coordinator, /\.user\.type == "Bot"/);
+  assert.match(coordinator, /group_by\(\.user\.id\)/);
+  assert.match(coordinator, /\.state != "CHANGES_REQUESTED"/);
+  assert.match(coordinator, /\.state == "APPROVED"/);
+  assert.match(coordinator, /\.state == "COMMENTED"/);
+  assert.match(coordinator, /reviewThreads\(first: 100, after: \$endCursor\)/);
+  assert.match(coordinator, /unresolved_threads/);
+  assert.match(coordinator, /\[ "\$\{unresolved_threads\}" -gt 0 \]/);
+  assert.match(coordinator, /--match-head-commit "\$\{head\}"/);
+  assert.match(coordinator, /-f expected_head_sha="\$\{head\}"/);
+  assert.ok(
+    coordinator.indexOf('if [ "${merge_state}" = "BEHIND" ]')
+      < coordinator.indexOf('if [ "${failed_required}" -gt 0 ]'),
+    "BEHIND PR must refresh its exact head before stale required failures are judged",
+  );
+  assert.doesNotMatch(coordinator, /reviews\.length/);
+  assert.doesNotMatch(coordinator, /review_count/);
+});
+
 test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const androidJob = jobBlock(workflow, "android", "notify-slack-ci-failure");
