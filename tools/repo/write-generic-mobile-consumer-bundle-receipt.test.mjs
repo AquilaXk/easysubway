@@ -165,5 +165,13 @@ test("publication workflow는 main에서만 닫힌 producer와 정확히 두 파
   assert.match(workflow, /name: easysubway-generic-mobile-consumer-bundle-1\.0\.0-604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3/);
   assert.match(workflow, /path: \|\n            release-artifacts\/mobile-contracts\/generic-mobile-consumer-bundle-v1\.json\n            release-artifacts\/mobile-contracts\/generic-mobile-consumer-publication-receipt-v1\.json/);
   assert.match(workflow, /retention-days: 90\n          overwrite: false/);
-  assert.match(workflow, /artifact-id=.*artifact-digest=.*artifact-url/s);
+  assert.match(workflow, /set -euo pipefail/);
+  assert.match(workflow, /artifact_id="\$\{\{ steps\.upload\.outputs\.artifact-id \}\}"[\s\S]*\^\[1-9\]\[0-9\]\*\$/);
+  assert.match(workflow, /artifact_digest="\$\{\{ steps\.upload\.outputs\.artifact-digest \}\}"[\s\S]*\^\[0-9a-f\]\{64\}\$/);
+  assert.match(workflow, /GITHUB_RUN_ID.*\^\[1-9\]\[0-9\]\*\$/);
+  assert.match(workflow, /GITHUB_SHA.*\^\[0-9a-f\]\{40\}\$/);
+  assert.match(workflow, /expected_artifact_url="https:\/\/github\.com\/AquilaXk\/easysubway\/actions\/runs\/\$\{GITHUB_RUN_ID\}\/artifacts\/\$\{artifact_id\}"/);
+  assert.match(workflow, /artifact_url}" != "\$\{expected_artifact_url\}"/);
+  assert.match(workflow, /workflow-path=\.github\/workflows\/generic-mobile-consumer-bundle-publish\.yml[\s\S]*workflow-run-id=.*workflow-head-sha=.*artifact-id=.*artifact-name=.*artifact-digest=.*artifact-url=.*retention-days=90/s);
+  assert.doesNotMatch(workflow, /continue-on-error|fallback|\|\|/i);
 });

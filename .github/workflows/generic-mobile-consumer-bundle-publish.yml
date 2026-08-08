@@ -58,9 +58,39 @@ jobs:
           retention-days: 90
           overwrite: false
 
-      - name: Log artifact locator
+      - name: Validate and log artifact locator
         shell: bash
         run: |
-          echo "artifact-id=${{ steps.upload.outputs.artifact-id }}"
-          echo "artifact-digest=${{ steps.upload.outputs.artifact-digest }}"
-          echo "artifact-url=${{ steps.upload.outputs.artifact-url }}"
+          set -euo pipefail
+          artifact_id="${{ steps.upload.outputs.artifact-id }}"
+          artifact_digest="${{ steps.upload.outputs.artifact-digest }}"
+          artifact_url="${{ steps.upload.outputs.artifact-url }}"
+          if [[ ! "${artifact_id}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "artifact-id is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${artifact_digest}" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "artifact-digest is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${GITHUB_RUN_ID}" =~ ^[1-9][0-9]*$ ]]; then
+            echo "workflow-run-id is invalid" >&2
+            exit 1
+          fi
+          if [[ ! "${GITHUB_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "workflow-head-sha is invalid" >&2
+            exit 1
+          fi
+          expected_artifact_url="https://github.com/AquilaXk/easysubway/actions/runs/${GITHUB_RUN_ID}/artifacts/${artifact_id}"
+          if [[ "${artifact_url}" != "${expected_artifact_url}" ]]; then
+            echo "artifact-url is invalid" >&2
+            exit 1
+          fi
+          echo "workflow-path=.github/workflows/generic-mobile-consumer-bundle-publish.yml"
+          echo "workflow-run-id=${GITHUB_RUN_ID}"
+          echo "workflow-head-sha=${GITHUB_SHA}"
+          echo "artifact-id=${artifact_id}"
+          echo "artifact-name=easysubway-generic-mobile-consumer-bundle-1.0.0-604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3"
+          echo "artifact-digest=${artifact_digest}"
+          echo "artifact-url=${artifact_url}"
+          echo "retention-days=90"
