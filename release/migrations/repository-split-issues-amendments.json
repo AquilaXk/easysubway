@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "AquilaXk/easysubway",
+  "snapshotLedger": "release/migrations/repository-split-issues.json",
+  "amendments": [
+    { "sourceIssue": 2700, "title": "[Architecture][Mobile] datapack lock과 verified AAB staging 도입", "disposition": "TRANSFER", "targetRepository": "AquilaXk/easysubway-mobile", "targetUrl": "https://github.com/AquilaXk/easysubway-mobile/issues/45", "transferredAt": "2026-08-01T16:08:48Z", "reason": "mobile datapack lock과 AAB staging 산출물 단독 소유", "classifiedAt": "2026-08-01T16:59:35Z" },
+    { "sourceIssue": 2705, "title": "[Architecture][Data][P0] Task6 data 레포 생성·history extraction·issue transfer", "disposition": "KEEP_HUB", "targetRepository": "AquilaXk/easysubway", "targetUrl": null, "transferredAt": null, "reason": "5개 레포 분리 Task6 orchestration tracker의 hub 소유", "classifiedAt": "2026-08-01T16:59:35Z" },
+    { "sourceIssue": 2710, "title": "[Feat] Aquila Software 공개 사이트와 EasySubway 제품 페이지 개편", "disposition": "KEEP_HUB", "targetRepository": "AquilaXk/easysubway", "targetUrl": null, "transferredAt": null, "reason": "공개 사이트 소유 레포 미정 — 오너 결정 대기 동안 hub 보류", "classifiedAt": "2026-08-01T16:59:35Z" },
+    { "sourceIssue": 2712, "title": "[Architecture][Platform][P0] Task7 platform 레포 생성·digest-only deploy cutover", "disposition": "KEEP_HUB", "targetRepository": "AquilaXk/easysubway", "targetUrl": null, "transferredAt": null, "reason": "5개 레포 분리 Task7 orchestration tracker의 hub 소유", "classifiedAt": "2026-08-01T16:59:35Z" },
+    { "sourceIssue": 2714, "title": "[Architecture][Backend][P0] Task8 backend 레포 생성·standalone image producer cutover", "disposition": "KEEP_HUB", "targetRepository": "AquilaXk/easysubway", "targetUrl": null, "transferredAt": null, "reason": "5개 레포 분리 Task8 orchestration tracker의 hub 소유", "classifiedAt": "2026-08-01T16:59:35Z" },
+    { "sourceIssue": 2720, "title": "[Tooling][Migration][P0] transferred issue bare reference 정규화·검증", "disposition": "KEEP_HUB", "targetRepository": "AquilaXk/easysubway", "targetUrl": null, "transferredAt": null, "reason": "hub 소유 issue migration tooling", "classifiedAt": "2026-08-01T16:59:35Z" },
+    { "sourceIssue": 2727, "title": "[CI] 타깃 4개 레포 의존성 자동화(dependabot) 부재 해소", "disposition": "KEEP_HUB", "targetRepository": "AquilaXk/easysubway", "targetUrl": null, "transferredAt": null, "reason": "4개 타깃 레포에 걸친 cross-repository 설정 조정", "classifiedAt": "2026-08-01T16:59:35Z" },
+    { "sourceIssue": 2728, "title": "[Architecture] product gate의 apps/mobile sha256 핀 cross-repo 결합 해소 (Task 10 선행)", "disposition": "KEEP_HUB", "targetRepository": "AquilaXk/easysubway", "targetUrl": null, "transferredAt": null, "reason": "hub product gate 소유와 cross-repository 결합 해소", "classifiedAt": "2026-08-01T16:59:35Z" }
+  ]
+}

@@ -5,7 +5,7 @@ import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, win32 } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
-import { validateLedger } from "../repo/issue-migration-ledger.mjs";
+import { validateAmendments, validateLedger } from "../repo/issue-migration-ledger.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isDeepStrictEqual } from "node:util";
@@ -242,16 +242,28 @@ export function collectContractErrors(
     }
   }
   validateJson(contract("datapack/catalog-raw-sql-tables.schema.json"), contract("datapack/catalog-raw-sql-tables.json"), errors);
+  const repositorySplitIssuesPath = join(repositoryRoot, "release/migrations/repository-split-issues.json");
   const repositorySplitIssueLedgerValid = validateJson(
     contract("repository-split-issues.schema.json"),
-    join(repositoryRoot, "release/migrations/repository-split-issues.json"),
+    repositorySplitIssuesPath,
     errors,
   );
   if (repositorySplitIssueLedgerValid) {
-    const repositorySplitIssuesPath = join(repositoryRoot, "release/migrations/repository-split-issues.json");
     errors.push(...validateRepositorySplitIssueLedger(loadJson(repositorySplitIssuesPath)).map(
       (error) => `${repositorySplitIssuesPath}: ${error}`,
     ));
+  }
+  const amendmentsPath = join(repositoryRoot, "release/migrations/repository-split-issues-amendments.json");
+  const amendmentsValid = validateJson(
+    contract("repository-split-issue-amendments.schema.json"),
+    amendmentsPath,
+    errors,
+  );
+  if (repositorySplitIssueLedgerValid && amendmentsValid) {
+    errors.push(...validateRepositorySplitIssueAmendments(
+      loadJson(amendmentsPath),
+      loadJson(repositorySplitIssuesPath),
+    ).map((error) => `${amendmentsPath}: ${error}`));
   }
   if (!existsSync(workspace.freshnessPolicy)) errors.push(`${workspace.freshnessPolicy} 누락`);
   if ([workspace.sourceInventory, workspace.governancePolicy, workspace.freshnessPolicy].every(existsSync)) {
@@ -271,6 +283,10 @@ export function collectContractErrors(
 
 export function validateRepositorySplitIssueLedger(ledger) {
   return validateLedger(ledger);
+}
+
+export function validateRepositorySplitIssueAmendments(amendments, ledger) {
+  return validateAmendments(amendments, { ledger });
 }
 
 export function validateSourceGovernanceContracts(

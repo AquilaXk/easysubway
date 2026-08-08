@@ -96,16 +96,29 @@
             "minItems": 2,
             "maxItems": 2,
             "uniqueItems": true,
-            "items": { "enum": ["AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile"] }
+            "items": { "enum": ["AquilaXk/easysubway-data", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile"] }
           },
           "childIssueUrls": {
-            "type": "object",
-            "additionalProperties": false,
-            "required": ["AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile"],
-            "properties": {
-              "AquilaXk/easysubway-data": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway-data/issues/[1-9][0-9]*$" },
-              "AquilaXk/easysubway-mobile": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway-mobile/issues/[1-9][0-9]*$" }
-            }
+            "oneOf": [
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile"],
+                "properties": {
+                  "AquilaXk/easysubway-data": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway-data/issues/[1-9][0-9]*$" },
+                  "AquilaXk/easysubway-mobile": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway-mobile/issues/[1-9][0-9]*$" }
+                }
+              },
+              {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile"],
+                "properties": {
+                  "AquilaXk/easysubway-backend": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway-backend/issues/[1-9][0-9]*$" },
+                  "AquilaXk/easysubway-mobile": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway-mobile/issues/[1-9][0-9]*$" }
+                }
+              }
+            ]
           },
           "reason": { "type": "string", "minLength": 1 },
           "classificationState": { "const": "REVIEWED" },
