@@ -1,0 +1,13 @@
+{
+  "$schema": "./reference-audit-scope.schema.json",
+  "schemaVersion": 1,
+  "repositories": [
+    { "repository": "AquilaXk/easysubway", "trackedDiscoveryRoots": [".github/PULL_REQUEST_TEMPLATE", "README.md", "contracts", "release/product-gates"] },
+    { "repository": "AquilaXk/easysubway-backend", "trackedDiscoveryRoots": ["README.md", "contracts", "backend/src/main/resources"] },
+    { "repository": "AquilaXk/easysubway-data", "trackedDiscoveryRoots": ["README.md", "contracts", "release"] },
+    { "repository": "AquilaXk/easysubway-mobile", "trackedDiscoveryRoots": ["README.md", "contracts", "apps/mobile/release"] },
+    { "repository": "AquilaXk/easysubway-platform", "trackedDiscoveryRoots": ["README.md", "contracts", "infra"] }
+  ],
+  "githubDiscovery": { "includeOpenIssues": true, "includeOpenPullRequests": true, "maxItemsPerRepository": 1000 },
+  "referenceClasses": ["ARTIFACT_IMMUTABLE_REFERENCE", "EXTERNAL_INPUT_PENDING_REFERENCE", "ISSUE_CURRENT_OWNER", "ISSUE_NONCLOSING_DEPENDENCY", "ISSUE_PARENT_OR_COORDINATOR", "ISSUE_TERMINAL_IMPLEMENTATION", "PATH_CANONICAL_CURRENT", "PATH_HISTORICAL_OR_SUPERSEDED", "PR_EVIDENCE_ONLY", "PR_IMPLEMENTATION"]
+}
