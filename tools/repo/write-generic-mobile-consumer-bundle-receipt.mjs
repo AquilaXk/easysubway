@@ -75,13 +75,18 @@ function validateBundle(bytes) {
 
 const positiveDecimal = (value) => typeof value === "string" && /^[1-9][0-9]*$/.test(value);
 const isoTimestamp = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) && Number.isFinite(Date.parse(value));
+const artifactRetentionMs = 90 * 24 * 60 * 60 * 1000;
+const artifactCreationSkewMs = 5 * 60 * 1000;
 
 export function validateGenericMobileConsumerBundleArtifactMetadata({ metadata, artifactId, artifactDigest, workflowRunId, repositoryId, headSha }) {
   if (!metadata || typeof metadata !== "object" || Array.isArray(metadata) || !positiveDecimal(artifactId) || !/^[0-9a-f]{64}$/.test(artifactDigest) || !positiveDecimal(workflowRunId) || !positiveDecimal(repositoryId) || !/^[0-9a-f]{40}$/.test(headSha)) throw new Error("artifact metadata validation input is invalid");
   const expectedArchiveUrl = `https://api.github.com/repos/${producerRepository}/actions/artifacts/${artifactId}/zip`;
   const workflowRun = metadata.workflow_run;
   if (String(metadata.id) !== artifactId || metadata.name !== artifactName || metadata.expired !== false || metadata.digest !== `sha256:${artifactDigest}` || metadata.archive_download_url !== expectedArchiveUrl || !workflowRun || typeof workflowRun !== "object" || Array.isArray(workflowRun) || String(workflowRun.id) !== workflowRunId || workflowRun.head_branch !== "main" || workflowRun.head_sha !== headSha || String(workflowRun.repository_id) !== repositoryId || String(workflowRun.head_repository_id) !== repositoryId) throw new Error("artifact metadata does not match the closed publication contract");
-  if (!isoTimestamp(metadata.created_at) || !isoTimestamp(metadata.expires_at) || Date.parse(metadata.expires_at) - Date.parse(metadata.created_at) !== 90 * 24 * 60 * 60 * 1000) throw new Error("artifact metadata retention is not exactly 90 days");
+  if (!isoTimestamp(metadata.created_at) || !isoTimestamp(metadata.expires_at)) throw new Error("artifact metadata retention timestamps are invalid");
+  const observedRetentionMs = Date.parse(metadata.expires_at) - Date.parse(metadata.created_at);
+  const requestToServerSkewMs = artifactRetentionMs - observedRetentionMs;
+  if (requestToServerSkewMs < 0 || requestToServerSkewMs > artifactCreationSkewMs) throw new Error("artifact metadata retention is outside the requested 90-day window");
 }
 
 async function ensureOutputDirectory(root, output) {

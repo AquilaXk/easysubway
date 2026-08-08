@@ -159,9 +159,14 @@ test("artifact metadata는 exact ID, digest, origin 및 90일 보존만 허용�
   };
   const input = { metadata, artifactId, artifactDigest, workflowRunId: "456", repositoryId: "789", headSha: producerSha };
   assert.doesNotThrow(() => validateGenericMobileConsumerBundleArtifactMetadata(input));
+  const requestToServerSkew = structuredClone(input);
+  requestToServerSkew.metadata.expires_at = "2026-03-31T23:59:30Z";
+  assert.doesNotThrow(() => validateGenericMobileConsumerBundleArtifactMetadata(requestToServerSkew));
   for (const mutate of [
     (value) => { delete value.metadata.digest; },
     (value) => { value.metadata.expires_at = "2026-01-31T00:00:00Z"; },
+    (value) => { value.metadata.expires_at = "2026-03-31T23:54:59Z"; },
+    (value) => { value.metadata.expires_at = "2026-04-01T00:00:01Z"; },
     (value) => { value.metadata.workflow_run.head_branch = "feature"; },
   ]) {
     const invalid = structuredClone(input);
