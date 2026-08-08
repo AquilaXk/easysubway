@@ -9,7 +9,7 @@
       "path": ".github/workflows/automerge-queue.yml",
       "selector": null,
       "kind": "WORKFLOW",
-      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "classification": "HUB_FALLBACK_REMOVE",
       "hubOwner": "hub",
       "targetOwner": null,
       "targetOutput": "Hub merge coordination",
@@ -19,7 +19,7 @@
       "releaseReachability": "CURRENT",
       "handoffState": "NOT_APPLICABLE",
       "handoffEvidence": [],
-      "plannedAction": "RETAIN",
+      "plannedAction": "REMOVE_FALLBACK",
       "executionEligibility": false,
       "reviewTrigger": [
         "workflow change"
@@ -721,7 +721,7 @@
       "path": ".github/workflows/release-artifacts.yml",
       "selector": "missing datapack run uses bundled index and capital artifact",
       "kind": "WORKFLOW",
-      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "classification": "HUB_FALLBACK_REMOVE",
       "hubOwner": "hub",
       "targetOwner": null,
       "targetOutput": "Fail-closed RC datapack acquisition",
@@ -731,7 +731,7 @@
       "releaseReachability": "CURRENT",
       "handoffState": "NOT_APPLICABLE",
       "handoffEvidence": [],
-      "plannedAction": "RETAIN",
+      "plannedAction": "REMOVE_FALLBACK",
       "executionEligibility": false,
       "reviewTrigger": [
         "release workflow change"
@@ -751,7 +751,7 @@
       "path": "tools/release/select-rc-datapack-artifact.mjs",
       "selector": "fallback.sqlite.gz selection and copy",
       "kind": "BUILD",
-      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "classification": "HUB_FALLBACK_REMOVE",
       "hubOwner": "hub",
       "targetOwner": null,
       "targetOutput": "Fail-closed immutable RC datapack selection",
@@ -761,7 +761,7 @@
       "releaseReachability": "CURRENT",
       "handoffState": "NOT_APPLICABLE",
       "handoffEvidence": [],
-      "plannedAction": "RETAIN",
+      "plannedAction": "REMOVE_FALLBACK",
       "executionEligibility": false,
       "reviewTrigger": [
         "RC artifact selector change"
@@ -781,7 +781,7 @@
       "path": "tools/datapack/lib/manifest-validation.mjs",
       "selector": "emergencyOverride fallback pack selection",
       "kind": "BUILD",
-      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "classification": "HUB_FALLBACK_REMOVE",
       "hubOwner": "hub",
       "targetOwner": null,
       "targetOutput": "Fail-closed datapack manifest validation",
@@ -791,7 +791,7 @@
       "releaseReachability": "CURRENT",
       "handoffState": "NOT_APPLICABLE",
       "handoffEvidence": [],
-      "plannedAction": "RETAIN",
+      "plannedAction": "REMOVE_FALLBACK",
       "executionEligibility": false,
       "reviewTrigger": [
         "manifest validation change"
@@ -811,7 +811,7 @@
       "path": "tools/release/generate-rc-evidence-manifest.mjs",
       "selector": "data-pack fallback artifact requirement",
       "kind": "BUILD",
-      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "classification": "HUB_FALLBACK_REMOVE",
       "hubOwner": "hub",
       "targetOwner": null,
       "targetOutput": "Fail-closed RC evidence manifest",
@@ -821,7 +821,7 @@
       "releaseReachability": "CURRENT",
       "handoffState": "NOT_APPLICABLE",
       "handoffEvidence": [],
-      "plannedAction": "RETAIN",
+      "plannedAction": "REMOVE_FALLBACK",
       "executionEligibility": false,
       "reviewTrigger": [
         "RC evidence manifest change"
@@ -842,7 +842,7 @@
       "path": ".github/workflows/ci.yml",
       "selector": "Admin QA upload continue-on-error and if-no-files-found warn",
       "kind": "WORKFLOW",
-      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "classification": "HUB_FALLBACK_REMOVE",
       "hubOwner": "hub",
       "targetOwner": null,
       "targetOutput": "Fail-closed Admin QA artifact publication",
@@ -852,7 +852,7 @@
       "releaseReachability": "CURRENT",
       "handoffState": "NOT_APPLICABLE",
       "handoffEvidence": [],
-      "plannedAction": "RETAIN",
+      "plannedAction": "REMOVE_FALLBACK",
       "executionEligibility": false,
       "reviewTrigger": [
         "workflow ownership correction"

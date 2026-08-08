@@ -1164,16 +1164,31 @@ test("repository contraction inventory는 ownership, handoff state, mixed select
   const target = inventory.entries.find((entry) => entry.classification === "TARGET_CANONICAL_DELETE_AFTER_HANDOFF");
   const retained = inventory.entries.find((entry) => entry.classification === "HUB_SYSTEM_OWNER_RETAIN");
   const duplicate = inventory.entries.find((entry) => entry.classification === "DUPLICATE_GATE_DISABLE_AFTER_TARGET");
+  assert.ok(target, "TARGET_CANONICAL_DELETE_AFTER_HANDOFF entry가 필요하다");
+  assert.ok(retained, "HUB_SYSTEM_OWNER_RETAIN entry가 필요하다");
+  assert.ok(duplicate, "DUPLICATE_GATE_DISABLE_AFTER_TARGET entry가 필요하다");
   const forbiddenFallbackIds = [
     "backend-ci-build", "data-ci-producer", "mobile-ci-build", "platform-ci-deploy",
     "data-datapack-release", "mobile-release-artifacts", "backend-docker-image",
-    "backend-raw-main-v1-stage", "data-previous-artifact-contract", "hub-automerge-queue",
-    "hub-release-artifacts-bundled-datapack", "hub-rc-datapack-selector",
-    "hub-manifest-emergency-override", "hub-rc-evidence-fallback-artifact",
+    "backend-raw-main-v1-stage", "data-previous-artifact-contract",
     "backend-source", "data-source", "mobile-source", "platform-infra", "platform-deploy-tools",
   ];
   for (const resourceId of forbiddenFallbackIds) {
     assert.equal(inventory.entries.find((entry) => entry.resourceId === resourceId)?.fallbackExposure, "FORBIDDEN_ACTIVE", resourceId);
+  }
+  for (const resourceId of [
+    "hub-automerge-queue", "hub-release-artifacts-bundled-datapack", "hub-rc-datapack-selector",
+    "hub-manifest-emergency-override", "hub-rc-evidence-fallback-artifact", "hub-admin-qa-upload-warn",
+  ]) {
+    const entry = inventory.entries.find((candidate) => candidate.resourceId === resourceId);
+    assert.ok(entry, `${resourceId} entry가 필요하다`);
+    assert.deepEqual(
+      [entry.classification, entry.repository, entry.hubOwner, entry.targetOwner, entry.plannedAction,
+        entry.executionEligibility, entry.fallbackExposure, entry.fallbackRemovalOwner, entry.fallbackVerificationState],
+      ["HUB_FALLBACK_REMOVE", "AquilaXk/easysubway", "hub", null, "REMOVE_FALLBACK", false,
+        "FORBIDDEN_ACTIVE", "hub", "PLANNED"],
+      resourceId,
+    );
   }
 
   for (const [mutate, expected] of [
@@ -1182,7 +1197,11 @@ test("repository contraction inventory는 ownership, handoff state, mixed select
     [(candidate) => { candidate.activeConsumers = []; }, "active consumer가 필요하다"],
     [(candidate) => { candidate.plannedAction = "RETAIN"; }, "plannedAction 불일치"],
     [(candidate) => { candidate.executionEligibility = true; }, "PENDING은 execution-eligible일 수 없다"],
-    [(candidate) => { candidate.resourceId = inventory.entries[0].resourceId; }, "resourceId 중복"],
+    [(candidate) => {
+      const other = inventory.entries.find((entry) => entry.resourceId !== candidate.resourceId);
+      assert.ok(other, "중복 대상으로 사용할 다른 entry가 필요하다");
+      candidate.resourceId = other.resourceId;
+    }, "resourceId 중복"],
   ]) {
     const candidate = structuredClone(inventory);
     mutate(candidate.entries.find((entry) => entry.resourceId === target.resourceId));
@@ -1229,6 +1248,7 @@ test("repository contraction inventory는 ownership, handoff state, mixed select
   }
 
   const hubFallback = inventory.entries.find((entry) => entry.resourceId === "hub-automerge-queue");
+  assert.ok(hubFallback, "hub-automerge-queue entry가 필요하다");
   for (const [mutate, expected] of [
     [(candidate) => { candidate.fallbackExposure = "NONE"; }, "known fallback은 FORBIDDEN_ACTIVE여야 한다"],
     [(candidate) => { candidate.fallbackRemovalOwner = null; }, "fallback removal owner가 필요하다"],
@@ -1255,6 +1275,16 @@ test("repository contraction inventory는 ownership, handoff state, mixed select
   rollback.rollbackRevision = null;
   assert.ok(validateRepositoryContractionInventory(invalidRollback)
     .some((error) => error.includes("Platform deployment rollback approval")));
+
+  const invalidHubRetain = structuredClone(inventory);
+  invalidHubRetain.entries.find((entry) => entry.resourceId === retained.resourceId).fallbackExposure = "FORBIDDEN_ACTIVE";
+  assert.ok(validateRepositoryContractionInventory(invalidHubRetain)
+    .some((error) => error.includes("HUB_SYSTEM_OWNER_RETAIN은 fallbackExposure NONE")));
+
+  const invalidExtractionRepository = structuredClone(inventory);
+  invalidExtractionRepository.entries.find((entry) => entry.resourceId === "backend-realtime-fallback").repository = "AquilaXk/easysubway-mobile";
+  assert.ok(validateRepositoryContractionInventory(invalidExtractionRepository)
+    .some((error) => error.includes("repository/targetOwner extraction mapping 불일치")));
 
   const duplicateFallbackGate = structuredClone(inventory);
   const activeFallbacks = duplicateFallbackGate.entries.filter((entry) => entry.fallbackExposure === "FORBIDDEN_ACTIVE");
@@ -1329,6 +1359,9 @@ test("repository contraction inventory는 #2731 P1 fallback required-set과 폐�
   const missingRollbackField = structuredClone(inventory);
   delete missingRollbackField.entries[0].rollbackOperation;
   assert.ok(validateSchema(schema, missingRollbackField).errors.some((error) => error.includes("rollbackOperation")));
+  const uppercaseRollbackRevision = structuredClone(inventory);
+  uppercaseRollbackRevision.entries[0].rollbackRevision = "A".repeat(40);
+  assert.ok(validateSchema(schema, uppercaseRollbackRevision).errors.some((error) => error.includes("rollbackRevision")));
 
   const missing = structuredClone(inventory);
   missing.entries = missing.entries.filter((entry) => entry.resourceId !== "hub-automerge-queue");
@@ -1338,10 +1371,11 @@ test("repository contraction inventory는 #2731 P1 fallback required-set과 폐�
   const handoff = duplicateEvidence.entries.find((entry) => entry.resourceId === "backend-ci-build");
   handoff.handoffState = "VERIFIED";
   handoff.handoffEvidence = [
-    { kind: "IMMUTABLE_TARGET", reference: "https://github.com/AquilaXk/easysubway-backend/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-    { kind: "IMMUTABLE_TARGET", reference: "https://github.com/AquilaXk/easysubway-backend/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-    { kind: "TARGET_CONSUMER", reference: "https://github.com/AquilaXk/easysubway-backend/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/.github/workflows/release.yml", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
-    { kind: "TERMINAL_GATE", reference: "https://github.com/AquilaXk/easysubway-backend/actions/runs/1", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { kind: "IMMUTABLE_TARGET", reference: "https://github.com/AquilaXk/easysubway-backend/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", conclusion: "NOT_APPLICABLE" },
+    { kind: "IMMUTABLE_TARGET", reference: "https://github.com/AquilaXk/easysubway-backend/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", conclusion: "NOT_APPLICABLE" },
+    { kind: "TARGET_CONSUMER", reference: "https://github.com/AquilaXk/easysubway-backend/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/.github/workflows/release.yml", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", conclusion: "NOT_APPLICABLE" },
+    { kind: "TARGET_TERMINAL_GATE", reference: "https://github.com/AquilaXk/easysubway-backend/actions/runs/1", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", conclusion: "SUCCESS" },
+    { kind: "SYSTEM_TERMINAL_GATE", reference: "https://github.com/AquilaXk/easysubway/actions/runs/1", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", conclusion: "SUCCESS" },
   ];
   assert.ok(validateRepositoryContractionInventory(duplicateEvidence).some((error) => error.includes("handoff evidence kind 중복")));
 
@@ -1405,6 +1439,36 @@ test("repository contraction inventory는 F3 terminal gate와 예약된 F4 Platf
   const rollbackCandidate = structuredClone(inventory);
   rollbackCandidate.entries.push(reservedRollback());
   assert.deepEqual(validateRepositoryContractionInventory(rollbackCandidate), []);
+
+  const digest = `sha256:${"b".repeat(64)}`;
+  const ociDigestCandidate = structuredClone(inventory);
+  const backendCiBuild = inventory.entries.find((entry) => entry.resourceId === "backend-ci-build");
+  assert.ok(backendCiBuild, "backend-ci-build entry가 필요하다");
+  ociDigestCandidate.entries.push({
+    ...structuredClone(backendCiBuild),
+    resourceId: "backend-oci-digest-target",
+    repository: "AquilaXk/easysubway-backend",
+    path: ".github/workflows/release.yml",
+    selector: "immutable OCI digest consumer",
+    classification: "TARGET_CANONICAL_DELETE_AFTER_HANDOFF",
+    targetOwner: "backend",
+    targetOutput: "Backend immutable OCI image",
+    activeConsumers: ["Backend deployment"],
+    handoffState: "VERIFIED",
+    handoffEvidence: [
+      { kind: "IMMUTABLE_TARGET", reference: `oci://AquilaXk/easysubway-backend@${digest}`, identity: digest, conclusion: "NOT_APPLICABLE" },
+      { kind: "TARGET_CONSUMER", reference: `oci://AquilaXk/easysubway-backend@${digest}`, identity: digest, conclusion: "NOT_APPLICABLE" },
+      { kind: "TARGET_TERMINAL_GATE", reference: "https://github.com/AquilaXk/easysubway-backend/actions/runs/1", identity: digest, conclusion: "SUCCESS" },
+      { kind: "SYSTEM_TERMINAL_GATE", reference: "https://github.com/AquilaXk/easysubway/actions/runs/2", identity: digest, conclusion: "SUCCESS" },
+    ],
+    plannedAction: "DELETE_AFTER_HANDOFF",
+    executionEligibility: true,
+    fallbackExposure: "NONE",
+    fallbackRemovalOwner: null,
+    fallbackVerification: [],
+    fallbackVerificationState: "NOT_APPLICABLE",
+  });
+  assert.deepEqual(validateRepositoryContractionInventory(ociDigestCandidate), []);
 
   const gatewayPromotion = structuredClone(inventory);
   Object.assign(gatewayPromotion.entries.find((entry) => entry.resourceId === "platform-compose-route-v2-gateway"), reservedRollback(), {

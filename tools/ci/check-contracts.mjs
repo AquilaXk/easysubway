@@ -260,7 +260,7 @@ export function collectContractErrors(
     errors,
   );
   if (repositoryContractionInventoryValid) {
-    errors.push(...validateRepositoryContractionInventory(loadJson(repositoryContractionInventoryPath)).map(
+    errors.push(...validateRepositoryContractionInventory(loadJson(repositoryContractionInventoryPath), repositoryRoot).map(
       (error) => `${repositoryContractionInventoryPath}: ${error}`,
     ));
   }
@@ -298,6 +298,7 @@ export function validateRepositorySplitIssueLedger(ledger) {
 
 const REPOSITORY_CONTRACTION_CLASSIFICATIONS = {
   HUB_SYSTEM_OWNER_RETAIN: { targetOwner: null, plannedAction: "RETAIN" },
+  HUB_FALLBACK_REMOVE: { targetOwner: null, plannedAction: "REMOVE_FALLBACK" },
   TARGET_CANONICAL_DELETE_AFTER_HANDOFF: { targetOwner: "component", plannedAction: "DELETE_AFTER_HANDOFF" },
   TARGET_FALLBACK_REMOVE: { targetOwner: "component", plannedAction: "REMOVE_FALLBACK" },
   HISTORICAL_ARCHIVE_NONEXECUTABLE: { targetOwner: null, plannedAction: "ARCHIVE_NONEXECUTABLE" },
@@ -365,12 +366,12 @@ const KNOWN_FALLBACK_SURFACES = new Map([
 ]);
 const KNOWN_FORBIDDEN_FALLBACK_RESOURCE_IDS = new Set(KNOWN_FALLBACK_SURFACES.keys());
 
-export function validateRepositoryContractionInventory(inventory) {
+export function validateRepositoryContractionInventory(inventory, repositoryRoot = process.cwd()) {
   const errors = [];
   const resourceIds = new Set();
   const selectorsBySurface = new Map();
   const activeFallbackVerificationIds = new Set();
-  validateInventoryBaseHead(inventory, errors);
+  validateInventoryBaseHead(inventory, errors, repositoryRoot);
   for (const entry of inventory.entries ?? []) {
     if (resourceIds.has(entry.resourceId)) errors.push(`${entry.resourceId}: resourceId 중복`);
     resourceIds.add(entry.resourceId);
@@ -400,8 +401,10 @@ export function validateRepositoryContractionInventory(inventory) {
         errors.push(`${entry.resourceId}: targetOwner 불일치`);
       }
     }
-    if (entry.repository !== "AquilaXk/easysubway" && entry.targetOwner !== entry.resourceId.split("-", 1)[0]) {
-      errors.push(`${entry.resourceId}: repository/targetOwner/resourceId prefix 불일치`);
+    if (entry.repository !== "AquilaXk/easysubway"
+        && (!Object.hasOwn(EXTRACTION_REPOSITORIES, entry.targetOwner)
+          || entry.repository !== EXTRACTION_REPOSITORIES[entry.targetOwner])) {
+      errors.push(`${entry.resourceId}: repository/targetOwner extraction mapping 불일치`);
     }
     if (entry.plannedAction !== rule.plannedAction) {
       errors.push(`${entry.resourceId}: ${entry.classification} plannedAction 불일치`);
@@ -413,6 +416,16 @@ export function validateRepositoryContractionInventory(inventory) {
           || entry.fallbackVerificationState !== "PLANNED"
           || entry.executionEligibility)) {
       errors.push(`${entry.resourceId}: TARGET_FALLBACK_REMOVE target/removal/fallback state 불일치`);
+    }
+    if (entry.classification === "HUB_FALLBACK_REMOVE"
+        && (entry.repository !== "AquilaXk/easysubway" || entry.targetOwner !== null
+          || entry.hubOwner !== "hub" || entry.fallbackRemovalOwner !== "hub"
+          || entry.fallbackExposure !== "FORBIDDEN_ACTIVE"
+          || entry.fallbackVerificationState !== "PLANNED" || entry.executionEligibility)) {
+      errors.push(`${entry.resourceId}: HUB_FALLBACK_REMOVE hub/removal/fallback state 불일치`);
+    }
+    if (entry.classification === "HUB_SYSTEM_OWNER_RETAIN" && entry.fallbackExposure !== "NONE") {
+      errors.push(`${entry.resourceId}: HUB_SYSTEM_OWNER_RETAIN은 fallbackExposure NONE이어야 한다`);
     }
     validateHandoffEvidence(entry, errors);
     if (typeof entry.selector === "string" && entry.selector.trim() === "") {
@@ -460,17 +473,12 @@ export function validateRepositoryContractionInventory(inventory) {
   return errors;
 }
 
-function validateInventoryBaseHead(inventory, errors) {
-  let remote;
+function validateInventoryBaseHead(inventory, errors, repositoryRoot) {
   try {
-    remote = inventoryGit(["remote", "get-url", "origin"], "utf8").trim();
-  } catch {
-    return;
-  }
-  if (!remote.includes("AquilaXk/easysubway")) return;
-  try {
-    inventoryGit(["cat-file", "-e", `${inventory.inventoryBaseHead}^{commit}`]);
-    inventoryGit(["merge-base", "--is-ancestor", inventory.inventoryBaseHead, "HEAD"]);
+    const remote = inventoryGit(repositoryRoot, ["remote", "get-url", "origin"], "utf8").trim();
+    if (!remote.includes("AquilaXk/easysubway")) throw new Error("Hub origin이 필요하다");
+    inventoryGit(repositoryRoot, ["cat-file", "-e", `${inventory.inventoryBaseHead}^{commit}`]);
+    inventoryGit(repositoryRoot, ["merge-base", "--is-ancestor", inventory.inventoryBaseHead, "HEAD"]);
   } catch {
     errors.push(`inventoryBaseHead ${inventory.inventoryBaseHead}: Hub Git base object와 HEAD ancestor가 필요하다`);
   }
@@ -522,8 +530,10 @@ function isImmutableTargetReference(reference, repository, revision) {
 }
 
 function isTargetConsumerReference(reference, repository, revision) {
-  return repository != null && /^[a-f0-9]{40}$/.test(revision)
-    && new RegExp(`^https://github\\.com/${repository}/blob/${revision}/[^/]+`).test(reference);
+  return repository != null && (revision.startsWith("sha256:")
+    ? reference === `oci://${repository}@${revision}`
+    : /^[a-f0-9]{40}$/.test(revision)
+      && new RegExp(`^https://github\\.com/${repository}/blob/${revision}/[^/]+`).test(reference));
 }
 
 function isTargetTerminalGateReference(reference, repository) {
@@ -822,10 +832,10 @@ function documentationGit(root, args, encoding = "buffer") {
   });
 }
 
-function inventoryGit(args, encoding = "buffer") {
+function inventoryGit(repositoryRoot, args, encoding = "buffer") {
   const env = { ...process.env, ...DOCUMENTATION_GIT_ENV };
   for (const key of DOCUMENTATION_GIT_UNSET) delete env[key];
-  return execFileSync("/usr/bin/git", args, { encoding, env, stdio: ["ignore", "pipe", "pipe"] });
+  return execFileSync("/usr/bin/git", ["-C", repositoryRoot, ...args], { encoding, env, stdio: ["ignore", "pipe", "pipe"] });
 }
 
 function documentationTransportError(errors, message) {
