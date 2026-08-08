@@ -3,6 +3,7 @@ import { constants } from "node:fs";
 import { link, lstat, mkdir, open, rm, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { buildGenericMobileConsumerBundle } from "./build-generic-mobile-consumer-bundle.mjs";
 
 const producerRepository = "AquilaXk/easysubway";
 const producerSha = "604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3";
@@ -72,6 +73,17 @@ function validateBundle(bytes) {
   return bundle;
 }
 
+const positiveDecimal = (value) => typeof value === "string" && /^[1-9][0-9]*$/.test(value);
+const isoTimestamp = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) && Number.isFinite(Date.parse(value));
+
+export function validateGenericMobileConsumerBundleArtifactMetadata({ metadata, artifactId, artifactDigest, workflowRunId, repositoryId, headSha }) {
+  if (!metadata || typeof metadata !== "object" || Array.isArray(metadata) || !positiveDecimal(artifactId) || !/^[0-9a-f]{64}$/.test(artifactDigest) || !positiveDecimal(workflowRunId) || !positiveDecimal(repositoryId) || !/^[0-9a-f]{40}$/.test(headSha)) throw new Error("artifact metadata validation input is invalid");
+  const expectedArchiveUrl = `https://api.github.com/repos/${producerRepository}/actions/artifacts/${artifactId}/zip`;
+  const workflowRun = metadata.workflow_run;
+  if (String(metadata.id) !== artifactId || metadata.name !== artifactName || metadata.expired !== false || metadata.digest !== `sha256:${artifactDigest}` || metadata.archive_download_url !== expectedArchiveUrl || !workflowRun || typeof workflowRun !== "object" || Array.isArray(workflowRun) || String(workflowRun.id) !== workflowRunId || workflowRun.head_branch !== "main" || workflowRun.head_sha !== headSha || String(workflowRun.repository_id) !== repositoryId || String(workflowRun.head_repository_id) !== repositoryId) throw new Error("artifact metadata does not match the closed publication contract");
+  if (!isoTimestamp(metadata.created_at) || !isoTimestamp(metadata.expires_at) || Date.parse(metadata.expires_at) - Date.parse(metadata.created_at) !== 90 * 24 * 60 * 60 * 1000) throw new Error("artifact metadata retention is not exactly 90 days");
+}
+
 async function ensureOutputDirectory(root, output) {
   const expectedDirectory = path.join(root, outputDirectory);
   if (path.dirname(output) !== expectedDirectory || path.basename(output) !== receiptFileName) throw new Error("output must be confined to release-artifacts/mobile-contracts");
@@ -101,6 +113,8 @@ export async function writeGenericMobileConsumerBundleReceipt({ repositoryRoot, 
   const output = path.resolve(outputPath);
   if (path.basename(bundleTarget) !== bundleFileName) throw new Error("bundle filename does not match the closed contract");
   const bundleBytes = await readRegularFile(root, bundleTarget, "bundle");
+  const expectedBundleBytes = await buildGenericMobileConsumerBundle({ repositoryRoot: root, producerSha });
+  if (!bundleBytes.equals(expectedBundleBytes)) throw new Error("bundle bytes do not match the closed producer output");
   const bundle = validateBundle(bundleBytes);
   await ensureOutputDirectory(root, output);
   const receipt = {
@@ -126,6 +140,12 @@ export async function writeGenericMobileConsumerBundleReceipt({ repositoryRoot, 
 
 async function main() {
   const args = process.argv.slice(2);
+  if (args.length === 12 && args[0] === "--artifact-metadata" && args[2] === "--artifact-id" && args[4] === "--artifact-digest" && args[6] === "--workflow-run-id" && args[8] === "--repository-id" && args[10] === "--head-sha") {
+    const metadataPath = path.resolve(args[1]);
+    const metadataBytes = await readRegularFile(path.dirname(metadataPath), metadataPath, "artifact metadata");
+    validateGenericMobileConsumerBundleArtifactMetadata({ metadata: JSON.parse(metadataBytes), artifactId: args[3], artifactDigest: args[5], workflowRunId: args[7], repositoryId: args[9], headSha: args[11] });
+    return;
+  }
   if (args.length !== 4 || args[0] !== "--bundle" || args[2] !== "--output") throw new Error("usage: --bundle <generic-mobile-consumer-bundle-v1.json> --output <release-artifacts/mobile-contracts/generic-mobile-consumer-publication-receipt-v1.json>");
   await writeGenericMobileConsumerBundleReceipt({ repositoryRoot: process.cwd(), bundlePath: args[1], outputPath: args[3] });
 }

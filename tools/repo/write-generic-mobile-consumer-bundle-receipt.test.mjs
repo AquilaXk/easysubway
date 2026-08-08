@@ -5,7 +5,7 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
 import { buildGenericMobileConsumerBundle } from "./build-generic-mobile-consumer-bundle.mjs";
-import { writeGenericMobileConsumerBundleReceipt } from "./write-generic-mobile-consumer-bundle-receipt.mjs";
+import { validateGenericMobileConsumerBundleArtifactMetadata, writeGenericMobileConsumerBundleReceipt } from "./write-generic-mobile-consumer-bundle-receipt.mjs";
 
 const producerSha = "604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3";
 const sourceRoot = process.cwd();
@@ -124,6 +124,52 @@ test("receipt는 인증된 bundle의 닫힌 header, resource와 digest 변조를
   }
 });
 
+test("receipt는 semantic parse 전에 whitespace, numeric spelling, duplicate key raw drift를 거절한다", async (t) => {
+  const root = await fixtureRoot(t);
+  const bundlePath = await writeBundle(root);
+  const original = await readFile(bundlePath, "utf8");
+  const outputPath = path.join(root, "release-artifacts/mobile-contracts/generic-mobile-consumer-publication-receipt-v1.json");
+  const drifts = [
+    ["leading whitespace", ` ${original}`],
+    ["numeric 1.0", original.replace('"schemaVersion": 1', '"schemaVersion": 1.0')],
+    ["duplicate component", original.replace('"component": "mobile",', '"component": "mobile",\n  "component": "mobile",')],
+  ];
+  for (const [label, bytes] of drifts) {
+    const directory = path.join(root, "raw-drifts", label.replaceAll(" ", "-"));
+    const driftPath = path.join(directory, "generic-mobile-consumer-bundle-v1.json");
+    await mkdir(directory, { recursive: true });
+    await writeFile(driftPath, bytes, { flag: "wx" });
+    await assert.rejects(writeGenericMobileConsumerBundleReceipt({ repositoryRoot: root, bundlePath: driftPath, outputPath }), /bytes/i, label);
+    await assert.rejects(lstat(outputPath), { code: "ENOENT" }, label);
+  }
+});
+
+test("artifact metadata는 exact ID, digest, origin 및 90일 보존만 허용한다", () => {
+  const artifactId = "123";
+  const artifactDigest = "a".repeat(64);
+  const metadata = {
+    id: 123,
+    name: "easysubway-generic-mobile-consumer-bundle-1.0.0-604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3",
+    expired: false,
+    digest: `sha256:${artifactDigest}`,
+    archive_download_url: "https://api.github.com/repos/AquilaXk/easysubway/actions/artifacts/123/zip",
+    created_at: "2026-01-01T00:00:00Z",
+    expires_at: "2026-04-01T00:00:00Z",
+    workflow_run: { id: 456, repository_id: 789, head_repository_id: 789, head_branch: "main", head_sha: producerSha },
+  };
+  const input = { metadata, artifactId, artifactDigest, workflowRunId: "456", repositoryId: "789", headSha: producerSha };
+  assert.doesNotThrow(() => validateGenericMobileConsumerBundleArtifactMetadata(input));
+  for (const mutate of [
+    (value) => { delete value.metadata.digest; },
+    (value) => { value.metadata.expires_at = "2026-01-31T00:00:00Z"; },
+    (value) => { value.metadata.workflow_run.head_branch = "feature"; },
+  ]) {
+    const invalid = structuredClone(input);
+    mutate(invalid);
+    assert.throws(() => validateGenericMobileConsumerBundleArtifactMetadata(invalid), /metadata|retention/i);
+  }
+});
+
 test("receipt 부분쓰기 hook은 test 환경에서만 허용되고 임시 파일까지 정리한다", async (t) => {
   const root = await fixtureRoot(t);
   const bundlePath = await writeBundle(root);
@@ -154,7 +200,7 @@ test("publication workflow는 main에서만 닫힌 producer와 정확히 두 파
   const workflow = await readFile(".github/workflows/generic-mobile-consumer-bundle-publish.yml", "utf8");
   assert.match(workflow, /^on:\n  workflow_dispatch:\n$/m);
   assert.doesNotMatch(workflow, /\n  (push|pull_request|schedule):/);
-  assert.match(workflow, /permissions:\n  contents: read/);
+  assert.match(workflow, /permissions:\n  actions: read\n  contents: read/);
   assert.match(workflow, /GITHUB_REF}" != "refs\/heads\/main"[\s\S]*exit 1/);
   assert.match(workflow, /actions\/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd[\s\S]*persist-credentials: false/);
   assert.doesNotMatch(workflow, /ref: 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3/);
@@ -173,5 +219,12 @@ test("publication workflow는 main에서만 닫힌 producer와 정확히 두 파
   assert.match(workflow, /expected_artifact_url="https:\/\/github\.com\/AquilaXk\/easysubway\/actions\/runs\/\$\{GITHUB_RUN_ID\}\/artifacts\/\$\{artifact_id\}"/);
   assert.match(workflow, /artifact_url}" != "\$\{expected_artifact_url\}"/);
   assert.match(workflow, /workflow-path=\.github\/workflows\/generic-mobile-consumer-bundle-publish\.yml[\s\S]*workflow-run-id=.*workflow-head-sha=.*artifact-id=.*artifact-name=.*artifact-digest=.*artifact-url=.*retention-days=90/s);
+  assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}[\s\S]*gh api --method GET "repos\/\$\{GITHUB_REPOSITORY\}\/actions\/artifacts\/\$\{artifact_id\}" > "\$\{metadata\}"/);
+  assert.match(workflow, /--artifact-metadata "\$\{metadata\}" --artifact-id "\$\{artifact_id\}" --artifact-digest "\$\{artifact_digest\}" --workflow-run-id "\$\{GITHUB_RUN_ID\}" --repository-id "\$\{GITHUB_REPOSITORY_ID\}" --head-sha "\$\{GITHUB_SHA\}"/);
+  assert.match(workflow, /actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093[\s\S]*artifact-ids: \$\{\{ steps\.upload\.outputs\.artifact-id \}\}/);
+  assert.match(workflow, /rm -rf "\$\{download_directory\}"/);
+  assert.match(workflow, /mapfile -t entries[\s\S]*"\$\{#entries\[@\]\}" -ne 2[\s\S]*generic-mobile-consumer-bundle-v1\.json[\s\S]*generic-mobile-consumer-publication-receipt-v1\.json/s);
+  assert.equal((workflow.match(/cmp -- /g) ?? []).length, 3);
+  assert.ok(workflow.indexOf("Verify downloaded artifact bytes") < workflow.indexOf("Validate and log artifact locator"));
   assert.doesNotMatch(workflow, /continue-on-error|fallback|\|\|/i);
 });
