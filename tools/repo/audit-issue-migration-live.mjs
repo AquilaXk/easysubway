@@ -10,6 +10,8 @@ const HUB_REPOSITORY = "AquilaXk/easysubway";
 const HUB_ISSUE_URL_PATTERN = /^https:\/\/github\.com\/[^/]+\/[^/]+\/issues\/[1-9]\d*$/;
 const NOT_FOUND_PATTERN = /\(HTTP 404\)/;
 const MAX_GH_BUFFER_BYTES = 64 * 1024 * 1024;
+const GH_TIMEOUT_MS = 30_000;
+const GH_KILL_SIGNAL = "SIGTERM";
 const MAX_OPEN_ISSUES = 1000;
 const execFileAsync = promisify(execFile);
 
@@ -146,8 +148,13 @@ function numberCompare(left, right) {
   return left - right;
 }
 
-async function execGh(args) {
-  const { stdout } = await execFileAsync("gh", args, { encoding: "utf8", maxBuffer: MAX_GH_BUFFER_BYTES });
+export async function execGh(args, execute = execFileAsync) {
+  const { stdout } = await execute("gh", args, {
+    encoding: "utf8",
+    maxBuffer: MAX_GH_BUFFER_BYTES,
+    timeout: GH_TIMEOUT_MS,
+    killSignal: GH_KILL_SIGNAL,
+  });
   return stdout;
 }
 

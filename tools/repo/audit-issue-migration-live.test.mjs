@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 import {
   auditMigrationState,
   collectLiveState,
+  execGh,
   parseArguments,
   recordedLocations,
 } from "./audit-issue-migration-live.mjs";
@@ -37,6 +38,32 @@ function ghFailure(stderr) {
   error.stderr = stderr;
   return error;
 }
+
+test("gh 실행은 bounded timeout과 SIGTERM을 고정하고 실행 실패를 그대로 전파한다", async () => {
+  let invocation;
+  const execute = async (...args) => {
+    invocation = args;
+    return { stdout: "ok\n" };
+  };
+
+  assert.equal(await execGh(["version"], execute), "ok\n");
+  assert.deepEqual(invocation, [
+    "gh",
+    ["version"],
+    {
+      encoding: "utf8",
+      maxBuffer: 64 * 1024 * 1024,
+      timeout: 30_000,
+      killSignal: "SIGTERM",
+    },
+  ]);
+
+  const timeout = Object.assign(new Error("Command failed: gh version"), {
+    killed: true,
+    signal: "SIGTERM",
+  });
+  await assert.rejects(() => execGh(["version"], async () => { throw timeout; }), (error) => error === timeout);
+});
 
 function fakeGh({ openNumbers, redirectFor }) {
   const calls = [];
