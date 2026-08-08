@@ -153,8 +153,8 @@ export function collectContractErrors(
     if (workspace.referenceAuditScope == null || workspace.referenceAuditReportSchema == null) {
       errors.push("reference audit workspace entries는 함께 필요하다");
     } else {
-      validateJson(contract("documentation/reference-audit-scope.schema.json"), workspace.referenceAuditScope, errors);
-      if (existsSync(workspace.referenceAuditScope)) validateReferenceAuditScope(loadJson(workspace.referenceAuditScope), errors, workspace.referenceAuditScope);
+      const referenceAuditScopeValid = validateJson(contract("documentation/reference-audit-scope.schema.json"), workspace.referenceAuditScope, errors);
+      if (referenceAuditScopeValid) validateReferenceAuditScope(loadJson(workspace.referenceAuditScope), errors, workspace.referenceAuditScope);
       if (!existsSync(workspace.referenceAuditReportSchema)) errors.push(`${workspace.referenceAuditReportSchema} 누락`);
       else {
         try { validateReferenceAuditReportSchema(loadJson(workspace.referenceAuditReportSchema), errors, workspace.referenceAuditReportSchema); }
@@ -311,7 +311,7 @@ export function validateReferenceAuditScope(scope, errors = [], path = "referenc
   const repositories = scope?.repositories;
   const actual = Array.isArray(repositories) ? repositories.map((entry) => entry?.repository) : [];
   if (JSON.stringify(actual) !== JSON.stringify(expected)) errors.push(`${path}: repository inventory는 exact codepoint sorted 5개여야 한다`);
-  for (const entry of repositories ?? []) {
+  for (const entry of Array.isArray(repositories) ? repositories : []) {
     for (const root of entry?.trackedDiscoveryRoots ?? []) {
       if (typeof root !== "string" || root === "" || root.startsWith("/") || root.startsWith("./") || root.includes("\\") || root.split("/").includes("..")) {
         errors.push(`${path}: ${entry?.repository} discovery root는 안전한 repository-relative path여야 한다`);

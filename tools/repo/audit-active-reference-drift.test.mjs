@@ -232,6 +232,54 @@ test("artifact extraction emits only mutable current locator drift", () => {
   assert.equal(extractArtifactFindings("[REFERENCE_CLASS:PATH_HISTORICAL_OR_SUPERSEDED] https://github.com/AquilaXk/easysubway/blob/" + "c".repeat(40) + "/a", source).length, 0);
 });
 
+test("F9-F13 reference source preserves issue variant, boundaries, artifact owner, and class type", () => {
+  const source = { kind: "PR", repository: "AquilaXk/easysubway", number: 1, locator: "issue-body" };
+  assert.equal(extractReferences("https://github.com/AquilaXk/easysubway/issues/7.", source)[0].source.kind, "PR");
+  assert.equal(extractReferences("#123abc #123_ #123.", { kind: "PATH", repository: "AquilaXk/easysubway", path: "a", blobSha: "a".repeat(40) }).length, 1);
+  const artifact = extractArtifactFindings("[REFERENCE_CLASS:ARTIFACT_IMMUTABLE_REFERENCE] https://github.com/AquilaXk/easysubway-mobile/blob/main/x", { kind: "PATH", repository: "AquilaXk/easysubway", path: "a", blobSha: "a".repeat(40) })[0];
+  assert.equal(artifact.target.repository, "AquilaXk/easysubway-mobile");
+  const [reference] = extractReferences("https://github.com/AquilaXk/easysubway/pull/7 [REFERENCE_CLASS:ISSUE_CURRENT_OWNER]", { kind: "PATH", repository: "AquilaXk/easysubway", path: "a", blobSha: "a".repeat(40) });
+  assert.equal(classifyReference(reference, { ledger: { issues: [] }, amendments: { amendments: [] }, item: { repository: "AquilaXk/easysubway", number: 7, type: "PR", title: "x", state: "OPEN", stateReason: null, labels: [], priority: null, milestone: null, parentOwner: null } }).code, "ISSUE_PR_TYPE_CONFUSION");
+});
+
+test("F9 source variant is preserved in a schema-valid item-body finding", () => {
+  const source = { kind: "ISSUE", repository: "AquilaXk/easysubway", number: 11, locator: "issue-body" };
+  const [reference] = extractReferences("#7 [REFERENCE_CLASS:ISSUE_CURRENT_OWNER]", source);
+  const finding = classifyReference(reference, { ledger: { issues: [] }, amendments: { amendments: [] }, item: null });
+  assert.deepEqual(finding.source, { ...source, locator: "#7" });
+  const schema = JSON.parse(readFileSync(resolve(projectRoot(), "contracts/documentation/reference-audit-report.schema.json"), "utf8"));
+  const report = createReport({ observedAt: "2026-08-08T00:00:00.000Z", sourceSha: "a".repeat(40), scopeText: "scope", ledgerText: "ledger", amendmentsText: "amendments", findings: [finding] });
+  assert.equal(validateSchema(schema, report).ok, true);
+  const [pathReference] = extractReferences("#7", { repository: "AquilaXk/easysubway", path: "contracts/a", blobSha: "a".repeat(40) });
+  assert.deepEqual(pathReference.source, { kind: "PATH", repository: "AquilaXk/easysubway", path: "contracts/a", blobSha: "a".repeat(40), locator: "#7" });
+});
+
+test("F10-F13 exact reference boundary, artifact owner, blob null and bidirectional class mismatch", () => {
+  const pathSource = { kind: "PATH", repository: "AquilaXk/easysubway", path: "a", blobSha: "a".repeat(40) };
+  assert.equal(extractReferences("#123abc #123_ #123.", pathSource).length, 1);
+  assert.equal(extractArtifactFindings("[REFERENCE_CLASS:ARTIFACT_IMMUTABLE_REFERENCE] https://github.com/AquilaXk/easysubway-mobile/blob/main/a", pathSource)[0].target.repository, "AquilaXk/easysubway-mobile");
+  assert.equal(extractCanonicalPathFindings("[REFERENCE_CLASS:PATH_CANONICAL_CURRENT] https://github.com/AquilaXk/easysubway/blob/" + "b".repeat(40) + "/missing", pathSource, [{ repository: "AquilaXk/easysubway", gitSha: "b".repeat(40), selected: [] }])[0].target.blobSha, null);
+  for (const [url, referenceClass, type] of [["https://github.com/AquilaXk/easysubway/pull/7", "ISSUE_CURRENT_OWNER", "PR"], ["https://github.com/AquilaXk/easysubway/issues/7", "PR_IMPLEMENTATION", "ISSUE"]]) {
+    const [reference] = extractReferences(`${url} [REFERENCE_CLASS:${referenceClass}]`, pathSource);
+    assert.equal(classifyReference(reference, { ledger: { issues: [] }, amendments: { amendments: [] }, item: { repository: "AquilaXk/easysubway", number: 7, type, title: "x", state: "OPEN", stateReason: null, labels: [], priority: null, milestone: null, parentOwner: null } }).code, "ISSUE_PR_TYPE_CONFUSION");
+  }
+});
+
+test("F14 repeated missing and closed references share one direct lookup per target", async () => {
+  const blob = "b".repeat(40); const calls = new Map();
+  const runGh = async ([, endpoint]) => {
+    calls.set(endpoint, (calls.get(endpoint) ?? 0) + 1);
+    if (endpoint.endsWith("issues?state=open&per_page=100&page=1")) return JSON.stringify(endpoint.startsWith("repos/AquilaXk/easysubway/") ? [{ number: 1, title: "#7 #8", body: "#7 #8", state: "open", labels: [] }] : []);
+    if (endpoint.endsWith(`/git/blobs/${blob}`)) return JSON.stringify({ encoding: "base64", content: Buffer.from("#7 #8").toString("base64") });
+    if (endpoint.endsWith("/issues/7")) return JSON.stringify({ number: 7, title: "closed", state: "closed", labels: [] });
+    if (endpoint.endsWith("/issues/8")) { const error = new Error("missing"); error.status = 404; throw error; }
+    throw new Error(endpoint);
+  };
+  await auditReferences({ scope: {}, repositories: [{ repository: "AquilaXk/easysubway", selected: [{ path: "a", blobSha: blob }] }], ledger: { issues: [] }, amendments: { amendments: [] }, execGh: runGh });
+  assert.equal(calls.get("repos/AquilaXk/easysubway/issues/7"), 1);
+  assert.equal(calls.get("repos/AquilaXk/easysubway/issues/8"), 1);
+});
+
 test("CLI는 fake gh 입력에서 complete/finding/incomplete와 write-once 출력을 구분한다", () => {
   const fixture = createCliFixture();
   try {

@@ -155,17 +155,20 @@ export async function collectCurrentInputs({ scope, execGh: runGh }) {
   return { repositories, incomplete };
 }
 
-export function extractReferences(text, { repository, path, blobSha }) {
+export function extractReferences(text, source) {
+  const normalizedSource = source?.kind == null && typeof source?.path === "string" && typeof source?.blobSha === "string"
+    ? { kind: "PATH", ...source } : source;
+  const { repository } = normalizedSource;
   const references = [];
   for (const line of String(text).split(/\r?\n/)) {
     const markers = parseMarkers(line);
-    const matcher = /https:\/\/github\.com\/([^/]+\/[^/]+)\/(issues|pull)\/([1-9]\d*)|(?<![A-Za-z0-9_/])#([1-9]\d*)/g;
+    const matcher = /https:\/\/github\.com\/([^/]+\/[^/]+)\/(issues|pull)\/([1-9]\d*)(?![A-Za-z0-9_])|(?<![A-Za-z0-9_/])#([1-9]\d*)(?![A-Za-z0-9_])/g;
     for (const match of line.matchAll(matcher)) {
     const target = match[4] == null
       ? { repository: match[1], type: match[2] === "pull" ? "PR" : "ISSUE", number: Number(match[3]) }
       : { repository, type: "ISSUE", number: Number(match[4]) };
     const displayedTitle = displayedTitleFor(line, match[0], target);
-    references.push({ source: { kind: "PATH", repository, path, blobSha, locator: match[0] }, target, markers, displayedTitle });
+    references.push({ source: { ...normalizedSource, locator: match[0] }, target, markers, displayedTitle });
     }
   }
   return references;
@@ -202,7 +205,7 @@ export function extractArtifactFindings(text, source) {
     if (ownerInvalid) findings.push({ code: "PLAN_OWNER_OVERLAP", referenceClass, source: { ...source, locator }, target: { repository: source.repository, type: "ARTIFACT", locator }, referenced: null, latestEffective: null, directOwner: null, consumerRoute: null, reason: "PLAN_OWNER must be an exact known plan route" });
     else if (!valid) {
       const result = classifyImmutableLocator(locator, referenceClass);
-      findings.push({ ...(result ?? { code: "CANONICAL_PATH_OR_ARTIFACT_DRIFT", referenceClass, reason: "path marker requires an exact immutable GitHub blob locator" }), source: { ...source, locator }, target: { repository: source.repository, type: "ARTIFACT", locator }, referenced: null, latestEffective: null, directOwner: null, consumerRoute: consumerRouteFor(markers.PLAN_OWNER) });
+      findings.push({ ...(result ?? { code: "CANONICAL_PATH_OR_ARTIFACT_DRIFT", referenceClass, reason: "path marker requires an exact immutable GitHub blob locator" }), source: { ...source, locator }, target: { repository: parseArtifactRepository(locator) ?? source.repository, type: "ARTIFACT", locator }, referenced: null, latestEffective: null, directOwner: null, consumerRoute: consumerRouteFor(markers.PLAN_OWNER) });
     }
   }
   return findings;
@@ -219,7 +222,7 @@ export function extractCanonicalPathFindings(text, source, repositories) {
     const { repository, sha, path } = match;
     const input = repositories.find((candidate) => candidate.repository === repository);
     const selected = input?.selected.find((candidate) => candidate.path === path);
-    if (input == null || sha !== input.gitSha || selected == null) findings.push({ code: "CANONICAL_PATH_OR_ARTIFACT_DRIFT", referenceClass: "PATH_CANONICAL_CURRENT", source: { ...source, locator }, target: { repository, type: "ARTIFACT", locator, path, blobSha: selected?.blobSha ?? sha }, referenced: null, latestEffective: null, directOwner: null, consumerRoute: consumerRouteFor(markers.PLAN_OWNER), reason: "canonical path must identify a collected current head, selected path, and tree blob" });
+    if (input == null || sha !== input.gitSha || selected == null) findings.push({ code: "CANONICAL_PATH_OR_ARTIFACT_DRIFT", referenceClass: "PATH_CANONICAL_CURRENT", source: { ...source, locator }, target: { repository, type: "ARTIFACT", locator, path, blobSha: selected?.blobSha ?? null }, referenced: null, latestEffective: null, directOwner: null, consumerRoute: consumerRouteFor(markers.PLAN_OWNER), reason: "canonical path must identify a collected current head, selected path, and tree blob" });
   }
   return findings;
 }
@@ -244,7 +247,7 @@ export function classifyReference(reference, { ledger, amendments, openHubIssues
     const expected = reference.markers?.[marker];
     if (expected !== undefined && expected !== "__OVERLAP__" && String(item[field] ?? "null") !== expected) return makeFinding(code, referenceClass, reference, item, null, `${marker} differs`);
   }
-  if (explicitClass && referenceClass === "PR_EVIDENCE_ONLY" && target.type !== "PR") return makeFinding("ISSUE_PR_TYPE_CONFUSION", referenceClass, reference, item, null, "PR evidence must target a pull request");
+  if (explicitClass && ((referenceClass.startsWith("PR_") && (target.type !== "PR" || item.type !== "PR")) || (referenceClass.startsWith("ISSUE_") && (target.type !== "ISSUE" || item.type !== "ISSUE")))) return makeFinding("ISSUE_PR_TYPE_CONFUSION", referenceClass, reference, item, null, "reference class and target type differ");
   if (["PR_EVIDENCE_ONLY", "PATH_HISTORICAL_OR_SUPERSEDED"].includes(referenceClass)) return null;
   if (explicitClass && item.state !== "OPEN" && reference.markers?.STATE !== "CLOSED") return makeFinding("CLOSED_NOT_PLANNED_USED_AS_ACTIVE", referenceClass, reference, item, null, "closed item is used as active reference");
   if (reference.markers?.PARENT_STATE !== undefined && reference.markers.PARENT_STATE !== "__OVERLAP__" && item.state !== reference.markers.PARENT_STATE) return makeFinding("PARENT_CHILD_STATE_DRIFT", referenceClass, reference, item, null, "PARENT_STATE differs");
@@ -296,6 +299,7 @@ function parseGitBlobLocator(value) {
   return { repository: match[1], sha: match[2], path: match[3] };
 }
 function isOciDigest(value) { return /^[a-z0-9][a-z0-9._/-]*@sha256:[0-9a-f]{64}$/.test(String(value)); }
+function parseArtifactRepository(value) { return /^https:\/\/github\.com\/([^/]+\/[^/]+)\//.exec(String(value))?.[1] ?? null; }
 
 export function normalizeItem(repository, item) {
   if (!Number.isInteger(item?.number) || typeof item?.title !== "string" || !["open", "closed"].includes(item?.state)) throw new Error("invalid item metadata");
@@ -333,6 +337,12 @@ export async function auditReferences({ scope, ledger, amendments, repositories,
   const findings = [];
   const incomplete = [];
   const metadata = new Map();
+  const lookup = new Map();
+  const readCachedItem = async (repository, number) => {
+    const key = `${repository}#${number}`;
+    if (!lookup.has(key)) lookup.set(key, readItem(repository, number, runGh));
+    return lookup.get(key);
+  };
   const hubOpenIssues = new Set();
   try {
     for (const repository of REPOSITORIES) {
@@ -376,7 +386,7 @@ export async function auditReferences({ scope, ledger, amendments, repositories,
           discovered += 1;
           const key = `${reference.target.repository}#${reference.target.number}`;
           let item = metadata.get(key);
-          if (item == null) item = await readItem(reference.target.repository, reference.target.number, runGh);
+          if (item == null) item = await readCachedItem(reference.target.repository, reference.target.number);
           const finding = classifyReference(reference, { ledger, amendments, openHubIssues: hubOpenIssues, item });
           if (finding != null) findings.push(finding);
           else validated += 1;
@@ -389,7 +399,7 @@ export async function auditReferences({ scope, ledger, amendments, repositories,
     for (const [kind, text] of [["title", item.title], ["body", item.body]]) {
       for (const reference of extractReferences(text, itemSource(item, kind))) {
         discovered += 1;
-        const target = metadata.get(`${reference.target.repository}#${reference.target.number}`) ?? await readItem(reference.target.repository, reference.target.number, runGh);
+        const target = metadata.get(`${reference.target.repository}#${reference.target.number}`) ?? await readCachedItem(reference.target.repository, reference.target.number);
         const finding = classifyReference(reference, { ledger, amendments, openHubIssues: hubOpenIssues, item: target });
         if (finding != null) findings.push(finding); else validated += 1;
         collectPlanOwner(reference);

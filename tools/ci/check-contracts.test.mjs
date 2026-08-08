@@ -44,6 +44,26 @@ test("reference audit report schema requires source identity and strict findings
   assert.equal(errors.length, 10);
 });
 
+test("F15 reference audit scope validation is total and skips semantics after schema failure", () => {
+  const directErrors = [];
+  assert.doesNotThrow(() => validateReferenceAuditScope({ repositories: null }, directErrors));
+  assert.ok(directErrors.length > 0);
+  const fixture = createExternalWorkspace();
+  try {
+    const workspace = loadJson(fixture.workspacePath);
+    workspace.referenceAuditScope = "inputs/reference-audit-scope.json";
+    workspace.referenceAuditReportSchema = "inputs/reference-audit-report.schema.json";
+    cpSync("contracts/documentation/reference-audit-report.schema.json", join(fixture.directory, "inputs/reference-audit-report.schema.json"));
+    writeFileSync(fixture.workspacePath, JSON.stringify(workspace));
+    writeFileSync(join(fixture.directory, "inputs/reference-audit-scope.json"), "{");
+    assert.doesNotThrow(() => collectContractErrors(fixture.workspacePath));
+    assert.ok(collectContractErrors(fixture.workspacePath).some((error) => error.includes("유효한 JSON")));
+    writeFileSync(join(fixture.directory, "inputs/reference-audit-scope.json"), JSON.stringify({ repositories: {} }));
+    assert.doesNotThrow(() => collectContractErrors(fixture.workspacePath));
+    assert.ok(collectContractErrors(fixture.workspacePath).some((error) => error.includes("reference-audit-scope")));
+  } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
+});
+
 test("reference audit report schema fixes referenceClass to the exact inventory", () => {
   const schema = loadJson("contracts/documentation/reference-audit-report.schema.json");
   assert.deepEqual(validateReferenceAuditReportSchema(schema), []);
