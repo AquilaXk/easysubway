@@ -226,7 +226,7 @@ test("publication workflow는 main에서만 닫힌 producer와 정확히 두 파
   assert.match(workflow, /workflow-path=\.github\/workflows\/generic-mobile-consumer-bundle-publish\.yml[\s\S]*workflow-run-id=.*workflow-head-sha=.*artifact-id=.*artifact-name=.*artifact-digest=.*artifact-url=.*retention-days=90/s);
   assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}[\s\S]*gh api --method GET "repos\/\$\{GITHUB_REPOSITORY\}\/actions\/artifacts\/\$\{artifact_id\}" > "\$\{metadata\}"/);
   assert.match(workflow, /--artifact-metadata "\$\{metadata\}" --artifact-id "\$\{artifact_id\}" --artifact-digest "\$\{artifact_digest\}" --workflow-run-id "\$\{GITHUB_RUN_ID\}" --repository-id "\$\{GITHUB_REPOSITORY_ID\}" --head-sha "\$\{GITHUB_SHA\}"/);
-  assert.match(workflow, /actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093[\s\S]*artifact-ids: \$\{\{ steps\.upload\.outputs\.artifact-id \}\}/);
+  assert.match(workflow, /actions\/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093[\s\S]*artifact-ids: \$\{\{ steps\.upload\.outputs\.artifact-id \}\}\n          merge-multiple: true/);
   assert.match(workflow, /\[\[ -e "\$\{download_directory\}" \|\| -L "\$\{download_directory\}" \]\][\s\S]*artifact download path already exists[\s\S]*exit 1/);
   assert.doesNotMatch(workflow, /rm -rf/);
   assert.match(workflow, /mapfile -t entries[\s\S]*"\$\{#entries\[@\]\}" -ne 2[\s\S]*generic-mobile-consumer-bundle-v1\.json[\s\S]*generic-mobile-consumer-publication-receipt-v1\.json/s);
