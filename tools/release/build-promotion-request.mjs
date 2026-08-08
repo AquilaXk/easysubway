@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-import { link, lstat, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { link, lstat, mkdtemp, readdir, rm, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { isDeepStrictEqual } from "node:util";
+import { selectEffectiveDataPack, stagedPackPath, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 
 import {
   hash,
@@ -11,22 +13,38 @@ import {
   regularJson,
   reviewerFromApproval,
   validateCompatibilityEvidence,
-  validateComponent,
+  validatePromotionCandidate,
   validateInventory,
 } from "./validate-promotion-request.mjs";
 
 async function main() {
   const args = parseArgs(process.argv.slice(2), [
-    "component", "inventory", "compatibility-evidence", "requested-by", "approval-evidence",
-    "workflow-run-id", "issue-ref", "output",
+    "candidate-root-1", "candidate-root-2", "candidate-root-3", "selected-candidate-workflow-run-id",
+    "candidate-workflow-run-id-1", "candidate-workflow-run-id-2", "candidate-workflow-run-id-3",
+    "candidate-head-sha-1", "candidate-head-sha-2", "candidate-head-sha-3",
+    "compatibility-evidence", "requested-by", "approval-evidence", "workflow-run-id", "issue-ref",
+    "rebuild-parity-evidence-output", "output",
   ]);
-  const [component] = await regularJson(args.get("component"), "--component");
-  validateComponent(component);
-  const [inventory, inventoryBytes] = await regularJson(args.get("inventory"), "--inventory");
-  validateInventory(inventory);
-  if (component.artifactInventorySha256 !== hash(inventoryBytes)) {
-    throw new Error("inventory hash mismatch");
+  const candidates = await Promise.all(["candidate-root-1", "candidate-root-2", "candidate-root-3"]
+    .map((name, index) => verifyPromotionCandidateRoot(
+      args.get(name), `--${name}`,
+      args.get(`candidate-workflow-run-id-${index + 1}`),
+      args.get(`candidate-head-sha-${index + 1}`),
+    )));
+  const inventoryBytes = candidates[0].inventoryBytes;
+  if (!candidates.every((candidate) => Buffer.compare(candidate.inventoryBytes, inventoryBytes) === 0)) {
+    throw new Error("candidate inventories differ");
   }
+  const components = candidates.map((candidate) => candidate.component)
+    .sort((left, right) => BigInt(left.workflowRunId) < BigInt(right.workflowRunId) ? -1 : 1);
+  const selectedCandidateWorkflowRunId = args.get("selected-candidate-workflow-run-id");
+  if (!positiveDecimal(selectedCandidateWorkflowRunId)
+    || new Set(components.map((component) => component.workflowRunId)).size !== 3
+    || !components.some((component) => component.workflowRunId === selectedCandidateWorkflowRunId)
+    || !sameIdentityExceptRun(components)) {
+    throw new Error("candidate parity is invalid");
+  }
+  const component = components.find((candidate) => candidate.workflowRunId === selectedCandidateWorkflowRunId);
 
   const [compatibility, compatibilityBytes] = await regularJson(
     args.get("compatibility-evidence"),
@@ -38,15 +56,26 @@ async function main() {
   const workflowRunId = args.get("workflow-run-id");
   const requestedBy = args.get("requested-by");
   if (!positiveDecimal(workflowRunId) || requestedBy.trim() === ""
-    || args.get("issue-ref") !== "AquilaXk/easysubway#2699") {
+    || args.get("issue-ref") !== "AquilaXk/easysubway#2705") {
     throw new Error("request arguments are invalid");
   }
 
+  const rebuildParityEvidence = {
+    schemaVersion: 1,
+    artifactKind: "datapack-rebuild-parity-evidence",
+    selectedCandidateWorkflowRunId,
+    candidates: components,
+    artifactInventorySha256: hash(inventoryBytes),
+    contractVersion: "datapack-rebuild-parity-v1",
+    issueRef: args.get("issue-ref"),
+  };
+  const rebuildParityEvidenceBytes = jsonBytes(rebuildParityEvidence);
   const request = {
     schemaVersion: 1,
     artifactKind: "datapack-promotion-request",
     candidate: component,
     compatibilityEvidenceSha256: hash(compatibilityBytes),
+    rebuildParityEvidenceSha256: hash(rebuildParityEvidenceBytes),
     requestedBy,
     approval: {
       workflowRunId,
@@ -57,25 +86,121 @@ async function main() {
     contractVersion: "datapack-promotion-v1",
     issueRef: args.get("issue-ref"),
   };
-  await writeExclusiveJson(args.get("output"), request);
+  const requestBytes = jsonBytes(request);
+  await writeExclusiveJsonPair(
+    args.get("rebuild-parity-evidence-output"), rebuildParityEvidenceBytes,
+    args.get("output"), requestBytes,
+  );
 }
 
-async function writeExclusiveJson(file, value) {
-  const output = path.resolve(file);
-  try {
-    await lstat(output);
-    throw new Error("--output must not exist");
-  } catch (error) {
-    if (error.code !== "ENOENT") throw error;
+export async function verifyPromotionCandidateRoot(root, label, expectedWorkflowRunId, expectedGitSha) {
+  if (!process.env.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM?.trim()
+    || !process.env.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID?.trim()) {
+    throw new Error("candidate signature validation key is required");
   }
+  const stats = await lstat(root);
+  if (!stats.isDirectory() || stats.isSymbolicLink()) {
+    throw new Error(`${label} must be a regular non-symlink directory`);
+  }
+  const componentPath = path.join(root, "data-component-manifest.json");
+  const inventoryPath = path.join(root, "data-artifact-inventory.json");
+  const manifestPath = path.join(root, "catalog", "current.json");
+  const provenancePath = path.join(root, "current.provenance.json");
+  const [component] = await regularJson(componentPath, `${label}/data-component-manifest.json`);
+  const [inventory, inventoryBytes] = await regularJson(inventoryPath, `${label}/data-artifact-inventory.json`);
+  const [manifest, manifestBytes] = await regularJson(manifestPath, `${label}/catalog/current.json`);
+  const [provenance] = await regularJson(provenancePath, `${label}/current.provenance.json`);
+  validateManifest(manifest, { requireProduction: true });
+  const activePack = selectEffectiveDataPack(manifest);
+  const actualEntries = await actualInventory(root);
+  const declaredPackPaths = new Set(manifest.packs.map(stagedPackPath));
+  const actualPackPaths = new Set(actualEntries.filter((entry) => entry.path.endsWith(".sqlite.gz")).map((entry) => entry.path));
+  const actualEntriesByPath = new Map(actualEntries.map((entry) => [entry.path, entry]));
+  validatePromotionCandidate(component);
+  validateInventory(inventory);
+  if (!positiveDecimal(expectedWorkflowRunId) || !/^[a-f0-9]{40}$/.test(expectedGitSha)
+    || component.workflowRunId !== expectedWorkflowRunId || component.gitSha !== expectedGitSha
+    || component.artifactInventorySha256 !== hash(inventoryBytes)
+    || manifest.manifestVersion !== 2 || !activePack
+    || component.manifestSha256 !== hash(manifestBytes)
+    || component.dataVersion !== activePack.version || component.releaseSequence !== manifest.releaseSequence
+    || component.provenance.sourceSnapshotSetHash !== provenance?.candidateBuild?.sourceSnapshotSetHash
+    || !/^[a-f0-9]{64}$/.test(provenance?.candidateBuild?.sourceSnapshotSetHash ?? "")
+    || declaredPackPaths.size !== actualPackPaths.size
+    || ![...declaredPackPaths].every((packPath) => actualPackPaths.has(packPath))
+    || !manifest.packs.every((pack) => {
+      const entry = actualEntriesByPath.get(stagedPackPath(pack));
+      return entry?.sizeBytes === pack.sizeBytes && entry.sha256 === pack.sha256;
+    })
+    || !isSameInventory(inventory.entries, actualEntries)) {
+    throw new Error("candidate inventory is invalid");
+  }
+  return { component, inventoryBytes };
+}
 
-  const temporaryDirectory = await mkdtemp(path.join(path.dirname(output), ".promotion-request-"));
+async function actualInventory(root, relative = "") {
+  const entries = [];
+  for (const entry of await readdir(path.join(root, relative), { withFileTypes: true })) {
+    const child = relative ? `${relative}/${entry.name}` : entry.name;
+    const diskPath = path.join(root, child);
+    const stats = await lstat(diskPath);
+    if (stats.isSymbolicLink()) throw new Error("candidate inventory contains symlink");
+    if (stats.isDirectory()) entries.push(...await actualInventory(root, child));
+    else if (stats.isFile()) {
+      if (relative === "" && (entry.name === "data-component-manifest.json" || entry.name === "data-artifact-inventory.json")) continue;
+      const bytes = await regularBytes(diskPath, "candidate inventory entry");
+      entries.push({ path: child, sizeBytes: bytes.length, sha256: hash(bytes) });
+    } else throw new Error("candidate inventory contains non-file");
+  }
+  return entries.sort((left, right) => Buffer.compare(Buffer.from(left.path), Buffer.from(right.path)));
+}
+
+function isSameInventory(left, right) {
+  return isDeepStrictEqual(left, right);
+}
+
+function sameIdentityExceptRun(components) {
+  const baseline = { ...components[0] };
+  delete baseline.workflowRunId;
+  return components.every((component) => {
+    const identity = { ...component };
+    delete identity.workflowRunId;
+    return isDeepStrictEqual(identity, baseline);
+  });
+}
+
+const jsonBytes = (value) => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
+
+async function writeExclusiveJsonPair(evidenceFile, evidenceBytes, requestFile, requestBytes) {
+  const evidenceOutput = path.resolve(evidenceFile);
+  const requestOutput = path.resolve(requestFile);
+  await Promise.all([evidenceOutput, requestOutput].map(assertMissing));
+  const temporaryDirectory = await mkdtemp(path.join(path.dirname(requestOutput), ".promotion-request-"));
+  let evidencePublished = false;
   try {
-    const temporaryOutput = path.join(temporaryDirectory, "request.json");
-    await writeFile(temporaryOutput, `${JSON.stringify(value, null, 2)}\n`, { flag: "wx" });
-    await link(temporaryOutput, output);
+    const temporaryEvidence = path.join(temporaryDirectory, "evidence.json");
+    const temporaryRequest = path.join(temporaryDirectory, "request.json");
+    await writeFile(temporaryEvidence, evidenceBytes, { flag: "wx" });
+    await writeFile(temporaryRequest, requestBytes, { flag: "wx" });
+    try {
+      await link(temporaryEvidence, evidenceOutput);
+      evidencePublished = true;
+      await link(temporaryRequest, requestOutput);
+    } catch (error) {
+      if (evidencePublished) await unlink(evidenceOutput).catch(() => {});
+      throw error;
+    }
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
+  }
+}
+
+async function assertMissing(file) {
+  try {
+    await lstat(file);
+    throw new Error("output must not exist");
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
   }
 }
 
