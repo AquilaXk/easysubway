@@ -1464,6 +1464,69 @@ test("automerge 큐는 frozen discovery 리뷰와 current-head delivery gate를 
   assert.doesNotMatch(coordinator, /review_count/);
 });
 
+test("automerge 큐 review reducer는 후속 빈 COMMENTED가 discovery 또는 reviewer 의견을 지우지 않는다", () => {
+  const coordinator = read(".github/workflows/automerge-queue.yml");
+  const expression = coordinator.match(/review_gate=\$\(jq -r '([\s\S]*?)' <<<"\$\{reviews\}"\)/)?.[1];
+  assert.ok(expression, "workflow must keep an inline review_gate jq expression");
+
+  const codexFallback = (id, state, body = "") => ({
+    id,
+    state,
+    submitted_at: `2026-08-08T00:00:0${id}Z`,
+    author_association: "OWNER",
+    user: { id: 1, login: "aquila", type: "User" },
+    body,
+  });
+  const trustedReviewer = (id, state) => ({
+    id,
+    state,
+    submitted_at: `2026-08-08T00:00:0${id}Z`,
+    author_association: "MEMBER",
+    user: { id: 2, login: "reviewer", type: "User" },
+    body: "",
+  });
+  const coderabbit = (id, user = { id: 136622811, login: "coderabbitai[bot]", type: "Bot" }) => ({
+    id,
+    state: "COMMENTED",
+    submitted_at: `2026-08-08T00:00:0${id}Z`,
+    author_association: "NONE",
+    user,
+    body: "",
+  });
+  const canonicalBody = "**Actionable comments posted: 1**\n<!-- Review source: Codex CLI fallback; canonical visible structure:";
+  const reviewGate = (pages) => execFileSync("jq", ["-r", expression], {
+    input: JSON.stringify(pages),
+    encoding: "utf8",
+  }).trim();
+
+  assert.equal(reviewGate([[
+    codexFallback(1, "COMMENTED", canonicalBody),
+    codexFallback(2, "COMMENTED"),
+  ]]), "true", "canonical fallback followed by an empty COMMENTED must pass");
+  assert.equal(reviewGate([[
+    codexFallback(1, "COMMENTED", canonicalBody),
+    codexFallback(2, "CHANGES_REQUESTED"),
+    codexFallback(3, "COMMENTED"),
+  ]]), "false", "empty COMMENTED must not clear an active change request");
+  assert.equal(reviewGate([[
+    codexFallback(1, "COMMENTED", canonicalBody),
+    codexFallback(2, "CHANGES_REQUESTED"),
+    codexFallback(3, "APPROVED"),
+  ]]), "true", "a later APPROVED by the same reviewer must clear their change request");
+  assert.equal(reviewGate([[
+    codexFallback(1, "COMMENTED", canonicalBody),
+    trustedReviewer(2, "CHANGES_REQUESTED"),
+  ]]), "false", "another reviewer's active change request must block");
+  assert.equal(reviewGate([[trustedReviewer(1, "APPROVED")]]), "true", "trusted human approval alone is discovery evidence");
+  assert.equal(reviewGate([[coderabbit(1)]]), "true", "the exact CodeRabbit identity is discovery evidence");
+  assert.equal(reviewGate([[coderabbit(1, { id: 999, login: "coderabbitai[bot]", type: "Bot" })]]), "false", "spoofed CodeRabbit identity is not discovery evidence");
+  assert.equal(reviewGate([]), "false", "empty slurped pages have no discovery evidence");
+  assert.equal(reviewGate([
+    [codexFallback(1, "COMMENTED", canonicalBody)],
+    [codexFallback(2, "COMMENTED")],
+  ]), "true", "later-page empty COMMENTED must not erase earlier discovery evidence");
+});
+
 test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const androidJob = jobBlock(workflow, "android", "notify-slack-ci-failure");
