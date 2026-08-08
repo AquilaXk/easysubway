@@ -2,7 +2,7 @@
   "$schema": "../../contracts/repository-contraction-inventory.schema.json",
   "schemaVersion": 1,
   "sourceRepository": "AquilaXk/easysubway",
-  "inventoryBaseHead": "645e218ea84b051e1482b65efd4a45869628a099",
+  "inventoryBaseHead": "4ccf78d8e9914575c67e2c3fd3398a2ac0d57f3b",
   "entries": [
     {
       "resourceId": "hub-automerge-queue",
