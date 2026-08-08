@@ -1434,6 +1434,27 @@ test("main ruleset 필수 체크는 ci.yml 잡 이름·automerge 코디네이터
   assert.deepEqual(JSON.parse(fallbackMatch[1]), REQUIRED_STATUS_CHECK_CONTEXTS);
 });
 
+test("automerge 큐는 current head의 신뢰 가능한 최신 리뷰 상태만 허용한다", () => {
+  const coordinator = read(".github/workflows/automerge-queue.yml");
+
+  assert.match(coordinator, /--json mergeStateStatus,headRefOid,statusCheckRollup/);
+  assert.match(coordinator, /gh api --paginate --slurp "repos\/\$\{REPO\}\/pulls\/\$\{pr_number\}\/reviews"/);
+  assert.match(coordinator, /\.commit_id == \$head/);
+  assert.match(coordinator, /\["OWNER", "MEMBER", "COLLABORATOR"\]/);
+  assert.match(coordinator, /\*\*Actionable comments posted: /);
+  assert.match(coordinator, /<!-- Review source: Codex CLI fallback; canonical visible structure:/);
+  assert.match(coordinator, /\.author_association == "NONE"/);
+  assert.match(coordinator, /\.user\.login == "coderabbitai\[bot\]"/);
+  assert.match(coordinator, /\.user\.id == 136622811/);
+  assert.match(coordinator, /\.user\.type == "Bot"/);
+  assert.match(coordinator, /group_by\(\.user\.id\)/);
+  assert.match(coordinator, /\.state != "CHANGES_REQUESTED"/);
+  assert.match(coordinator, /\.state == "APPROVED"/);
+  assert.match(coordinator, /\.state == "COMMENTED"/);
+  assert.doesNotMatch(coordinator, /reviews\.length/);
+  assert.doesNotMatch(coordinator, /review_count/);
+});
+
 test("필수 지속적 통합 작업은 변경 없는 영역도 성공 상태로 종료한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const androidJob = jobBlock(workflow, "android", "notify-slack-ci-failure");

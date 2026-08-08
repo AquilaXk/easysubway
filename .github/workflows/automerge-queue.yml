@@ -107,19 +107,44 @@ jobs:
 
           for pr_number in ${queue}; do
             state=$(gh pr view "${pr_number}" --repo "${REPO}" \
-              --json mergeStateStatus,reviews,statusCheckRollup)
+              --json mergeStateStatus,headRefOid,statusCheckRollup)
             merge_state=$(jq -r '.mergeStateStatus' <<<"${state}")
-            review_count=$(jq -r '.reviews | length' <<<"${state}")
+            head=$(jq -r '.headRefOid' <<<"${state}")
+            reviews=$(gh api --paginate --slurp "repos/${REPO}/pulls/${pr_number}/reviews")
+            review_gate=$(jq -r --arg head "${head}" '
+              def is_coderabbit:
+                .author_association == "NONE" and
+                .user.login == "coderabbitai[bot]" and
+                .user.id == 136622811 and
+                .user.type == "Bot";
+              def is_trusted_human:
+                . as $review |
+                (["OWNER", "MEMBER", "COLLABORATOR"] | index($review.author_association)) != null;
+              [flatten[]
+                | select(.user != null)
+                | select(is_trusted_human or is_coderabbit)]
+              | group_by(.user.id)
+              | map(sort_by(.submitted_at, .id) | last) as $latest
+              | ($latest | length > 0) and
+                all($latest[]; .state != "CHANGES_REQUESTED") and
+                any($latest[];
+                  .commit_id == $head and
+                  ((.state == "APPROVED" and is_trusted_human) or
+                    (.state == "COMMENTED" and
+                      (is_coderabbit or
+                        ((.body // "" | startswith("**Actionable comments posted: ")) and
+                          (.body // "" | contains("<!-- Review source: Codex CLI fallback; canonical visible structure:")))))))
+            ' <<<"${reviews}")
             failed_required=$(jq -r --argjson required "${required_checks}" \
               '[.statusCheckRollup[]?
                 | select(($required | index(.name? // .context?)) != null)
                 | select(((.conclusion? // .state?) // "") as $c
                   | $c == "FAILURE" or $c == "ERROR")] | length' <<<"${state}")
 
-            echo "PR #${pr_number}: mergeStateStatus=${merge_state}, reviews=${review_count}, failedRequiredChecks=${failed_required}"
+            echo "PR #${pr_number}: mergeStateStatus=${merge_state}, reviewGate=${review_gate}, failedRequiredChecks=${failed_required}"
 
-            if [ "${review_count}" -eq 0 ]; then
-              derail "${pr_number}" "GitHub PR Review 객체가 없습니다 (merge-workflow 규약 4단계 코드리뷰 게이트 미충족)."
+            if [ "${review_gate}" != "true" ]; then
+              derail "${pr_number}" "현재 head의 신뢰 가능한 GitHub PR Review가 없거나 active change request가 있습니다."
               continue
             fi
 
