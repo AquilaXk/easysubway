@@ -20977,3 +20977,50 @@ test("#2609 accessibility release canonical pins는 tracked source와 exact-matc
     "seoul-metro-accessibility-20260728",
   ]);
 });
+
+test("documentation reference audit evidence workflow는 current main의 sanitized report만 보존한다", () => {
+  const workflow = read(".github/workflows/documentation-reference-audit.yml");
+
+  assert.match(workflow, /^on:\n  workflow_dispatch:\s*$/m);
+  assert.doesNotMatch(workflow, /^\s{2}(push|pull_request|schedule):/m);
+  assert.doesNotMatch(workflow, /^\s{4}inputs:/m);
+  assert.match(workflow, /timeout-minutes: 15/);
+  assert.match(workflow, /DEFAULT_BRANCH: \$\{\{ github\.event\.repository\.default_branch \}\}/);
+  assert.match(workflow, /if \[\[ "\$\{GITHUB_REF\}" != "refs\/heads\/\$\{DEFAULT_BRANCH\}" \]\]; then[\s\S]*?exit 1/);
+  assert.match(workflow, /permissions:\n      contents: read\n      issues: read\n      pull-requests: read/);
+  assert.match(workflow, /actions\/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd/);
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
+  assert.match(workflow, /node-version: "24"/);
+  assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}/);
+  assert.match(workflow, /EVIDENCE_DIR="audit-evidence"/);
+  assert.match(workflow, /REPORT_PATH="\$\{EVIDENCE_DIR\}\/reference-audit-report\.json"/);
+  assert.doesNotMatch(workflow, /REPORT_PATH="\$\{RUNNER_TEMP\}/);
+  assert.match(
+    workflow,
+    /rm --recursive --force -- "\$\{EVIDENCE_DIR\}"\n\s+mkdir --parents -- "\$\{EVIDENCE_DIR\}"/,
+  );
+  assert.match(
+    workflow,
+    /OBSERVED_AT="\$\(date --utc \+"%Y-%m-%dT%H:%M:%S\.000Z"\)"/,
+  );
+  assert.match(workflow, /node tools\/repo\/audit-active-reference-drift\.mjs/);
+  for (const input of [
+    "--scope contracts/documentation/reference-audit-scope.json",
+    "--repository-root .",
+    "--source-sha \"${GITHUB_SHA}\"",
+    "--ledger release/migrations/repository-split-issues.json",
+    "--amendments release/migrations/repository-split-issues-amendments.json",
+    "--observed-at \"${OBSERVED_AT}\"",
+    "--output \"${REPORT_PATH}\"",
+  ]) assert.match(workflow, new RegExp(input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(workflow, /test ! -e "\$\{REPORT_PATH\}"/);
+  assert.match(workflow, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(workflow, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(workflow, /path: audit-evidence\/reference-audit-report\.json/);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.match(workflow, /include-hidden-files: false/);
+  assert.match(workflow, /retention-days: 14/);
+  assert.doesNotMatch(workflow, /continue-on-error|cache|previous report|git (?:add|commit|push)/i);
+});
