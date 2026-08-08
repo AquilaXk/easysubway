@@ -1,0 +1,66 @@
+name: Generic Mobile Consumer Bundle Publish
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    name: Publish Generic Mobile Consumer Bundle
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject non-main dispatch
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "This workflow may only be dispatched from main."
+            exit 1
+          fi
+
+      - name: Checkout closed producer
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: 22.14.0
+
+      - name: Build and validate closed bundle
+        shell: bash
+        run: |
+          set -euo pipefail
+          output_directory="release-artifacts/mobile-contracts"
+          bundle="${output_directory}/generic-mobile-consumer-bundle-v1.json"
+          comparison_bundle="${output_directory}/generic-mobile-consumer-bundle-v1.comparison.json"
+          receipt="${output_directory}/generic-mobile-consumer-publication-receipt-v1.json"
+          mkdir -p "${output_directory}"
+          node tools/repo/build-generic-mobile-consumer-bundle.mjs --producer-sha 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3 --output "${bundle}"
+          node tools/repo/build-generic-mobile-consumer-bundle.mjs --producer-sha 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3 --output "${comparison_bundle}"
+          cmp -- "${bundle}" "${comparison_bundle}"
+          rm -- "${comparison_bundle}"
+          node tools/repo/write-generic-mobile-consumer-bundle-receipt.mjs --bundle "${bundle}" --output "${receipt}"
+          test -f "${bundle}" && test ! -L "${bundle}"
+          test -f "${receipt}" && test ! -L "${receipt}"
+
+      - name: Upload closed mobile consumer bundle
+        id: upload
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: easysubway-generic-mobile-consumer-bundle-1.0.0-604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3
+          path: |
+            release-artifacts/mobile-contracts/generic-mobile-consumer-bundle-v1.json
+            release-artifacts/mobile-contracts/generic-mobile-consumer-publication-receipt-v1.json
+          if-no-files-found: error
+          retention-days: 90
+          overwrite: false
+
+      - name: Log artifact locator
+        shell: bash
+        run: |
+          echo "artifact-id=${{ steps.upload.outputs.artifact-id }}"
+          echo "artifact-digest=${{ steps.upload.outputs.artifact-digest }}"
+          echo "artifact-url=${{ steps.upload.outputs.artifact-url }}"

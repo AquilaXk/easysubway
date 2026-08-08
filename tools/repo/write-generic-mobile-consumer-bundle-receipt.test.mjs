@@ -93,3 +93,20 @@ test("receipt는 변조·symlink·경로 이탈·기존 output을 fail closed한
   await assert.rejects(writeGenericMobileConsumerBundleReceipt({ repositoryRoot: root, bundlePath, outputPath }), /exists|output/i);
   assert.equal(await readFile(outputPath, "utf8"), "old");
 });
+
+test("publication workflow는 main에서만 닫힌 producer와 정확히 두 파일을 artifact v4로 게시한다", async () => {
+  const workflow = await readFile(".github/workflows/generic-mobile-consumer-bundle-publish.yml", "utf8");
+  assert.match(workflow, /^on:\n  workflow_dispatch:\n$/m);
+  assert.doesNotMatch(workflow, /\n  (push|pull_request|schedule):/);
+  assert.match(workflow, /permissions:\n  contents: read/);
+  assert.match(workflow, /GITHUB_REF}" != "refs\/heads\/main"[\s\S]*exit 1/);
+  assert.match(workflow, /actions\/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd[\s\S]*ref: 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3/);
+  assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
+  assert.equal((workflow.match(/build-generic-mobile-consumer-bundle\.mjs --producer-sha 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3/g) ?? []).length, 2);
+  assert.match(workflow, /cmp -- "\$\{bundle\}" "\$\{comparison_bundle\}"/);
+  assert.match(workflow, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(workflow, /name: easysubway-generic-mobile-consumer-bundle-1\.0\.0-604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3/);
+  assert.match(workflow, /path: \|\n            release-artifacts\/mobile-contracts\/generic-mobile-consumer-bundle-v1\.json\n            release-artifacts\/mobile-contracts\/generic-mobile-consumer-publication-receipt-v1\.json/);
+  assert.match(workflow, /retention-days: 90\n          overwrite: false/);
+  assert.match(workflow, /artifact-id=.*artifact-digest=.*artifact-url/s);
+});
