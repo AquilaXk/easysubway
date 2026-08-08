@@ -18047,7 +18047,7 @@ test("production candidate는 admission에 결속되지 않은 ITX timetable row
         "tools/datapack/build-datapack.mjs",
         "--build-spec", buildSpecPath,
         "--output", path.join(workspace, "output"),
-      ], { cwd: root, env: productionEnv }),
+      ], { cwd: root, env: candidateReplayEnv }),
       /production ITX timetable rows require explicit admission/,
     );
   } finally {
@@ -18074,7 +18074,7 @@ test("production candidate는 최초 admission과 다른 ITX readmission project
         "tools/datapack/build-datapack.mjs",
         "--build-spec", buildSpecPath,
         "--output", path.join(workspace, "output"),
-      ], { cwd: root, env: productionEnv }),
+      ], { cwd: root, env: candidateReplayEnv }),
       /tracked ITX readmission projection does not match original admission/,
     );
   } finally {
