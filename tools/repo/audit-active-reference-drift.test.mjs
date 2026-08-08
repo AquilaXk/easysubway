@@ -312,6 +312,32 @@ test("issue body shorthand keeps qualifier repository and explicit type without 
   ]);
 });
 
+test("GitHub URL prefix accepts JSON, path and query suffixes without fragment duplicates", () => {
+  const source = { kind: "ISSUE", repository: "AquilaXk/easysubway", number: 2784, locator: "body" };
+  const references = extractReferences([
+    '{"url":"https://github.com/AquilaXk/easysubway/issues/7"}',
+    "https://github.com/AquilaXk/easysubway/pull/7/files",
+    "https://github.com/AquilaXk/easysubway/issues/8?tab=discussion",
+    "https://github.com/AquilaXk/easysubway/issues/9#123",
+    "https://github.com/AquilaXk/easysubway/pull/10#issuecomment-42",
+    "https://github.com/AquilaXk/easysubway/issues/71abc",
+  ].join("\n"), source);
+  assert.deepEqual(references.map(({ target }) => target), [
+    { repository: "AquilaXk/easysubway", type: "ISSUE", number: 7 },
+    { repository: "AquilaXk/easysubway", type: "PR", number: 7 },
+    { repository: "AquilaXk/easysubway", type: "ISSUE", number: 8 },
+    { repository: "AquilaXk/easysubway", type: "ISSUE", number: 9 },
+    { repository: "AquilaXk/easysubway", type: "PR", number: 10 },
+  ]);
+});
+
+test("fragment-suffixed canonical Markdown label preserves displayed title without duplication", () => {
+  const source = { kind: "PATH", repository: "AquilaXk/easysubway", path: "README.md", blobSha: "a".repeat(40) };
+  const references = extractReferences("[AquilaXk/easysubway#9 — exact title](https://github.com/AquilaXk/easysubway/issues/9#discussion)", source);
+  assert.equal(references.length, 1);
+  assert.equal(references[0].displayedTitle, "exact title");
+});
+
 test("bare references are limited to structured text paths while explicit references remain auditable", () => {
   const css = { kind: "PATH", repository: "AquilaXk/easysubway", path: "assets/theme.css", blobSha: "a".repeat(40) };
   const sql = { ...css, path: "db/V1__schema.sql" };

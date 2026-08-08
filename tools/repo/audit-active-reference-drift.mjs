@@ -178,17 +178,19 @@ export function extractReferences(text, source) {
       references.push({ source: { ...normalizedSource, locator }, target, markers, displayedTitle: displayedTitleFor(line, locator, target) });
     };
     const parseUrl = (value) => {
-      const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(issues|pull)\/([1-9]\d*)(?![A-Za-z0-9_])(?:#[A-Za-z0-9_.:-]+)?$/.exec(value);
-      return match == null ? null : { repository: match[1], type: match[2] === "pull" ? "PR" : "ISSUE", number: Number(match[3]) };
+      const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(issues|pull)\/([1-9]\d*)(?![A-Za-z0-9_])/.exec(value);
+      return match == null ? null : {
+        locator: match[0],
+        target: { repository: match[1], type: match[2] === "pull" ? "PR" : "ISSUE", number: Number(match[3]) },
+      };
     };
     for (const match of line.matchAll(/\[[^\]]*\]\((https:\/\/github\.com\/[^\s)]+)\)/g)) {
-      const locator = match[1]; const target = parseUrl(locator);
-      if (target != null) add(match.index, match.index + match[0].length, locator, target);
+      const parsed = parseUrl(match[1]);
+      if (parsed != null) add(match.index, match.index + match[0].length, match[1], parsed.target);
     }
     for (const match of line.matchAll(/https:\/\/github\.com\/[^\s)]+/g)) {
-      const locator = match[0].replace(/[.,;:]+$/, "");
-      const target = parseUrl(locator);
-      if (target != null) add(match.index, match.index + match[0].length, locator, target);
+      const parsed = parseUrl(match[0]);
+      if (parsed != null) add(match.index, match.index + match[0].length, parsed.locator, parsed.target);
     }
     for (const match of line.matchAll(/\b(?:(Hub|Data|Backend|Mobile|Platform)\s+(?:(Issue|PR)\s+)?|(Issue|PR)\s+)#([1-9]\d*)(?![A-Za-z0-9_])/g)) {
       const kind = match[2] ?? match[3] ?? "Issue";
