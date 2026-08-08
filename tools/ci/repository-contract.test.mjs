@@ -1515,6 +1515,11 @@ test("automerge 큐 review reducer는 후속 빈 COMMENTED가 discovery 또는 r
   ]]), "true", "a later APPROVED by the same reviewer must clear their change request");
   assert.equal(reviewGate([[
     codexFallback(1, "COMMENTED", canonicalBody),
+    codexFallback(3, "APPROVED"),
+    codexFallback(2, "CHANGES_REQUESTED"),
+  ]]), "true", "latest opinion must use submitted_at instead of input order");
+  assert.equal(reviewGate([[
+    codexFallback(1, "COMMENTED", canonicalBody),
     trustedReviewer(2, "CHANGES_REQUESTED"),
   ]]), "false", "another reviewer's active change request must block");
   assert.equal(reviewGate([[trustedReviewer(1, "APPROVED")]]), "true", "trusted human approval alone is discovery evidence");
