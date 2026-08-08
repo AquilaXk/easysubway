@@ -88,12 +88,15 @@ jobs:
           test -f "${metadata}" && test ! -L "${metadata}"
           node tools/repo/write-generic-mobile-consumer-bundle-receipt.mjs --artifact-metadata "${metadata}" --artifact-id "${artifact_id}" --artifact-digest "${artifact_digest}" --workflow-run-id "${GITHUB_RUN_ID}" --repository-id "${GITHUB_REPOSITORY_ID}" --head-sha "${GITHUB_SHA}"
 
-      - name: Clean artifact download directory
+      - name: Reject preexisting artifact download path
         shell: bash
         run: |
           set -euo pipefail
           download_directory="${RUNNER_TEMP}/easysubway-generic-mobile-consumer-bundle-download-${GITHUB_RUN_ID}"
-          rm -rf "${download_directory}"
+          if [[ -e "${download_directory}" || -L "${download_directory}" ]]; then
+            echo "artifact download path already exists" >&2
+            exit 1
+          fi
 
       - name: Download exact artifact ID
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
