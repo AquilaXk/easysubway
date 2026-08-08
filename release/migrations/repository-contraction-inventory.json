@@ -2,7 +2,7 @@
   "$schema": "../../contracts/repository-contraction-inventory.schema.json",
   "schemaVersion": 1,
   "sourceRepository": "AquilaXk/easysubway",
-  "inventoryBaseHead": "4ccf78d8e9914575c67e2c3fd3398a2ac0d57f3b",
+  "inventoryBaseHead": "4ccf78d8bf60db2d25233d6fe744daf805c7b0ac",
   "entries": [
     {
       "resourceId": "hub-automerge-queue",
@@ -30,8 +30,9 @@
         "AUTOMERGE_RULESET_FAILURE_FAIL_CLOSED"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "hub-ci-fan-in",
@@ -58,8 +59,9 @@
       "fallbackRemovalOwner": null,
       "fallbackVerification": [],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "NOT_APPLICABLE"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "NOT_APPLICABLE",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "backend-ci-build",
@@ -76,7 +78,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-backend/issues/44"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DISABLE_AFTER_TARGET",
       "executionEligibility": false,
@@ -89,8 +95,9 @@
         "BACKEND_LOCAL_BUILD_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "data-ci-producer",
@@ -107,7 +114,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-data/pull/55"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-data/pull/55",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DISABLE_AFTER_TARGET",
       "executionEligibility": false,
@@ -120,8 +131,9 @@
         "DATA_LOCAL_PRODUCER_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "mobile-ci-build",
@@ -138,7 +150,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-mobile/issues/67"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/67",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DISABLE_AFTER_TARGET",
       "executionEligibility": false,
@@ -151,8 +167,9 @@
         "MOBILE_LOCAL_BUILD_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "platform-ci-deploy",
@@ -169,7 +186,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-platform/issues/17"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-platform/issues/17",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DISABLE_AFTER_TARGET",
       "executionEligibility": false,
@@ -182,8 +203,9 @@
         "PLATFORM_LOCAL_DEPLOY_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "data-datapack-release",
@@ -200,7 +222,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-data/pull/55"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-data/pull/55",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DISABLE_AFTER_TARGET",
       "executionEligibility": false,
@@ -213,8 +239,9 @@
         "DATA_LOCAL_RELEASE_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "mobile-release-artifacts",
@@ -231,7 +258,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-mobile/issues/68"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/68",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DISABLE_AFTER_TARGET",
       "executionEligibility": false,
@@ -244,8 +275,9 @@
         "MOBILE_LOCAL_RELEASE_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "backend-docker-image",
@@ -262,7 +294,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-backend/issues/44"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DELETE_AFTER_HANDOFF",
       "executionEligibility": false,
@@ -275,8 +311,9 @@
         "BACKEND_HUB_IMAGE_BUILD_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "backend-source",
@@ -293,7 +330,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-backend/issues/44"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DELETE_AFTER_HANDOFF",
       "executionEligibility": false,
@@ -306,8 +347,9 @@
         "BACKEND_LEGACY_SOURCE_COPY_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "data-source",
@@ -324,7 +366,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-data/pull/55"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-data/pull/55",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DELETE_AFTER_HANDOFF",
       "executionEligibility": false,
@@ -337,8 +383,9 @@
         "DATA_LEGACY_SOURCE_COPY_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "mobile-source",
@@ -355,7 +402,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-mobile/issues/71"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DELETE_AFTER_HANDOFF",
       "executionEligibility": false,
@@ -368,8 +419,9 @@
         "MOBILE_LEGACY_SOURCE_COPY_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "platform-infra",
@@ -386,7 +438,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-platform/issues/17"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-platform/issues/17",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DELETE_AFTER_HANDOFF",
       "executionEligibility": false,
@@ -399,8 +455,9 @@
         "PLATFORM_LEGACY_INFRA_COPY_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "platform-deploy-tools",
@@ -417,7 +474,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-platform/issues/17"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-platform/issues/17",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DELETE_AFTER_HANDOFF",
       "executionEligibility": false,
@@ -430,8 +491,9 @@
         "PLATFORM_LEGACY_DEPLOY_COPY_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "hub-system-boundaries",
@@ -458,8 +520,9 @@
       "fallbackRemovalOwner": null,
       "fallbackVerification": [],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "NOT_APPLICABLE"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "NOT_APPLICABLE",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "hub-documentation-governance",
@@ -485,8 +548,9 @@
       "fallbackRemovalOwner": null,
       "fallbackVerification": [],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "NOT_APPLICABLE"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "NOT_APPLICABLE",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "hub-release-governance",
@@ -512,8 +576,9 @@
       "fallbackRemovalOwner": null,
       "fallbackVerification": [],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "NOT_APPLICABLE"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "NOT_APPLICABLE",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "data-freshness-gate",
@@ -530,19 +595,26 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-data/pull/55"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-data/pull/55",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DISABLE_AFTER_TARGET",
       "executionEligibility": false,
       "reviewTrigger": [
         "target freshness verification"
       ],
-      "fallbackExposure": "NONE",
-      "fallbackRemovalOwner": null,
-      "fallbackVerification": [],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "data",
+      "fallbackVerification": [
+        "DATA_STALE_LABEL_AND_ROLLBACK_ABSENT"
+      ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "NOT_APPLICABLE"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "hub-repository-split-ledger",
@@ -568,8 +640,9 @@
       "fallbackRemovalOwner": null,
       "fallbackVerification": [],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "NOT_APPLICABLE"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "NOT_APPLICABLE",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "backend-raw-main-v1-stage",
@@ -586,7 +659,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-backend/issues/44"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DELETE_AFTER_HANDOFF",
       "executionEligibility": false,
@@ -599,8 +676,9 @@
         "BACKEND_RAW_MAIN_LOCATOR_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "data-previous-artifact-contract",
@@ -617,7 +695,11 @@
       "releaseReachability": "CURRENT",
       "handoffState": "PENDING",
       "handoffEvidence": [
-        "https://github.com/AquilaXk/easysubway-data/pull/55"
+        {
+          "kind": "PLANNED_REFERENCE",
+          "reference": "https://github.com/AquilaXk/easysubway-data/pull/55",
+          "identity": null, "conclusion": "NOT_APPLICABLE"
+        }
       ],
       "plannedAction": "DISABLE_AFTER_TARGET",
       "executionEligibility": false,
@@ -630,8 +712,9 @@
         "DATA_PREVIOUS_ARTIFACT_FIELD_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "hub-release-artifacts-bundled-datapack",
@@ -659,8 +742,9 @@
         "RC_MISSING_DATAPACK_RUN_FAILS"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "hub-rc-datapack-selector",
@@ -688,8 +772,9 @@
         "RC_FALLBACK_ARTIFACT_SELECTION_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "hub-manifest-emergency-override",
@@ -717,8 +802,9 @@
         "MANIFEST_EMERGENCY_OVERRIDE_FALLBACK_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
     },
     {
       "resourceId": "hub-rc-evidence-fallback-artifact",
@@ -746,8 +832,76 @@
         "RC_FALLBACK_ARTIFACT_REQUIREMENT_ABSENT"
       ],
       "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null,
-      "fallbackVerificationState": "PLANNED"
-    }
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
+      "fallbackVerificationState": "PLANNED",
+      "repository": "AquilaXk/easysubway"
+    },
+    {
+      "resourceId": "hub-admin-qa-upload-warn",
+      "repository": "AquilaXk/easysubway",
+      "path": ".github/workflows/ci.yml",
+      "selector": "Admin QA upload continue-on-error and if-no-files-found warn",
+      "kind": "WORKFLOW",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "Fail-closed Admin QA artifact publication",
+      "activeConsumers": [
+        "Hub Admin QA workflow"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "workflow ownership correction"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "hub",
+      "fallbackVerificationState": "PLANNED",
+      "fallbackVerification": [
+        "ADMIN_QA_UPLOAD_WARN_SUCCESS_SUBSTITUTION_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE"
+    },
+    { "resourceId": "backend-realtime-fallback", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java", "selector": "POST_SCAN_REALTIME_FALLBACK_REASON", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Backend fallback removal", "activeConsumers": ["Backend route service"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_REALTIME_FALLBACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-planner-fallback", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java", "selector": "Legacy graph fallback", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Backend planner fallback removal", "activeConsumers": ["Backend route service"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_PLANNER_FALLBACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-stale-fallback", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java", "selector": "STALE_FALLBACK", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Backend stale fallback removal", "activeConsumers": ["Backend route service"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_STALE_FALLBACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-static-fallback", "repository": "AquilaXk/easysubway-backend", "path": "tools/routes/check-route-commercialization-gate.mjs", "selector": "STATIC_BACKEND_ESTIMATE", "kind": "BUILD", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Backend static fallback removal", "activeConsumers": ["Backend route gate"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_STATIC_FALLBACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-raw-main-contract", "repository": "AquilaXk/easysubway-backend", "path": "backend/tools/stage-contracts.mjs", "selector": "raw.githubusercontent.com/AquilaXk/easysubway/main", "kind": "BUILD", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Backend immutable contract input", "activeConsumers": ["Backend contract stage"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend contract input removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_RAW_MAIN_INPUT_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "data-rollback-fallback", "repository": "AquilaXk/easysubway-data", "path": "tools/datapack/rollback-manifest.mjs", "selector": "rollback manifest", "kind": "BUILD", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "data", "targetOutput": "Data artifact rollback removal", "activeConsumers": ["Data publication"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-data/pull/55", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Data fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "data", "fallbackVerification": ["DATA_ARTIFACT_ROLLBACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "mobile-local-fallback", "repository": "AquilaXk/easysubway-mobile", "path": "apps/mobile/lib/features/routes/data/local_route_repository.dart", "selector": "offline/local fallback repository", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "mobile", "targetOutput": "Mobile local fallback removal", "activeConsumers": ["Mobile route search"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Mobile fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "mobile", "fallbackVerification": ["MOBILE_LOCAL_FALLBACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "mobile-v1-fallback", "repository": "AquilaXk/easysubway-mobile", "path": "apps/mobile/lib/route_search.dart", "selector": "Route V1 fallback", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "mobile", "targetOutput": "Mobile V1 fallback removal", "activeConsumers": ["Mobile route search"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Mobile fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "mobile", "fallbackVerification": ["MOBILE_V1_FALLBACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "mobile-v2-fallback", "repository": "AquilaXk/easysubway-mobile", "path": "apps/mobile/lib/route_search.dart", "selector": "Route V2 fallback", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "mobile", "targetOutput": "Mobile V2 fallback removal", "activeConsumers": ["Mobile route search"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Mobile fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "mobile", "fallbackVerification": ["MOBILE_V2_FALLBACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "platform-raw-main-fallback", "repository": "AquilaXk/easysubway-platform", "path": "tools/platform/stage-contracts.mjs", "selector": "raw.githubusercontent.com/AquilaXk/easysubway/main", "kind": "BUILD", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "platform", "targetOutput": "Platform immutable contract input", "activeConsumers": ["Platform contract stage"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-platform/issues/17", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Platform fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "platform", "fallbackVerification": ["PLATFORM_RAW_MAIN_INPUT_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "platform-legacy-restore-fallback", "repository": "AquilaXk/easysubway-platform", "path": "tools/deploy/deploy-backend.sh", "selector": "restore_legacy_backend_service", "kind": "DEPLOYMENT", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "platform", "targetOutput": "Platform legacy restore removal", "activeConsumers": ["Platform deployment"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-platform/issues/17", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Platform fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "platform", "fallbackVerification": ["PLATFORM_LEGACY_RESTORE_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "platform-legacy-credential-fallback", "repository": "AquilaXk/easysubway-platform", "path": "tools/deploy/prepare-deployment-env.sh", "selector": "legacy_pepper", "kind": "DEPLOYMENT", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "platform", "targetOutput": "Platform legacy credential removal", "activeConsumers": ["Platform deployment"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-platform/issues/17", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Platform fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "platform", "fallbackVerification": ["PLATFORM_LEGACY_CREDENTIAL_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-topis-fixture-fallback", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/realtime/application/TopisRealtimeProvider.java", "selector": "fixtureEnabled fallbackProvider", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "TOPIS fixture fallback removal", "activeConsumers": ["Backend realtime provider"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_TOPIS_FIXTURE_FALLBACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-realtime-overlay-fallback", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/route/domain/RealtimeEtaOverlay.java", "selector": "PLANNED EtaSource.FALLBACK", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Realtime planned fallback removal", "activeConsumers": ["Backend realtime overlay"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_REALTIME_OVERLAY_FALLBACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-v2-planner-legacy-graph", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java", "selector": "legacy graph", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Route V2 legacy graph removal", "activeConsumers": ["Backend V2 planner"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_V2_PLANNER_LEGACY_GRAPH_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-route-controller-v1-refresh", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java", "selector": "api/v1 LEGACY_STATIC refresh", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Route controller legacy fallback removal", "activeConsumers": ["Backend route controller"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_ROUTE_CONTROLLER_V1_REFRESH_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-timetable-seed-last-known-good", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/route/adapter/out/persistence/TimetableSeedLoader.java", "selector": "last-known-good snapshot", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Last-known-good timetable removal", "activeConsumers": ["Backend timetable seed"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_TIMETABLE_LAST_KNOWN_GOOD_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-jdbc-timetable-break-glass", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteTimetableRepository.java", "selector": "breakGlass freshness filter", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Timetable freshness break-glass removal", "activeConsumers": ["Backend timetable repository"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_JDBC_TIMETABLE_BREAK_GLASS_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-timetable-monitor-break-glass", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/route/adapter/out/persistence/TimetableFreshnessMonitor.java", "selector": "break-glass expired snapshot", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Timetable monitor break-glass removal", "activeConsumers": ["Backend freshness monitor"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_TIMETABLE_MONITOR_BREAK_GLASS_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "backend-transit-master-static-empty", "repository": "AquilaXk/easysubway-backend", "path": "backend/src/main/java/com/easysubway/transit/adapter/out/persistence/JdbcTransitMasterOverrideRepository.java", "selector": "static-seed Optional.empty DataAccess", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "backend", "targetOutput": "Transit static/empty fallback removal", "activeConsumers": ["Backend transit master"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-backend/issues/44", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Backend fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "backend", "fallbackVerification": ["BACKEND_TRANSIT_MASTER_STATIC_EMPTY_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "data-itx-historical-previous", "repository": "AquilaXk/easysubway-data", "path": "tools/datapack/apply-itx-topology-to-bundled-pack.mjs", "selector": "UNCHANGED_AUTO previousArtifactPath", "kind": "BUILD", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "data", "targetOutput": "ITX previous artifact fallback removal", "activeConsumers": ["Data ITX topology build"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-data/pull/55", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Data fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "data", "fallbackVerification": ["DATA_ITX_HISTORICAL_PREVIOUS_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "data-build-previous-artifact-chain", "repository": "AquilaXk/easysubway-data", "path": "tools/datapack/build-datapack.mjs", "selector": "previous artifact chain", "kind": "BUILD", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "data", "targetOutput": "Data previous artifact chain removal", "activeConsumers": ["Data pack build"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-data/pull/55", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Data fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "data", "fallbackVerification": ["DATA_BUILD_PREVIOUS_ARTIFACT_CHAIN_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "data-manifest-emergency-latest-capital", "repository": "AquilaXk/easysubway-data", "path": "tools/datapack/lib/manifest-validation.mjs", "selector": "emergencyOverride latest capital", "kind": "BUILD", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "data", "targetOutput": "Manifest emergency/latest fallback removal", "activeConsumers": ["Data manifest validation"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-data/pull/55", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Data fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "data", "fallbackVerification": ["DATA_MANIFEST_EMERGENCY_LATEST_CAPITAL_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "data-coverage-active-default-capital", "repository": "AquilaXk/easysubway-data", "path": "tools/datapack/report-coverage-gaps.mjs", "selector": "active default capital", "kind": "BUILD", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "data", "targetOutput": "Coverage active/default fallback removal", "activeConsumers": ["Data coverage report"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-data/pull/55", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Data fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "data", "fallbackVerification": ["DATA_COVERAGE_ACTIVE_DEFAULT_CAPITAL_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "data-release-first-pack", "repository": "AquilaXk/easysubway-data", "path": "tools/ci/datapack-release-workflow.test.mjs", "selector": "packs[0]", "kind": "WORKFLOW", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "data", "targetOutput": "Data first-pack fallback removal", "activeConsumers": ["Data release workflow"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-data/pull/55", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Data fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "data", "fallbackVerification": ["DATA_RELEASE_FIRST_PACK_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "data-molit-edge-sample", "repository": "AquilaXk/easysubway-data", "path": "tools/datapack/build-molit-nationwide-fixture.mjs", "selector": "edge-sample", "kind": "BUILD", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "data", "targetOutput": "MOLIT edge sample fallback removal", "activeConsumers": ["Data nationwide fixture"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-data/pull/55", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Data fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "data", "fallbackVerification": ["DATA_MOLIT_EDGE_SAMPLE_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "data-public-api-static-planned", "repository": "AquilaXk/easysubway-data", "path": "tools/datapack/collect-nationwide-public-api-coverage.mjs", "selector": "STATIC_LOCAL PLANNED", "kind": "BUILD", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "data", "targetOutput": "Public API static/planned fallback removal", "activeConsumers": ["Data public API coverage"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-data/pull/55", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Data fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "data", "fallbackVerification": ["DATA_PUBLIC_API_STATIC_PLANNED_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "mobile-dependencies-local-first", "repository": "AquilaXk/easysubway-mobile", "path": "apps/mobile/lib/app/app_dependencies.dart", "selector": "LocalFirst flag", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "mobile", "targetOutput": "Mobile LocalFirst fallback removal", "activeConsumers": ["Mobile dependency composition"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Mobile fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "mobile", "fallbackVerification": ["MOBILE_DEPENDENCIES_LOCAL_FIRST_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "mobile-bootstrap-local-route", "repository": "AquilaXk/easysubway-mobile", "path": "apps/mobile/lib/app/app_bootstrap.dart", "selector": "LocalRouteRepository", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "mobile", "targetOutput": "Mobile bootstrap local route removal", "activeConsumers": ["Mobile bootstrap"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Mobile fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "mobile", "fallbackVerification": ["MOBILE_BOOTSTRAP_LOCAL_ROUTE_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "mobile-route-search-refresh", "repository": "AquilaXk/easysubway-mobile", "path": "apps/mobile/lib/route_search.dart", "selector": "V1 V2 refresh", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "mobile", "targetOutput": "Mobile route refresh fallback removal", "activeConsumers": ["Mobile route search"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Mobile fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "mobile", "fallbackVerification": ["MOBILE_ROUTE_SEARCH_REFRESH_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "mobile-route-v2-transport-scoped", "repository": "AquilaXk/easysubway-mobile", "path": "apps/mobile/lib/route_v2_ingress.dart", "selector": "TransportScoped", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "mobile", "targetOutput": "Mobile transport scoped fallback removal", "activeConsumers": ["Mobile Route V2 ingress"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Mobile fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "mobile", "fallbackVerification": ["MOBILE_ROUTE_V2_TRANSPORT_SCOPED_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "mobile-internal-route-local", "repository": "AquilaXk/easysubway-mobile", "path": "apps/mobile/lib/features/internal_route/data/local_internal_route_repository.dart", "selector": "local internal route", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "mobile", "targetOutput": "Mobile internal local fallback removal", "activeConsumers": ["Mobile internal route"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Mobile fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "mobile", "fallbackVerification": ["MOBILE_INTERNAL_ROUTE_LOCAL_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "mobile-catalog-known-good-bundled", "repository": "AquilaXk/easysubway-mobile", "path": "apps/mobile/lib/core/database/catalog/catalog_database_opener.dart", "selector": "known-good bundled", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "mobile", "targetOutput": "Mobile catalog fallback removal", "activeConsumers": ["Mobile catalog opener"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Mobile fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "mobile", "fallbackVerification": ["MOBILE_CATALOG_KNOWN_GOOD_BUNDLED_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "mobile-pack-update-corrupt-default", "repository": "AquilaXk/easysubway-mobile", "path": "apps/mobile/lib/core/datapack/data_pack_update_state.dart", "selector": "corrupted-policy default", "kind": "SOURCE", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "mobile", "targetOutput": "Mobile corrupted default removal", "activeConsumers": ["Mobile datapack update"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-mobile/issues/71", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Mobile fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "mobile", "fallbackVerification": ["MOBILE_PACK_UPDATE_CORRUPT_DEFAULT_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "platform-ci-raw-main", "repository": "AquilaXk/easysubway-platform", "path": ".github/workflows/ci.yml", "selector": "raw.githubusercontent.com/AquilaXk/easysubway/main", "kind": "WORKFLOW", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "platform", "targetOutput": "Platform CI raw-main removal", "activeConsumers": ["Platform CI"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-platform/issues/17", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Platform fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "platform", "fallbackVerification": ["PLATFORM_CI_RAW_MAIN_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "platform-contract-lock-raw-main", "repository": "AquilaXk/easysubway-platform", "path": "contracts.lock.json", "selector": "raw.githubusercontent.com/AquilaXk/easysubway/main", "kind": "CONTRACT", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "platform", "targetOutput": "Platform lock raw-main removal", "activeConsumers": ["Platform contract lock"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-platform/issues/17", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Platform fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "platform", "fallbackVerification": ["PLATFORM_CONTRACT_LOCK_RAW_MAIN_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" },
+    { "resourceId": "platform-compose-route-v2-gateway", "repository": "AquilaXk/easysubway-platform", "path": "infra/docker-compose.yml", "selector": "route-v2-gateway", "kind": "DEPLOYMENT", "classification": "TARGET_FALLBACK_REMOVE", "hubOwner": "hub", "targetOwner": "platform", "targetOutput": "Platform Route V2 gateway removal", "activeConsumers": ["Platform deployment"], "releaseReachability": "CURRENT", "handoffState": "PENDING", "handoffEvidence": [{ "kind": "PLANNED_REFERENCE", "reference": "https://github.com/AquilaXk/easysubway-platform/issues/17", "identity": null, "conclusion": "NOT_APPLICABLE" }], "plannedAction": "REMOVE_FALLBACK", "executionEligibility": false, "reviewTrigger": ["Platform fallback removal"], "fallbackExposure": "FORBIDDEN_ACTIVE", "fallbackRemovalOwner": "platform", "fallbackVerification": ["PLATFORM_COMPOSE_ROUTE_V2_GATEWAY_ABSENT"], "fallbackVerificationState": "PLANNED", "rollbackMode": "NOT_APPLICABLE", "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE" }
   ]
 }

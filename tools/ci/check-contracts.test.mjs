@@ -1254,13 +1254,193 @@ test("repository contraction inventory는 ownership, handoff state, mixed select
   rollback.rollbackMode = "NOT_APPLICABLE";
   rollback.rollbackRevision = null;
   assert.ok(validateRepositoryContractionInventory(invalidRollback)
-    .some((error) => error.includes("exact immutable revision")));
+    .some((error) => error.includes("Platform deployment rollback approval")));
 
   const duplicateFallbackGate = structuredClone(inventory);
   const activeFallbacks = duplicateFallbackGate.entries.filter((entry) => entry.fallbackExposure === "FORBIDDEN_ACTIVE");
   activeFallbacks[1].fallbackVerification = [...activeFallbacks[0].fallbackVerification];
   assert.ok(validateRepositoryContractionInventory(duplicateFallbackGate)
     .some((error) => error.includes("verification identifier 중복")));
+});
+
+test("repository contraction inventory는 #2731 P1 fallback required-set과 폐쇄형 handoff를 강제한다", () => {
+  const inventory = loadJson("release/migrations/repository-contraction-inventory.json");
+  const requiredFallbacks = [
+    ["backend-realtime-fallback", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java", "POST_SCAN_REALTIME_FALLBACK_REASON"],
+    ["backend-planner-fallback", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java", "Legacy graph fallback"],
+    ["backend-stale-fallback", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java", "STALE_FALLBACK"],
+    ["backend-static-fallback", "AquilaXk/easysubway-backend", "tools/routes/check-route-commercialization-gate.mjs", "STATIC_BACKEND_ESTIMATE"],
+    ["backend-raw-main-contract", "AquilaXk/easysubway-backend", "backend/tools/stage-contracts.mjs", "raw.githubusercontent.com/AquilaXk/easysubway/main"],
+    ["data-rollback-fallback", "AquilaXk/easysubway-data", "tools/datapack/rollback-manifest.mjs", "rollback manifest"],
+    ["mobile-local-fallback", "AquilaXk/easysubway-mobile", "apps/mobile/lib/features/routes/data/local_route_repository.dart", "offline/local fallback repository"],
+    ["mobile-v1-fallback", "AquilaXk/easysubway-mobile", "apps/mobile/lib/route_search.dart", "Route V1 fallback"],
+    ["mobile-v2-fallback", "AquilaXk/easysubway-mobile", "apps/mobile/lib/route_search.dart", "Route V2 fallback"],
+    ["platform-raw-main-fallback", "AquilaXk/easysubway-platform", "tools/platform/stage-contracts.mjs", "raw.githubusercontent.com/AquilaXk/easysubway/main"],
+    ["platform-legacy-restore-fallback", "AquilaXk/easysubway-platform", "tools/deploy/deploy-backend.sh", "restore_legacy_backend_service"],
+    ["platform-legacy-credential-fallback", "AquilaXk/easysubway-platform", "tools/deploy/prepare-deployment-env.sh", "legacy_pepper"],
+    ["hub-admin-qa-upload-warn", "AquilaXk/easysubway", ".github/workflows/ci.yml", "Admin QA upload continue-on-error and if-no-files-found warn"],
+    ["hub-automerge-queue", "AquilaXk/easysubway", ".github/workflows/automerge-queue.yml", null],
+    ["hub-release-artifacts-bundled-datapack", "AquilaXk/easysubway", ".github/workflows/release-artifacts.yml", "missing datapack run uses bundled index and capital artifact"],
+    ["hub-rc-datapack-selector", "AquilaXk/easysubway", "tools/release/select-rc-datapack-artifact.mjs", "fallback.sqlite.gz selection and copy"],
+    ["hub-manifest-emergency-override", "AquilaXk/easysubway", "tools/datapack/lib/manifest-validation.mjs", "emergencyOverride fallback pack selection"],
+    ["hub-rc-evidence-fallback-artifact", "AquilaXk/easysubway", "tools/release/generate-rc-evidence-manifest.mjs", "data-pack fallback artifact requirement"],
+    ["backend-topis-fixture-fallback", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/realtime/application/TopisRealtimeProvider.java", "fixtureEnabled fallbackProvider"],
+    ["backend-realtime-overlay-fallback", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/domain/RealtimeEtaOverlay.java", "PLANNED EtaSource.FALLBACK"],
+    ["backend-v2-planner-legacy-graph", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java", "legacy graph"],
+    ["backend-route-controller-v1-refresh", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java", "api/v1 LEGACY_STATIC refresh"],
+    ["backend-timetable-seed-last-known-good", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/adapter/out/persistence/TimetableSeedLoader.java", "last-known-good snapshot"],
+    ["backend-jdbc-timetable-break-glass", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteTimetableRepository.java", "breakGlass freshness filter"],
+    ["backend-timetable-monitor-break-glass", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/adapter/out/persistence/TimetableFreshnessMonitor.java", "break-glass expired snapshot"],
+    ["backend-transit-master-static-empty", "AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/transit/adapter/out/persistence/JdbcTransitMasterOverrideRepository.java", "static-seed Optional.empty DataAccess"],
+    ["data-itx-historical-previous", "AquilaXk/easysubway-data", "tools/datapack/apply-itx-topology-to-bundled-pack.mjs", "UNCHANGED_AUTO previousArtifactPath"],
+    ["data-build-previous-artifact-chain", "AquilaXk/easysubway-data", "tools/datapack/build-datapack.mjs", "previous artifact chain"],
+    ["data-manifest-emergency-latest-capital", "AquilaXk/easysubway-data", "tools/datapack/lib/manifest-validation.mjs", "emergencyOverride latest capital"],
+    ["data-coverage-active-default-capital", "AquilaXk/easysubway-data", "tools/datapack/report-coverage-gaps.mjs", "active default capital"],
+    ["data-release-first-pack", "AquilaXk/easysubway-data", "tools/ci/datapack-release-workflow.test.mjs", "packs[0]"],
+    ["data-molit-edge-sample", "AquilaXk/easysubway-data", "tools/datapack/build-molit-nationwide-fixture.mjs", "edge-sample"],
+    ["data-public-api-static-planned", "AquilaXk/easysubway-data", "tools/datapack/collect-nationwide-public-api-coverage.mjs", "STATIC_LOCAL PLANNED"],
+    ["mobile-dependencies-local-first", "AquilaXk/easysubway-mobile", "apps/mobile/lib/app/app_dependencies.dart", "LocalFirst flag"],
+    ["mobile-bootstrap-local-route", "AquilaXk/easysubway-mobile", "apps/mobile/lib/app/app_bootstrap.dart", "LocalRouteRepository"],
+    ["mobile-route-search-refresh", "AquilaXk/easysubway-mobile", "apps/mobile/lib/route_search.dart", "V1 V2 refresh"],
+    ["mobile-route-v2-transport-scoped", "AquilaXk/easysubway-mobile", "apps/mobile/lib/route_v2_ingress.dart", "TransportScoped"],
+    ["mobile-internal-route-local", "AquilaXk/easysubway-mobile", "apps/mobile/lib/features/internal_route/data/local_internal_route_repository.dart", "local internal route"],
+    ["mobile-catalog-known-good-bundled", "AquilaXk/easysubway-mobile", "apps/mobile/lib/core/database/catalog/catalog_database_opener.dart", "known-good bundled"],
+    ["mobile-pack-update-corrupt-default", "AquilaXk/easysubway-mobile", "apps/mobile/lib/core/datapack/data_pack_update_state.dart", "corrupted-policy default"],
+    ["platform-ci-raw-main", "AquilaXk/easysubway-platform", ".github/workflows/ci.yml", "raw.githubusercontent.com/AquilaXk/easysubway/main"],
+    ["platform-contract-lock-raw-main", "AquilaXk/easysubway-platform", "contracts.lock.json", "raw.githubusercontent.com/AquilaXk/easysubway/main"],
+    ["platform-compose-route-v2-gateway", "AquilaXk/easysubway-platform", "infra/docker-compose.yml", "route-v2-gateway"],
+  ];
+  for (const [resourceId, repository, path, selector] of requiredFallbacks) {
+    const entry = inventory.entries.find((candidate) => candidate.resourceId === resourceId);
+    assert.deepEqual([entry?.repository, entry?.path, entry?.selector], [repository, path, selector], resourceId);
+    if (repository !== "AquilaXk/easysubway") {
+      assert.equal(entry?.classification, "TARGET_FALLBACK_REMOVE", resourceId);
+      assert.equal(entry?.plannedAction, "REMOVE_FALLBACK", resourceId);
+    }
+  }
+  const schema = loadJson("contracts/repository-contraction-inventory.schema.json");
+  for (const entry of inventory.entries) {
+    assert.deepEqual(
+      [entry.rollbackTargetRepository, entry.rollbackApprovalEvidence, entry.rollbackOperation],
+      [null, null, "NOT_APPLICABLE"],
+      `${entry.resourceId}: rollback closed fields`,
+    );
+  }
+  const missingRollbackField = structuredClone(inventory);
+  delete missingRollbackField.entries[0].rollbackOperation;
+  assert.ok(validateSchema(schema, missingRollbackField).errors.some((error) => error.includes("rollbackOperation")));
+
+  const missing = structuredClone(inventory);
+  missing.entries = missing.entries.filter((entry) => entry.resourceId !== "hub-automerge-queue");
+  assert.ok(validateRepositoryContractionInventory(missing).some((error) => error.includes("known fallback required-set 누락")));
+
+  const duplicateEvidence = structuredClone(inventory);
+  const handoff = duplicateEvidence.entries.find((entry) => entry.resourceId === "backend-ci-build");
+  handoff.handoffState = "VERIFIED";
+  handoff.handoffEvidence = [
+    { kind: "IMMUTABLE_TARGET", reference: "https://github.com/AquilaXk/easysubway-backend/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { kind: "IMMUTABLE_TARGET", reference: "https://github.com/AquilaXk/easysubway-backend/commit/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { kind: "TARGET_CONSUMER", reference: "https://github.com/AquilaXk/easysubway-backend/blob/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa/.github/workflows/release.yml", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+    { kind: "TERMINAL_GATE", reference: "https://github.com/AquilaXk/easysubway-backend/actions/runs/1", identity: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa" },
+  ];
+  assert.ok(validateRepositoryContractionInventory(duplicateEvidence).some((error) => error.includes("handoff evidence kind 중복")));
+
+  const invalidBase = structuredClone(inventory);
+  invalidBase.inventoryBaseHead = "0000000000000000000000000000000000000000";
+  assert.ok(validateRepositoryContractionInventory(invalidBase).some((error) => error.includes("HEAD ancestor")));
+
+  const invalidRollback = structuredClone(inventory);
+  const rollback = invalidRollback.entries.find((entry) => entry.resourceId === "hub-system-boundaries");
+  rollback.fallbackExposure = "VERIFIED_ROLLBACK_ONLY";
+  rollback.fallbackVerificationState = "VERIFIED";
+  rollback.fallbackVerification = ["PLATFORM_MANUAL_DEPLOYMENT_ROLLBACK"];
+  rollback.rollbackMode = "EXACT_IMMUTABLE_DEPLOYMENT_ONLY";
+  rollback.rollbackRevision = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+  rollback.rollbackTargetRepository = "AquilaXk/easysubway-data";
+  rollback.rollbackApprovalEvidence = "https://github.com/AquilaXk/easysubway-data/issues/1";
+  rollback.rollbackOperation = "MANUAL_DEPLOYMENT";
+  assert.ok(validateRepositoryContractionInventory(invalidRollback).some((error) => error.includes("deployment rollback")));
+  for (const rejected of ["data restore", "artifact restore", "source restore", "legacy restore"]) {
+    const candidate = structuredClone(invalidRollback);
+    candidate.entries.find((entry) => entry.resourceId === rollback.resourceId).targetOutput = rejected;
+    assert.ok(validateRepositoryContractionInventory(candidate).some((error) => error.includes("deployment rollback")), rejected);
+  }
+});
+
+test("repository contraction inventory는 F3 terminal gate와 예약된 F4 Platform rollback binding을 강제한다", () => {
+  const inventory = loadJson("release/migrations/repository-contraction-inventory.json");
+  const revision = "a".repeat(40);
+  const verifiedEvidence = [
+    { kind: "IMMUTABLE_TARGET", reference: `https://github.com/AquilaXk/easysubway-platform/commit/${revision}`, identity: revision, conclusion: "NOT_APPLICABLE" },
+    { kind: "TARGET_CONSUMER", reference: `https://github.com/AquilaXk/easysubway-platform/blob/${revision}/.github/workflows/deploy.yml`, identity: revision, conclusion: "NOT_APPLICABLE" },
+    { kind: "TARGET_TERMINAL_GATE", reference: "https://github.com/AquilaXk/easysubway-platform/actions/runs/1", identity: revision, conclusion: "SUCCESS" },
+    { kind: "SYSTEM_TERMINAL_GATE", reference: "https://github.com/AquilaXk/easysubway/actions/runs/2", identity: revision, conclusion: "SUCCESS" },
+  ];
+  const reservedRollback = () => ({
+    ...structuredClone(inventory.entries.find((entry) => entry.resourceId === "platform-compose-route-v2-gateway")),
+    resourceId: "platform-approved-deployment-rollback",
+    path: ".github/workflows/deploy.yml",
+    selector: "PLATFORM_ATOMIC_TRAFFIC_ACTIVATION",
+    classification: "TARGET_CANONICAL_DELETE_AFTER_HANDOFF",
+    targetOutput: "Platform atomic traffic activation rollback",
+    plannedAction: "DELETE_AFTER_HANDOFF",
+    handoffState: "VERIFIED",
+    handoffEvidence: verifiedEvidence,
+    fallbackExposure: "VERIFIED_ROLLBACK_ONLY",
+    fallbackRemovalOwner: null,
+    fallbackVerificationState: "VERIFIED",
+    fallbackVerification: ["PLATFORM_ATOMIC_TRAFFIC_ROLLBACK"],
+    rollbackMode: "EXACT_IMMUTABLE_DEPLOYMENT_ONLY",
+    rollbackRevision: revision,
+    rollbackTargetRepository: "AquilaXk/easysubway-platform",
+    rollbackOperation: "MANUAL_DEPLOYMENT",
+    rollbackApprovalEvidence: {
+      decision: "APPROVED",
+      revision,
+      operation: "MANUAL_DEPLOYMENT",
+      deploymentClass: "PLATFORM_ATOMIC_TRAFFIC_ACTIVATION",
+      reference: "https://github.com/AquilaXk/easysubway-platform/issues/17",
+    },
+  });
+  const rollbackCandidate = structuredClone(inventory);
+  rollbackCandidate.entries.push(reservedRollback());
+  assert.deepEqual(validateRepositoryContractionInventory(rollbackCandidate), []);
+
+  const gatewayPromotion = structuredClone(inventory);
+  Object.assign(gatewayPromotion.entries.find((entry) => entry.resourceId === "platform-compose-route-v2-gateway"), reservedRollback(), {
+    resourceId: "platform-compose-route-v2-gateway",
+    path: "infra/docker-compose.yml",
+    selector: "route-v2-gateway",
+    classification: "TARGET_FALLBACK_REMOVE",
+    plannedAction: "REMOVE_FALLBACK",
+  });
+  assert.ok(validateRepositoryContractionInventory(gatewayPromotion)
+    .some((error) => error.includes("known fallback은 FORBIDDEN_ACTIVE여야 한다")));
+
+  for (const [mutate, expected] of [
+    [(entry) => { entry.handoffEvidence = entry.handoffEvidence.filter((item) => item.kind !== "SYSTEM_TERMINAL_GATE"); }, "target/system terminal gate evidence"],
+    [(entry) => { entry.handoffEvidence[3].kind = "TARGET_TERMINAL_GATE"; }, "handoff evidence kind 중복"],
+    [(entry) => { entry.handoffEvidence[2].conclusion = "FAILURE"; }, "target/system terminal gate evidence"],
+    [(entry) => { entry.handoffEvidence[3].reference = "https://github.com/AquilaXk/easysubway-backend/actions/runs/2"; }, "target/system terminal gate evidence"],
+  ]) {
+    const candidate = structuredClone(rollbackCandidate);
+    mutate(candidate.entries.find((entry) => entry.resourceId === "platform-approved-deployment-rollback"));
+    assert.ok(validateRepositoryContractionInventory(candidate).some((error) => error.includes(expected)), expected);
+  }
+  for (const [mutate, expected] of [
+    [(entry) => { entry.rollbackApprovalEvidence = null; }, "Platform deployment rollback approval"],
+    [(entry) => { entry.rollbackApprovalEvidence.revision = "b".repeat(40); }, "Platform deployment rollback approval"],
+    [(entry) => { entry.rollbackApprovalEvidence.operation = "AUTOMATIC"; }, "Platform deployment rollback approval"],
+    [(entry) => { entry.rollbackApprovalEvidence.deploymentClass = "UNKNOWN"; }, "Platform deployment rollback approval"],
+    [(entry) => { entry.rollbackTargetRepository = "AquilaXk/easysubway-data"; }, "Platform deployment rollback approval"],
+    [(entry) => { entry.kind = "SOURCE"; }, "Platform deployment rollback approval"],
+    [(entry) => { entry.path = "artifacts/current-pointer.json"; }, "Platform deployment rollback approval"],
+    [(entry) => { entry.selector = "restore_legacy_backend_service"; }, "Platform deployment rollback approval"],
+  ]) {
+    const candidate = structuredClone(rollbackCandidate);
+    mutate(candidate.entries.find((entry) => entry.resourceId === "platform-approved-deployment-rollback"));
+    assert.ok(validateRepositoryContractionInventory(candidate).some((error) => error.includes(expected)), expected);
+  }
 });
 
 test("contract gate는 post-snapshot amendments의 disposition↔lifecycle 결속을 검증한다", () => {

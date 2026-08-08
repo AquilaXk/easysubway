@@ -17,24 +17,26 @@
         "additionalProperties": false,
         "required": [
           "resourceId", "path", "selector", "kind", "classification", "hubOwner", "targetOwner",
-          "targetOutput", "activeConsumers", "releaseReachability", "handoffState", "handoffEvidence",
+          "repository", "targetOutput", "activeConsumers", "releaseReachability", "handoffState", "handoffEvidence",
           "plannedAction", "executionEligibility", "reviewTrigger", "fallbackExposure",
-          "fallbackRemovalOwner", "fallbackVerification", "fallbackVerificationState", "rollbackMode", "rollbackRevision"
+          "fallbackRemovalOwner", "fallbackVerification", "fallbackVerificationState", "rollbackMode", "rollbackRevision",
+          "rollbackTargetRepository", "rollbackApprovalEvidence", "rollbackOperation"
         ],
         "properties": {
           "resourceId": { "type": "string", "pattern": "^(hub|backend|data|mobile|platform)-[a-z0-9-]+$" },
           "path": { "type": "string", "minLength": 1 },
+          "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
           "selector": { "type": ["string", "null"] },
           "kind": { "enum": ["SOURCE", "BUILD", "WORKFLOW", "CONTRACT", "GOVERNANCE", "MIGRATION", "AUDIT", "DOCUMENTATION", "DEPLOYMENT"] },
-          "classification": { "enum": ["HUB_SYSTEM_OWNER_RETAIN", "TARGET_CANONICAL_DELETE_AFTER_HANDOFF", "HISTORICAL_ARCHIVE_NONEXECUTABLE", "DUPLICATE_GATE_DISABLE_AFTER_TARGET"] },
+          "classification": { "enum": ["HUB_SYSTEM_OWNER_RETAIN", "TARGET_CANONICAL_DELETE_AFTER_HANDOFF", "TARGET_FALLBACK_REMOVE", "HISTORICAL_ARCHIVE_NONEXECUTABLE", "DUPLICATE_GATE_DISABLE_AFTER_TARGET"] },
           "hubOwner": { "const": "hub" },
           "targetOwner": { "enum": ["backend", "data", "mobile", "platform", null] },
           "targetOutput": { "type": "string", "minLength": 1 },
           "activeConsumers": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
           "releaseReachability": { "enum": ["CURRENT", "NOT_CURRENT"] },
           "handoffState": { "enum": ["NOT_APPLICABLE", "PENDING", "VERIFIED"] },
-          "handoffEvidence": { "type": "array", "uniqueItems": true, "items": { "type": "string", "format": "uri" } },
-          "plannedAction": { "enum": ["RETAIN", "DELETE_AFTER_HANDOFF", "ARCHIVE_NONEXECUTABLE", "DISABLE_AFTER_TARGET"] },
+          "handoffEvidence": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["kind", "reference", "identity", "conclusion"], "properties": { "kind": { "enum": ["PLANNED_REFERENCE", "IMMUTABLE_TARGET", "TARGET_CONSUMER", "TARGET_TERMINAL_GATE", "SYSTEM_TERMINAL_GATE"] }, "reference": { "type": "string", "minLength": 1 }, "identity": { "type": ["string", "null"] }, "conclusion": { "enum": ["NOT_APPLICABLE", "SUCCESS", "FAILURE"] } } } },
+          "plannedAction": { "enum": ["RETAIN", "DELETE_AFTER_HANDOFF", "ARCHIVE_NONEXECUTABLE", "DISABLE_AFTER_TARGET", "REMOVE_FALLBACK"] },
           "executionEligibility": { "type": "boolean" },
           "reviewTrigger": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } },
           "fallbackExposure": { "enum": ["NONE", "FORBIDDEN_ACTIVE", "VERIFIED_ROLLBACK_ONLY"] },
@@ -42,7 +44,10 @@
           "fallbackVerification": { "type": "array", "uniqueItems": true, "items": { "type": "string", "pattern": "^(?:[A-Z][A-Z0-9_.-]*|[a-z0-9][a-z0-9/_.-]*(?::[A-Za-z0-9_.-]+)?)$" } },
           "fallbackVerificationState": { "enum": ["NOT_APPLICABLE", "PLANNED", "VERIFIED"] },
           "rollbackMode": { "enum": ["NOT_APPLICABLE", "EXACT_IMMUTABLE_DEPLOYMENT_ONLY"] },
-          "rollbackRevision": { "type": ["string", "null"] }
+          "rollbackRevision": { "type": ["string", "null"] },
+          "rollbackTargetRepository": { "enum": ["AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform", null] },
+          "rollbackApprovalEvidence": { "oneOf": [{ "type": "null" }, { "type": "object", "additionalProperties": false, "required": ["decision", "revision", "operation", "deploymentClass", "reference"], "properties": { "decision": { "enum": ["APPROVED"] }, "revision": { "type": "string", "pattern": "^[a-f0-9]{40}$" }, "operation": { "enum": ["MANUAL_DEPLOYMENT"] }, "deploymentClass": { "enum": ["PLATFORM_ATOMIC_TRAFFIC_ACTIVATION"] }, "reference": { "type": "string", "format": "uri" } } }] },
+          "rollbackOperation": { "enum": ["NOT_APPLICABLE", "MANUAL_DEPLOYMENT"] }
         }
       }
     }
