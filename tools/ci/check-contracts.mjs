@@ -83,6 +83,8 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     architectureDecision: resolveWorkspacePath(workspace.architectureDecision),
     documentationSystemCatalog: resolveWorkspacePath(workspace.documentationSystemCatalog),
     productClaimCatalog: resolveWorkspacePath(workspace.productClaimCatalog),
+    referenceAuditScope: workspace.referenceAuditScope == null ? null : resolveWorkspacePath(workspace.referenceAuditScope),
+    referenceAuditReportSchema: workspace.referenceAuditReportSchema == null ? null : resolveWorkspacePath(workspace.referenceAuditReportSchema),
   };
 }
 
@@ -145,6 +147,19 @@ export function collectContractErrors(
         forbiddenClaims,
         publicCopy: readProductClaimReadme(join(repositoryRoot, "README.md"), errors),
       });
+    }
+  }
+  if (workspace.referenceAuditScope != null || workspace.referenceAuditReportSchema != null) {
+    if (workspace.referenceAuditScope == null || workspace.referenceAuditReportSchema == null) {
+      errors.push("reference audit workspace entries는 함께 필요하다");
+    } else {
+      const referenceAuditScopeValid = validateJson(contract("documentation/reference-audit-scope.schema.json"), workspace.referenceAuditScope, errors);
+      if (referenceAuditScopeValid) validateReferenceAuditScope(loadJson(workspace.referenceAuditScope), errors, workspace.referenceAuditScope);
+      if (!existsSync(workspace.referenceAuditReportSchema)) errors.push(`${workspace.referenceAuditReportSchema} 누락`);
+      else {
+        try { validateReferenceAuditReportSchema(loadJson(workspace.referenceAuditReportSchema), errors, workspace.referenceAuditReportSchema); }
+        catch { errors.push(`${workspace.referenceAuditReportSchema}: 유효한 JSON이 필요하다`); }
+      }
     }
   }
   let currentArchitectureDecisions = [];
@@ -253,6 +268,17 @@ export function collectContractErrors(
       (error) => `${repositorySplitIssuesPath}: ${error}`,
     ));
   }
+  const repositoryContractionInventoryPath = join(repositoryRoot, "release/migrations/repository-contraction-inventory.json");
+  const repositoryContractionInventoryValid = validateJson(
+    contract("repository-contraction-inventory.schema.json"),
+    repositoryContractionInventoryPath,
+    errors,
+  );
+  if (repositoryContractionInventoryValid) {
+    errors.push(...validateRepositoryContractionInventory(loadJson(repositoryContractionInventoryPath), repositoryRoot).map(
+      (error) => `${repositoryContractionInventoryPath}: ${error}`,
+    ));
+  }
   const amendmentsPath = join(repositoryRoot, "release/migrations/repository-split-issues-amendments.json");
   const amendmentsValid = validateJson(
     contract("repository-split-issue-amendments.schema.json"),
@@ -285,8 +311,413 @@ export function validateRepositorySplitIssueLedger(ledger) {
   return validateLedger(ledger);
 }
 
+const REPOSITORY_CONTRACTION_CLASSIFICATIONS = {
+  HUB_SYSTEM_OWNER_RETAIN: { targetOwner: null, plannedAction: "RETAIN" },
+  HUB_FALLBACK_REMOVE: { targetOwner: null, plannedAction: "REMOVE_FALLBACK" },
+  TARGET_CANONICAL_DELETE_AFTER_HANDOFF: { targetOwner: "component", plannedAction: "DELETE_AFTER_HANDOFF" },
+  TARGET_FALLBACK_REMOVE: { targetOwner: "component", plannedAction: "REMOVE_FALLBACK" },
+  HISTORICAL_ARCHIVE_NONEXECUTABLE: { targetOwner: null, plannedAction: "ARCHIVE_NONEXECUTABLE" },
+  DUPLICATE_GATE_DISABLE_AFTER_TARGET: { targetOwner: "component", plannedAction: "DISABLE_AFTER_TARGET" },
+};
+const KNOWN_FALLBACK_SURFACES = new Map([
+  ["backend-ci-build", ["AquilaXk/easysubway", ".github/workflows/ci.yml", "backend build and package jobs"]],
+  ["data-ci-producer", ["AquilaXk/easysubway", ".github/workflows/ci.yml", "datapack producer jobs"]],
+  ["mobile-ci-build", ["AquilaXk/easysubway", ".github/workflows/ci.yml", "mobile build jobs"]],
+  ["platform-ci-deploy", ["AquilaXk/easysubway", ".github/workflows/ci.yml", "platform deployment checks"]],
+  ["data-datapack-release", ["AquilaXk/easysubway", ".github/workflows/datapack-release.yml", null]],
+  ["mobile-release-artifacts", ["AquilaXk/easysubway", ".github/workflows/release-artifacts.yml", "Android artifact build job"]],
+  ["backend-docker-image", ["AquilaXk/easysubway", "Dockerfile", null]],
+  ["backend-source", ["AquilaXk/easysubway", "backend", null]],
+  ["data-source", ["AquilaXk/easysubway", "tools/datapack", null]],
+  ["mobile-source", ["AquilaXk/easysubway", "apps/mobile", null]],
+  ["platform-infra", ["AquilaXk/easysubway", "infra", null]],
+  ["platform-deploy-tools", ["AquilaXk/easysubway", "tools/deploy", null]],
+  ["hub-automerge-queue", ["AquilaXk/easysubway", ".github/workflows/automerge-queue.yml", null]],
+  ["backend-raw-main-v1-stage", ["AquilaXk/easysubway", "backend/tools/stage-contracts.mjs", null]],
+  ["data-freshness-gate", ["AquilaXk/easysubway", "release/product-gates/datapack-freshness-sla.json", null]],
+  ["data-previous-artifact-contract", ["AquilaXk/easysubway", "release/product-gates/rc-evidence-manifest-contract.json", "dataPackFallbackArtifactSha256"]],
+  ["hub-release-artifacts-bundled-datapack", ["AquilaXk/easysubway", ".github/workflows/release-artifacts.yml", "missing datapack run uses bundled index and capital artifact"]],
+  ["hub-rc-datapack-selector", ["AquilaXk/easysubway", "tools/release/select-rc-datapack-artifact.mjs", "fallback.sqlite.gz selection and copy"]],
+  ["hub-manifest-emergency-override", ["AquilaXk/easysubway", "tools/datapack/lib/manifest-validation.mjs", "emergencyOverride fallback pack selection"]],
+  ["hub-rc-evidence-fallback-artifact", ["AquilaXk/easysubway", "tools/release/generate-rc-evidence-manifest.mjs", "data-pack fallback artifact requirement"]],
+  ["hub-admin-qa-upload-warn", ["AquilaXk/easysubway", ".github/workflows/ci.yml", "Admin QA upload continue-on-error and if-no-files-found warn"]],
+  ["backend-realtime-fallback", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java", "POST_SCAN_REALTIME_FALLBACK_REASON"]],
+  ["backend-planner-fallback", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java", "Legacy graph fallback"]],
+  ["backend-stale-fallback", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/application/service/RouteSearchService.java", "STALE_FALLBACK"]],
+  ["backend-static-fallback", ["AquilaXk/easysubway-backend", "tools/routes/check-route-commercialization-gate.mjs", "STATIC_BACKEND_ESTIMATE"]],
+  ["backend-raw-main-contract", ["AquilaXk/easysubway-backend", "backend/tools/stage-contracts.mjs", "raw.githubusercontent.com/AquilaXk/easysubway/main"]],
+  ["data-rollback-fallback", ["AquilaXk/easysubway-data", "tools/datapack/rollback-manifest.mjs", "rollback manifest"]],
+  ["mobile-local-fallback", ["AquilaXk/easysubway-mobile", "apps/mobile/lib/features/routes/data/local_route_repository.dart", "offline/local fallback repository"]],
+  ["mobile-v1-fallback", ["AquilaXk/easysubway-mobile", "apps/mobile/lib/route_search.dart", "Route V1 fallback"]],
+  ["mobile-v2-fallback", ["AquilaXk/easysubway-mobile", "apps/mobile/lib/route_search.dart", "Route V2 fallback"]],
+  ["platform-raw-main-fallback", ["AquilaXk/easysubway-platform", "tools/platform/stage-contracts.mjs", "raw.githubusercontent.com/AquilaXk/easysubway/main"]],
+  ["platform-legacy-restore-fallback", ["AquilaXk/easysubway-platform", "tools/deploy/deploy-backend.sh", "restore_legacy_backend_service"]],
+  ["platform-legacy-credential-fallback", ["AquilaXk/easysubway-platform", "tools/deploy/prepare-deployment-env.sh", "legacy_pepper"]],
+  ["backend-topis-fixture-fallback", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/realtime/application/TopisRealtimeProvider.java", "fixtureEnabled fallbackProvider"]],
+  ["backend-realtime-overlay-fallback", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/domain/RealtimeEtaOverlay.java", "PLANNED EtaSource.FALLBACK"]],
+  ["backend-v2-planner-legacy-graph", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/application/service/RouteV2Planner.java", "legacy graph"]],
+  ["backend-route-controller-v1-refresh", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/adapter/in/web/RouteSearchController.java", "api/v1 LEGACY_STATIC refresh"]],
+  ["backend-timetable-seed-last-known-good", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/adapter/out/persistence/TimetableSeedLoader.java", "last-known-good snapshot"]],
+  ["backend-jdbc-timetable-break-glass", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/adapter/out/persistence/JdbcRouteTimetableRepository.java", "breakGlass freshness filter"]],
+  ["backend-timetable-monitor-break-glass", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/route/adapter/out/persistence/TimetableFreshnessMonitor.java", "break-glass expired snapshot"]],
+  ["backend-transit-master-static-empty", ["AquilaXk/easysubway-backend", "backend/src/main/java/com/easysubway/transit/adapter/out/persistence/JdbcTransitMasterOverrideRepository.java", "static-seed Optional.empty DataAccess"]],
+  ["data-itx-historical-previous", ["AquilaXk/easysubway-data", "tools/datapack/apply-itx-topology-to-bundled-pack.mjs", "UNCHANGED_AUTO previousArtifactPath"]],
+  ["data-build-previous-artifact-chain", ["AquilaXk/easysubway-data", "tools/datapack/build-datapack.mjs", "previous artifact chain"]],
+  ["data-manifest-emergency-latest-capital", ["AquilaXk/easysubway-data", "tools/datapack/lib/manifest-validation.mjs", "emergencyOverride latest capital"]],
+  ["data-coverage-active-default-capital", ["AquilaXk/easysubway-data", "tools/datapack/report-coverage-gaps.mjs", "active default capital"]],
+  ["data-release-first-pack", ["AquilaXk/easysubway-data", "tools/ci/datapack-release-workflow.test.mjs", "packs[0]"]],
+  ["data-molit-edge-sample", ["AquilaXk/easysubway-data", "tools/datapack/build-molit-nationwide-fixture.mjs", "edge-sample"]],
+  ["data-public-api-static-planned", ["AquilaXk/easysubway-data", "tools/datapack/collect-nationwide-public-api-coverage.mjs", "STATIC_LOCAL PLANNED"]],
+  ["mobile-dependencies-local-first", ["AquilaXk/easysubway-mobile", "apps/mobile/lib/app/app_dependencies.dart", "LocalFirst flag"]],
+  ["mobile-bootstrap-local-route", ["AquilaXk/easysubway-mobile", "apps/mobile/lib/app/app_bootstrap.dart", "LocalRouteRepository"]],
+  ["mobile-route-search-refresh", ["AquilaXk/easysubway-mobile", "apps/mobile/lib/route_search.dart", "V1 V2 refresh"]],
+  ["mobile-route-v2-transport-scoped", ["AquilaXk/easysubway-mobile", "apps/mobile/lib/route_v2_ingress.dart", "TransportScoped"]],
+  ["mobile-internal-route-local", ["AquilaXk/easysubway-mobile", "apps/mobile/lib/features/internal_route/data/local_internal_route_repository.dart", "local internal route"]],
+  ["mobile-catalog-known-good-bundled", ["AquilaXk/easysubway-mobile", "apps/mobile/lib/core/database/catalog/catalog_database_opener.dart", "known-good bundled"]],
+  ["mobile-pack-update-corrupt-default", ["AquilaXk/easysubway-mobile", "apps/mobile/lib/core/datapack/data_pack_update_state.dart", "corrupted-policy default"]],
+  ["platform-ci-raw-main", ["AquilaXk/easysubway-platform", ".github/workflows/ci.yml", "raw.githubusercontent.com/AquilaXk/easysubway/main"]],
+  ["platform-contract-lock-raw-main", ["AquilaXk/easysubway-platform", "contracts.lock.json", "raw.githubusercontent.com/AquilaXk/easysubway/main"]],
+  ["platform-compose-route-v2-gateway", ["AquilaXk/easysubway-platform", "infra/docker-compose.yml", "route-v2-gateway"]],
+]);
+const KNOWN_FORBIDDEN_FALLBACK_RESOURCE_IDS = new Set(KNOWN_FALLBACK_SURFACES.keys());
+const KNOWN_DUPLICATE_GATE_SURFACES = new Map([
+  ["data-datapack-expiry-alert", ["AquilaXk/easysubway", ".github/workflows/datapack-expiry-alert.yml", "scheduled/manual expiry alert jobs and Slack notification"]],
+]);
+
+export function validateRepositoryContractionInventory(inventory, repositoryRoot = process.cwd()) {
+  const errors = [];
+  const resourceIds = new Set();
+  const selectorsBySurface = new Map();
+  const activeFallbackVerificationIds = new Set();
+  validateInventoryBaseHead(inventory, errors, repositoryRoot);
+  for (const entry of inventory.entries ?? []) {
+    if (resourceIds.has(entry.resourceId)) errors.push(`${entry.resourceId}: resourceId 중복`);
+    resourceIds.add(entry.resourceId);
+    const requiredSurface = KNOWN_FALLBACK_SURFACES.get(entry.resourceId);
+    if (requiredSurface != null && (entry.repository !== requiredSurface[0] || entry.path !== requiredSurface[1] || entry.selector !== requiredSurface[2])) {
+      errors.push(`${entry.resourceId}: known fallback exact repository/path/selector 불일치`);
+    }
+    const duplicateGateSurface = KNOWN_DUPLICATE_GATE_SURFACES.get(entry.resourceId);
+    if (duplicateGateSurface != null && (entry.repository !== duplicateGateSurface[0]
+        || entry.path !== duplicateGateSurface[1] || entry.selector !== duplicateGateSurface[2])) {
+      errors.push(`${entry.resourceId}: known duplicate gate exact repository/path/selector 불일치`);
+    }
+    const surface = `${entry.repository}\u0000${entry.path}`;
+    const selectors = selectorsBySurface.get(surface) ?? [];
+    selectors.push(entry.selector);
+    selectorsBySurface.set(surface, selectors);
+
+    const rule = REPOSITORY_CONTRACTION_CLASSIFICATIONS[entry.classification];
+    if (rule == null) {
+      errors.push(`${entry.path}: unknown classification`);
+      continue;
+    }
+    if (entry.hubOwner !== "hub") {
+      errors.push(`${entry.resourceId}: hubOwner는 hub여야 한다`);
+    }
+    if (rule.targetOwner === null && entry.targetOwner !== null) {
+      errors.push(`${entry.resourceId}: ${entry.classification} targetOwner는 null이어야 한다`);
+    }
+    if (rule.targetOwner === "component") {
+      const expectedTargetOwner = entry.resourceId.split("-", 1)[0];
+      if (entry.targetOwner !== expectedTargetOwner) {
+        errors.push(`${entry.resourceId}: targetOwner 불일치`);
+      }
+    }
+    if (entry.repository !== "AquilaXk/easysubway"
+        && (!Object.hasOwn(EXTRACTION_REPOSITORIES, entry.targetOwner)
+          || entry.repository !== EXTRACTION_REPOSITORIES[entry.targetOwner])) {
+      errors.push(`${entry.resourceId}: repository/targetOwner extraction mapping 불일치`);
+    }
+    if (entry.plannedAction !== rule.plannedAction) {
+      errors.push(`${entry.resourceId}: ${entry.classification} plannedAction 불일치`);
+    }
+    if (duplicateGateSurface != null && (entry.classification !== "DUPLICATE_GATE_DISABLE_AFTER_TARGET"
+        || entry.targetOwner !== "data" || entry.plannedAction !== "DISABLE_AFTER_TARGET")) {
+      errors.push(`${entry.resourceId}: known duplicate gate classification/target/action 불일치`);
+    }
+    if (entry.classification === "TARGET_FALLBACK_REMOVE"
+        && (entry.repository !== EXTRACTION_REPOSITORIES[entry.targetOwner]
+          || entry.fallbackRemovalOwner !== entry.targetOwner
+          || entry.fallbackExposure !== "FORBIDDEN_ACTIVE"
+          || entry.fallbackVerificationState !== "PLANNED"
+          || entry.executionEligibility)) {
+      errors.push(`${entry.resourceId}: TARGET_FALLBACK_REMOVE target/removal/fallback state 불일치`);
+    }
+    if (entry.classification === "HUB_FALLBACK_REMOVE"
+        && (entry.repository !== "AquilaXk/easysubway" || entry.targetOwner !== null
+          || entry.hubOwner !== "hub" || entry.fallbackRemovalOwner !== "hub"
+          || entry.fallbackExposure !== "FORBIDDEN_ACTIVE"
+          || entry.fallbackVerificationState !== "PLANNED" || entry.executionEligibility)) {
+      errors.push(`${entry.resourceId}: HUB_FALLBACK_REMOVE hub/removal/fallback state 불일치`);
+    }
+    if (entry.classification === "HUB_SYSTEM_OWNER_RETAIN" && entry.fallbackExposure !== "NONE") {
+      errors.push(`${entry.resourceId}: HUB_SYSTEM_OWNER_RETAIN은 fallbackExposure NONE이어야 한다`);
+    }
+    validateHandoffEvidence(entry, errors);
+    if (typeof entry.selector === "string" && entry.selector.trim() === "") {
+      errors.push(`${entry.resourceId}: selector는 비어 있을 수 없다`);
+    }
+    if (rule.targetOwner === "component" && !["PENDING", "VERIFIED"].includes(entry.handoffState)) {
+      errors.push(`${entry.resourceId}: target handoffState는 PENDING 또는 VERIFIED여야 한다`);
+    }
+    if (rule.targetOwner === null && entry.handoffState !== "NOT_APPLICABLE") {
+      errors.push(`${entry.resourceId}: Hub retain/historical handoffState는 NOT_APPLICABLE여야 한다`);
+    }
+    if (["TARGET_CANONICAL_DELETE_AFTER_HANDOFF", "DUPLICATE_GATE_DISABLE_AFTER_TARGET", "TARGET_FALLBACK_REMOVE"].includes(entry.classification)) {
+      if (entry.activeConsumers.length === 0) errors.push(`${entry.resourceId}: active consumer가 필요하다`);
+      if (entry.handoffEvidence.length === 0) errors.push(`${entry.resourceId}: handoff evidence가 필요하다`);
+      if (entry.handoffState === "PENDING" && entry.executionEligibility) {
+        errors.push(`${entry.resourceId}: PENDING은 execution-eligible일 수 없다`);
+      }
+      if (entry.handoffState === "VERIFIED" && entry.handoffEvidence.length === 0) {
+        errors.push(`${entry.resourceId}: VERIFIED handoff evidence가 필요하다`);
+      }
+      if ((entry.handoffState === "VERIFIED" || entry.executionEligibility)
+          && !hasTerminalHandoffEvidence(entry.handoffEvidence)) {
+        errors.push(`${entry.resourceId}: VERIFIED/execution handoff에는 immutable target, consumer, terminal gate evidence가 필요하다`);
+      }
+    } else if (entry.executionEligibility) {
+      errors.push(`${entry.resourceId}: ${entry.classification}은 execution-eligible일 수 없다`);
+    }
+    if (entry.classification === "HISTORICAL_ARCHIVE_NONEXECUTABLE") {
+      if (entry.releaseReachability !== "NOT_CURRENT") errors.push(`${entry.resourceId}: historical item은 current-reachable일 수 없다`);
+      if (entry.activeConsumers.length !== 0) errors.push(`${entry.resourceId}: historical item은 active consumer가 있을 수 없다`);
+    }
+    validateFallbackExposure(entry, errors, activeFallbackVerificationIds);
+  }
+  for (const resourceId of KNOWN_FALLBACK_SURFACES.keys()) {
+    if (!resourceIds.has(resourceId)) errors.push(`${resourceId}: known fallback required-set 누락`);
+  }
+  for (const resourceId of KNOWN_DUPLICATE_GATE_SURFACES.keys()) {
+    if (!resourceIds.has(resourceId)) errors.push(`${resourceId}: known duplicate gate required-set 누락`);
+  }
+  for (const [surface, selectors] of selectorsBySurface) {
+    if (selectors.length < 2) continue;
+    if (selectors.some((selector) => typeof selector !== "string" || selector.trim() === "")) {
+      errors.push(`${surface.replace("\u0000", "/")}: mixed path selector가 필요하다`);
+      continue;
+    }
+    if (new Set(selectors).size !== selectors.length) errors.push(`${surface.replace("\u0000", "/")}: mixed path selector 중복`);
+  }
+  return errors;
+}
+
+function validateInventoryBaseHead(inventory, errors, repositoryRoot) {
+  try {
+    const remote = inventoryGit(repositoryRoot, ["remote", "get-url", "origin"], "utf8").trim();
+    if (!remote.includes("AquilaXk/easysubway")) throw new Error("Hub origin이 필요하다");
+    inventoryGit(repositoryRoot, ["cat-file", "-e", `${inventory.inventoryBaseHead}^{commit}`]);
+    inventoryGit(repositoryRoot, ["merge-base", "--is-ancestor", inventory.inventoryBaseHead, "HEAD"]);
+  } catch {
+    errors.push(`inventoryBaseHead ${inventory.inventoryBaseHead}: Hub Git base object와 HEAD ancestor가 필요하다`);
+  }
+}
+
+function validateHandoffEvidence(entry, errors) {
+  const evidence = entry.handoffEvidence ?? [];
+  const kinds = new Set();
+  const expiryAlertEvidenceKinds = new Set(["TARGET_SCHEDULED_GATE", "TARGET_MANUAL_GATE", "TARGET_NOTIFICATION_EVIDENCE"]);
+  for (const item of evidence) {
+    if (kinds.has(item.kind)) errors.push(`${entry.resourceId}: handoff evidence kind 중복`);
+    kinds.add(item.kind);
+    if (item.kind === "PLANNED_REFERENCE" && (item.identity !== null || !/^https:\/\/github\.com\/AquilaXk\/easysubway(?:-(?:backend|data|mobile|platform))?\/(?:issues|pull)\/\d+$/.test(item.reference))) {
+      errors.push(`${entry.resourceId}: planned handoff reference format 불일치`);
+    }
+    if (["PLANNED_REFERENCE", "IMMUTABLE_TARGET", "TARGET_CONSUMER"].includes(item.kind) && item.conclusion !== "NOT_APPLICABLE") {
+      errors.push(`${entry.resourceId}: non-gate handoff conclusion은 NOT_APPLICABLE여야 한다`);
+    }
+    if (["TARGET_TERMINAL_GATE", "SYSTEM_TERMINAL_GATE", ...expiryAlertEvidenceKinds].includes(item.kind) && item.conclusion !== "SUCCESS") {
+      errors.push(`${entry.resourceId}: terminal gate conclusion은 SUCCESS여야 한다`);
+    }
+    if (expiryAlertEvidenceKinds.has(item.kind) && entry.resourceId !== "data-datapack-expiry-alert") {
+      errors.push(`${entry.resourceId}: expiry alert handoff evidence는 data-datapack-expiry-alert에만 허용된다`);
+    }
+  }
+  if (entry.handoffState !== "VERIFIED" && !entry.executionEligibility) return;
+  const immutable = evidence.find((item) => item.kind === "IMMUTABLE_TARGET");
+  const consumer = evidence.find((item) => item.kind === "TARGET_CONSUMER");
+  const targetTerminal = evidence.find((item) => item.kind === "TARGET_TERMINAL_GATE");
+  const systemTerminal = evidence.find((item) => item.kind === "SYSTEM_TERMINAL_GATE");
+  const targetRepository = EXTRACTION_REPOSITORIES[entry.targetOwner];
+  const immutableRevision = immutable?.identity ?? "";
+  if (immutable == null || !/^(?:[a-f0-9]{40}|sha256:[a-f0-9]{64})$/.test(immutableRevision)
+      || !isImmutableTargetReference(immutable.reference, targetRepository, immutableRevision)
+      || consumer == null || !isTargetConsumerReference(consumer.reference, targetRepository, immutableRevision)
+      || consumer.identity !== immutableRevision || targetTerminal == null || systemTerminal == null
+      || !isTargetTerminalGateReference(targetTerminal.reference, targetRepository) || targetTerminal.identity !== immutableRevision || targetTerminal.conclusion !== "SUCCESS"
+      || !isSystemTerminalGateReference(systemTerminal.reference) || systemTerminal.identity !== immutableRevision || systemTerminal.conclusion !== "SUCCESS"
+      || evidence.some((item) => ["PLANNED_REFERENCE", "IMMUTABLE_TARGET", "TARGET_CONSUMER"].includes(item.kind) && item.conclusion !== "NOT_APPLICABLE")) {
+    errors.push(`${entry.resourceId}: VERIFIED/execution handoff에는 exact target/system terminal gate evidence가 필요하다`);
+  }
+  if (entry.resourceId === "data-datapack-expiry-alert") {
+    const scheduled = evidence.find((item) => item.kind === "TARGET_SCHEDULED_GATE");
+    const manual = evidence.find((item) => item.kind === "TARGET_MANUAL_GATE");
+    const notification = evidence.find((item) => item.kind === "TARGET_NOTIFICATION_EVIDENCE");
+    const dataRepository = "AquilaXk/easysubway-data";
+    const targetRun = new RegExp(`^https://github\\.com/${dataRepository}/actions/runs/\\d+$`);
+    const notificationArtifact = new RegExp(`^https://github\\.com/${dataRepository}/actions/runs/\\d+/artifacts/\\d+$`);
+    const notificationRun = typeof notification?.reference === "string"
+      ? notification.reference.replace(/\/artifacts\/\d+$/, "")
+      : "";
+    if (scheduled == null || manual == null || notification == null
+        || scheduled.identity !== immutableRevision || manual.identity !== immutableRevision || notification.identity !== immutableRevision
+        || !targetRun.test(scheduled.reference) || !targetRun.test(manual.reference) || !notificationArtifact.test(notification.reference)
+        || scheduled.reference === manual.reference || ![scheduled.reference, manual.reference].includes(notificationRun)
+        || scheduled.conclusion !== "SUCCESS" || manual.conclusion !== "SUCCESS" || notification.conclusion !== "SUCCESS") {
+      errors.push(`${entry.resourceId}: VERIFIED/execution handoff에는 exact scheduled/manual/notification evidence가 필요하다`);
+    }
+  }
+}
+
+function hasTerminalHandoffEvidence(evidence) {
+  const kinds = new Set((evidence ?? []).map((item) => item.kind));
+  return kinds.has("IMMUTABLE_TARGET") && kinds.has("TARGET_CONSUMER")
+    && kinds.has("TARGET_TERMINAL_GATE") && kinds.has("SYSTEM_TERMINAL_GATE");
+}
+
+function isImmutableTargetReference(reference, repository, revision) {
+  return repository != null && (reference === `https://github.com/${repository}/commit/${revision}`
+    || (revision.startsWith("sha256:") && reference.startsWith(`oci://${repository}@${revision}`)));
+}
+
+function isTargetConsumerReference(reference, repository, revision) {
+  return repository != null && (revision.startsWith("sha256:")
+    ? reference === `oci://${repository}@${revision}`
+    : /^[a-f0-9]{40}$/.test(revision)
+      && new RegExp(`^https://github\\.com/${repository}/blob/${revision}/[^/]+`).test(reference));
+}
+
+function isTargetTerminalGateReference(reference, repository) {
+  return repository != null && new RegExp(`^https://github\\.com/${repository}/actions/runs/\\d+$`).test(reference);
+}
+
+function isSystemTerminalGateReference(reference) {
+  return /^https:\/\/github\.com\/AquilaXk\/easysubway\/actions\/runs\/\d+$/.test(reference);
+}
+
+function validateFallbackExposure(entry, errors, activeFallbackVerificationIds) {
+  if (KNOWN_FORBIDDEN_FALLBACK_RESOURCE_IDS.has(entry.resourceId)
+      && entry.fallbackExposure !== "FORBIDDEN_ACTIVE") {
+    errors.push(`${entry.resourceId}: known fallback은 FORBIDDEN_ACTIVE여야 한다`);
+  }
+  if (entry.fallbackExposure === "NONE") {
+    if (entry.fallbackRemovalOwner !== null || entry.fallbackVerification.length !== 0
+        || entry.fallbackVerificationState !== "NOT_APPLICABLE"
+        || entry.rollbackMode !== "NOT_APPLICABLE" || entry.rollbackRevision !== null
+        || entry.rollbackTargetRepository != null || entry.rollbackApprovalEvidence != null || entry.rollbackOperation !== "NOT_APPLICABLE") {
+      errors.push(`${entry.resourceId}: NONE fallback metadata 불일치`);
+    }
+    return;
+  }
+  if (entry.fallbackExposure === "FORBIDDEN_ACTIVE") {
+    const expectedRemovalOwner = entry.targetOwner ?? "hub";
+    if (entry.fallbackRemovalOwner !== expectedRemovalOwner) {
+      errors.push(`${entry.resourceId}: fallback removal owner가 필요하다`);
+    }
+    if (entry.fallbackVerificationState !== "PLANNED") errors.push(`${entry.resourceId}: FORBIDDEN_ACTIVE fallback verification은 PLANNED여야 한다`);
+    if (entry.fallbackVerification.length === 0) errors.push(`${entry.resourceId}: fallback verification이 필요하다`);
+    if (entry.fallbackVerification.some((identifier) => !isFallbackVerificationIdentifier(identifier))) {
+      errors.push(`${entry.resourceId}: fallback verification은 executable test/gate identifier여야 한다`);
+    }
+    for (const identifier of entry.fallbackVerification) {
+      if (activeFallbackVerificationIds.has(identifier)) errors.push(`${entry.resourceId}: active fallback verification identifier 중복`);
+      activeFallbackVerificationIds.add(identifier);
+    }
+    if (entry.handoffState === "VERIFIED") errors.push(`${entry.resourceId}: FORBIDDEN_ACTIVE은 handoff VERIFIED일 수 없다`);
+    if (entry.executionEligibility) errors.push(`${entry.resourceId}: FORBIDDEN_ACTIVE은 execution-eligible일 수 없다`);
+    if (entry.rollbackMode !== "NOT_APPLICABLE" || entry.rollbackRevision !== null
+        || entry.rollbackTargetRepository != null || entry.rollbackApprovalEvidence != null || entry.rollbackOperation !== "NOT_APPLICABLE") {
+      errors.push(`${entry.resourceId}: FORBIDDEN_ACTIVE rollback metadata 불일치`);
+    }
+    return;
+  }
+  const approval = entry.rollbackApprovalEvidence;
+  const deploymentRollback = entry.resourceId === "platform-approved-deployment-rollback"
+    && entry.kind === "DEPLOYMENT" && entry.targetOwner === "platform"
+    && entry.repository === "AquilaXk/easysubway-platform"
+    && entry.rollbackTargetRepository === "AquilaXk/easysubway-platform"
+    && entry.path === ".github/workflows/deploy.yml" && entry.selector === "PLATFORM_ATOMIC_TRAFFIC_ACTIVATION"
+    && hasVerifiedPlatformDeploymentHandoff(entry)
+    && /^[a-f0-9]{40}$/.test(entry.rollbackRevision ?? "")
+    && approval != null && approval.decision === "APPROVED" && approval.revision === entry.rollbackRevision
+    && approval.operation === "MANUAL_DEPLOYMENT" && approval.deploymentClass === "PLATFORM_ATOMIC_TRAFFIC_ACTIVATION"
+    && /^https:\/\/github\.com\/AquilaXk\/easysubway-platform\/(?:issues|pull)\/\d+$/.test(approval.reference)
+    && entry.rollbackOperation === "MANUAL_DEPLOYMENT";
+  if (entry.fallbackRemovalOwner !== null || entry.fallbackVerificationState !== "VERIFIED" || entry.fallbackVerification.length === 0
+      || entry.fallbackVerification.some((identifier) => !isFallbackVerificationIdentifier(identifier))
+      || entry.rollbackMode !== "EXACT_IMMUTABLE_DEPLOYMENT_ONLY"
+      || !/^[a-f0-9]{40}$/.test(entry.rollbackRevision ?? "")
+      || !deploymentRollback) {
+    errors.push(`${entry.resourceId}: VERIFIED_ROLLBACK_ONLY는 Platform deployment rollback approval의 exact revision, manual operation, atomic traffic activation이어야 한다`);
+  }
+}
+
+function hasVerifiedPlatformDeploymentHandoff(entry) {
+  const evidence = entry.handoffEvidence ?? [];
+  const immutable = evidence.find((item) => item.kind === "IMMUTABLE_TARGET");
+  const consumer = evidence.find((item) => item.kind === "TARGET_CONSUMER");
+  const targetTerminal = evidence.find((item) => item.kind === "TARGET_TERMINAL_GATE");
+  const systemTerminal = evidence.find((item) => item.kind === "SYSTEM_TERMINAL_GATE");
+  const revision = immutable?.identity ?? "";
+  return entry.handoffState === "VERIFIED" && /^[a-f0-9]{40}$/.test(revision)
+    && isImmutableTargetReference(immutable?.reference, "AquilaXk/easysubway-platform", revision)
+    && consumer?.identity === revision
+    && isTargetConsumerReference(consumer?.reference, "AquilaXk/easysubway-platform", revision)
+    && targetTerminal?.identity === revision && targetTerminal.conclusion === "SUCCESS"
+    && isTargetTerminalGateReference(targetTerminal?.reference, "AquilaXk/easysubway-platform")
+    && systemTerminal?.identity === revision && systemTerminal.conclusion === "SUCCESS"
+    && isSystemTerminalGateReference(systemTerminal?.reference);
+}
+
+function isFallbackVerificationIdentifier(value) {
+  return /^(?:[A-Z][A-Z0-9_.-]*|[a-z0-9][a-z0-9/_.-]*(?::[A-Za-z0-9_.-]+)?)$/.test(value);
+}
+
 export function validateRepositorySplitIssueAmendments(amendments, ledger) {
   return validateAmendments(amendments, { ledger });
+}
+
+export function validateReferenceAuditScope(scope, errors = [], path = "reference-audit-scope") {
+  const expected = [
+    "AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform",
+  ];
+  const repositories = scope?.repositories;
+  const actual = Array.isArray(repositories) ? repositories.map((entry) => entry?.repository) : [];
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) errors.push(`${path}: repository inventory는 exact codepoint sorted 5개여야 한다`);
+  for (const entry of Array.isArray(repositories) ? repositories : []) {
+    for (const root of entry?.trackedDiscoveryRoots ?? []) {
+      if (typeof root !== "string" || root === "" || root.startsWith("/") || root.startsWith("./") || root.includes("\\") || root.split("/").includes("..")) {
+        errors.push(`${path}: ${entry?.repository} discovery root는 안전한 repository-relative path여야 한다`);
+      }
+    }
+  }
+  return errors;
+}
+
+export function validateReferenceAuditReportSchema(schema, errors = [], path = "reference-audit-report.schema") {
+  const report = schema?.properties;
+  const inputs = report?.inputs?.properties;
+  const finding = report?.findings?.items;
+  if (schema?.type !== "object" || schema?.additionalProperties !== false || !Array.isArray(schema?.required)) errors.push(`${path}: strict report object schema가 필요하다`);
+  if (!Array.isArray(report?.observedAt?.type) && report?.observedAt?.format !== "date-time") errors.push(`${path}: observedAt canonical timestamp contract가 필요하다`);
+  if (!Array.isArray(report?.inputs?.required) || !report.inputs.required.includes("sourceSha") || (inputs?.sourceSha?.pattern !== "^[0-9a-f]{40}$" && inputs?.sourceSha?.$ref !== "#/$defs/sha")) errors.push(`${path}: sourceSha input identity가 필요하다`);
+  if (finding?.additionalProperties !== false || !["code", "referenceClass", "source", "target", "reason"].every((key) => finding?.required?.includes(key))) errors.push(`${path}: strict finding shape가 필요하다`);
+  if (JSON.stringify(finding?.properties?.referenceClass?.enum) !== JSON.stringify(["ARTIFACT_IMMUTABLE_REFERENCE", "EXTERNAL_INPUT_PENDING_REFERENCE", "ISSUE_CURRENT_OWNER", "ISSUE_NONCLOSING_DEPENDENCY", "ISSUE_PARENT_OR_COORDINATOR", "ISSUE_TERMINAL_IMPLEMENTATION", "PATH_CANONICAL_CURRENT", "PATH_HISTORICAL_OR_SUPERSEDED", "PR_EVIDENCE_ONLY", "PR_IMPLEMENTATION"])) errors.push(`${path}: referenceClass exact enum schema가 필요하다`);
+  for (const field of ["source", "target"]) {
+    const property = finding?.properties?.[field];
+    const variants = property?.oneOf;
+    if (property?.$ref !== `#/$defs/${field}` && (!Array.isArray(variants) || variants.length < 2 || variants.some((variant) => variant.type !== "object" || variant.additionalProperties !== false))) errors.push(`${path}: ${field} strict object schema가 필요하다`);
+  }
+  for (const field of ["referenced", "latestEffective"]) {
+    const branches = finding?.properties?.[field]?.oneOf;
+    if (!Array.isArray(branches) || !branches.some((branch) => branch.type === "null")
+      || !branches.some((branch) => branch.type === "object" && branch.additionalProperties === false)) errors.push(`${path}: ${field} strict nullable object schema가 필요하다`);
+  }
+  const expectedOwners = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform", null];
+  if (JSON.stringify(finding?.properties?.directOwner?.enum) !== JSON.stringify(expectedOwners)) errors.push(`${path}: directOwner enum schema가 필요하다`);
+  if (JSON.stringify(finding?.properties?.consumerRoute?.enum) !== JSON.stringify(["PLAN-DOC", "PLAN-REPO", "PLAN-JOURNEY", null])) errors.push(`${path}: consumerRoute enum schema가 필요하다`);
+  return errors;
 }
 
 export function validateSourceGovernanceContracts(
@@ -493,6 +924,12 @@ function documentationGit(root, args, encoding = "buffer") {
     env, maxBuffer: DOCUMENTATION_GIT_MAX_BUFFER,
     stdio: ["ignore", "pipe", "pipe"],
   });
+}
+
+function inventoryGit(repositoryRoot, args, encoding = "buffer") {
+  const env = { ...process.env, ...DOCUMENTATION_GIT_ENV };
+  for (const key of DOCUMENTATION_GIT_UNSET) delete env[key];
+  return execFileSync("/usr/bin/git", ["-C", repositoryRoot, ...args], { encoding, env, stdio: ["ignore", "pipe", "pipe"] });
 }
 
 function documentationTransportError(errors, message) {
