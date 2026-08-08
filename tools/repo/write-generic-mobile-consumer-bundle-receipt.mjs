@@ -93,8 +93,9 @@ async function ensureOutputDirectory(root, output) {
   }
 }
 
-export async function writeGenericMobileConsumerBundleReceipt({ repositoryRoot, bundlePath, outputPath }) {
+export async function writeGenericMobileConsumerBundleReceipt({ repositoryRoot, bundlePath, outputPath, testHook } = {}) {
   if (typeof repositoryRoot !== "string" || typeof bundlePath !== "string" || typeof outputPath !== "string") throw new Error("repositoryRoot, bundlePath, and outputPath must be strings");
+  if (testHook !== undefined && (process.env.NODE_ENV !== "test" || typeof testHook !== "function")) throw new Error("testHook is only available as a function when NODE_ENV=test");
   const root = path.resolve(repositoryRoot);
   const bundleTarget = path.resolve(bundlePath);
   const output = path.resolve(outputPath);
@@ -116,6 +117,7 @@ export async function writeGenericMobileConsumerBundleReceipt({ repositoryRoot, 
   const bytes = Buffer.from(`${JSON.stringify(receipt, null, 2)}\n`, "utf8");
   try {
     await writeFile(temporary, bytes, { flag: "wx", mode: 0o600 });
+    if (testHook) await testHook({ temporaryPath: temporary, bytes });
     await link(temporary, output);
   } finally {
     await rm(temporary, { force: true });

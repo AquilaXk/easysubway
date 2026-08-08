@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { lstat, mkdir, mkdtemp, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, readdir, rm, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -94,14 +94,71 @@ test("receipt는 변조·symlink·경로 이탈·기존 output을 fail closed한
   assert.equal(await readFile(outputPath, "utf8"), "old");
 });
 
+test("receipt는 인증된 bundle의 닫힌 header, resource와 digest 변조를 output 없이 거절한다", async (t) => {
+  const root = await fixtureRoot(t);
+  const bundlePath = await writeBundle(root);
+  const original = JSON.parse(await readFile(bundlePath, "utf8"));
+  const outputPath = path.join(root, "release-artifacts/mobile-contracts/generic-mobile-consumer-publication-receipt-v1.json");
+  const mutations = [
+    ["extra top key", (bundle) => { bundle.extra = true; }],
+    ["component", (bundle) => { bundle.component = "other"; }],
+    ["version", (bundle) => { bundle.bundleVersion = "2.0.0"; }],
+    ["producer", (bundle) => { bundle.producer.gitSha = "0".repeat(40); }],
+    ["resource order", (bundle) => { bundle.resources.reverse(); }],
+    ["resource owner", (bundle) => { bundle.resources[0].ownerRepository = "AquilaXk/other"; }],
+    ["resource raw digest", (bundle) => { bundle.resources[0].rawSha256 = "0".repeat(64); }],
+    ["resource content", (bundle) => { bundle.resources[0].contentBase64 = Buffer.from("{}\n").toString("base64"); }],
+    ["resource size", (bundle) => { bundle.resources[0].sizeBytes += 1; }],
+    ["resource inventory digest", (bundle) => { bundle.resourceInventorySha256 = "0".repeat(64); }],
+    ["payload digest", (bundle) => { bundle.payloadSha256 = "0".repeat(64); }],
+  ];
+  for (const [label, mutate] of mutations) {
+    const bundle = structuredClone(original);
+    mutate(bundle);
+    const mutationDirectory = path.join(root, "mutations", label.replaceAll(" ", "-"));
+    const mutationPath = path.join(mutationDirectory, "generic-mobile-consumer-bundle-v1.json");
+    await mkdir(mutationDirectory, { recursive: true });
+    await writeFile(mutationPath, `${JSON.stringify(bundle)}\n`, { flag: "wx" });
+    await assert.rejects(writeGenericMobileConsumerBundleReceipt({ repositoryRoot: root, bundlePath: mutationPath, outputPath }), /bundle|contract|digest|keys|resource/i, label);
+    await assert.rejects(lstat(outputPath), { code: "ENOENT" }, label);
+  }
+});
+
+test("receipt 부분쓰기 hook은 test 환경에서만 허용되고 임시 파일까지 정리한다", async (t) => {
+  const root = await fixtureRoot(t);
+  const bundlePath = await writeBundle(root);
+  const outputDirectory = path.join(root, "release-artifacts/mobile-contracts");
+  const outputPath = path.join(outputDirectory, "generic-mobile-consumer-publication-receipt-v1.json");
+  await assert.rejects(writeGenericMobileConsumerBundleReceipt({ repositoryRoot: root, bundlePath, outputPath, testHook: () => {} }), /NODE_ENV=test/);
+  const previousNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = "test";
+  try {
+    await assert.rejects(writeGenericMobileConsumerBundleReceipt({
+      repositoryRoot: root,
+      bundlePath,
+      outputPath,
+      testHook: async ({ temporaryPath }) => {
+        await writeFile(temporaryPath, "{", { flag: "w" });
+        throw new Error("simulated partial write");
+      },
+    }), /simulated partial write/);
+  } finally {
+    if (previousNodeEnv === undefined) delete process.env.NODE_ENV;
+    else process.env.NODE_ENV = previousNodeEnv;
+  }
+  await assert.rejects(lstat(outputPath), { code: "ENOENT" });
+  assert.deepEqual(await readdir(outputDirectory), []);
+});
+
 test("publication workflow는 main에서만 닫힌 producer와 정확히 두 파일을 artifact v4로 게시한다", async () => {
   const workflow = await readFile(".github/workflows/generic-mobile-consumer-bundle-publish.yml", "utf8");
   assert.match(workflow, /^on:\n  workflow_dispatch:\n$/m);
   assert.doesNotMatch(workflow, /\n  (push|pull_request|schedule):/);
   assert.match(workflow, /permissions:\n  contents: read/);
   assert.match(workflow, /GITHUB_REF}" != "refs\/heads\/main"[\s\S]*exit 1/);
-  assert.match(workflow, /actions\/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd[\s\S]*ref: 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3/);
-  assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
+  assert.match(workflow, /actions\/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd[\s\S]*persist-credentials: false/);
+  assert.doesNotMatch(workflow, /ref: 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3/);
+  assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e[\s\S]*node-version: 24\.19\.0/);
   assert.equal((workflow.match(/build-generic-mobile-consumer-bundle\.mjs --producer-sha 604a2ae525cc20b3bdcd3cbe2e22f93de19fefc3/g) ?? []).length, 2);
   assert.match(workflow, /cmp -- "\$\{bundle\}" "\$\{comparison_bundle\}"/);
   assert.match(workflow, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
