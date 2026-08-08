@@ -83,6 +83,8 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     architectureDecision: resolveWorkspacePath(workspace.architectureDecision),
     documentationSystemCatalog: resolveWorkspacePath(workspace.documentationSystemCatalog),
     productClaimCatalog: resolveWorkspacePath(workspace.productClaimCatalog),
+    referenceAuditScope: workspace.referenceAuditScope == null ? null : resolveWorkspacePath(workspace.referenceAuditScope),
+    referenceAuditReportSchema: workspace.referenceAuditReportSchema == null ? null : resolveWorkspacePath(workspace.referenceAuditReportSchema),
   };
 }
 
@@ -145,6 +147,19 @@ export function collectContractErrors(
         forbiddenClaims,
         publicCopy: readProductClaimReadme(join(repositoryRoot, "README.md"), errors),
       });
+    }
+  }
+  if (workspace.referenceAuditScope != null || workspace.referenceAuditReportSchema != null) {
+    if (workspace.referenceAuditScope == null || workspace.referenceAuditReportSchema == null) {
+      errors.push("reference audit workspace entries는 함께 필요하다");
+    } else {
+      validateJson(contract("documentation/reference-audit-scope.schema.json"), workspace.referenceAuditScope, errors);
+      if (existsSync(workspace.referenceAuditScope)) validateReferenceAuditScope(loadJson(workspace.referenceAuditScope), errors, workspace.referenceAuditScope);
+      if (!existsSync(workspace.referenceAuditReportSchema)) errors.push(`${workspace.referenceAuditReportSchema} 누락`);
+      else {
+        try { validateReferenceAuditReportSchema(loadJson(workspace.referenceAuditReportSchema), errors, workspace.referenceAuditReportSchema); }
+        catch { errors.push(`${workspace.referenceAuditReportSchema}: 유효한 JSON이 필요하다`); }
+      }
     }
   }
   let currentArchitectureDecisions = [];
@@ -287,6 +302,48 @@ export function validateRepositorySplitIssueLedger(ledger) {
 
 export function validateRepositorySplitIssueAmendments(amendments, ledger) {
   return validateAmendments(amendments, { ledger });
+}
+
+export function validateReferenceAuditScope(scope, errors = [], path = "reference-audit-scope") {
+  const expected = [
+    "AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform",
+  ];
+  const repositories = scope?.repositories;
+  const actual = Array.isArray(repositories) ? repositories.map((entry) => entry?.repository) : [];
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) errors.push(`${path}: repository inventory는 exact codepoint sorted 5개여야 한다`);
+  for (const entry of repositories ?? []) {
+    for (const root of entry?.trackedDiscoveryRoots ?? []) {
+      if (typeof root !== "string" || root === "" || root.startsWith("/") || root.startsWith("./") || root.includes("\\") || root.split("/").includes("..")) {
+        errors.push(`${path}: ${entry?.repository} discovery root는 안전한 repository-relative path여야 한다`);
+      }
+    }
+  }
+  return errors;
+}
+
+export function validateReferenceAuditReportSchema(schema, errors = [], path = "reference-audit-report.schema") {
+  const report = schema?.properties;
+  const inputs = report?.inputs?.properties;
+  const finding = report?.findings?.items;
+  if (schema?.type !== "object" || schema?.additionalProperties !== false || !Array.isArray(schema?.required)) errors.push(`${path}: strict report object schema가 필요하다`);
+  if (!Array.isArray(report?.observedAt?.type) && report?.observedAt?.format !== "date-time") errors.push(`${path}: observedAt canonical timestamp contract가 필요하다`);
+  if (!Array.isArray(report?.inputs?.required) || !report.inputs.required.includes("sourceSha") || (inputs?.sourceSha?.pattern !== "^[0-9a-f]{40}$" && inputs?.sourceSha?.$ref !== "#/$defs/sha")) errors.push(`${path}: sourceSha input identity가 필요하다`);
+  if (finding?.additionalProperties !== false || !["code", "referenceClass", "source", "target", "reason"].every((key) => finding?.required?.includes(key))) errors.push(`${path}: strict finding shape가 필요하다`);
+  if (JSON.stringify(finding?.properties?.referenceClass?.enum) !== JSON.stringify(["ARTIFACT_IMMUTABLE_REFERENCE", "EXTERNAL_INPUT_PENDING_REFERENCE", "ISSUE_CURRENT_OWNER", "ISSUE_NONCLOSING_DEPENDENCY", "ISSUE_PARENT_OR_COORDINATOR", "ISSUE_TERMINAL_IMPLEMENTATION", "PATH_CANONICAL_CURRENT", "PATH_HISTORICAL_OR_SUPERSEDED", "PR_EVIDENCE_ONLY", "PR_IMPLEMENTATION"])) errors.push(`${path}: referenceClass exact enum schema가 필요하다`);
+  for (const field of ["source", "target"]) {
+    const property = finding?.properties?.[field];
+    const variants = property?.oneOf;
+    if (property?.$ref !== `#/$defs/${field}` && (!Array.isArray(variants) || variants.length < 2 || variants.some((variant) => variant.type !== "object" || variant.additionalProperties !== false))) errors.push(`${path}: ${field} strict object schema가 필요하다`);
+  }
+  for (const field of ["referenced", "latestEffective"]) {
+    const branches = finding?.properties?.[field]?.oneOf;
+    if (!Array.isArray(branches) || !branches.some((branch) => branch.type === "null")
+      || !branches.some((branch) => branch.type === "object" && branch.additionalProperties === false)) errors.push(`${path}: ${field} strict nullable object schema가 필요하다`);
+  }
+  const expectedOwners = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform", null];
+  if (JSON.stringify(finding?.properties?.directOwner?.enum) !== JSON.stringify(expectedOwners)) errors.push(`${path}: directOwner enum schema가 필요하다`);
+  if (JSON.stringify(finding?.properties?.consumerRoute?.enum) !== JSON.stringify(["PLAN-DOC", "PLAN-REPO", "PLAN-JOURNEY", null])) errors.push(`${path}: consumerRoute enum schema가 필요하다`);
+  return errors;
 }
 
 export function validateSourceGovernanceContracts(

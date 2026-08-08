@@ -26,8 +26,30 @@ import {
   validateDocumentationSystemCatalog,
   validateGateIndex,
   validateProductClaimCatalog,
+  validateReferenceAuditScope,
+  validateReferenceAuditReportSchema,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
+
+test("reference audit scope requires the exact five-repository inventory", () => {
+  const errors = [];
+  validateReferenceAuditScope({ repositories: [{ repository: "AquilaXk/easysubway", trackedDiscoveryRoots: ["../unsafe"] }] }, errors);
+  assert.ok(errors.some((error) => error.includes("exact codepoint sorted 5개")));
+  assert.ok(errors.some((error) => error.includes("안전한 repository-relative")));
+});
+
+test("reference audit report schema requires source identity and strict findings", () => {
+  const errors = [];
+  validateReferenceAuditReportSchema({ type: "object", additionalProperties: false, required: [], properties: { observedAt: {}, inputs: { properties: {} }, findings: { items: {} } } }, errors);
+  assert.equal(errors.length, 10);
+});
+
+test("reference audit report schema fixes referenceClass to the exact inventory", () => {
+  const schema = loadJson("contracts/documentation/reference-audit-report.schema.json");
+  assert.deepEqual(validateReferenceAuditReportSchema(schema), []);
+  schema.properties.findings.items.properties.referenceClass = { type: "string" };
+  assert.ok(validateReferenceAuditReportSchema(schema).some((error) => error.includes("referenceClass")));
+});
 
 const FIXTURE_GIT_UNSET = ["GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY", "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_CONFIG_COUNT", "GIT_CONFIG_PARAMETERS", "GIT_NAMESPACE", "GIT_SHALLOW_FILE", "GIT_QUARANTINE_PATH", "GIT_CEILING_DIRECTORIES", "GIT_GLOB_PATHSPECS", "GIT_NOGLOB_PATHSPECS", "GIT_ICASE_PATHSPECS"];
 
