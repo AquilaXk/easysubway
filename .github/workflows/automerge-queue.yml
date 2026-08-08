@@ -120,19 +120,24 @@ jobs:
               def is_trusted_human:
                 . as $review |
                 (["OWNER", "MEMBER", "COLLABORATOR"] | index($review.author_association)) != null;
+              def is_discovery:
+                (.state == "APPROVED" and is_trusted_human) or
+                (.state == "COMMENTED" and
+                  (is_coderabbit or
+                    ((.body // "" | startswith("**Actionable comments posted: ")) and
+                      (.body // "" | contains("<!-- Review source: Codex CLI fallback; canonical visible structure:")))));
               [flatten[]
                 | select(.user != null)
-                | select(is_trusted_human or is_coderabbit)]
-              | group_by(.user.id)
-              | map(sort_by(.submitted_at, .id) | last) as $latest
-              | ($latest | length > 0) and
-                all($latest[]; .state != "CHANGES_REQUESTED") and
-                any($latest[];
-                  ((.state == "APPROVED" and is_trusted_human) or
-                    (.state == "COMMENTED" and
-                      (is_coderabbit or
-                        ((.body // "" | startswith("**Actionable comments posted: ")) and
-                          (.body // "" | contains("<!-- Review source: Codex CLI fallback; canonical visible structure:")))))))
+                | select(is_trusted_human or is_coderabbit)] as $eligible
+              | ($eligible | map(select(is_discovery)) | length > 0) as $has_discovery
+              | ($eligible
+                | group_by(.user.id)
+                | map(sort_by(.submitted_at, .id)
+                  | map(select(.state == "APPROVED" or .state == "CHANGES_REQUESTED"))
+                  | last?)
+                | map(select(. != null))) as $latest_opinions
+              | $has_discovery and
+                all($latest_opinions[]; .state != "CHANGES_REQUESTED")
             ' <<<"${reviews}")
             threads=$(gh api graphql --paginate --slurp \
               -f query='query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
