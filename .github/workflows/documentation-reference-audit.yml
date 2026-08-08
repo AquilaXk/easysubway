@@ -1,0 +1,67 @@
+name: Documentation Reference Audit Evidence
+
+on:
+  workflow_dispatch:
+
+jobs:
+  audit:
+    name: Audit current documentation references
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+    env:
+      DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+
+    steps:
+      - name: Documentation Reference Audit / Reject non-default branch execution
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ "${GITHUB_REF}" != "refs/heads/${DEFAULT_BRANCH}" ]]; then
+            echo "documentation reference audit must run from the default branch" >&2
+            exit 1
+          fi
+
+      - name: Documentation Reference Audit / Checkout current source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Documentation Reference Audit / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Documentation Reference Audit / Create current report
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          EVIDENCE_DIR="audit-evidence"
+          REPORT_PATH="${EVIDENCE_DIR}/reference-audit-report.json"
+          OBSERVED_AT="$(date --utc +"%Y-%m-%dT%H:%M:%S.000Z")"
+          mkdir --parents "${EVIDENCE_DIR}"
+          test ! -e "${REPORT_PATH}"
+          node tools/repo/audit-active-reference-drift.mjs \
+            --scope contracts/documentation/reference-audit-scope.json \
+            --repository-root . \
+            --source-sha "${GITHUB_SHA}" \
+            --ledger release/migrations/repository-split-issues.json \
+            --amendments release/migrations/repository-split-issues-amendments.json \
+            --observed-at "${OBSERVED_AT}" \
+            --output "${REPORT_PATH}"
+
+      - name: Documentation Reference Audit / Upload sanitized report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: documentation-reference-audit-${{ github.sha }}
+          path: audit-evidence/reference-audit-report.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 14
