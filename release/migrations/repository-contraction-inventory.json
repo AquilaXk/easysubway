@@ -1,0 +1,753 @@
+{
+  "$schema": "../../contracts/repository-contraction-inventory.schema.json",
+  "schemaVersion": 1,
+  "sourceRepository": "AquilaXk/easysubway",
+  "inventoryBaseHead": "645e218ea84b051e1482b65efd4a45869628a099",
+  "entries": [
+    {
+      "resourceId": "hub-automerge-queue",
+      "path": ".github/workflows/automerge-queue.yml",
+      "selector": null,
+      "kind": "WORKFLOW",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "Hub merge coordination",
+      "activeConsumers": [
+        "Hub pull requests"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "workflow change"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "hub",
+      "fallbackVerification": [
+        "AUTOMERGE_RULESET_FAILURE_FAIL_CLOSED"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "hub-ci-fan-in",
+      "path": ".github/workflows/ci.yml",
+      "selector": "hub fan-in and audit jobs",
+      "kind": "WORKFLOW",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "Five-repository integration gate",
+      "activeConsumers": [
+        "Hub pull requests",
+        "Hub main"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "workflow change"
+      ],
+      "fallbackExposure": "NONE",
+      "fallbackRemovalOwner": null,
+      "fallbackVerification": [],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "NOT_APPLICABLE"
+    },
+    {
+      "resourceId": "backend-ci-build",
+      "path": ".github/workflows/ci.yml",
+      "selector": "backend build and package jobs",
+      "kind": "WORKFLOW",
+      "classification": "DUPLICATE_GATE_DISABLE_AFTER_TARGET",
+      "hubOwner": "hub",
+      "targetOwner": "backend",
+      "targetOutput": "Backend repository CI",
+      "activeConsumers": [
+        "Hub backend CI job"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-backend/issues/44"
+      ],
+      "plannedAction": "DISABLE_AFTER_TARGET",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target CI verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "backend",
+      "fallbackVerification": [
+        "BACKEND_LOCAL_BUILD_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "data-ci-producer",
+      "path": ".github/workflows/ci.yml",
+      "selector": "datapack producer jobs",
+      "kind": "WORKFLOW",
+      "classification": "DUPLICATE_GATE_DISABLE_AFTER_TARGET",
+      "hubOwner": "hub",
+      "targetOwner": "data",
+      "targetOutput": "Data repository CI",
+      "activeConsumers": [
+        "Hub datapack CI job"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-data/pull/55"
+      ],
+      "plannedAction": "DISABLE_AFTER_TARGET",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target CI verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "data",
+      "fallbackVerification": [
+        "DATA_LOCAL_PRODUCER_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "mobile-ci-build",
+      "path": ".github/workflows/ci.yml",
+      "selector": "mobile build jobs",
+      "kind": "WORKFLOW",
+      "classification": "DUPLICATE_GATE_DISABLE_AFTER_TARGET",
+      "hubOwner": "hub",
+      "targetOwner": "mobile",
+      "targetOutput": "Mobile repository CI",
+      "activeConsumers": [
+        "Hub mobile CI job"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-mobile/issues/67"
+      ],
+      "plannedAction": "DISABLE_AFTER_TARGET",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target CI verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "mobile",
+      "fallbackVerification": [
+        "MOBILE_LOCAL_BUILD_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "platform-ci-deploy",
+      "path": ".github/workflows/ci.yml",
+      "selector": "platform deployment checks",
+      "kind": "WORKFLOW",
+      "classification": "DUPLICATE_GATE_DISABLE_AFTER_TARGET",
+      "hubOwner": "hub",
+      "targetOwner": "platform",
+      "targetOutput": "Platform repository CI",
+      "activeConsumers": [
+        "Hub deployment CI job"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-platform/issues/17"
+      ],
+      "plannedAction": "DISABLE_AFTER_TARGET",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target CI verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "platform",
+      "fallbackVerification": [
+        "PLATFORM_LOCAL_DEPLOY_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "data-datapack-release",
+      "path": ".github/workflows/datapack-release.yml",
+      "selector": null,
+      "kind": "WORKFLOW",
+      "classification": "DUPLICATE_GATE_DISABLE_AFTER_TARGET",
+      "hubOwner": "hub",
+      "targetOwner": "data",
+      "targetOutput": "Data immutable datapack release gate",
+      "activeConsumers": [
+        "Hub datapack release workflow"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-data/pull/55"
+      ],
+      "plannedAction": "DISABLE_AFTER_TARGET",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target release verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "data",
+      "fallbackVerification": [
+        "DATA_LOCAL_RELEASE_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "mobile-release-artifacts",
+      "path": ".github/workflows/release-artifacts.yml",
+      "selector": "Android artifact build job",
+      "kind": "WORKFLOW",
+      "classification": "DUPLICATE_GATE_DISABLE_AFTER_TARGET",
+      "hubOwner": "hub",
+      "targetOwner": "mobile",
+      "targetOutput": "Mobile release artifact gate",
+      "activeConsumers": [
+        "Hub Android release artifact workflow"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-mobile/issues/68"
+      ],
+      "plannedAction": "DISABLE_AFTER_TARGET",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target release verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "mobile",
+      "fallbackVerification": [
+        "MOBILE_LOCAL_RELEASE_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "backend-docker-image",
+      "path": "Dockerfile",
+      "selector": null,
+      "kind": "BUILD",
+      "classification": "TARGET_CANONICAL_DELETE_AFTER_HANDOFF",
+      "hubOwner": "hub",
+      "targetOwner": "backend",
+      "targetOutput": "Backend OCI image",
+      "activeConsumers": [
+        "Hub backend image build"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-backend/issues/44"
+      ],
+      "plannedAction": "DELETE_AFTER_HANDOFF",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target image verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "backend",
+      "fallbackVerification": [
+        "BACKEND_HUB_IMAGE_BUILD_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "backend-source",
+      "path": "backend",
+      "selector": null,
+      "kind": "SOURCE",
+      "classification": "TARGET_CANONICAL_DELETE_AFTER_HANDOFF",
+      "hubOwner": "hub",
+      "targetOwner": "backend",
+      "targetOutput": "Journey server contract consumer",
+      "activeConsumers": [
+        "Hub backend CI and release jobs"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-backend/issues/44"
+      ],
+      "plannedAction": "DELETE_AFTER_HANDOFF",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target contract verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "backend",
+      "fallbackVerification": [
+        "BACKEND_LEGACY_SOURCE_COPY_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "data-source",
+      "path": "tools/datapack",
+      "selector": null,
+      "kind": "SOURCE",
+      "classification": "TARGET_CANONICAL_DELETE_AFTER_HANDOFF",
+      "hubOwner": "hub",
+      "targetOwner": "data",
+      "targetOutput": "Immutable datapack producer",
+      "activeConsumers": [
+        "Hub datapack workflows"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-data/pull/55"
+      ],
+      "plannedAction": "DELETE_AFTER_HANDOFF",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target artifact verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "data",
+      "fallbackVerification": [
+        "DATA_LEGACY_SOURCE_COPY_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "mobile-source",
+      "path": "apps/mobile",
+      "selector": null,
+      "kind": "SOURCE",
+      "classification": "TARGET_CANONICAL_DELETE_AFTER_HANDOFF",
+      "hubOwner": "hub",
+      "targetOwner": "mobile",
+      "targetOutput": "Mobile application and release artifact",
+      "activeConsumers": [
+        "Hub Android release workflow"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-mobile/issues/71"
+      ],
+      "plannedAction": "DELETE_AFTER_HANDOFF",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target artifact verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "mobile",
+      "fallbackVerification": [
+        "MOBILE_LEGACY_SOURCE_COPY_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "platform-infra",
+      "path": "infra",
+      "selector": null,
+      "kind": "SOURCE",
+      "classification": "TARGET_CANONICAL_DELETE_AFTER_HANDOFF",
+      "hubOwner": "hub",
+      "targetOwner": "platform",
+      "targetOutput": "Platform deployment and observability configuration",
+      "activeConsumers": [
+        "Hub deployment and operations workflows"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-platform/issues/17"
+      ],
+      "plannedAction": "DELETE_AFTER_HANDOFF",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target deployment verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "platform",
+      "fallbackVerification": [
+        "PLATFORM_LEGACY_INFRA_COPY_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "platform-deploy-tools",
+      "path": "tools/deploy",
+      "selector": null,
+      "kind": "BUILD",
+      "classification": "TARGET_CANONICAL_DELETE_AFTER_HANDOFF",
+      "hubOwner": "hub",
+      "targetOwner": "platform",
+      "targetOutput": "Platform deployment automation",
+      "activeConsumers": [
+        "Hub deployment workflow"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-platform/issues/17"
+      ],
+      "plannedAction": "DELETE_AFTER_HANDOFF",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target deployment verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "platform",
+      "fallbackVerification": [
+        "PLATFORM_LEGACY_DEPLOY_COPY_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "hub-system-boundaries",
+      "path": "contracts/boundaries.json",
+      "selector": null,
+      "kind": "CONTRACT",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "Five-repository ownership boundary",
+      "activeConsumers": [
+        "Hub contract gate",
+        "Component repositories"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "contract change"
+      ],
+      "fallbackExposure": "NONE",
+      "fallbackRemovalOwner": null,
+      "fallbackVerification": [],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "NOT_APPLICABLE"
+    },
+    {
+      "resourceId": "hub-documentation-governance",
+      "path": "contracts/documentation",
+      "selector": null,
+      "kind": "DOCUMENTATION",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "Five-repository documentation governance",
+      "activeConsumers": [
+        "Hub contract gate"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "documentation governance change"
+      ],
+      "fallbackExposure": "NONE",
+      "fallbackRemovalOwner": null,
+      "fallbackVerification": [],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "NOT_APPLICABLE"
+    },
+    {
+      "resourceId": "hub-release-governance",
+      "path": "release/product-gates/release-governance-gate.json",
+      "selector": null,
+      "kind": "GOVERNANCE",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "System GO/NO_GO governance",
+      "activeConsumers": [
+        "Hub release decision"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "GO/NO_GO change"
+      ],
+      "fallbackExposure": "NONE",
+      "fallbackRemovalOwner": null,
+      "fallbackVerification": [],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "NOT_APPLICABLE"
+    },
+    {
+      "resourceId": "data-freshness-gate",
+      "path": "release/product-gates/datapack-freshness-sla.json",
+      "selector": null,
+      "kind": "GOVERNANCE",
+      "classification": "DUPLICATE_GATE_DISABLE_AFTER_TARGET",
+      "hubOwner": "hub",
+      "targetOwner": "data",
+      "targetOutput": "Data freshness admission gate",
+      "activeConsumers": [
+        "Hub datapack release gate"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-data/pull/55"
+      ],
+      "plannedAction": "DISABLE_AFTER_TARGET",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target freshness verification"
+      ],
+      "fallbackExposure": "NONE",
+      "fallbackRemovalOwner": null,
+      "fallbackVerification": [],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "NOT_APPLICABLE"
+    },
+    {
+      "resourceId": "hub-repository-split-ledger",
+      "path": "release/migrations/repository-split-issues.json",
+      "selector": null,
+      "kind": "MIGRATION",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "Repository split issue ledger",
+      "activeConsumers": [
+        "Hub contract gate"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "migration ledger change"
+      ],
+      "fallbackExposure": "NONE",
+      "fallbackRemovalOwner": null,
+      "fallbackVerification": [],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "NOT_APPLICABLE"
+    },
+    {
+      "resourceId": "backend-raw-main-v1-stage",
+      "path": "backend/tools/stage-contracts.mjs",
+      "selector": null,
+      "kind": "BUILD",
+      "classification": "TARGET_CANONICAL_DELETE_AFTER_HANDOFF",
+      "hubOwner": "hub",
+      "targetOwner": "backend",
+      "targetOutput": "Backend immutable Journey contract staging",
+      "activeConsumers": [
+        "Hub backend CI and release jobs"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-backend/issues/44"
+      ],
+      "plannedAction": "DELETE_AFTER_HANDOFF",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target contract verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "backend",
+      "fallbackVerification": [
+        "BACKEND_RAW_MAIN_LOCATOR_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "data-previous-artifact-contract",
+      "path": "release/product-gates/rc-evidence-manifest-contract.json",
+      "selector": "dataPackFallbackArtifactSha256",
+      "kind": "CONTRACT",
+      "classification": "DUPLICATE_GATE_DISABLE_AFTER_TARGET",
+      "hubOwner": "hub",
+      "targetOwner": "data",
+      "targetOutput": "Data immutable artifact deployment evidence",
+      "activeConsumers": [
+        "Hub release evidence validation"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "PENDING",
+      "handoffEvidence": [
+        "https://github.com/AquilaXk/easysubway-data/pull/55"
+      ],
+      "plannedAction": "DISABLE_AFTER_TARGET",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "target artifact verification"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "data",
+      "fallbackVerification": [
+        "DATA_PREVIOUS_ARTIFACT_FIELD_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "hub-release-artifacts-bundled-datapack",
+      "path": ".github/workflows/release-artifacts.yml",
+      "selector": "missing datapack run uses bundled index and capital artifact",
+      "kind": "WORKFLOW",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "Fail-closed RC datapack acquisition",
+      "activeConsumers": [
+        "Hub RC evidence workflow"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "release workflow change"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "hub",
+      "fallbackVerification": [
+        "RC_MISSING_DATAPACK_RUN_FAILS"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "hub-rc-datapack-selector",
+      "path": "tools/release/select-rc-datapack-artifact.mjs",
+      "selector": "fallback.sqlite.gz selection and copy",
+      "kind": "BUILD",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "Fail-closed immutable RC datapack selection",
+      "activeConsumers": [
+        "Hub RC evidence workflow"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "RC artifact selector change"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "hub",
+      "fallbackVerification": [
+        "RC_FALLBACK_ARTIFACT_SELECTION_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "hub-manifest-emergency-override",
+      "path": "tools/datapack/lib/manifest-validation.mjs",
+      "selector": "emergencyOverride fallback pack selection",
+      "kind": "BUILD",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "Fail-closed datapack manifest validation",
+      "activeConsumers": [
+        "Hub RC artifact selector"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "manifest validation change"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "hub",
+      "fallbackVerification": [
+        "MANIFEST_EMERGENCY_OVERRIDE_FALLBACK_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    },
+    {
+      "resourceId": "hub-rc-evidence-fallback-artifact",
+      "path": "tools/release/generate-rc-evidence-manifest.mjs",
+      "selector": "data-pack fallback artifact requirement",
+      "kind": "BUILD",
+      "classification": "HUB_SYSTEM_OWNER_RETAIN",
+      "hubOwner": "hub",
+      "targetOwner": null,
+      "targetOutput": "Fail-closed RC evidence manifest",
+      "activeConsumers": [
+        "Hub RC evidence workflow"
+      ],
+      "releaseReachability": "CURRENT",
+      "handoffState": "NOT_APPLICABLE",
+      "handoffEvidence": [],
+      "plannedAction": "RETAIN",
+      "executionEligibility": false,
+      "reviewTrigger": [
+        "RC evidence manifest change"
+      ],
+      "fallbackExposure": "FORBIDDEN_ACTIVE",
+      "fallbackRemovalOwner": "hub",
+      "fallbackVerification": [
+        "RC_FALLBACK_ARTIFACT_REQUIREMENT_ABSENT"
+      ],
+      "rollbackMode": "NOT_APPLICABLE",
+      "rollbackRevision": null,
+      "fallbackVerificationState": "PLANNED"
+    }
+  ]
+}

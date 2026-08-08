@@ -253,6 +253,17 @@ export function collectContractErrors(
       (error) => `${repositorySplitIssuesPath}: ${error}`,
     ));
   }
+  const repositoryContractionInventoryPath = join(repositoryRoot, "release/migrations/repository-contraction-inventory.json");
+  const repositoryContractionInventoryValid = validateJson(
+    contract("repository-contraction-inventory.schema.json"),
+    repositoryContractionInventoryPath,
+    errors,
+  );
+  if (repositoryContractionInventoryValid) {
+    errors.push(...validateRepositoryContractionInventory(loadJson(repositoryContractionInventoryPath)).map(
+      (error) => `${repositoryContractionInventoryPath}: ${error}`,
+    ));
+  }
   if (!existsSync(workspace.freshnessPolicy)) errors.push(`${workspace.freshnessPolicy} 누락`);
   if ([workspace.sourceInventory, workspace.governancePolicy, workspace.freshnessPolicy].every(existsSync)) {
     validateSourceGovernanceContracts({
@@ -271,6 +282,151 @@ export function collectContractErrors(
 
 export function validateRepositorySplitIssueLedger(ledger) {
   return validateLedger(ledger);
+}
+
+const REPOSITORY_CONTRACTION_CLASSIFICATIONS = {
+  HUB_SYSTEM_OWNER_RETAIN: { targetOwner: null, plannedAction: "RETAIN" },
+  TARGET_CANONICAL_DELETE_AFTER_HANDOFF: { targetOwner: "component", plannedAction: "DELETE_AFTER_HANDOFF" },
+  HISTORICAL_ARCHIVE_NONEXECUTABLE: { targetOwner: null, plannedAction: "ARCHIVE_NONEXECUTABLE" },
+  DUPLICATE_GATE_DISABLE_AFTER_TARGET: { targetOwner: "component", plannedAction: "DISABLE_AFTER_TARGET" },
+};
+const KNOWN_FORBIDDEN_FALLBACK_RESOURCE_IDS = new Set([
+  "backend-ci-build",
+  "data-ci-producer",
+  "mobile-ci-build",
+  "platform-ci-deploy",
+  "data-datapack-release",
+  "mobile-release-artifacts",
+  "backend-docker-image",
+  "backend-raw-main-v1-stage",
+  "data-previous-artifact-contract",
+  "hub-automerge-queue",
+  "hub-release-artifacts-bundled-datapack",
+  "hub-rc-datapack-selector",
+  "hub-manifest-emergency-override",
+  "hub-rc-evidence-fallback-artifact",
+  "backend-source",
+  "data-source",
+  "mobile-source",
+  "platform-infra",
+  "platform-deploy-tools",
+]);
+
+export function validateRepositoryContractionInventory(inventory) {
+  const errors = [];
+  const resourceIds = new Set();
+  const selectorsByPath = new Map();
+  const activeFallbackVerificationIds = new Set();
+  for (const entry of inventory.entries ?? []) {
+    if (resourceIds.has(entry.resourceId)) errors.push(`${entry.resourceId}: resourceId 중복`);
+    resourceIds.add(entry.resourceId);
+    const selectors = selectorsByPath.get(entry.path) ?? [];
+    selectors.push(entry.selector);
+    selectorsByPath.set(entry.path, selectors);
+
+    const rule = REPOSITORY_CONTRACTION_CLASSIFICATIONS[entry.classification];
+    if (rule == null) {
+      errors.push(`${entry.path}: unknown classification`);
+      continue;
+    }
+    if (entry.hubOwner !== "hub") {
+      errors.push(`${entry.resourceId}: hubOwner는 hub여야 한다`);
+    }
+    if (rule.targetOwner === null && entry.targetOwner !== null) {
+      errors.push(`${entry.resourceId}: ${entry.classification} targetOwner는 null이어야 한다`);
+    }
+    if (rule.targetOwner === "component") {
+      const expectedTargetOwner = entry.resourceId.split("-", 1)[0];
+      if (entry.targetOwner !== expectedTargetOwner) {
+        errors.push(`${entry.resourceId}: targetOwner 불일치`);
+      }
+    }
+    if (entry.plannedAction !== rule.plannedAction) {
+      errors.push(`${entry.resourceId}: ${entry.classification} plannedAction 불일치`);
+    }
+    if (typeof entry.selector === "string" && entry.selector.trim() === "") {
+      errors.push(`${entry.resourceId}: selector는 비어 있을 수 없다`);
+    }
+    if (rule.targetOwner === "component" && !["PENDING", "VERIFIED"].includes(entry.handoffState)) {
+      errors.push(`${entry.resourceId}: target handoffState는 PENDING 또는 VERIFIED여야 한다`);
+    }
+    if (rule.targetOwner === null && entry.handoffState !== "NOT_APPLICABLE") {
+      errors.push(`${entry.resourceId}: Hub retain/historical handoffState는 NOT_APPLICABLE여야 한다`);
+    }
+    if (["TARGET_CANONICAL_DELETE_AFTER_HANDOFF", "DUPLICATE_GATE_DISABLE_AFTER_TARGET"].includes(entry.classification)) {
+      if (entry.activeConsumers.length === 0) errors.push(`${entry.resourceId}: active consumer가 필요하다`);
+      if (entry.handoffEvidence.length === 0) errors.push(`${entry.resourceId}: handoff evidence가 필요하다`);
+      if (entry.handoffState === "PENDING" && entry.executionEligibility) {
+        errors.push(`${entry.resourceId}: PENDING은 execution-eligible일 수 없다`);
+      }
+      if (entry.handoffState === "VERIFIED" && entry.handoffEvidence.length === 0) {
+        errors.push(`${entry.resourceId}: VERIFIED handoff evidence가 필요하다`);
+      }
+    } else if (entry.executionEligibility) {
+      errors.push(`${entry.resourceId}: ${entry.classification}은 execution-eligible일 수 없다`);
+    }
+    if (entry.classification === "HISTORICAL_ARCHIVE_NONEXECUTABLE") {
+      if (entry.releaseReachability !== "NOT_CURRENT") errors.push(`${entry.resourceId}: historical item은 current-reachable일 수 없다`);
+      if (entry.activeConsumers.length !== 0) errors.push(`${entry.resourceId}: historical item은 active consumer가 있을 수 없다`);
+    }
+    validateFallbackExposure(entry, errors, activeFallbackVerificationIds);
+  }
+  for (const [path, selectors] of selectorsByPath) {
+    if (selectors.length < 2) continue;
+    if (selectors.some((selector) => typeof selector !== "string" || selector.trim() === "")) {
+      errors.push(`${path}: mixed path selector가 필요하다`);
+      continue;
+    }
+    if (new Set(selectors).size !== selectors.length) errors.push(`${path}: mixed path selector 중복`);
+  }
+  return errors;
+}
+
+function validateFallbackExposure(entry, errors, activeFallbackVerificationIds) {
+  if (KNOWN_FORBIDDEN_FALLBACK_RESOURCE_IDS.has(entry.resourceId)
+      && entry.fallbackExposure !== "FORBIDDEN_ACTIVE") {
+    errors.push(`${entry.resourceId}: known fallback은 FORBIDDEN_ACTIVE여야 한다`);
+  }
+  if (entry.fallbackExposure === "NONE") {
+    if (entry.fallbackRemovalOwner !== null || entry.fallbackVerification.length !== 0
+        || entry.fallbackVerificationState !== "NOT_APPLICABLE"
+        || entry.rollbackMode !== "NOT_APPLICABLE" || entry.rollbackRevision !== null) {
+      errors.push(`${entry.resourceId}: NONE fallback metadata 불일치`);
+    }
+    return;
+  }
+  if (entry.fallbackExposure === "FORBIDDEN_ACTIVE") {
+    const expectedRemovalOwner = entry.targetOwner ?? "hub";
+    if (entry.fallbackRemovalOwner !== expectedRemovalOwner) {
+      errors.push(`${entry.resourceId}: fallback removal owner가 필요하다`);
+    }
+    if (entry.fallbackVerificationState !== "PLANNED") errors.push(`${entry.resourceId}: FORBIDDEN_ACTIVE fallback verification은 PLANNED여야 한다`);
+    if (entry.fallbackVerification.length === 0) errors.push(`${entry.resourceId}: fallback verification이 필요하다`);
+    if (entry.fallbackVerification.some((identifier) => !isFallbackVerificationIdentifier(identifier))) {
+      errors.push(`${entry.resourceId}: fallback verification은 executable test/gate identifier여야 한다`);
+    }
+    for (const identifier of entry.fallbackVerification) {
+      if (activeFallbackVerificationIds.has(identifier)) errors.push(`${entry.resourceId}: active fallback verification identifier 중복`);
+      activeFallbackVerificationIds.add(identifier);
+    }
+    if (entry.handoffState === "VERIFIED") errors.push(`${entry.resourceId}: FORBIDDEN_ACTIVE은 handoff VERIFIED일 수 없다`);
+    if (entry.executionEligibility) errors.push(`${entry.resourceId}: FORBIDDEN_ACTIVE은 execution-eligible일 수 없다`);
+    if (entry.rollbackMode !== "NOT_APPLICABLE" || entry.rollbackRevision !== null) {
+      errors.push(`${entry.resourceId}: FORBIDDEN_ACTIVE rollback metadata 불일치`);
+    }
+    return;
+  }
+  if (entry.fallbackRemovalOwner !== null || entry.fallbackVerificationState !== "VERIFIED" || entry.fallbackVerification.length === 0
+      || entry.fallbackVerification.some((identifier) => !isFallbackVerificationIdentifier(identifier))
+      || entry.rollbackMode !== "EXACT_IMMUTABLE_DEPLOYMENT_ONLY"
+      || !/^[a-f0-9]{40}$/.test(entry.rollbackRevision ?? "")
+      || entry.kind !== "DEPLOYMENT") {
+    errors.push(`${entry.resourceId}: VERIFIED_ROLLBACK_ONLY는 exact immutable revision의 별도 승인 deployment evidence가 필요하다`);
+  }
+}
+
+function isFallbackVerificationIdentifier(value) {
+  return /^(?:[A-Z][A-Z0-9_.-]*|[a-z0-9][a-z0-9/_.-]*(?::[A-Za-z0-9_.-]+)?)$/.test(value);
 }
 
 export function validateSourceGovernanceContracts(
