@@ -20954,13 +20954,17 @@ test("#2609 accessibility release canonical pins는 tracked source와 exact-matc
   const spec = JSON.parse(specBytes);
   const inventory = JSON.parse(inventoryBytes);
   const snapshots = JSON.parse(read("tools/datapack/release/source-snapshots.json"));
+  const productionScope = JSON.parse(read("release/product-gates/production-datapack-scope.json"));
   const request = JSON.parse(read("tools/datapack/release/release-request.json"));
   const pack = JSON.parse(read("tools/datapack/release/capital-production-canonical-pack.json")).packs[0];
 
   assert.equal(spec.sourceInventorySha256, digest(JSON.stringify(inventory)));
   assert.equal(spec.networkEdgeEvidence.sourceInventory.sha256, digest(inventoryBytes));
   const { headsBySource } = validateLineage(snapshots);
-  const releaseSnapshots = snapshots.filter(({ sourceId, snapshotId }) => headsBySource[sourceId] === snapshotId);
+  const requiredSourceIds = new Set(productionScope.productionSourceSet.requiredSourceIds);
+  const releaseSnapshots = snapshots.filter(({ sourceId, snapshotId }) =>
+    requiredSourceIds.has(sourceId) && headsBySource[sourceId] === snapshotId,
+  );
   assert.equal(spec.sourceSnapshotSetHash, digest(JSON.stringify(releaseSnapshots)));
   assert.deepEqual(spec.sourceSnapshots.map(({ snapshotId }) => snapshotId), releaseSnapshots.map(({ snapshotId }) => snapshotId));
   assert.equal(request.buildSpecSha256, digest(specBytes));
