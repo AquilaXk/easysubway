@@ -4,7 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
-import { AuditIncomplete, auditPostGoBoundary, collectPostGoBoundaryLive, createPostGoBoundaryReport, runAuditCli, validatePostGoBoundaryScope } from "./audit-post-go-boundary.mjs";
+import { AuditIncomplete, auditPostGoBoundary, collectPostGoBoundaryLive, createPostGoBoundaryReport, runAuditCli, runGraphql, validatePostGoBoundaryScope } from "./audit-post-go-boundary.mjs";
 
 const SCOPE = JSON.parse(readFileSync("contracts/documentation/post-go-boundary-audit-scope.json", "utf8"));
 const SHA = "a".repeat(40);
@@ -70,6 +70,20 @@ test("post-GO boundary audit accepts the actual decision rows and rejects parent
   assert.doesNotThrow(() => auditPostGoBoundary({ scope: SCOPE, sourceSha: SHA, live: candidate }));
   candidate.issues.fieldResearch.body = candidate.issues.fieldResearch.body.replace("activation      Hub #1020 GO + stable public release scope\n", "") + "\nactivation      Hub #1020 GO + stable public release scope";
   assert.throws(() => auditPostGoBoundary({ scope: SCOPE, sourceSha: SHA, live: candidate }), AuditIncomplete);
+  const duplicate = live();
+  duplicate.issues.fieldResearch.body += "\n\n## 판정·역할\n\n```text\nactivation      Hub #1020 GO + stable public release scope\n```";
+  assert.throws(() => auditPostGoBoundary({ scope: SCOPE, sourceSha: SHA, live: duplicate }), AuditIncomplete);
+});
+
+test("post-GO boundary GraphQL closes the query and omits the initial null cursor", async () => {
+  const calls = [];
+  const execute = async (_command, args) => { calls.push(args); return { stdout: "{}" }; };
+  await runGraphql(2766, null, execute);
+  await runGraphql(2766, "next", execute);
+  const query = calls[0].find((value) => value.startsWith("query=")).slice("query=".length);
+  assert.equal((query.match(/{/g) ?? []).length, (query.match(/}/g) ?? []).length);
+  assert.equal(calls[0].some((value) => value.startsWith("cursor=")), false);
+  assert.ok(calls[1].includes("cursor=next"));
 });
 
 test("post-GO boundary audit fails closed for default-head drift and partial parent sub-issue connection", async () => {

@@ -139,10 +139,12 @@ test("post-GO boundary audit contracts bind current blockers and strict report",
     (value) => { value.parents.privacyMetrics.blockedMarkers[0] = "other"; },
   ]) { const invalid = structuredClone(scope); mutate(invalid); assert.ok(validatePostGoBoundaryAuditScope(invalid).length > 0); }
   for (const mutate of [
+    (value) => { value.properties.status.enum = ["COMPLETE"]; },
     (value) => { value.properties.lanes.minItems = 1; },
     (value) => { value.properties.lanes.items.properties.status.enum.push("START_ELIGIBLE"); },
     (value) => { value.properties.lanes.items.required = ["parent"]; },
     (value) => { value.oneOf[1].properties.incomplete.minItems = 0; },
+    (value) => { value.oneOf[0].properties.status.const = "AUDIT_INCOMPLETE"; },
     (value) => { value.properties.inputs.required = value.properties.inputs.required.filter((field) => field !== "stateEndSha256"); },
     (value) => { value.properties.inputs.properties.stateBeginSha256.pattern = ".+"; },
   ]) { const invalid = structuredClone(reportSchema); mutate(invalid); assert.ok(validatePostGoBoundaryAuditReportSchema(invalid).length > 0); }
