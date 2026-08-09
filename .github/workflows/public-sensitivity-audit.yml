@@ -1,0 +1,72 @@
+name: Public Sensitivity Audit
+
+on:
+  workflow_dispatch:
+    inputs:
+      observed_at:
+        description: Canonical UTC observation time
+        required: true
+        type: string
+      owner_receipts:
+        description: Repository-local JSON manifest of five exact receipt artifact locators and heads
+        required: true
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  audit:
+    if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Public Sensitivity Audit / Checkout default branch head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Public Sensitivity Audit / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Public Sensitivity Audit / Materialize immutable handoff manifest
+        shell: bash
+        env:
+          OWNER_RECEIPTS: ${{ inputs.owner_receipts }}
+        run: |
+          set -euo pipefail
+          mkdir --parents d20-audit
+          test ! -e d20-audit/owner-receipts.json
+          printf '%s\n' "${OWNER_RECEIPTS}" > d20-audit/owner-receipts.json
+
+      - name: Public Sensitivity Audit / Run write-once sanitized report
+        shell: bash
+        env:
+          D20_FIVE_REPO_PUBLIC_AUDIT_READ_TOKEN: ${{ secrets.D20_FIVE_REPO_PUBLIC_AUDIT_READ_TOKEN }}
+          GH_TOKEN: ${{ secrets.D20_FIVE_REPO_PUBLIC_AUDIT_READ_TOKEN }}
+          OBSERVED_AT: ${{ inputs.observed_at }}
+        run: |
+          set -euo pipefail
+          test ! -e d20-audit/public-sensitivity-audit-report.json
+          node tools/repo/run-public-sensitivity-audit.mjs \
+            --scope contracts/documentation/public-sensitivity-audit-scope.json \
+            --owner-receipts d20-audit/owner-receipts.json \
+            --observed-at "${OBSERVED_AT}" \
+            --runner-sha "${GITHUB_SHA}" \
+            --repository-root . \
+            --output d20-audit/public-sensitivity-audit-report.json
+
+      - name: Public Sensitivity Audit / Upload sanitized report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: d20-public-sensitivity-audit-${{ github.sha }}
+          path: d20-audit/public-sensitivity-audit-report.json
+          if-no-files-found: error
+          include-hidden-files: false
+          overwrite: false
+          retention-days: 14
