@@ -91,7 +91,7 @@ test("public sensitivity contracts bind the exact scope and corrected owner rece
   invalid.falsePositiveDispositions.push({ locationFingerprint: "a".repeat(64), detectorId: "KNOWN_TOKEN_FORMAT", reason: "reviewed", owner: "owner", verifiedAt: "2026-08-09T03:00:00.000Z", expiresAt: "2026-08-08T03:00:00.000Z" });
   assert.ok(validatePublicSensitivityAuditScope(invalid).some((error) => error.includes("revalidation/expiry")));
   const offsetInvalid = structuredClone(scope);
-  offsetInvalid.falsePositiveDispositions.push({ locationFingerprint: "a".repeat(64), detectorId: "KNOWN_TOKEN_FORMAT", reason: "reviewed", owner: "owner", verifiedAt: "2026-08-09T00:00:00+09:00", expiresAt: "2026-08-08T23:30:00Z" });
+  offsetInvalid.falsePositiveDispositions.push({ locationFingerprint: "a".repeat(64), detectorId: "KNOWN_TOKEN_FORMAT", reason: "reviewed", owner: "owner", verifiedAt: "2026-08-08T23:30:00Z", expiresAt: "2026-08-09T00:00:00+09:00" });
   assert.ok(validatePublicSensitivityAuditScope(offsetInvalid).some((error) => error.includes("revalidation/expiry")));
 });
 
