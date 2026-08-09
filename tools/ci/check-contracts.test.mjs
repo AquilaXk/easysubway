@@ -34,6 +34,8 @@ import {
   validatePublicSensitivityAuditReportSchema,
   validatePlanDocExecutionAuditScope,
   validatePlanDocExecutionAuditReportSchema,
+  validatePostGoBoundaryAuditScope,
+  validatePostGoBoundaryAuditReportSchema,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
@@ -123,6 +125,27 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
     mutate(mutated);
     assert.ok(validatePlanDocExecutionAuditReportSchema(mutated).length > 0, name);
   }
+});
+
+test("post-GO boundary audit contracts bind current blockers and strict report", () => {
+  const scope = loadJson("contracts/documentation/post-go-boundary-audit-scope.json");
+  const scopeSchema = loadJson("contracts/documentation/post-go-boundary-audit-scope.schema.json");
+  const reportSchema = loadJson("contracts/documentation/post-go-boundary-audit-report.schema.json");
+  assert.equal(validateSchema(scopeSchema, scope).ok, true);
+  assert.deepEqual(validatePostGoBoundaryAuditScope(scope), []);
+  assert.deepEqual(validatePostGoBoundaryAuditReportSchema(reportSchema), []);
+  for (const mutate of [
+    (value) => { value.parents.fieldResearch.activationMarker = "other"; },
+    (value) => { value.parents.privacyMetrics.blockedMarkers[0] = "other"; },
+  ]) { const invalid = structuredClone(scope); mutate(invalid); assert.ok(validatePostGoBoundaryAuditScope(invalid).length > 0); }
+  for (const mutate of [
+    (value) => { value.properties.lanes.minItems = 1; },
+    (value) => { value.properties.lanes.items.properties.status.enum.push("START_ELIGIBLE"); },
+    (value) => { value.properties.lanes.items.required = ["parent"]; },
+    (value) => { value.oneOf[1].properties.incomplete.minItems = 0; },
+    (value) => { value.properties.inputs.required = value.properties.inputs.required.filter((field) => field !== "stateEndSha256"); },
+    (value) => { value.properties.inputs.properties.stateBeginSha256.pattern = ".+"; },
+  ]) { const invalid = structuredClone(reportSchema); mutate(invalid); assert.ok(validatePostGoBoundaryAuditReportSchema(invalid).length > 0); }
 });
 
 test("F15 reference audit scope validation is total and skips semantics after schema failure", () => {

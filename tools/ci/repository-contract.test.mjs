@@ -20991,6 +20991,7 @@ test("documentation reference audit evidence workflow는 current main의 sanitiz
   assert.match(workflow, /actions\/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd/);
   assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /rm --recursive --force -- "\$\{EVIDENCE_DIR\}"\n          mkdir --parents -- "\$\{EVIDENCE_DIR\}"\n          test ! -e "\$\{REPORT_PATH\}"/);
   assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
   assert.match(workflow, /node-version: "24"/);
   assert.match(workflow, /GH_TOKEN: \$\{\{ github\.token \}\}/);
@@ -21048,4 +21049,17 @@ test("plan-doc execution audit workflow binds merged source SHA to a write-once 
   assert.match(workflow, /if-no-files-found: error/);
   assert.match(workflow, /retention-days: 14/);
   assert.doesNotMatch(workflow, /continue-on-error|uses:\s*actions\/cache@|git (?:add|commit|push)/i);
+});
+
+test("post-GO boundary audit workflow pins merged SHA, write-once report, and always upload", () => {
+  const workflow = read(".github/workflows/post-go-boundary-audit.yml");
+  assert.match(workflow, /^on:\n  push:\n    branches: \[main\]/m);
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /test ! -e "\$\{REPORT_PATH\}"/);
+  assert.match(workflow, /rm --recursive --force -- "\$\{EVIDENCE_DIR\}"\n          mkdir --parents -- "\$\{EVIDENCE_DIR\}"\n          test ! -e "\$\{REPORT_PATH\}"/);
+  assert.match(workflow, /--source-sha "\$\{GITHUB_SHA\}"/);
+  assert.match(workflow, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(workflow, /post-go-boundary-audit-\$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /continue-on-error|cache|previous report|git (?:add|commit|push)/i);
 });
