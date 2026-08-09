@@ -23,8 +23,9 @@ test("owner receipt workflow pins the reusable two-artifact protocol and separat
   assert.match(text, /include-hidden-files: false/g);
   assert.match(text, /if-no-files-found: error/g);
   assert.match(text, /actions\/checkout@[0-9a-f]{40}/);
-  assert.match(text, /repository: \$\{\{ job\.workflow_repository \}\}/);
-  assert.match(text, /ref: \$\{\{ job\.workflow_sha \}\}/);
+  assert.match(text, /repository: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'repository'\)\] \}\}/);
+  assert.match(text, /ref: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'sha'\)\] \}\}/);
+  assert.match(text, /--git-sha "\$\{GITHUB_SHA\}"/);
   assert.match(text, /actions\/setup-node@[0-9a-f]{40}/);
   assert.match(text, /actions\/upload-artifact@[0-9a-f]{40}/);
 });

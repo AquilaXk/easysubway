@@ -29,8 +29,8 @@ jobs:
       - name: Public Sensitivity Owner Receipt / Checkout default branch head
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
+          repository: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'repository')] }}
+          ref: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'sha')] }}
           persist-credentials: false
 
       - name: Public Sensitivity Owner Receipt / Set up Node.js
