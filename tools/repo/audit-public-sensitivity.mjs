@@ -200,15 +200,12 @@ export async function collectActionsArtifacts({ repository, execGh, catalog: sup
     if (collected.incomplete.length) return { findings, scannedArtifacts, incomplete: collected.incomplete };
     const catalog = collected.catalog;
     const eligible = catalog.filter((artifact) => artifact.expired === false && instant(artifact.createdAt) <= instant(observedAt));
-    if (receiptEvidenceLocator !== undefined) {
-      const transport = catalog.find((artifact) => artifactLocator(repository, artifact) === receiptEvidenceLocator);
-      if (transport == null || transport.expired !== false || instant(transport.createdAt) <= instant(observedAt)) incomplete.push(incompleteEntry("artifacts", "ARTIFACT_TRANSPORT_INVALID", repository));
-    }
+    if (!validReceiptTransport({ catalog, repository, receiptEvidenceLocator, observedAt })) incomplete.push(incompleteEntry("artifacts", "ARTIFACT_TRANSPORT_INVALID", repository));
     if (eligible.length !== receiptArtifacts.length || JSON.stringify(eligible.map((artifact) => String(artifact.id)).sort()) !== JSON.stringify(receiptArtifacts.map((artifact) => artifact.artifactId).sort())) incomplete.push(incompleteEntry("artifacts", "ARTIFACT_CATALOG_MISMATCH", repository));
     const runs = new Map();
     for (const artifact of eligible) {
       const receipt = receiptArtifacts.find((entry) => entry.artifactId === String(artifact.id));
-      if (receipt == null || receipt.detectorPolicyVersion !== detectorPolicyVersion || receipt.scanStatus !== "COMPLETE" || receipt.createdAt !== artifact.createdAt || receipt.expiresAt !== artifact.expiresAt || instant(receipt.createdAt) > instant(observedAt) || instant(observedAt) >= instant(receipt.expiresAt)) { incomplete.push(incompleteEntry("artifacts", "ARTIFACT_CATALOG_MISMATCH", repository)); continue; }
+      if (!validReceiptArtifact({ receipt, artifact, observedAt, detectorPolicyVersion })) { incomplete.push(incompleteEntry("artifacts", "ARTIFACT_CATALOG_MISMATCH", repository)); continue; }
       const runId = artifact.workflow_run?.id; let run = runs.get(runId);
       if (run == null) { run = await execGh({ method: "GET", endpoint: `repos/${repository}/actions/runs/${runId}` }); runs.set(runId, run); }
       if (receipt.workflowPath !== run?.path || receipt.runId !== String(artifact.workflow_run?.id) || receipt.artifactName !== artifact.name || receipt.archiveDigest !== artifact.digest) { incomplete.push(incompleteEntry("artifacts", "ARTIFACT_CATALOG_MISMATCH", repository)); continue; }
@@ -294,6 +291,14 @@ function normalizeCatalogArtifact(raw) {
 }
 function artifactCatalogWatermark(catalog) { return digestBytes(JSON.stringify([...catalog].sort((left, right) => left.id - right.id).map(({ id, createdAt, expiresAt, expired, digest, name, workflow_run }) => ({ id, createdAt, expiresAt, expired, digest, name, workflowRunId: workflow_run.id })))); }
 function artifactLocator(repository, artifact) { return `https://github.com/${repository}/actions/runs/${artifact.workflow_run.id}/artifacts/${artifact.id}`; }
+function validReceiptTransport({ catalog, repository, receiptEvidenceLocator, observedAt }) {
+  if (receiptEvidenceLocator === undefined) return true;
+  const transport = catalog.find((artifact) => artifactLocator(repository, artifact) === receiptEvidenceLocator);
+  return transport?.expired === false && instant(transport.createdAt) > instant(observedAt);
+}
+function validReceiptArtifact({ receipt, artifact, observedAt, detectorPolicyVersion }) {
+  return receipt != null && receipt.detectorPolicyVersion === detectorPolicyVersion && receipt.scanStatus === "COMPLETE" && receipt.createdAt === artifact.createdAt && receipt.expiresAt === artifact.expiresAt && instant(receipt.createdAt) <= instant(observedAt) && instant(observedAt) < instant(receipt.expiresAt);
+}
 function incompleteEntry(stage, code, affectedIdentity) { return { stage, code, affectedIdentity: safeIdentity(affectedIdentity) ? affectedIdentity : "redacted" }; }
 function safeLocator(value) { return /^https:\/\/github\.com\/AquilaXk\/easysubway(?:-(?:backend|data|mobile|platform))?\/actions\/runs\/\d+\/artifacts\/\d+$/.test(value ?? ""); }
 function safeLocatorForRepository(value, repository) { return safeLocator(value) && value.startsWith(`https://github.com/${repository}/actions/runs/`); }
