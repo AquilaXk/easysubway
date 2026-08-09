@@ -426,6 +426,18 @@ test("post-snapshot amendments는 snapshot 밖 hub issue의 분류를 기록한�
     2765, 2766, 2767, 2768, 2776,
   ]);
   assert.deepEqual(
+    Object.fromEntries(
+      amendments.amendments
+        .filter(({ sourceIssue }) => [2727, 2728, 2743].includes(sourceIssue))
+        .map(({ sourceIssue, title }) => [sourceIssue, title]),
+    ),
+    {
+      2727: "[CI][Architecture][P2] target Dependabot 완료·Hub /backend 중복 제거",
+      2728: "[Architecture][P0] Mobile source-file pin → Journey V3 mobile component manifest 전환",
+      2743: "[Architecture][P0][No-Fallback] 5개 레포 구현상 semantic fallback 영구 금지·재도입 방지",
+    },
+  );
+  assert.deepEqual(
     amendments.amendments.filter(({ disposition }) => disposition === "TRANSFER"),
     [{
       sourceIssue: 2700,
