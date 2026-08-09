@@ -1,0 +1,108 @@
+name: Public Sensitivity Owner Receipt
+
+on:
+  workflow_call:
+    secrets:
+      D20_SECRET_SCANNING_ALERTS_READ_TOKEN:
+        required: true
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  receipt:
+    if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      REPO_CODE: ${{ github.repository == 'AquilaXk/easysubway' && 'hub' || github.repository == 'AquilaXk/easysubway-backend' && 'backend' || github.repository == 'AquilaXk/easysubway-data' && 'data' || github.repository == 'AquilaXk/easysubway-mobile' && 'mobile' || github.repository == 'AquilaXk/easysubway-platform' && 'platform' || 'invalid' }}
+    steps:
+      - name: Public Sensitivity Owner Receipt / Reject missing secret-alert capability
+        shell: bash
+        env:
+          D20_SECRET_SCANNING_ALERTS_READ_TOKEN: ${{ secrets.D20_SECRET_SCANNING_ALERTS_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          test -n "${D20_SECRET_SCANNING_ALERTS_READ_TOKEN}"
+
+      - name: Public Sensitivity Owner Receipt / Checkout default branch head
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'repository')] }}
+          ref: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'sha')] }}
+          persist-credentials: false
+
+      - name: Public Sensitivity Owner Receipt / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Public Sensitivity Owner Receipt / Create sanitized evidence bundle
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          D20_SECRET_SCANNING_ALERTS_READ_TOKEN: ${{ secrets.D20_SECRET_SCANNING_ALERTS_READ_TOKEN }}
+        run: |
+          set -euo pipefail
+          mkdir --parents d20-evidence
+          test ! -e d20-evidence/evidence.json
+          OBSERVED_AT="$(date --utc +"%Y-%m-%dT%H:%M:%S.000Z")"
+          printf 'OBSERVED_AT=%s\n' "${OBSERVED_AT}" >> "${GITHUB_ENV}"
+          node tools/repo/produce-public-sensitivity-owner-receipt.mjs \
+            --repository "${GITHUB_REPOSITORY}" \
+            --git-sha "${GITHUB_SHA}" \
+            --observed-at "${OBSERVED_AT}" \
+            --evidence-output d20-evidence/evidence.json
+
+      - id: evidence-upload
+        name: Public Sensitivity Owner Receipt / Upload evidence first
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: d20-public-sensitivity-evidence-${{ env.REPO_CODE }}-${{ github.sha }}
+          path: d20-evidence/evidence.json
+          if-no-files-found: error
+          include-hidden-files: false
+          overwrite: false
+          retention-days: 14
+
+      - name: Public Sensitivity Owner Receipt / Finalize receipt after evidence identity
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVIDENCE_ARTIFACT_ID: ${{ steps.evidence-upload.outputs.artifact-id }}
+          EVIDENCE_ARTIFACT_DIGEST: ${{ steps.evidence-upload.outputs.artifact-digest }}
+        run: |
+          set -euo pipefail
+          test -n "${EVIDENCE_ARTIFACT_ID}"
+          [[ "${EVIDENCE_ARTIFACT_DIGEST}" =~ ^[0-9a-f]{64}$ ]]
+          mkdir --parents d20-receipt
+          gh api "repos/${GITHUB_REPOSITORY}/actions/artifacts/${EVIDENCE_ARTIFACT_ID}" --jq '{id,expired,created_at,expires_at,name,digest,workflow_run}' > d20-receipt/evidence-artifact.json
+          node tools/repo/produce-public-sensitivity-owner-receipt.mjs \
+            --repository "${GITHUB_REPOSITORY}" \
+            --git-sha "${GITHUB_SHA}" \
+            --observed-at "${OBSERVED_AT}" \
+            --evidence-locator "https://github.com/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}/artifacts/${EVIDENCE_ARTIFACT_ID}" \
+            --evidence-digest "${EVIDENCE_ARTIFACT_DIGEST}" \
+            --evidence-input d20-evidence/evidence.json \
+            --evidence-artifact d20-receipt/evidence-artifact.json \
+            --output d20-receipt/receipt.json
+
+      - name: Public Sensitivity Owner Receipt / Reject non-single receipt handoff
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(find d20-receipt -type f | wc -l | tr -d ' ')" = 2
+          test -s d20-receipt/receipt.json
+          rm d20-receipt/evidence-artifact.json
+          test "$(find d20-receipt -type f | wc -l | tr -d ' ')" = 1
+
+      - name: Public Sensitivity Owner Receipt / Upload finalized handoff
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: d20-public-sensitivity-owner-receipt-${{ env.REPO_CODE }}-${{ github.sha }}
+          path: d20-receipt/receipt.json
+          if-no-files-found: error
+          include-hidden-files: false
+          overwrite: false
+          retention-days: 14
