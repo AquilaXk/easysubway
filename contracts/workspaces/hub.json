@@ -15,5 +15,7 @@
   "referenceAuditReportSchema": "../documentation/reference-audit-report.schema.json",
   "publicSensitivityAuditScope": "../documentation/public-sensitivity-audit-scope.json",
   "publicSensitivityOwnerReceiptSchema": "../documentation/public-sensitivity-owner-receipt.schema.json",
-  "publicSensitivityAuditReportSchema": "../documentation/public-sensitivity-audit-report.schema.json"
+  "publicSensitivityAuditReportSchema": "../documentation/public-sensitivity-audit-report.schema.json",
+  "planDocExecutionAuditScope": "../documentation/plan-doc-execution-audit-scope.json",
+  "planDocExecutionAuditReportSchema": "../documentation/plan-doc-execution-audit-report.schema.json"
 }

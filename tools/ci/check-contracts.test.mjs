@@ -32,6 +32,8 @@ import {
   validatePublicSensitivityAuditScope,
   validatePublicSensitivityOwnerReceiptSchema,
   validatePublicSensitivityAuditReportSchema,
+  validatePlanDocExecutionAuditScope,
+  validatePlanDocExecutionAuditReportSchema,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
@@ -95,6 +97,32 @@ test("public sensitivity contracts bind the exact scope and corrected owner rece
   const offsetInvalid = structuredClone(scope);
   offsetInvalid.falsePositiveDispositions.push({ locationFingerprint: "a".repeat(64), detectorId: "KNOWN_TOKEN_FORMAT", reason: "reviewed", owner: "owner", verifiedAt: "2026-08-08T23:30:00Z", expiresAt: "2026-08-09T00:00:00+09:00" });
   assert.ok(validatePublicSensitivityAuditScope(offsetInvalid).some((error) => error.includes("revalidation/expiry")));
+});
+
+test("plan-doc execution audit contracts fix the historical inventory and fail-closed report", () => {
+  const scope = loadJson("contracts/documentation/plan-doc-execution-audit-scope.json");
+  const scopeSchema = loadJson("contracts/documentation/plan-doc-execution-audit-scope.schema.json");
+  const reportSchema = loadJson("contracts/documentation/plan-doc-execution-audit-report.schema.json");
+  assert.equal(validateSchema(scopeSchema, scope).ok, true);
+  assert.deepEqual(validatePlanDocExecutionAuditScope(scope), []);
+  assert.deepEqual(validatePlanDocExecutionAuditReportSchema(reportSchema), []);
+  const invalid = structuredClone(scope); invalid.historical[0].mergeSha = "a".repeat(40);
+  assert.ok(validatePlanDocExecutionAuditScope(invalid).length > 0);
+  const weakened = structuredClone(reportSchema); delete weakened.oneOf;
+  assert.ok(validatePlanDocExecutionAuditReportSchema(weakened).length > 0);
+  for (const [name, mutate] of [
+    ["scopeSha256", (schema) => { schema.properties.inputs.properties.scopeSha256.pattern = ".+"; }],
+    ["record repository", (schema) => { schema.properties.records.items.properties.repository.const = "AquilaXk/other"; }],
+    ["mergeSha", (schema) => { schema.properties.records.items.properties.mergeSha.pattern = ".+"; }],
+    ["changedFiles uniqueness", (schema) => { schema.properties.records.items.properties.changedFiles.uniqueItems = false; }],
+    ["records", (schema) => { schema.properties.records.items.required = schema.properties.records.items.required.filter((field) => field !== "changedFiles"); }],
+    ["findings", (schema) => { schema.properties.findings.items.required = schema.properties.findings.items.required.filter((field) => field !== "identity"); }],
+    ["incomplete", (schema) => { schema.properties.incomplete.items.required = schema.properties.incomplete.items.required.filter((field) => field !== "affectedIdentity"); }],
+  ]) {
+    const mutated = structuredClone(reportSchema);
+    mutate(mutated);
+    assert.ok(validatePlanDocExecutionAuditReportSchema(mutated).length > 0, name);
+  }
 });
 
 test("F15 reference audit scope validation is total and skips semantics after schema failure", () => {

@@ -1,0 +1,25 @@
+{
+  "schemaVersion": 1,
+  "executionRepository": "AquilaXk/easysubway",
+  "planOwner": "PLAN-DOC",
+  "forbiddenTargetPathPrefixes": ["apps/mobile/", "backend/", "infra/", "tools/datapack/", "tools/ops/", "tools/release/"],
+  "historical": [
+    { "issueNumber": 2748, "prNumber": 2749, "mergeSha": "5ad660a7f07563999c1c076790614e7e717e0ea7", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2754, "prNumber": 2755, "mergeSha": "0568c2195ccac35f0d46f6bb3594093471310977", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2756, "prNumber": 2757, "mergeSha": "2b102c1b50f495d628617e61ae95f81944b69c20", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2758, "prNumber": 2759, "mergeSha": "00c6109bf91e052fc0d9944a84fde1601c1c50c1", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2760, "prNumber": 2761, "mergeSha": "decc1072aa8c8facbfa0143fa1f8fe7646bc016d", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2762, "prNumber": 2763, "mergeSha": "560e07239e9ef99b3bfea2ab4bf758b5115acb43", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2729, "prNumber": 2730, "mergeSha": "4ccf78d8bf60db2d25233d6fe744daf805c7b0ac", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2733, "prNumber": 2775, "mergeSha": "96119c4d723d9c60fcd8999da8e58af0731b0847", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2781, "prNumber": 2782, "mergeSha": "6194860b5cb13334b91410374fd2504ee056684c", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2783, "prNumber": 2784, "mergeSha": "3ea7ef2929ce680268783a1a14476138beb2b521", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2785, "prNumber": 2787, "mergeSha": "79bcd0b8e05eb90907c411bdde9b30e24592ce53", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2729, "prNumber": 2788, "mergeSha": "a44259fcbdd5538586f4aabaa9a6cb844a41dc03", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2748, "prNumber": 2789, "mergeSha": "90a169d9b35e4845bfd03d518522544b66dd189f", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2790, "prNumber": 2791, "mergeSha": "40d1bb13906a6a96a3c7342b0923ad180d290234", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2792, "prNumber": 2793, "mergeSha": "3d1590baa98c929ceabd0d2d44414cebcc643c6f", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2795, "prNumber": 2796, "mergeSha": "b853fe6101c7848a8d556bf21b882b3f0e3060a9", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" }
+  ],
+  "self": { "issueNumber": 2797, "planOwner": "PLAN-DOC" }
+}
