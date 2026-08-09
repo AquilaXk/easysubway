@@ -182,6 +182,92 @@ function candidateEvidenceBindsSpec(admission) {
     && declared.sha256 === admission.specSha256;
 }
 
+function sameOrderedStringSet(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right)) {
+    return false;
+  }
+  return JSON.stringify([...new Set(left)].sort()) === JSON.stringify([...new Set(right)].sort());
+}
+
+function pilotRequirement(evidence, variant, requirementKey) {
+  return evidence?.variants?.[variant]?.pilotRequirements
+    ?.find((entry) => entry?.requirementKey === requirementKey);
+}
+
+function inheritedCandidateBindings(source, admission) {
+  const bindings = [];
+  for (const redescription of admission?.spec?.lineScopeRedescriptions ?? []) {
+    if (redescription?.sourceDomain !== ROUTE_MAP_DOMAIN) {
+      continue;
+    }
+    for (const declaration of redescription.nonTransitioningRequirements ?? []) {
+      if (declaration?.reasonCode !== "ALREADY_SUPPORTED_BY_INHERITED_SOURCE") {
+        continue;
+      }
+      const baseline = pilotRequirement(admission.evidence, "baseline", declaration.requirementKey);
+      if (baseline?.sourceIds?.includes(source.id)) {
+        bindings.push({ requirementKey: declaration.requirementKey, redescription });
+      }
+    }
+  }
+  return bindings;
+}
+
+// snapshot이 없는 inherited source는 current official source의 재기술 선언이 그 support를 그대로
+// 승계한다고 exact spec/evidence에 기록한 한 scope에만 허용한다. source ID 하나가 baseline에 끼어
+// 있다는 사실만으로는 부족하고, 두 variant의 SUPPORTED 상태와 source 집합 증분까지 모두 대조한다.
+function validateInheritedCandidateScope({ source, key, lineId, admission, auditedScopeKeys, push }) {
+  const requirementKey = `${key}:${ROUTE_MAP_DOMAIN}`;
+  const candidates = (admission?.spec?.lineScopeRedescriptions ?? []).filter((entry) =>
+    entry?.sourceDomain === ROUTE_MAP_DOMAIN
+    && (entry.lineIds ?? []).includes(lineId)
+    && (entry.requirementKeys ?? []).includes(requirementKey)
+    && (entry.nonTransitioningRequirements ?? []).some((declaration) =>
+      declaration?.requirementKey === requirementKey
+      && declaration.reasonCode === "ALREADY_SUPPORTED_BY_INHERITED_SOURCE"));
+  if (candidates.length !== 1) {
+    return false;
+  }
+  if (!candidateEvidenceBindsSpec(admission)) {
+    push("SOURCE_CANDIDATE_EVIDENCE_SPEC_UNBOUND", "candidate 게이트 evidence가 이 spec 바이트를 입력으로 기록하지 않았다");
+    return true;
+  }
+
+  const [redescription] = candidates;
+  const baseline = pilotRequirement(admission.evidence, "baseline", requirementKey);
+  const lineScoped = pilotRequirement(admission.evidence, "lineScoped", requirementKey);
+  const declaration = (admission.evidence?.declaredNonTransitions?.entries ?? [])
+    .find((entry) => entry?.requirementKey === requirementKey);
+  const expectedCurrentSources = [source.id, redescription.sourceId];
+  const exactDeclaration = declaration?.sourceId === redescription.sourceId
+    && declaration.sourceDomain === ROUTE_MAP_DOMAIN
+    && declaration.reasonCode === "ALREADY_SUPPORTED_BY_INHERITED_SOURCE"
+    && declaration.before === "SUPPORTED"
+    && declaration.after === "SUPPORTED"
+    && sameOrderedStringSet(declaration.baselineSourceIds, [source.id])
+    && sameOrderedStringSet(declaration.lineScopedSourceIds, expectedCurrentSources);
+  const exactVariants = baseline?.status === "SUPPORTED"
+    && lineScoped?.status === "SUPPORTED"
+    && sameOrderedStringSet(baseline.sourceIds, [source.id])
+    && sameOrderedStringSet(lineScoped.sourceIds, expectedCurrentSources);
+  const supported = new Set(admission.evidence?.variants?.lineScoped?.supportedRequirementKeys ?? []);
+  if (!supported.has(requirementKey)) {
+    push("SOURCE_CANDIDATE_SCOPE_NOT_SUPPORTED", `candidate 게이트가 ${requirementKey}를 SUPPORTED로 실증하지 않았다`);
+    return true;
+  }
+  if (!exactDeclaration || !exactVariants) {
+    push(
+      "SOURCE_INHERITED_CANDIDATE_BINDING_MISMATCH",
+      `${requirementKey} inherited support와 current official source 증분이 exact spec/evidence와 다르다`,
+    );
+    return true;
+  }
+  if (!auditedScopeKeys.has(key)) {
+    push("SOURCE_CANDIDATE_SCOPE_UNAUDITED", `${key}가 containment 감사 대상 scope가 아니어서 판정할 수 없다`);
+  }
+  return true;
+}
+
 // 재기술 claim 하나의 근거 결속. 성립하면 등재된 재기술 항목을 돌려준다.
 function boundCandidateRedescription({ source, admission, push }) {
   const redescription = (admission?.spec?.lineScopeRedescriptions ?? [])
@@ -222,6 +308,20 @@ function validateCandidateScope({ key, redescription, supported, auditedScopeKey
 function validateCandidateLineScopeClaims({ sources, admission, auditedScopeKeys, violations }) {
   for (const source of sources) {
     const push = (kind, message) => violations.push({ kind, sourceId: source.id, message: `${source.id}: ${message}` });
+    const inheritedClaims = claimedScopes(source.coverageScope);
+    const inheritedBindings = inheritedCandidateBindings(source, admission);
+    if (inheritedBindings.length > 0) {
+      const claimedRequirementKeys = inheritedClaims.map(({ key }) => `${key}:${ROUTE_MAP_DOMAIN}`);
+      const boundRequirementKeys = inheritedBindings.map(({ requirementKey }) => requirementKey);
+      if (!sameOrderedStringSet(claimedRequirementKeys, boundRequirementKeys)) {
+        push("SOURCE_CANDIDATE_LINE_SCOPE_MISMATCH", "inherited source의 coverageScope.lineIds가 candidate spec 선언과 다르다");
+        continue;
+      }
+      if (inheritedClaims.every(({ key, lineId }) =>
+        validateInheritedCandidateScope({ source, key, lineId, admission, auditedScopeKeys, push }))) {
+        continue;
+      }
+    }
     const redescription = boundCandidateRedescription({ source, admission, push });
     if (!redescription) {
       continue;

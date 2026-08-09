@@ -827,6 +827,20 @@ test("admitted snapshot 없는 재기술 claim은 근거가 전부 결속되면 
   assert.ok(result.auditedScopeKeys.includes(CANDIDATE_REDESCRIBED_SCOPE_KEY));
 });
 
+test("admitted snapshot 없는 inherited claim은 exact baseline·current source 증분이 깨지면 거부된다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const evidence = structuredClone(inputs.candidateLineScopeAdmission.evidence);
+  const declaration = evidence.declaredNonTransitions.entries.find(
+    ({ requirementKey }) => requirementKey === `${CANDIDATE_REDESCRIBED_SCOPE_KEY}:${ROUTE_MAP_DOMAIN}`,
+  );
+  declaration.baselineSourceIds = [];
+  const candidateLineScopeAdmission = { ...inputs.candidateLineScopeAdmission, evidence };
+
+  const result = auditRouteMapCoverageScopes({ ...inputs, candidateLineScopeAdmission });
+
+  assert.deepEqual(violationKinds(result), ["SOURCE_INHERITED_CANDIDATE_BINDING_MISMATCH"]);
+});
+
 test("candidate 재기술 근거가 없으면 snapshot 없는 lineIds claim은 위반이다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
 
