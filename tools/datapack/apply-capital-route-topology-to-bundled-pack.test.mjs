@@ -114,15 +114,29 @@ test("원문 CSV 재파싱이 스냅샷 contentSha256과 일치한다(대표 노
     assert.equal(parsed.rawSha256, line.rawSha256, slug);
   }
   const seohaeSource = LINE_SOURCES.find((item) => item.slug === "seohae");
+  const seohaeLine = snapshot.lines.find(({ lineId }) => lineId === seohaeSource.lineId);
+  const [primaryProvenance, secondaryProvenance] = seohaeLine.inputProvenance ?? [
+    {
+      datasetId: seohaeSource.datasetId,
+      detailUrl: seohaeSource.detailUrl,
+      downloadUrl: seohaeSource.downloadUrl,
+    },
+    {
+      datasetId: seohaeSource.molitDatasetId,
+      detailUrl: seohaeSource.molitDownloadUrl,
+      downloadUrl: seohaeSource.molitDownloadUrl,
+    },
+  ];
   const seohaeParsed = parseLineSource(
     seohaeSource,
     await readFile(path.resolve(root, seohaeSource.localCsv)),
     {
       capturedAt: new Date(snapshot.capturedAt),
+      resolvedDownloadUrl: primaryProvenance.downloadUrl,
       secondaryBytes: await readFile(path.resolve(root, seohaeSource.localMolitCsv)),
+      secondaryProvenance,
     },
   );
-  const seohaeLine = snapshot.lines.find(({ lineId }) => lineId === seohaeSource.lineId);
   assert.equal(seohaeParsed.contentSha256, seohaeLine.contentSha256, "seohae");
   assert.equal(seohaeParsed.rawSha256, seohaeLine.rawSha256, "seohae");
 });

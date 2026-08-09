@@ -13,7 +13,7 @@
     },
     "capitalTopology": {
       "path": "tools/datapack/sources/capital-route-topology-20260809.json",
-      "sha256": "c3e5d050675ea42d79f918c46709524068c6d4c08fc6400a4e9bfa3416560441",
+      "sha256": "23761f7230c01971c07d7a6340286404a9eedcc0fee224f3080f16a0cbe224d5",
       "snapshotId": "capital-route-topology-20260809"
     },
     "capitalTopologyAdmission": {

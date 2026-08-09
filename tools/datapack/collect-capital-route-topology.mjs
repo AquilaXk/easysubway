@@ -344,6 +344,7 @@ export const LINE_SOURCES = Object.freeze([
       "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003639143&fileDetailSn=1&insertDataPrcus=N",
     localCsv: "tools/datapack/sources/capital-seohae-korail-distance-20260724.csv",
     localMolitCsv: "tools/datapack/sources/molit-urban-rail-full-route-20251211.csv",
+    molitDatasetId: "15122916",
     molitDownloadUrl: "https://www.data.go.kr/data/15122916/fileData.do",
     kind: "seohae-merged",
     acceptedBranchNames: ["서해선"],
@@ -1019,7 +1020,7 @@ function indexToColumn(index) {
   return out;
 }
 
-function lineSnapshotFromUndirected(source, csvBytes, parsed, capturedAt) {
+function lineSnapshotFromUndirected(source, csvBytes, parsed, capturedAt, resolvedDownloadUrl) {
   const edges = materializeEdges(parsed.undirected);
   const scope = buildScope(parsed.undirected);
   const rawSha256 = sha256(Buffer.from(csvBytes));
@@ -1028,7 +1029,7 @@ function lineSnapshotFromUndirected(source, csvBytes, parsed, capturedAt) {
     slug: source.slug,
     datasetId: source.datasetId,
     detailUrl: source.detailUrl,
-    endpoint: source.downloadUrl,
+    endpoint: resolvedDownloadUrl,
     branchNames: parsed.branchNames,
     branchSequences: parsed.branchSequences,
     stationCount: scope.length,
@@ -1043,7 +1044,12 @@ function lineSnapshotFromUndirected(source, csvBytes, parsed, capturedAt) {
   };
 }
 
-export function parseLineSource(source, fileBytes, { capturedAt = new Date(), secondaryBytes = null } = {}) {
+export function parseLineSource(source, fileBytes, {
+  capturedAt = new Date(),
+  resolvedDownloadUrl = source.downloadUrl,
+  secondaryBytes = null,
+  secondaryProvenance = null,
+} = {}) {
   const captured = validDate(capturedAt, "capturedAt");
   if (source.kind === "line1") {
     const snap = parseCapitalLine1RouteTopology(fileBytes, { capturedAt: captured });
@@ -1067,10 +1073,22 @@ export function parseLineSource(source, fileBytes, { capturedAt = new Date(), se
     };
   }
   if (source.kind === "line6") {
-    return lineSnapshotFromUndirected(source, fileBytes, parseLine6DistanceCsv(fileBytes, source), captured);
+    return lineSnapshotFromUndirected(
+      source,
+      fileBytes,
+      parseLine6DistanceCsv(fileBytes, source),
+      captured,
+      resolvedDownloadUrl,
+    );
   }
   if (source.kind === "gtxa-xlsx") {
-    return lineSnapshotFromUndirected(source, fileBytes, parseGtxADistanceXlsx(fileBytes), captured);
+    return lineSnapshotFromUndirected(
+      source,
+      fileBytes,
+      parseGtxADistanceXlsx(fileBytes),
+      captured,
+      resolvedDownloadUrl,
+    );
   }
   if (source.kind === "molit-sequence") {
     return lineSnapshotFromUndirected(
@@ -1078,11 +1096,15 @@ export function parseLineSource(source, fileBytes, { capturedAt = new Date(), se
       fileBytes,
       parseMolitSequenceCsv(fileBytes, source),
       captured,
+      resolvedDownloadUrl,
     );
   }
   if (source.kind === "seohae-merged") {
     if (secondaryBytes == null) {
       throw new Error(`${source.slug}: MOLIT secondaryBytes required for seohae-merged`);
+    }
+    if (secondaryProvenance == null) {
+      throw new Error(`${source.slug}: secondaryProvenance required for seohae-merged`);
     }
     const parsed = parseSeohaeMerged(fileBytes, secondaryBytes, source);
     const rawSha256 = sha256(Buffer.concat([
@@ -1097,7 +1119,21 @@ export function parseLineSource(source, fileBytes, { capturedAt = new Date(), se
       slug: source.slug,
       datasetId: source.datasetId,
       detailUrl: source.detailUrl,
-      endpoint: source.downloadUrl,
+      endpoint: resolvedDownloadUrl,
+      inputProvenance: [
+        {
+          datasetId: source.datasetId,
+          detailUrl: source.detailUrl,
+          downloadUrl: resolvedDownloadUrl,
+          rawSha256: sha256(Buffer.from(fileBytes)),
+        },
+        {
+          datasetId: secondaryProvenance.datasetId,
+          detailUrl: secondaryProvenance.detailUrl,
+          downloadUrl: secondaryProvenance.downloadUrl,
+          rawSha256: sha256(Buffer.from(secondaryBytes)),
+        },
+      ],
       branchNames: parsed.branchNames,
       branchSequences: parsed.branchSequences,
       stationCount: scope.length,
@@ -1116,6 +1152,7 @@ export function parseLineSource(source, fileBytes, { capturedAt = new Date(), se
     fileBytes,
     parseGenericCapitalDistanceCsv(fileBytes, source),
     captured,
+    resolvedDownloadUrl,
   );
 }
 
@@ -1129,19 +1166,34 @@ export async function collectCapitalRouteTopology({
   const captured = validDate(now, "now");
   const lines = [];
   for (const source of sources) {
-    const bytes = useLocalFiles
-      ? await readFile(path.resolve(root, source.localCsv))
+    const primary = useLocalFiles
+      ? {
+          bytes: await readFile(path.resolve(root, source.localCsv)),
+          downloadUrl: source.downloadUrl,
+        }
       : await downloadBytes(fetchImpl, source);
-    let secondaryBytes = null;
+    let secondary = null;
     if (source.kind === "seohae-merged") {
       if (typeof source.localMolitCsv !== "string" || source.localMolitCsv.length === 0) {
         throw new Error(`${source.slug}: localMolitCsv required`);
       }
-      secondaryBytes = useLocalFiles
-        ? await readFile(path.resolve(root, source.localMolitCsv))
+      secondary = useLocalFiles
+        ? {
+            bytes: await readFile(path.resolve(root, source.localMolitCsv)),
+            downloadUrl: source.molitDownloadUrl,
+          }
         : await downloadDataGoDetailFile(fetchImpl, source.molitDownloadUrl);
     }
-    lines.push(parseLineSource(source, bytes, { capturedAt: captured, secondaryBytes }));
+    lines.push(parseLineSource(source, primary.bytes, {
+      capturedAt: captured,
+      resolvedDownloadUrl: primary.downloadUrl,
+      secondaryBytes: secondary?.bytes ?? null,
+      secondaryProvenance: secondary == null ? null : {
+        datasetId: source.molitDatasetId,
+        detailUrl: source.molitDownloadUrl,
+        downloadUrl: secondary.downloadUrl,
+      },
+    }));
   }
   lines.sort((left, right) => codepointCompare(left.lineId, right.lineId));
   const topologyGaps = [...TOPOLOGY_GAPS];
@@ -1217,7 +1269,10 @@ async function downloadBytes(fetchImpl, source) {
     },
   });
   if (!response.ok) throw new Error(`${source.slug} CSV HTTP ${response.status}`);
-  return Buffer.from(await response.arrayBuffer());
+  return {
+    bytes: Buffer.from(await response.arrayBuffer()),
+    downloadUrl: source.downloadUrl,
+  };
 }
 
 async function downloadDataGoDetailFile(fetchImpl, detailUrl) {
@@ -1233,7 +1288,10 @@ async function downloadDataGoDetailFile(fetchImpl, detailUrl) {
     },
   });
   if (!fileResponse.ok) throw new Error(`data.go.kr file HTTP ${fileResponse.status}`);
-  return Buffer.from(await fileResponse.arrayBuffer());
+  return {
+    bytes: Buffer.from(await fileResponse.arrayBuffer()),
+    downloadUrl,
+  };
 }
 
 export function resolveDataGoDownloadUrl(html, detailUrl) {

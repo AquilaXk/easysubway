@@ -519,6 +519,15 @@ async function syncReleaseEvidence({ check }) {
   const productionScope = JSON.parse(productionScopeBytes);
   const governance = JSON.parse(governanceBytes);
   const freshness = JSON.parse(freshnessBytes);
+  const capitalTopology = spec.networkEdgeEvidence?.capitalTopology;
+  if (typeof capitalTopology?.path !== "string" || capitalTopology.path.length === 0) {
+    throw new Error("candidate build spec capital topology path is missing");
+  }
+  const capitalTopologyPath = path.resolve(root, capitalTopology.path);
+  if (!capitalTopologyPath.startsWith(`${root}${path.sep}`)) {
+    throw new Error("candidate build spec capital topology path escapes repository root");
+  }
+  capitalTopology.sha256 = sha256(await readFile(capitalTopologyPath));
   const inventoryBySource = new Map(inventory.sources.map((entry) => [entry.id, entry]));
   const { headsBySource } = validateLineage(snapshots);
   const requiredSourceIds = new Set(productionScope.productionSourceSet?.requiredSourceIds ?? []);
