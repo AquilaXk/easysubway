@@ -21026,3 +21026,28 @@ test("documentation reference audit evidence workflow는 current main의 sanitiz
   assert.match(workflow, /retention-days: 14/);
   assert.doesNotMatch(workflow, /continue-on-error|cache|previous report|git (?:add|commit|push)/i);
 });
+
+test("plan-doc execution audit workflow binds merged source SHA to a write-once sanitized artifact", () => {
+  const workflow = read(".github/workflows/plan-doc-execution-audit.yml");
+  assert.match(workflow, /^on:\n  push:\n    branches: \[main\]\n    paths:$/m);
+  const pathBlock = workflow.match(/^    paths:\n((?:      - [^\n]+\n?)+)/m)?.[1] ?? "";
+  assert.deepEqual([...pathBlock.matchAll(/^      - ([^\n]+)$/gm)].map((match) => match[1]), [
+    ".github/workflows/plan-doc-execution-audit.yml",
+    "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
+    "contracts/documentation/plan-doc-execution-audit-scope.json",
+    "contracts/documentation/plan-doc-execution-audit-report.schema.json",
+    "tools/repo/audit-plan-doc-execution.mjs",
+    "tools/repo/audit-plan-doc-execution.test.mjs",
+  ]);
+  assert.match(workflow, /permissions:\n      contents: read\n      issues: read\n      pull-requests: read/);
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /set -euo pipefail/);
+  assert.match(workflow, /node tools\/repo\/audit-plan-doc-execution\.mjs/);
+  for (const input of ["--scope contracts/documentation/plan-doc-execution-audit-scope.json", "--scope-schema contracts/documentation/plan-doc-execution-audit-scope.schema.json", "--report-schema contracts/documentation/plan-doc-execution-audit-report.schema.json", "--source-sha \"${GITHUB_SHA}\"", "--observed-at \"${OBSERVED_AT}\"", "--output \"${REPORT_PATH}\""]) assert.match(workflow, new RegExp(input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(workflow, /test ! -e "\$\{REPORT_PATH\}"/);
+  assert.match(workflow, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.match(workflow, /retention-days: 14/);
+  assert.doesNotMatch(workflow, /continue-on-error|uses:\s*actions\/cache@|git (?:add|commit|push)/i);
+});
