@@ -13,12 +13,12 @@ function artifact(id, overrides = {}) {
   return { id, expired: false, created_at: "2026-08-08T00:00:00.000Z", expires_at: "2026-09-09T00:00:00.000Z", name: `evidence-${id}`, digest: `sha256:${"b".repeat(64)}`, workflow_run: { id: 7 }, ...overrides };
 }
 
-function gh({ evidence = artifact(9, { created_at: "2026-08-09T00:00:00.001Z" }) } = {}) {
+function gh({ evidence = artifact(9, { created_at: "2026-08-09T00:00:00.001Z" }), evidenceArchive = null } = {}) {
   return async ({ endpoint, binary }) => {
     if (endpoint === `repos/${REPOSITORY}/actions/artifacts?per_page=100&page=1`) return { total_count: 1, artifacts: [evidence] };
     if (endpoint === `repos/${REPOSITORY}/git/ref/heads/main`) return { ref: "refs/heads/main", object: { sha: SHA } };
     if (endpoint === `repos/${REPOSITORY}/actions/runs/7`) return { path: ".github/workflows/public-sensitivity-owner-receipt.yml" };
-    if (endpoint === `repos/${REPOSITORY}/actions/artifacts/9/zip`) return Buffer.from("PK\x05\x06\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", "binary");
+    if (endpoint === `repos/${REPOSITORY}/actions/artifacts/9/zip`) return evidenceArchive ?? Buffer.from("PK\x05\x06\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0\0", "binary");
     throw new Error(`unexpected ${binary ? "binary " : ""}${endpoint}`);
   };
 }
@@ -48,7 +48,9 @@ test("receipt is created only after the post-cutoff evidence artifact identity i
   const evidence = await produceOwnerEvidence({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, execGh: gh(), execAlerts: alerts() });
   await assert.rejects(() => produceOwnerReceipt({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, evidenceLocator: LOCATOR, evidence, execGh: gh() }), /EVIDENCE_TRANSPORT_INVALID/);
   const transport = artifact(9, { created_at: "2026-08-09T00:00:00.001Z" });
-  const result = await produceOwnerReceipt({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, evidenceLocator: LOCATOR, evidence, expectedEvidenceDigest: transport.digest.slice("sha256:".length), evidenceArtifact: transport, execGh: gh() });
+  const archive = zip("evidence.json", JSON.stringify(evidence));
+  transport.digest = `sha256:${createHash("sha256").update(archive).digest("hex")}`;
+  const result = await produceOwnerReceipt({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, evidenceLocator: LOCATOR, evidence, expectedEvidenceDigest: transport.digest.slice("sha256:".length), evidenceArtifact: transport, execGh: gh({ evidence: transport, evidenceArchive: archive }) });
   assert.equal(result.receipt.evidenceLocator, LOCATOR);
   assert.equal(result.receipt.alertEnumerationComplete, true);
   assert.equal(result.receipt.publicArtifactEnumerationComplete, true);
@@ -59,6 +61,21 @@ test("producer fails closed when alert capability or post-cutoff evidence bounda
   const beforeCutoff = artifact(9);
   await assert.rejects(() => produceOwnerReceipt({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, evidenceLocator: LOCATOR, evidence, expectedEvidenceDigest: beforeCutoff.digest.slice("sha256:".length), evidenceArtifact: beforeCutoff, execGh: gh({ evidence: beforeCutoff }) }), /EVIDENCE_TRANSPORT_INVALID/);
   await assert.rejects(() => produceOwnerEvidence({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, execGh: gh(), execAlerts: async () => { throw new Error("403 secret value"); } }), /ALERT_CAPABILITY_UNAVAILABLE/);
+});
+
+test("receipt finalization rejects missing, digest-mismatched, malformed, and changed uploaded evidence", async () => {
+  const evidence = await produceOwnerEvidence({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, execGh: gh(), execAlerts: alerts() });
+  const transport = artifact(9, { created_at: "2026-08-09T00:00:00.001Z" });
+  const original = zip("evidence.json", JSON.stringify(evidence));
+  transport.digest = `sha256:${createHash("sha256").update(original).digest("hex")}`;
+  const input = { repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, evidenceLocator: LOCATOR, evidence, expectedEvidenceDigest: transport.digest.slice("sha256:".length), evidenceArtifact: transport };
+  await assert.rejects(() => produceOwnerReceipt({ ...input, execGh: async ({ endpoint }) => { if (endpoint.endsWith("/zip")) throw new Error("404"); return gh({ evidence: transport })({ endpoint }); } }), /EVIDENCE_TRANSPORT_INVALID/);
+  const malformed = Buffer.from("not-a-zip");
+  const malformedTransport = { ...transport, digest: `sha256:${createHash("sha256").update(malformed).digest("hex")}` };
+  await assert.rejects(() => produceOwnerReceipt({ ...input, expectedEvidenceDigest: malformedTransport.digest.slice("sha256:".length), evidenceArtifact: malformedTransport, execGh: gh({ evidence: malformedTransport, evidenceArchive: malformed }) }), /EVIDENCE_TRANSPORT_INVALID/);
+  const changed = zip("evidence.json", JSON.stringify({ ...evidence, openAlertCount: 1 }));
+  transport.digest = `sha256:${createHash("sha256").update(changed).digest("hex")}`;
+  await assert.rejects(() => produceOwnerReceipt({ ...input, expectedEvidenceDigest: transport.digest.slice("sha256:".length), evidenceArtifact: transport, execGh: gh({ evidence: transport, evidenceArchive: changed }) }), /EVIDENCE_TRANSPORT_INVALID/);
 });
 
 test("complete scan with findings remains COMPLETE for receipt admission", async () => {
@@ -79,7 +96,9 @@ test("complete scan with findings remains COMPLETE for receipt admission", async
 test("receipt reuses the uploaded evidence snapshot without a second live scan", async () => {
   const evidence = await produceOwnerEvidence({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, execGh: gh(), execAlerts: alerts() });
   const transport = artifact(9, { created_at: "2026-08-09T00:00:00.001Z" });
-  const result = await produceOwnerReceipt({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, evidenceLocator: LOCATOR, evidence, expectedEvidenceDigest: transport.digest.slice("sha256:".length), evidenceArtifact: transport, execGh: gh(), execAlerts: async () => { throw new Error("must not rescan"); } });
+  const archive = zip("evidence.json", JSON.stringify(evidence));
+  transport.digest = `sha256:${createHash("sha256").update(archive).digest("hex")}`;
+  const result = await produceOwnerReceipt({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, evidenceLocator: LOCATOR, evidence, expectedEvidenceDigest: transport.digest.slice("sha256:".length), evidenceArtifact: transport, execGh: gh({ evidence: transport, evidenceArchive: archive }), execAlerts: async () => { throw new Error("must not rescan"); } });
   assert.deepEqual(result.receipt, { ...evidence, evidenceLocator: LOCATOR });
   await assert.rejects(() => produceOwnerReceipt({ repository: REPOSITORY, gitSha: SHA, observedAt: OBSERVED_AT, evidenceLocator: LOCATOR, evidence, expectedEvidenceDigest: `sha256:${"c".repeat(64)}`, evidenceArtifact: transport, execGh: gh() }), /EVIDENCE_TRANSPORT_INVALID/);
 });

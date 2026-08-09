@@ -67,7 +67,6 @@ export async function runFanInCli(args = process.argv.slice(2), { execGh = publi
     await containedInput(root, parsed.scope);
     const manifestPath = await containedInput(root, parsed.ownerReceipts);
     const outputPath = await containedOutput(root, parsed.output);
-    resolvedReceipts = relative(root, resolve(dirname(outputPath), "resolved-owner-receipts.json"));
     const scope = JSON.parse(await readFile(await containedInput(root, parsed.scope), "utf8"));
     if (!validateSchema(SCOPE_SCHEMA, scope).ok || validateScope(scope).length) throw new Error("INVALID_SCOPE");
     const inputs = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -78,14 +77,13 @@ export async function runFanInCli(args = process.argv.slice(2), { execGh = publi
     const heads = Object.fromEntries(inputs.map(({ repository, gitSha }) => [repository, gitSha]));
     const receipts = assembleOwnerReceipts({ observedAt: parsed.observedAt, heads, handoffs });
     await verifyOwnerEvidence({ receipts, observedAt: parsed.observedAt, execGh });
-    await writeOnce(resolve(root, resolvedReceipts), receipts);
+    resolvedReceipts = await writeResolvedReceipts(root, outputPath, receipts);
   } catch {
     if (parsed == null) { process.stderr.write("AUDIT_INCOMPLETE\n"); return 2; }
     try {
       root ??= await realpath(parsed.root);
       const outputPath = await containedOutput(root, parsed.output);
-      resolvedReceipts ??= relative(root, resolve(dirname(outputPath), "resolved-owner-receipts.json"));
-      await writeOnce(resolve(root, resolvedReceipts), []);
+      resolvedReceipts ??= await writeResolvedReceipts(root, outputPath, []);
     } catch { process.stderr.write("AUDIT_INCOMPLETE\n"); return 2; }
   }
   const auditObservedAt = canonicalUtc(parsed.observedAt) ? parsed.observedAt : "1970-01-01T00:00:00.000Z";
@@ -105,7 +103,7 @@ function normalizeArtifact(raw) {
   return { id: raw.id, name: raw.name, digest: raw.digest, workflowRunId: raw.workflow_run.id, expired: raw.expired, createdAt, expiresAt };
 }
 
-function readSingleZipJson(bytes, expectedName) {
+export function readSingleZipJson(bytes, expectedName) {
   try {
     if (!Buffer.isBuffer(bytes) || bytes.length < 22 || bytes.length > BINARY_OUTPUT_LIMIT) throw new Error();
     let eocd = -1;
@@ -130,12 +128,12 @@ function readSingleZipJson(bytes, expectedName) {
 function repositoryCode(repository) { return repository === "AquilaXk/easysubway" ? "hub" : repository.slice("AquilaXk/easysubway-".length); }
 function handoffName(repository, gitSha) { return `d20-public-sensitivity-owner-receipt-${repositoryCode(repository)}-${gitSha}`; }
 function evidenceName(repository, gitSha) { return `d20-public-sensitivity-evidence-${repositoryCode(repository)}-${gitSha}`; }
-function stableJson(value) { if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`; if (value != null && typeof value === "object") return `{${Object.keys(value).sort(codepointCompare).map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`; return JSON.stringify(value); }
+export function stableJson(value) { if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`; if (value != null && typeof value === "object") return `{${Object.keys(value).sort(codepointCompare).map((key) => `${JSON.stringify(key)}:${stableJson(value[key])}`).join(",")}}`; return JSON.stringify(value); }
 function validInputs(inputs) { return Array.isArray(inputs) && inputs.length === REPOSITORIES.length && JSON.stringify([...inputs].map(({ repository }) => repository).sort(codepointCompare)) === JSON.stringify([...REPOSITORIES].sort(codepointCompare)) && inputs.every((input) => JSON.stringify(Object.keys(input ?? {}).sort(codepointCompare)) === JSON.stringify(["gitSha", "locator", "repository"]) && /^[0-9a-f]{40}$/.test(input.gitSha) && parseLocator(input.locator)?.repository === input.repository); }
 function canonicalUtc(value) { return /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value ?? "") && new Date(value).toISOString() === value; }
 function normalizeTimestamp(value) { const parsed = Date.parse(value ?? ""); return Number.isFinite(parsed) && /(?:Z|[+-]\d\d:\d\d)$/.test(value ?? "") ? new Date(parsed).toISOString() : null; }
 function instant(value) { const parsed = Date.parse(value); return Number.isFinite(parsed) ? parsed : NaN; }
-function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
+export function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function crc32(bytes) { let crc = 0xffffffff; for (const byte of bytes) { crc ^= byte; for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1)); } return (crc ^ 0xffffffff) >>> 0; }
 function codepointCompare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function safeToken(value) { return typeof value === "string" && value.length > 0 && value.length <= 4096 && !/[\0-\x1f\x7f]/.test(value); }
@@ -153,5 +151,13 @@ function safePathToken(value) { return typeof value === "string" && value.length
 async function containedInput(root, candidate) { if (!safePathToken(candidate)) throw new Error("unsafe path"); const path = resolve(root, candidate); if (relative(root, path).startsWith("..") || (await realpath(path)) !== path || (await lstat(path)).isSymbolicLink()) throw new Error("unsafe path"); return path; }
 async function containedOutput(root, candidate) { if (!safePathToken(candidate)) throw new Error("unsafe path"); const path = resolve(root, candidate); if (relative(root, path).startsWith("..")) throw new Error("unsafe path"); const parent = await realpath(dirname(path)); if (parent !== dirname(path) || (parent !== root && !parent.startsWith(`${root}/`))) throw new Error("unsafe path"); let cursor = root; for (const part of relative(root, parent).split("/").filter(Boolean)) { cursor = resolve(cursor, part); if ((await lstat(cursor)).isSymbolicLink()) throw new Error("unsafe path"); } return path; }
 async function writeOnce(path, value) { const file = await open(path, "wx"); try { await file.writeFile(`${JSON.stringify(value, null, 2)}\n`); } finally { await file.close(); } }
+async function writeResolvedReceipts(root, outputPath, receipts) {
+  const parent = dirname(outputPath); const stem = `resolved-owner-receipts-${digest(Buffer.from(relative(root, outputPath))).slice(0, 16)}`;
+  for (let index = 0; index < 100; index += 1) {
+    const path = resolve(parent, `${stem}-${index}.json`);
+    try { await writeOnce(path, receipts); return relative(root, path); } catch (error) { if (error?.code !== "EEXIST") throw error; }
+  }
+  throw new Error("RESOLVED_RECEIPT_PATH_EXHAUSTED");
+}
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await runFanInCli();

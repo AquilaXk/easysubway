@@ -49,11 +49,15 @@ test("fan-in rejects a handoff archive digest mismatch", async () => {
 test("valid CLI arguments write a sanitized incomplete report on malformed handoff input", async () => {
   const root = await mkdtemp(join(tmpdir(), "d20-fanin-")); await mkdir(join(root, "out"));
   await writeFile(join(root, "scope.json"), "{}"); await writeFile(join(root, "handoffs.json"), "{raw-provider-secret");
+  const resolvedName = `resolved-owner-receipts-${createHash("sha256").update("out/report.json").digest("hex").slice(0, 16)}-0.json`;
+  await writeFile(join(root, "out", resolvedName), "already-owned-by-another-attempt\n");
   const exitCode = await runFanInCli(["--scope", "scope.json", "--owner-receipts", "handoffs.json", "--observed-at", OBSERVED_AT, "--runner-sha", SHA, "--repository-root", root, "--output", "out/report.json"]);
   assert.equal(exitCode, 2);
   const text = await readFile(join(root, "out/report.json"), "utf8");
   assert.equal(text.includes("raw-provider-secret"), false);
   assert.equal(JSON.parse(text).status, "AUDIT_INCOMPLETE");
+  assert.equal(await readFile(join(root, "out", resolvedName), "utf8"), "already-owned-by-another-attempt\n");
+  assert.equal(JSON.parse(await readFile(join(root, "out", `${resolvedName.slice(0, -6)}1.json`), "utf8")).length, 0);
 });
 
 test("malformed observed_at still writes one schema-valid incomplete report", async () => {

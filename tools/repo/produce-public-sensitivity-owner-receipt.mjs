@@ -3,6 +3,7 @@ import { open, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
 import { DETECTORS, REPOSITORIES, collectArtifactCatalog, scanArtifactArchive, validateReceipt } from "./audit-public-sensitivity.mjs";
+import { digest, readSingleZipJson, stableJson } from "./run-public-sensitivity-audit.mjs";
 
 const OUTPUT_LIMIT = 2 * 1024 * 1024;
 const BINARY_OUTPUT_LIMIT = 16 * 1024 * 1024;
@@ -16,6 +17,12 @@ export async function produceOwnerReceipt({ repository, gitSha, observedAt, evid
   if (!validEvidenceShape(evidence) || validateReceipt(receipt, { repository, gitSha, observedAt, detectorPolicyVersion: POLICY }).length) throw new Error("EVIDENCE_SNAPSHOT_INVALID");
   const catalog = await collectArtifactCatalog({ repository, execGh });
   if (catalog.incomplete.length || !catalog.catalog.some((artifact) => sameArtifact(artifact, transport))) throw new Error("EVIDENCE_TRANSPORT_INVALID");
+  let bytes;
+  try { bytes = await execGh({ method: "GET", endpoint: `repos/${repository}/actions/artifacts/${transport.id}/zip`, binary: true }); } catch { throw new Error("EVIDENCE_TRANSPORT_INVALID"); }
+  if (!Buffer.isBuffer(bytes) || `sha256:${digest(bytes)}` !== transport.digest) throw new Error("EVIDENCE_TRANSPORT_INVALID");
+  let archivedEvidence;
+  try { archivedEvidence = JSON.parse(readSingleZipJson(bytes, "evidence.json").text); } catch { throw new Error("EVIDENCE_TRANSPORT_INVALID"); }
+  if (stableJson(archivedEvidence) !== stableJson(evidence)) throw new Error("EVIDENCE_TRANSPORT_INVALID");
   return { evidence, receipt };
 }
 

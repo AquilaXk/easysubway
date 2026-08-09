@@ -23,6 +23,8 @@ test("owner receipt workflow pins the reusable two-artifact protocol and separat
   assert.match(text, /include-hidden-files: false/g);
   assert.match(text, /if-no-files-found: error/g);
   assert.match(text, /actions\/checkout@[0-9a-f]{40}/);
+  assert.match(text, /repository: \$\{\{ job\.workflow_repository \}\}/);
+  assert.match(text, /ref: \$\{\{ job\.workflow_sha \}\}/);
   assert.match(text, /actions\/setup-node@[0-9a-f]{40}/);
   assert.match(text, /actions\/upload-artifact@[0-9a-f]{40}/);
 });
@@ -31,6 +33,7 @@ test("fan-in workflow uses its dedicated five-repository public-audit token and 
   const text = await read("public-sensitivity-audit.yml");
   assert.match(text, /workflow_dispatch:/);
   assert.match(text, /D20_FIVE_REPO_PUBLIC_AUDIT_READ_TOKEN:/);
+  assert.doesNotMatch(text, /issues: read|pull-requests: read/);
   assert.match(text, /GH_TOKEN: \$\{\{ secrets\.D20_FIVE_REPO_PUBLIC_AUDIT_READ_TOKEN \}\}/);
   assert.match(text, /--owner-receipts/);
   assert.match(text, /--output/);
