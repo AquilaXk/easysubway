@@ -9,6 +9,7 @@ import {
   auditPlanDocExecution,
   collectPlanDocExecutionLive,
   createPlanDocExecutionReport,
+  parseClosingIssues,
   runAuditCli,
   validatePlanDocExecutionScope,
 } from "./audit-plan-doc-execution.mjs";
@@ -25,7 +26,7 @@ function matchingLive(scope = SCOPE) {
       mergedAt: OBSERVED_AT,
       changedFiles: ["contracts/documentation/example.json"],
       relationText: record.relation === "CLOSES" ? `Closes #${record.issueNumber}` : `Refs #${record.issueNumber}`,
-      closedByMerge: record.relation === "CLOSES",
+      closingIssues: record.relation === "CLOSES" ? [{ number: record.issueNumber, state: "CLOSED" }] : [],
     })),
     self: {
       issueNumber: scope.self.issueNumber,
@@ -35,7 +36,7 @@ function matchingLive(scope = SCOPE) {
       mergedAt: OBSERVED_AT,
       changedFiles: ["contracts/documentation/plan-doc-execution-audit-scope.json"],
       relationText: `Closes #${scope.self.issueNumber}`,
-      closedByMerge: true,
+      closingIssues: [{ number: scope.self.issueNumber, state: "CLOSED" }],
     },
   };
 }
@@ -61,13 +62,19 @@ test("plan-doc execution audit emits concrete findings for merge, relation, repo
   live.records[1].repository = "AquilaXk/easysubway-mobile";
   live.records[2].relationText = `Refs #${SCOPE.historical[2].issueNumber}`;
   live.records[3].changedFiles = ["apps/mobile/lib/main.dart"];
+  live.records[4].closingIssues = [{ number: 9999, state: "CLOSED" }];
+  live.records[0].closingIssues = [{ number: 2748, state: "CLOSED" }];
+  live.records[5].relationText = `Fixes #${SCOPE.historical[5].issueNumber}`;
 
   assert.deepEqual(
     auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }).map(({ code, identity }) => [code, identity]),
     [
       ["EXECUTION_REPOSITORY_MISMATCH", "pr:2755"],
       ["MERGE_SHA_MISMATCH", "pr:2749"],
+      ["RELATION_MISMATCH", "pr:2749"],
       ["RELATION_MISMATCH", "pr:2757"],
+      ["RELATION_MISMATCH", "pr:2761"],
+      ["RELATION_MISMATCH", "pr:2763"],
       ["TARGET_PATH_MODIFICATION", "pr:2759:apps/mobile/lib/main.dart"],
     ],
   );
@@ -128,18 +135,63 @@ test("plan-doc execution audit preserves both sides of a rename without treating
         ? [{ filename: "contracts/documentation/renamed.json", previous_filename: "apps/mobile/lib/old.dart" }]
         : [{ filename: "contracts/documentation/example.json" }]);
     }
-    const eventMatch = endpoint.match(/^repos\/AquilaXk\/easysubway\/issues\/(\d+)\/events\?per_page=100&page=(\d+)$/);
-    if (eventMatch != null) {
-      const issueNumber = Number(eventMatch[1]);
-      const record = [...recordByPr.values()].find((candidate) => candidate.issueNumber === issueNumber && candidate.relation === "CLOSES") ?? (issueNumber === 2797 ? { mergeSha: SHA } : null);
-      return JSON.stringify(Number(eventMatch[2]) === 1 && record != null ? [{ event: "closed", commit_id: record.mergeSha }] : []);
-    }
     throw new Error(`unexpected provider request: ${endpoint}`);
   };
 
-  const live = await collectPlanDocExecutionLive({ scope: SCOPE, sourceSha: SHA, execGh: provider });
+  const graphql = async (prNumber) => {
+    const record = recordByPr.get(prNumber) ?? { issueNumber: 2797, relation: "CLOSES", mergeSha: SHA };
+    return JSON.stringify({ data: { repository: { pullRequest: {
+      number: prNumber, merged: true, mergeCommit: { oid: record.mergeSha },
+      closingIssuesReferences: { totalCount: record.relation === "CLOSES" ? 1 : 0, pageInfo: { hasNextPage: false }, nodes: record.relation === "CLOSES" ? [{ number: record.issueNumber, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }] : [] },
+    } } } });
+  };
+
+  const live = await collectPlanDocExecutionLive({ scope: SCOPE, sourceSha: SHA, execGh: provider, execGraphql: graphql });
   assert.deepEqual(live.records[0].changedFiles, ["apps/mobile/lib/old.dart", "contracts/documentation/renamed.json"]);
   assert.deepEqual(auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }).filter(({ code }) => code === "TARGET_PATH_MODIFICATION"), [{ code: "TARGET_PATH_MODIFICATION", identity: "pr:2749:apps/mobile/lib/old.dart" }]);
+});
+
+test("plan-doc execution audit accepts a GitHub-shaped null close event only through an exact GraphQL closing reference", async () => {
+  const recordByPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
+  const provider = async ([, endpoint]) => {
+    if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}/pulls`) return JSON.stringify([{ number: 2798 }]);
+    const pr = endpoint.match(/^repos\/AquilaXk\/easysubway\/pulls\/(\d+)$/);
+    if (pr != null) {
+      const record = recordByPr.get(Number(pr[1])) ?? { issueNumber: 2797, relation: "CLOSES", mergeSha: SHA };
+      return JSON.stringify({ number: Number(pr[1]), merged: true, merge_commit_sha: record.mergeSha, base: { repo: { full_name: SCOPE.executionRepository } }, changed_files: 0, body: record.relation === "CLOSES" ? `Closes #${record.issueNumber}` : `Refs #${record.issueNumber}`, merged_at: OBSERVED_AT });
+    }
+    if (/\/files\?per_page=100&page=1$/.test(endpoint)) return "[]";
+    throw new Error(`unexpected REST request: ${endpoint}`);
+  };
+  const graphql = async (prNumber) => {
+    const record = recordByPr.get(prNumber) ?? { issueNumber: 2797, relation: "CLOSES", mergeSha: SHA };
+    return JSON.stringify({ data: { repository: { pullRequest: {
+      number: prNumber, merged: true, mergeCommit: { oid: record.mergeSha },
+      closingIssuesReferences: { totalCount: record.relation === "CLOSES" ? 1 : 0, pageInfo: { hasNextPage: false }, nodes: record.relation === "CLOSES" ? [{ number: record.issueNumber, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }] : [] },
+    } } } });
+  };
+
+  const live = await collectPlanDocExecutionLive({ scope: SCOPE, sourceSha: SHA, execGh: provider, execGraphql: graphql });
+  assert.deepEqual(auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }), []);
+});
+
+test("plan-doc execution audit fails closed for GraphQL relation provider drift", async () => {
+  const valid = JSON.stringify({ data: { repository: { pullRequest: {
+    number: 2749, merged: true, mergeCommit: { oid: SCOPE.historical[0].mergeSha },
+    closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [{ number: 2748, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }] },
+  } } } });
+  for (const response of [
+    JSON.stringify({ errors: [{ message: "unavailable" }] }),
+    JSON.stringify({ data: { repository: { pullRequest: { number: 2749, merged: true, mergeCommit: { oid: SCOPE.historical[0].mergeSha }, closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [] } } } } }),
+    JSON.stringify({ data: { repository: { pullRequest: { number: 2749, merged: true, mergeCommit: { oid: SCOPE.historical[0].mergeSha }, closingIssuesReferences: { totalCount: 101, pageInfo: { hasNextPage: true }, nodes: [] } } } } }),
+    JSON.stringify({ data: { repository: { pullRequest: { number: 2749, merged: true, mergeCommit: { oid: "b".repeat(40) }, closingIssuesReferences: { totalCount: 0, pageInfo: { hasNextPage: false }, nodes: [] } } } } }),
+    JSON.stringify({ data: { repository: { pullRequest: { number: 2749, merged: true, mergeCommit: { oid: SCOPE.historical[0].mergeSha }, closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [{ number: 2748, state: "CLOSED", repository: { nameWithOwner: "AquilaXk/other" } }] } } } } }),
+    JSON.stringify({ data: { repository: { pullRequest: { number: 2749, merged: true, mergeCommit: { oid: SCOPE.historical[0].mergeSha }, closingIssuesReferences: { totalCount: 2, pageInfo: { hasNextPage: false }, nodes: [{ number: 2748, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }, { number: 2748, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }] } } } } }),
+    "{malformed",
+  ]) {
+    assert.throws(() => parseClosingIssues(response, 2749, SCOPE.historical[0].mergeSha), AuditIncomplete);
+  }
+  assert.deepEqual(parseClosingIssues(valid, 2749, SCOPE.historical[0].mergeSha), [{ number: 2748, state: "CLOSED" }]);
 });
 
 test("plan-doc execution audit report uses the repository codepoint comparator", () => {

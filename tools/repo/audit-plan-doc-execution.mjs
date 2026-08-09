@@ -13,6 +13,7 @@ const MAX_ITEMS = 3000;
 const GH_TIMEOUT_MS = 30_000;
 const GH_MAX_BUFFER = 64 * 1024 * 1024;
 const execFileAsync = promisify(execFile);
+const CLOSING_ISSUES_QUERY = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { number merged mergeCommit { oid } closingIssuesReferences(first: 100) { totalCount pageInfo { hasNextPage } nodes { number state repository { nameWithOwner } } } } } }`;
 const EXPECTED_RECORDS = new Map([
   [2749, [2748, "5ad660a7f07563999c1c076790614e7e717e0ea7", "COORDINATOR_FOLLOWUP"]], [2755, [2754, "0568c2195ccac35f0d46f6bb3594093471310977", "CLOSES"]], [2757, [2756, "2b102c1b50f495d628617e61ae95f81944b69c20", "CLOSES"]], [2759, [2758, "00c6109bf91e052fc0d9944a84fde1601c1c50c1", "CLOSES"]], [2761, [2760, "decc1072aa8c8facbfa0143fa1f8fe7646bc016d", "CLOSES"]], [2763, [2762, "560e07239e9ef99b3bfea2ab4bf758b5115acb43", "CLOSES"]], [2730, [2729, "4ccf78d8bf60db2d25233d6fe744daf805c7b0ac", "COORDINATOR_FOLLOWUP"]], [2775, [2733, "96119c4d723d9c60fcd8999da8e58af0731b0847", "CLOSES"]], [2782, [2781, "6194860b5cb13334b91410374fd2504ee056684c", "CLOSES"]], [2784, [2783, "3ea7ef2929ce680268783a1a14476138beb2b521", "CLOSES"]], [2787, [2785, "79bcd0b8e05eb90907c411bdde9b30e24592ce53", "CLOSES"]], [2788, [2729, "a44259fcbdd5538586f4aabaa9a6cb844a41dc03", "COORDINATOR_FOLLOWUP"]], [2789, [2748, "90a169d9b35e4845bfd03d518522544b66dd189f", "COORDINATOR_FOLLOWUP"]], [2791, [2790, "40d1bb13906a6a96a3c7342b0923ad180d290234", "CLOSES"]], [2793, [2792, "3d1590baa98c929ceabd0d2d44414cebcc643c6f", "CLOSES"]], [2796, [2795, "b853fe6101c7848a8d556bf21b882b3f0e3060a9", "CLOSES"]],
 ]);
@@ -63,31 +64,46 @@ export function auditPlanDocExecution({ scope, sourceSha, live }) {
 
 function relationMatches(record, observed) {
   const number = record.issueNumber;
-  const exactCloses = new RegExp(`(?:^|\\n)\\s*(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?)\\s+#${number}\\s*(?:$|\\n)`, "im").test(observed.relationText ?? "");
+  const exactCloses = new RegExp(`(?:^|\\n)\\s*Closes\\s+#${number}\\s*(?:$|\\n)`, "m").test(observed.relationText ?? "");
   const exactRefs = new RegExp(`(?:^|\\n)\\s*Refs\\s+#${number}\\s*(?:$|\\n)`, "m").test(observed.relationText ?? "");
-  return record.relation === "CLOSES" ? exactCloses && observed.closedByMerge === true : exactRefs && observed.closedByMerge === false;
+  const closingIssues = observed.closingIssues ?? [];
+  return record.relation === "CLOSES"
+    ? exactCloses && closingIssues.length === 1 && closingIssues[0]?.number === number && closingIssues[0]?.state === "CLOSED"
+    : exactRefs && closingIssues.length === 0;
 }
 
 function duplicateValues(values) { return [...new Set(values.filter((value, index) => values.indexOf(value) !== index))].sort((a, b) => codepointCompare(String(a), String(b))); }
 function compare(left, right) { return codepointCompare(`${left.code}\0${left.identity}`, `${right.code}\0${right.identity}`); }
 
-export async function collectPlanDocExecutionLive({ scope, sourceSha, execGh = runGh }) {
+export async function collectPlanDocExecutionLive({ scope, sourceSha, execGh = runGh, execGraphql = runClosingIssuesGraphql }) {
   const records = [];
-  for (const record of scope.historical) records.push(await collectRecord({ issueNumber: record.issueNumber, prNumber: record.prNumber, execGh }));
+  for (const record of scope.historical) records.push(await collectRecord({ issueNumber: record.issueNumber, prNumber: record.prNumber, execGh, execGraphql }));
   const associated = parseJson(await execGh(["api", `repos/${REPOSITORY}/commits/${sourceSha}/pulls`]), `sha:${sourceSha}`);
   if (!Array.isArray(associated) || associated.length !== 1 || !Number.isInteger(associated[0]?.number)) throw new AuditIncomplete("ASSOCIATION_AMBIGUOUS", `sha:${sourceSha}`);
-  const self = await collectRecord({ issueNumber: scope.self.issueNumber, prNumber: associated[0].number, execGh });
+  const self = await collectRecord({ issueNumber: scope.self.issueNumber, prNumber: associated[0].number, execGh, execGraphql });
   return { records, self };
 }
 
-async function collectRecord({ issueNumber, prNumber, execGh }) {
+async function collectRecord({ issueNumber, prNumber, execGh, execGraphql }) {
   const pr = parseJson(await execGh(["api", `repos/${REPOSITORY}/pulls/${prNumber}`]), `pr:${prNumber}`);
   if (pr?.number !== prNumber || pr?.merged !== true || !/^[0-9a-f]{40}$/.test(pr?.merge_commit_sha) || pr?.base?.repo?.full_name !== REPOSITORY || !Number.isInteger(pr?.changed_files) || pr.changed_files < 0 || pr.changed_files > MAX_ITEMS) throw new AuditIncomplete("PROVIDER_MALFORMED", `pr:${prNumber}`);
   const changedFileEntries = await collectPages(`repos/${REPOSITORY}/pulls/${prNumber}/files`, `pr:${prNumber}:files`, execGh, (entry) => typeof entry?.filename === "string" && entry.filename !== "" && (entry.previous_filename == null || (typeof entry.previous_filename === "string" && entry.previous_filename !== "")), (entry) => entry.filename);
   if (changedFileEntries.length !== pr.changed_files) throw new AuditIncomplete("PROVIDER_PARTIAL", `pr:${prNumber}:files`);
   const changedFiles = [...new Set(changedFileEntries.flatMap(({ filename, previous_filename: previousFilename }) => previousFilename == null ? [filename] : [previousFilename, filename]))].sort(codepointCompare);
-  const events = await collectPages(`repos/${REPOSITORY}/issues/${issueNumber}/events`, `issue:${issueNumber}:events`, execGh, (entry) => typeof entry?.event === "string", (entry) => JSON.stringify(entry));
-  return { issueNumber, prNumber, repository: pr.base.repo.full_name, mergeSha: pr.merge_commit_sha, mergedAt: pr.merged_at, changedFiles, relationText: String(pr.body ?? ""), closedByMerge: events.some((event) => event.event === "closed" && event.commit_id === pr.merge_commit_sha) };
+  const closingIssues = parseClosingIssues(await execGraphql(prNumber), prNumber, pr.merge_commit_sha);
+  return { issueNumber, prNumber, repository: pr.base.repo.full_name, mergeSha: pr.merge_commit_sha, mergedAt: pr.merged_at, changedFiles, relationText: String(pr.body ?? ""), closingIssues };
+}
+
+export function parseClosingIssues(text, prNumber, mergeSha) {
+  const response = parseJson(text, `pr:${prNumber}:closing-issues`);
+  const pullRequest = response?.data?.repository?.pullRequest;
+  const references = pullRequest?.closingIssuesReferences;
+  if (!Array.isArray(response?.errors) && response?.errors != null) throw new AuditIncomplete("PROVIDER_MALFORMED", `pr:${prNumber}:closing-issues`);
+  if (Array.isArray(response?.errors) && response.errors.length !== 0) throw new AuditIncomplete("PROVIDER_MALFORMED", `pr:${prNumber}:closing-issues`);
+  if (pullRequest?.number !== prNumber || pullRequest?.merged !== true || pullRequest?.mergeCommit?.oid !== mergeSha || !Number.isInteger(references?.totalCount) || references.totalCount < 0 || references.totalCount > PAGE_SIZE || references?.pageInfo?.hasNextPage !== false || !Array.isArray(references?.nodes) || references.nodes.length !== references.totalCount) throw new AuditIncomplete("PROVIDER_PARTIAL", `pr:${prNumber}:closing-issues`);
+  if (!references.nodes.every((node) => Number.isInteger(node?.number) && node.number > 0 && (node.state === "OPEN" || node.state === "CLOSED") && node.repository?.nameWithOwner === REPOSITORY)) throw new AuditIncomplete("PROVIDER_MALFORMED", `pr:${prNumber}:closing-issues`);
+  if (new Set(references.nodes.map((node) => node.number)).size !== references.nodes.length) throw new AuditIncomplete("PROVIDER_PARTIAL", `pr:${prNumber}:closing-issues`);
+  return references.nodes.map(({ number, state }) => ({ number, state })).sort((left, right) => left.number - right.number);
 }
 
 async function collectPages(base, identity, execGh, valid, key) {
@@ -116,8 +132,14 @@ function compareIncomplete(a, b) { return codepointCompare(`${a.stage}\0${a.code
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 
 export async function runGh(args, execute = execFileAsync) {
-  if (!Array.isArray(args) || args.length !== 2 || args[0] !== "api" || typeof args[1] !== "string" || !new RegExp(`^repos/${REPOSITORY}/(?:pulls/[1-9]\\d*(?:/files)?|issues/[1-9]\\d*/events|commits/[0-9a-f]{40}/pulls)(?:\\?|$)`).test(args[1])) throw new Error("gh read-only allowlist violation");
+  if (!Array.isArray(args) || args.length !== 2 || args[0] !== "api" || typeof args[1] !== "string" || !new RegExp(`^repos/${REPOSITORY}/(?:pulls/[1-9]\\d*(?:/files)?|commits/[0-9a-f]{40}/pulls)(?:\\?|$)`).test(args[1])) throw new Error("gh read-only allowlist violation");
   const { stdout } = await execute("gh", args, { encoding: "utf8", timeout: GH_TIMEOUT_MS, killSignal: "SIGTERM", maxBuffer: GH_MAX_BUFFER });
+  return stdout;
+}
+
+export async function runClosingIssuesGraphql(prNumber, execute = execFileAsync) {
+  if (!Number.isInteger(prNumber) || prNumber < 1) throw new Error("gh GraphQL allowlist violation");
+  const { stdout } = await execute("gh", ["api", "graphql", "-f", `query=${CLOSING_ISSUES_QUERY}`, "-F", "owner=AquilaXk", "-F", "name=easysubway", "-F", `number=${prNumber}`], { encoding: "utf8", timeout: GH_TIMEOUT_MS, killSignal: "SIGTERM", maxBuffer: GH_MAX_BUFFER });
   return stdout;
 }
 
