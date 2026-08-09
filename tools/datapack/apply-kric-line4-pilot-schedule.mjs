@@ -217,7 +217,10 @@ export function validateKricLine4PilotCollectionArtifact(artifact) {
     throw new Error("KRIC pilot artifact must be an object");
   }
   requireEqual(artifact.artifactKind, "kric-line4-timetable-collection", "artifactKind");
-  if (artifact.sourceId && !SOURCE_ARTIFACT_IDS.has(artifact.sourceId)) {
+  if (typeof artifact.sourceId !== "string" || artifact.sourceId.length === 0) {
+    throw new Error("KRIC pilot artifact sourceId is required");
+  }
+  if (!SOURCE_ARTIFACT_IDS.has(artifact.sourceId)) {
     throw new Error(`KRIC pilot artifact sourceId mismatch: ${artifact.sourceId}`);
   }
   requireEqual(artifact.lineId, LINE_ID, "lineId");

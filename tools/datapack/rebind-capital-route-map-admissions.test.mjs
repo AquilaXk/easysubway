@@ -105,3 +105,33 @@ test("current topology에 없는 station은 input을 변경하지 않고 거부�
   }), /station membership mismatch/);
   assert.deepEqual(values.inventory, before);
 });
+
+test("position snapshot bytes가 admission hash와 다르면 input을 변경하지 않고 거부한다", () => {
+  const values = fixture();
+  const before = structuredClone(values.inventory);
+  assert.throws(() => withCurrentCapitalTopologyAdmissions({
+    inventory: values.inventory,
+    topology: values.topology,
+    topologySnapshotId: "capital-route-topology-20260809",
+    reviewedAt: "2026-08-09T12:04:20.479Z",
+    snapshotBytesByPath: new Map([[
+      "tools/datapack/sources/official-route-map.json",
+      Buffer.from("{}"),
+    ]]),
+  }), /position snapshot byte identity mismatch/);
+  assert.deepEqual(values.inventory, before);
+});
+
+test("capital topology admission 대상 source가 없으면 input을 변경하지 않고 거부한다", () => {
+  const values = fixture();
+  values.inventory.sources = [];
+  const before = structuredClone(values.inventory);
+  assert.throws(() => withCurrentCapitalTopologyAdmissions({
+    inventory: values.inventory,
+    topology: values.topology,
+    topologySnapshotId: "capital-route-topology-20260809",
+    reviewedAt: "2026-08-09T12:04:20.479Z",
+    snapshotBytesByPath: new Map(),
+  }), /capital route-map admissions are missing/);
+  assert.deepEqual(values.inventory, before);
+});

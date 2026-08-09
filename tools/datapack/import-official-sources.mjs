@@ -269,6 +269,7 @@ function validateSelectedSourceRows(input, sourceIds, transitSchedule, scheduleP
     return;
   }
   const counts = new Map(sourceIds.map((sourceId) => [sourceId, 0]));
+  const allowedSourceIds = new Set(sourceIds);
   const add = (sourceId) => {
     if (counts.has(sourceId)) {
       counts.set(sourceId, counts.get(sourceId) + 1);
@@ -279,7 +280,13 @@ function validateSelectedSourceRows(input, sourceIds, transitSchedule, scheduleP
   for (const row of input.facilityRows ?? []) add(row.sourceId ?? row.station?.sourceId);
   for (const row of input.movementPathCandidates ?? []) add(row.sourceId);
   for (const row of input.routeMapPositions ?? []) add(row.sourceId);
-  for (const row of input.officialOdFareQuotes ?? []) add(row.sourceId);
+  for (const row of input.officialOdFareQuotes ?? []) {
+    const sourceId = requiredString(row.sourceId, "officialOdFareQuotes.sourceId");
+    if (!allowedSourceIds.has(sourceId)) {
+      throw new Error(`officialOdFareQuotes sourceId must be selected: ${sourceId}`);
+    }
+    add(sourceId);
+  }
   if (scheduleProvenance && hasTimetableRows(transitSchedule)) add(scheduleProvenance.sourceId);
   for (const sourceId of sourceIds) {
     if ((counts.get(sourceId) ?? 0) === 0) {

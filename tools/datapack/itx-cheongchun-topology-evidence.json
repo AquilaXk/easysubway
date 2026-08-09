@@ -5028,7 +5028,7 @@
     },
     {
       "readmittedAt": "2026-08-09T13:01:53.015Z",
-      "provenance": "Issue #2776 owner-approved production source scope sync: retired movement sources removed; ITX #2135 subgraph unchanged",
+      "provenance": "Issue #2776 owner-approved production source scope sync: retired movement sources removed; official_od_fares domain and seoul-metro-official-od-fares source added; ITX #2135 subgraph unchanged",
       "previousPack": {
         "sha256": "f328fbedff014be18a0e8341e0bdbfe9b0dd774fa7e9ae7692aa869e831707b3",
         "sqliteSha256": "a581c5d2a78f765b859e7e7b7d62d3bf0d9b573bcebd246ab4c6f0cd62fddfc5",

@@ -55,6 +55,7 @@ test("서해선 official file이 다른 노선을 함께 반환해도 서해선 
     "코레일,서해선,일산,1.9",
     "코레일,서해선,풍산,1.7",
     "코레일,서해선,백마,1.6",
+    "코레일,서해선,부천종합운동장역,1.4",
   ].join("\n"));
   const molitBytes = Buffer.from([
     "권역,권역명,철도운영기관명,노선명,순번,역명",
@@ -70,4 +71,26 @@ test("서해선 official file이 다른 노선을 함께 반환해도 서해선 
   assert.deepEqual(result.branchNames, ["서해선"]);
   assert.equal(result.scope.some(({ stationName }) => stationName === "가능"), false);
   assert.equal(result.scope.some(({ stationName }) => stationName === "일산"), true);
+});
+
+test("서해선 splice endpoint가 각 공식 입력에 없으면 거부한다", () => {
+  const source = LINE_SOURCES.find(({ slug }) => slug === "seohae");
+  const korailBytes = Buffer.from([
+    "철도운영기관명,선명,역명,역간거리(km)",
+    "코레일,서해선,일산,1.9",
+    "코레일,서해선,풍산,1.7",
+  ].join("\n"));
+  const molitBytes = Buffer.from([
+    "권역,권역명,철도운영기관명,노선명,순번,역명",
+    "1,수도권,서해철도,서해선,10,소사",
+    "1,수도권,서해철도,서해선,11,소새울",
+  ].join("\n"));
+
+  assert.throws(
+    () => parseLineSource(source, korailBytes, {
+      capturedAt: new Date("2026-08-09T12:04:20.479Z"),
+      secondaryBytes: molitBytes,
+    }),
+    /서해선 splice endpoint missing: 부천종합운동장-소사/,
+  );
 });

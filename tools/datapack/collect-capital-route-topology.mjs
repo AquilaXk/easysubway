@@ -828,6 +828,10 @@ export function parseSeohaeMerged(korailBytes, molitBytes, source) {
       routeName,
     );
   }
+  if (findRow(korailParsed.rows, "부천종합운동장역") == null
+    || findRow(molitRows, "소사") == null) {
+    throw new Error("서해선 splice endpoint missing: 부천종합운동장-소사");
+  }
   // 코레일 종점(부천종합운동장) ↔ 서해철도 기점(소사) — MOLIT 순번상 인접, 거리 미제공 → 0.
   upsertUndirected(
     undirected,

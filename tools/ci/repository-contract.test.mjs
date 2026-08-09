@@ -8473,7 +8473,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     networkCalls: 0,
   });
   assert.deepEqual(routeV2Readiness.timetableSnapshotCache, {
-    status: "SATISFIED",
+    status: "STALE",
     implementedByIssue: 2145,
     requiredKey: {
       format: "snapshotSha256 + freshUntil",
@@ -8481,7 +8481,7 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
       sameFreshnessDifferentHashReloadRequired: true,
     },
     currentImplementation: {
-      status: "SATISFIED",
+      status: "STALE",
       fields: ["snapshotSha256", "freshUntil"],
       snapshotId: "server-timetable-snapshot-4c5edd51c10fb187",
       snapshotSha256: "4c5edd51c10fb187e6d09122b89ddd8b35343b2f54404773f4ed8e245236bfe8",

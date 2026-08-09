@@ -512,16 +512,18 @@ function candidateBuildProvenance(buildSpec, buildSpecSha256, officialOdFareEvid
   };
 }
 
+const NETWORK_EDGE_EVIDENCE_KEYS = Object.freeze([
+  "sourceInventory",
+  "capitalTopology",
+  "capitalTopologyAdmission",
+  "itxCoverageContract",
+  "itxCurrentTopologyAdmission",
+]);
+
 function candidateNetworkEdgeEvidence(evidence) {
   assertExactKeys(
     evidence,
-    [
-      "sourceInventory",
-      "capitalTopology",
-      "capitalTopologyAdmission",
-      "itxCoverageContract",
-      "itxCurrentTopologyAdmission",
-    ],
+    NETWORK_EDGE_EVIDENCE_KEYS,
     "buildSpec.networkEdgeEvidence",
   );
   const sourceInventory = pinnedBuildInput(evidence.sourceInventory, "buildSpec.networkEdgeEvidence.sourceInventory");
@@ -608,13 +610,7 @@ async function validateAndApplyNetworkEdgeProvenance(buildSpec, fixture, itxTopo
   }
   assertExactKeys(
     evidence,
-    [
-      "sourceInventory",
-      "capitalTopology",
-      "capitalTopologyAdmission",
-      "itxCoverageContract",
-      "itxCurrentTopologyAdmission",
-    ],
+    NETWORK_EDGE_EVIDENCE_KEYS,
     "buildSpec.networkEdgeEvidence",
   );
   const sourceInventory = await readPinnedBuildJson(

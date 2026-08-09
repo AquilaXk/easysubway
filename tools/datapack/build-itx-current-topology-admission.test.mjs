@@ -118,3 +118,36 @@ test("current weekday canonical station set이 previous admission과 다르면 t
     previousSha256: "7".repeat(64),
   }), /canonical station set mismatch/);
 });
+
+test("current weekday는 up/down sequence를 정확히 하나씩만 허용한다", () => {
+  const values = fixture();
+  values.collection.serviceDays[0].roster.stationSequences.push(
+    structuredClone(values.collection.serviceDays[0].roster.stationSequences[1]),
+  );
+  assert.throws(() => buildItxCurrentTopologyAdmission({
+    collection: values.collection,
+    collectionSha256: "6".repeat(64),
+    previousSource: values.previousSource,
+    previousSha256: "7".repeat(64),
+  }), /must contain exactly one up and one down station sequence/);
+});
+
+test("station set이 같고 pair가 다르면 previous pair를 유지한 admission에 drift를 명시한다", () => {
+  const values = fixture();
+  values.collection.serviceDays[0].roster.stationSequences = [
+    sequence("up", ["station-a", "station-c", "station-b"]),
+    sequence("down", ["station-b", "station-c", "station-a"]),
+  ];
+  const result = buildItxCurrentTopologyAdmission({
+    collection: values.collection,
+    collectionSha256: "6".repeat(64),
+    previousSource: values.previousSource,
+    previousSha256: "7".repeat(64),
+  });
+
+  assert.equal(result.status, "ADMITTED");
+  assert.equal(result.topologyMode, "UNCHANGED_AUTO_STATION_SET");
+  assert.ok(result.observedPairChange.addedCount > 0);
+  assert.ok(result.observedPairChange.removedCount > 0);
+  assert.notEqual(result.observedPairSetSha256, result.admittedPairSetSha256);
+});

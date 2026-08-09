@@ -287,6 +287,25 @@
               "rawSha256",
               "positionsSha256"
             ],
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["currentTopologyAdmission"],
+                "properties": {
+                  "topologySourceId": { "const": "capital-route-topology" }
+                }
+              },
+              {
+                "type": "object",
+                "not": {
+                  "type": "object",
+                  "required": ["topologySourceId"],
+                  "properties": {
+                    "topologySourceId": { "const": "capital-route-topology" }
+                  }
+                }
+              }
+            ],
             "properties": {
               "issue": { "type": "integer", "minimum": 1 },
               "admissionKind": {

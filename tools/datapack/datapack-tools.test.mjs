@@ -11522,6 +11522,17 @@ test("공식 source ingest adapter는 tracked production input의 OD fare와 ITX
   assert.equal(generated.packs[0].routeServiceArtifactEvidence.length, 1);
 });
 
+test("공식 source ingest adapter는 선택되지 않은 source의 OD fare quote를 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-unselected-fare-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  input.officialOdFareQuotes[0].sourceId = "unselected-official-fare";
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /officialOdFareQuotes sourceId must be selected: unselected-official-fare/,
+  );
+});
+
 test("공식 source ingest adapter는 production timetable provenance snapshot이 selected source admission과 다르면 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-schedule-snapshot-${Date.now()}`);
   const input = await capitalPilotProductionSourceInput();

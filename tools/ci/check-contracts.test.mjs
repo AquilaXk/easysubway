@@ -2983,6 +2983,20 @@ test("route map admission evidence는 승인 필드 외 값을 거부한다", ()
   )));
 });
 
+test("capital topology route-map source는 currentTopologyAdmission을 필수로 요구한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const source = inventory.sources.find((entry) =>
+    entry.routeMapAdmissionEvidence?.topologySourceId === "capital-route-topology");
+  assert.ok(source);
+  delete source.routeMapAdmissionEvidence.currentTopologyAdmission;
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("routeMapAdmissionEvidence")
+      && error.includes("oneOf 분기 정확히 하나")
+  )));
+});
+
 test("boundaries.json이 스스로 정합하다", () => {
   const boundaries = loadJson("contracts/boundaries.json");
 
