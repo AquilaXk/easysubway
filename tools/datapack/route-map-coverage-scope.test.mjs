@@ -841,6 +841,37 @@ test("admitted snapshot 없는 inherited claim은 exact baseline·current source
   assert.deepEqual(violationKinds(result), ["SOURCE_INHERITED_CANDIDATE_BINDING_MISMATCH"]);
 });
 
+test("admitted snapshot 없는 inherited claim은 자기 자신을 current source로 재기술할 수 없다 (#2516)", async () => {
+  const inputs = await loadAuditInputs();
+  const spec = JSON.parse(inputs.candidateLineScopeAdmission.specBytes.toString("utf8"));
+  const redescription = spec.lineScopeRedescriptions.find(
+    ({ nonTransitioningRequirements }) => nonTransitioningRequirements?.some(
+      ({ requirementKey }) => requirementKey === `${CANDIDATE_REDESCRIBED_SCOPE_KEY}:${ROUTE_MAP_DOMAIN}`,
+    ),
+  );
+  const evidence = structuredClone(inputs.candidateLineScopeAdmission.evidence);
+  const declaration = evidence.declaredNonTransitions.entries.find(
+    ({ requirementKey }) => requirementKey === `${CANDIDATE_REDESCRIBED_SCOPE_KEY}:${ROUTE_MAP_DOMAIN}`,
+  );
+  const inheritedSourceId = CANDIDATE_REDESCRIBED_SOURCE_ID;
+  redescription.sourceId = inheritedSourceId;
+  declaration.sourceId = inheritedSourceId;
+  declaration.lineScopedSourceIds = [inheritedSourceId];
+  const lineScoped = evidence.variants.lineScoped.pilotRequirements.find(
+    ({ requirementKey }) => requirementKey === `${CANDIDATE_REDESCRIBED_SCOPE_KEY}:${ROUTE_MAP_DOMAIN}`,
+  );
+  lineScoped.sourceIds = [inheritedSourceId];
+  const specBytes = Buffer.from(JSON.stringify(spec));
+  evidence.inputs.spec.sha256 = createHash("sha256").update(specBytes).digest("hex");
+
+  const result = auditRouteMapCoverageScopes({
+    ...inputs,
+    candidateLineScopeAdmission: { ...inputs.candidateLineScopeAdmission, specBytes, evidence },
+  });
+
+  assert.deepEqual(violationKinds(result), ["SOURCE_INHERITED_CANDIDATE_BINDING_MISMATCH"]);
+});
+
 test("candidate 재기술 근거가 없으면 snapshot 없는 lineIds claim은 위반이다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
 

@@ -186,7 +186,9 @@ function sameOrderedStringSet(left, right) {
   if (!Array.isArray(left) || !Array.isArray(right)) {
     return false;
   }
-  return JSON.stringify([...new Set(left)].sort()) === JSON.stringify([...new Set(right)].sort());
+  const compare = (first, second) => first < second ? -1 : first > second ? 1 : 0;
+  return JSON.stringify([...new Set(left)].sort(compare))
+    === JSON.stringify([...new Set(right)].sort(compare));
 }
 
 function pilotRequirement(evidence, variant, requirementKey) {
@@ -234,6 +236,13 @@ function validateInheritedCandidateScope({ source, key, lineId, admission, audit
   }
 
   const [redescription] = candidates;
+  if (redescription.sourceId === source.id) {
+    push(
+      "SOURCE_INHERITED_CANDIDATE_BINDING_MISMATCH",
+      `${requirementKey} inherited source가 current official source를 자기 자신으로 재기술했다`,
+    );
+    return true;
+  }
   const baseline = pilotRequirement(admission.evidence, "baseline", requirementKey);
   const lineScoped = pilotRequirement(admission.evidence, "lineScoped", requirementKey);
   const declaration = (admission.evidence?.declaredNonTransitions?.entries ?? [])
