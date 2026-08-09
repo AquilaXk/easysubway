@@ -29,6 +29,9 @@ import {
   validateRepositoryContractionInventory,
   validateReferenceAuditScope,
   validateReferenceAuditReportSchema,
+  validatePublicSensitivityAuditScope,
+  validatePublicSensitivityOwnerReceiptSchema,
+  validatePublicSensitivityAuditReportSchema,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 
@@ -53,6 +56,43 @@ test("reference audit report schema requires source identity and strict findings
   const errors = [];
   validateReferenceAuditReportSchema({ type: "object", additionalProperties: false, required: [], properties: { observedAt: {}, inputs: { properties: {} }, findings: { items: {} } } }, errors);
   assert.equal(errors.length, 12);
+});
+
+test("public sensitivity contracts bind the exact scope and corrected owner receipt artifacts", () => {
+  const scopeSchema = loadJson("contracts/documentation/public-sensitivity-audit-scope.schema.json");
+  const scope = loadJson("contracts/documentation/public-sensitivity-audit-scope.json");
+  const receiptSchema = loadJson("contracts/documentation/public-sensitivity-owner-receipt.schema.json");
+  const reportSchema = loadJson("contracts/documentation/public-sensitivity-audit-report.schema.json");
+  assert.equal(validateSchema(scopeSchema, scope).ok, true);
+  assert.deepEqual(validatePublicSensitivityAuditScope(scope), []);
+  assert.deepEqual(validatePublicSensitivityOwnerReceiptSchema(receiptSchema), []);
+  assert.deepEqual(validatePublicSensitivityAuditReportSchema(reportSchema), []);
+  for (const mutate of [
+    (value) => { value.properties.openAlertCount.type = "number"; },
+    (value) => { value.properties.publicArtifacts.uniqueItems = false; },
+    (value) => { value.properties.publicArtifacts.items.properties.artifactId.pattern = ".+"; },
+  ]) {
+    const weakened = structuredClone(receiptSchema);
+    mutate(weakened);
+    assert.ok(validatePublicSensitivityOwnerReceiptSchema(weakened).length > 0);
+  }
+  for (const mutate of [
+    (value) => { delete value.oneOf; },
+    (value) => { value.properties.summary.properties.findings.type = "number"; },
+    (value) => { value.properties.findings.uniqueItems = false; },
+    (value) => { value.properties.findings.items.properties.detectorId = { type: "string" }; },
+    (value) => { value.properties.inputs.properties.repositories.minItems = 0; },
+  ]) {
+    const weakened = structuredClone(reportSchema);
+    mutate(weakened);
+    assert.ok(validatePublicSensitivityAuditReportSchema(weakened).length > 0);
+  }
+  const invalid = structuredClone(scope);
+  invalid.falsePositiveDispositions.push({ locationFingerprint: "a".repeat(64), detectorId: "KNOWN_TOKEN_FORMAT", reason: "reviewed", owner: "owner", verifiedAt: "2026-08-09T03:00:00.000Z", expiresAt: "2026-08-08T03:00:00.000Z" });
+  assert.ok(validatePublicSensitivityAuditScope(invalid).some((error) => error.includes("revalidation/expiry")));
+  const offsetInvalid = structuredClone(scope);
+  offsetInvalid.falsePositiveDispositions.push({ locationFingerprint: "a".repeat(64), detectorId: "KNOWN_TOKEN_FORMAT", reason: "reviewed", owner: "owner", verifiedAt: "2026-08-08T23:30:00Z", expiresAt: "2026-08-09T00:00:00+09:00" });
+  assert.ok(validatePublicSensitivityAuditScope(offsetInvalid).some((error) => error.includes("revalidation/expiry")));
 });
 
 test("F15 reference audit scope validation is total and skips semantics after schema failure", () => {

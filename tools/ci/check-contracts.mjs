@@ -85,6 +85,9 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     productClaimCatalog: resolveWorkspacePath(workspace.productClaimCatalog),
     referenceAuditScope: workspace.referenceAuditScope == null ? null : resolveWorkspacePath(workspace.referenceAuditScope),
     referenceAuditReportSchema: workspace.referenceAuditReportSchema == null ? null : resolveWorkspacePath(workspace.referenceAuditReportSchema),
+    publicSensitivityAuditScope: workspace.publicSensitivityAuditScope == null ? null : resolveWorkspacePath(workspace.publicSensitivityAuditScope),
+    publicSensitivityOwnerReceiptSchema: workspace.publicSensitivityOwnerReceiptSchema == null ? null : resolveWorkspacePath(workspace.publicSensitivityOwnerReceiptSchema),
+    publicSensitivityAuditReportSchema: workspace.publicSensitivityAuditReportSchema == null ? null : resolveWorkspacePath(workspace.publicSensitivityAuditReportSchema),
   };
 }
 
@@ -159,6 +162,25 @@ export function collectContractErrors(
       else {
         try { validateReferenceAuditReportSchema(loadJson(workspace.referenceAuditReportSchema), errors, workspace.referenceAuditReportSchema); }
         catch { errors.push(`${workspace.referenceAuditReportSchema}: 유효한 JSON이 필요하다`); }
+      }
+    }
+  }
+  const publicSensitivityEntries = [workspace.publicSensitivityAuditScope, workspace.publicSensitivityOwnerReceiptSchema, workspace.publicSensitivityAuditReportSchema];
+  if (publicSensitivityEntries.some((entry) => entry != null)) {
+    if (publicSensitivityEntries.some((entry) => entry == null)) {
+      errors.push("public sensitivity workspace entries는 함께 필요하다");
+    } else {
+      const scopeValid = validateJson(contract("documentation/public-sensitivity-audit-scope.schema.json"), workspace.publicSensitivityAuditScope, errors);
+      if (scopeValid) validatePublicSensitivityAuditScope(loadJson(workspace.publicSensitivityAuditScope), errors, workspace.publicSensitivityAuditScope);
+      for (const [label, path] of [["owner receipt", workspace.publicSensitivityOwnerReceiptSchema], ["report", workspace.publicSensitivityAuditReportSchema]]) {
+        if (!existsSync(path)) errors.push(`${path} 누락`);
+        else {
+          try {
+            const schema = loadJson(path);
+            if (label === "owner receipt") validatePublicSensitivityOwnerReceiptSchema(schema, errors, path);
+            else validatePublicSensitivityAuditReportSchema(schema, errors, path);
+          } catch { errors.push(`${path}: 유효한 JSON이 필요하다`); }
+        }
       }
     }
   }
@@ -726,6 +748,59 @@ export function validateReferenceAuditReportSchema(schema, errors = [], path = "
   const selected = inputs?.repositories?.items?.properties?.selected?.items;
   if (!Array.isArray(selected?.required) || !selected.required.includes("contentClass")
     || JSON.stringify(selected?.properties?.contentClass?.enum) !== JSON.stringify(["AUDITABLE_TEXT", "NON_REFERENCE_BINARY"])) errors.push(`${path}: selected contentClass schema가 필요하다`);
+  return errors;
+}
+
+export function validatePublicSensitivityAuditScope(scope, errors = [], path = "public-sensitivity-audit-scope") {
+  const repositories = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
+  const surfaces = ["REPOSITORY_SECURITY_RECEIPT", "ISSUE_TITLE", "ISSUE_BODY", "ISSUE_COMMENT", "PR_TITLE", "PR_BODY", "PR_COMMENT", "PR_REVIEW_BODY", "PR_REVIEW_COMMENT", "COMMIT_COMMENT", "RELEASE_METADATA", "PUBLIC_ARTIFACT"];
+  const detectors = ["PRIVATE_KEY_BLOCK", "KNOWN_TOKEN_FORMAT", "AUTHORIZATION_VALUE", "SIGNED_URL_QUERY", "PRIVATE_ABSOLUTE_PATH", "RAW_PROVIDER_PAYLOAD", "RAW_USER_PAYLOAD"];
+  if (scope?.schemaVersion !== 1) errors.push(`${path}: schemaVersion은 1이어야 한다`);
+  if (JSON.stringify(scope?.repositories?.map(({ repository }) => repository)) !== JSON.stringify(repositories)) errors.push(`${path}: repository inventory는 exact codepoint sorted 5개여야 한다`);
+  if (JSON.stringify(scope?.surfaces) !== JSON.stringify(surfaces)) errors.push(`${path}: surface inventory는 exact여야 한다`);
+  if (JSON.stringify(scope?.detectors) !== JSON.stringify(detectors)) errors.push(`${path}: detector inventory는 exact여야 한다`);
+  const expectedDispositionKeys = JSON.stringify(["detectorId", "expiresAt", "locationFingerprint", "owner", "reason", "verifiedAt"]);
+  let previous = "";
+  for (const disposition of scope?.falsePositiveDispositions ?? []) {
+    if (JSON.stringify(Object.keys(disposition ?? {}).sort()) !== expectedDispositionKeys) errors.push(`${path}: falsePositiveDisposition shape는 exact여야 한다`);
+    const identity = `${disposition?.locationFingerprint}\u0000${disposition?.detectorId}`;
+    if (identity <= previous) errors.push(`${path}: falsePositiveDisposition은 codepoint sorted-unique여야 한다`);
+    previous = identity;
+    const verifiedAt = Date.parse(disposition?.verifiedAt); const expiresAt = Date.parse(disposition?.expiresAt);
+    if (!Number.isFinite(verifiedAt) || !Number.isFinite(expiresAt) || verifiedAt >= expiresAt) errors.push(`${path}: falsePositiveDisposition current revalidation/expiry가 필요하다`);
+  }
+  return errors;
+}
+
+export function validatePublicSensitivityOwnerReceiptSchema(schema, errors = [], path = "public-sensitivity-owner-receipt.schema") {
+  const required = ["schemaVersion", "repository", "gitSha", "observedAt", "secretScanningEnabled", "pushProtectionEnabled", "reachableRefAuditComplete", "alertEnumerationComplete", "locationEnumerationComplete", "openAlertCount", "unresolvedAlertCount", "detectorPolicyVersion", "evidenceLocator", "publicArtifactEnumerationComplete", "publicArtifacts"];
+  if (schema?.type !== "object" || schema?.additionalProperties !== false || JSON.stringify(schema?.required) !== JSON.stringify(required)) errors.push(`${path}: strict owner receipt top-level schema가 필요하다`);
+  const artifact = schema?.properties?.publicArtifacts?.items;
+  const artifactRequired = ["artifactId", "artifactName", "workflowPath", "runId", "archiveDigest", "expiresAt", "detectorPolicyVersion", "scanStatus", "scanReceiptLocator"];
+  if (artifact?.additionalProperties !== false || JSON.stringify(artifact?.required) !== JSON.stringify(artifactRequired) || JSON.stringify(artifact?.properties?.scanStatus?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"])) errors.push(`${path}: corrected publicArtifacts exact schema가 필요하다`);
+  if (schema?.properties?.openAlertCount?.type !== "integer" || schema?.properties?.unresolvedAlertCount?.type !== "integer" || schema?.properties?.publicArtifacts?.uniqueItems !== true) errors.push(`${path}: receipt count와 artifact uniqueness 계약이 필요하다`);
+  if (artifact?.properties?.artifactId?.pattern !== "^[0-9]+$" || artifact?.properties?.runId?.pattern !== "^[0-9]+$" || !artifact?.properties?.workflowPath?.pattern?.includes("github/workflows") || !artifact?.properties?.scanReceiptLocator?.pattern?.includes("actions/runs")) errors.push(`${path}: artifact identity/locator closed grammar가 필요하다`);
+  return errors;
+}
+
+export function validatePublicSensitivityAuditReportSchema(schema, errors = [], path = "public-sensitivity-audit-report.schema") {
+  const repositories = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
+  const surfaces = ["REPOSITORY_SECURITY_RECEIPT", "ISSUE_TITLE", "ISSUE_BODY", "ISSUE_COMMENT", "PR_TITLE", "PR_BODY", "PR_COMMENT", "PR_REVIEW_BODY", "PR_REVIEW_COMMENT", "COMMIT_COMMENT", "RELEASE_METADATA", "PUBLIC_ARTIFACT"];
+  const detectors = ["PRIVATE_KEY_BLOCK", "KNOWN_TOKEN_FORMAT", "AUTHORIZATION_VALUE", "SIGNED_URL_QUERY", "PRIVATE_ABSOLUTE_PATH", "RAW_PROVIDER_PAYLOAD", "RAW_USER_PAYLOAD"];
+  const report = schema?.properties;
+  const required = ["schemaVersion", "status", "observedAt", "inputs", "summary", "findings", "incomplete"];
+  if (schema?.type !== "object" || schema?.additionalProperties !== false || JSON.stringify(schema?.required) !== JSON.stringify(required)) errors.push(`${path}: strict public sensitivity report schema가 필요하다`);
+  if (report?.schemaVersion?.const !== 1 || JSON.stringify(report?.status?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"])) errors.push(`${path}: report status contract가 필요하다`);
+  const finding = report?.findings?.items;
+  if (finding?.additionalProperties !== false || JSON.stringify(finding?.required) !== JSON.stringify(["code", "detectorId", "repository", "surface", "immutableSourceIdentity", "locationFingerprint"]) || finding?.properties?.code?.const !== "SENSITIVE_RAW_EVIDENCE") errors.push(`${path}: sanitized finding schema가 필요하다`);
+  const incomplete = report?.incomplete?.items;
+  if (incomplete?.additionalProperties !== false || JSON.stringify(incomplete?.required) !== JSON.stringify(["stage", "code", "affectedIdentity"])) errors.push(`${path}: incomplete shape가 필요하다`);
+  const repositoryList = report?.inputs?.properties?.repositories;
+  if (repositoryList?.minItems !== 5 || repositoryList?.maxItems !== 5 || repositoryList?.uniqueItems !== true || JSON.stringify(repositoryList?.items?.properties?.repository?.enum) !== JSON.stringify(repositories)) errors.push(`${path}: exact five repository schema가 필요하다`);
+  if (report?.findings?.uniqueItems !== true || report?.incomplete?.uniqueItems !== true || JSON.stringify(finding?.properties?.detectorId?.enum) !== JSON.stringify(detectors) || JSON.stringify(finding?.properties?.repository?.enum) !== JSON.stringify(repositories) || JSON.stringify(finding?.properties?.surface?.enum) !== JSON.stringify(surfaces)) errors.push(`${path}: finding enum/uniqueness schema가 필요하다`);
+  if (!["scannedSurfaces", "scannedArtifacts", "detectors", "findings", "incomplete"].every((key) => report?.summary?.properties?.[key]?.type === "integer")) errors.push(`${path}: integer summary schema가 필요하다`);
+  const parity = schema?.oneOf;
+  if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: status/incomplete oneOf parity가 필요하다`);
   return errors;
 }
 
