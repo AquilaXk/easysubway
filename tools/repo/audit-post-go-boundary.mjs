@@ -61,7 +61,7 @@ export function auditPostGoBoundary({ scope, sourceSha, live }) {
     const lane = lanes.find((value) => value.parent === child.parent); lane.declaredJitChildren += 1;
     if (lane.status === "START_BLOCKED") findings.push({ code: "JIT_CHILD_CREATED_BEFORE_ACTIVATION", identity: `${child.parent}:${child.repository}:${child.number}` });
   }
-  return findings.sort((a, b) => a.identity.localeCompare(b.identity));
+  return findings.sort((a, b) => codepointCompare(a.identity, b.identity));
 }
 function escapeRegExp(value) { return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); }
 function roleActivationMarkerMatches(body, marker) { const text = String(body); const start = text.indexOf("## 판정·역할"); const remainder = start < 0 ? "" : text.slice(start + "## 판정·역할".length); const next = remainder.search(/\n## /); const section = next < 0 ? remainder : remainder.slice(0, next); const blocks = [...section.matchAll(/```text\s*\n([\s\S]*?)\n```/gm)]; return blocks.length === 1 && exactCount(blocks[0][1], new RegExp(`^${escapeRegExp(marker)}$`, "gm")) === 1; }
