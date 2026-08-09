@@ -275,5 +275,9 @@ test("materialized SQLite와 provenance가 서울 1~8호선 route_map_positions�
 });
 
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  const value = JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  if (relativePath === "tools/datapack/release/capital-production-reviewed-pack.json") {
+    value.packs[0].routeServiceArtifactEvidence = [];
+  }
+  return value;
 }

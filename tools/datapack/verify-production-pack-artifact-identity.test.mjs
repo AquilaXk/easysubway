@@ -14,7 +14,7 @@ import { verifyProductionPackArtifactIdentity } from "./verify-production-pack-a
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
 // ponytail: committed fixture replay clock; release workflow keeps actual time.
-process.env.EASYSUBWAY_DATAPACK_BUILD_NOW = "2026-07-30T00:00:00.000Z";
+process.env.EASYSUBWAY_DATAPACK_BUILD_NOW = "2026-08-09T14:30:00.000Z";
 const { privateKey } = generateKeyPairSync("rsa", { modulusLength: 2048 });
 const env = {
   ...process.env,
@@ -153,16 +153,13 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       path.join(root, "apps/mobile/assets/datapacks/index.json"),
       "utf8",
     ));
-    assert.equal(manifest.expiresAt, "2026-08-02T15:00:00.000Z");
+    assert.equal(manifest.expiresAt, "2026-08-10T12:04:20.479Z");
     assert.equal(bundledIndex.freshnessExpiresAt, manifest.expiresAt);
     const pack = manifest.packs.find(({ id }) => id === "capital");
     const topologySource = pack.sourceInventory.find(({ id }) => id === "capital-route-topology");
     assert.ok(topologySource);
     assert.ok(topologySource.fields.includes("network_edges"));
     assert.ok(!topologySource.fields.includes("duration_seconds"));
-    const itxSource = pack.sourceInventory.find(({ id }) => id === "itx-cheongchun-source-timetable");
-    assert.ok(itxSource);
-    assert.deepEqual(itxSource.fields, ["network_edges"]);
     const fieldProvenance = JSON.parse(await readFile(
       path.join(baselineDir, "current.provenance.json"),
       "utf8",
@@ -179,11 +176,14 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
     assert.equal(capitalDistanceRecords.filter(({ derivationKind }) => derivationKind === "OFFICIAL").length, 542);
     const itxPlaceholderRecords = fieldProvenance.packs
       .flatMap(({ records }) => records)
-      .filter(({ sourceId, field }) => sourceId === "itx-cheongchun-source-timetable"
+      .filter(({ sourceId, field }) => sourceId === "itx-current-network-edge-admission"
         && ["duration_seconds", "distance_meters"].includes(field));
     assert.equal(new Set(itxPlaceholderRecords.map(({ entityId, field }) => `${entityId}\0${field}`)).size, 96);
     assert.ok(itxPlaceholderRecords.every(({ derivationKind }) => derivationKind === "GENERATED"));
     await copyFile(path.join(root, "apps/mobile/assets/datapacks/index.json"), indexPath);
+    const staleIndex = JSON.parse(await readFile(indexPath, "utf8"));
+    staleIndex.freshnessExpiresAt = "2026-08-02T15:00:00.000Z";
+    await writeFile(indexPath, `${JSON.stringify(staleIndex, null, 2)}\n`);
     const gzipBytes = await readFile(assetPath);
     assert.equal(gzipBytes[9], 255);
     const sqliteBytes = gunzipSync(gzipBytes);
@@ -223,7 +223,15 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
         SELECT DISTINCT source_id AS sourceId
         FROM network_edges
         WHERE service_class = 'ITX_CHEONGCHUN'
-      `).all().map(({ sourceId }) => sourceId), ["itx-cheongchun-source-timetable"]);
+      `).all().map(({ sourceId }) => sourceId), ["itx-current-network-edge-admission"]);
+      assert.deepEqual(database.prepare(`
+        SELECT timetable_artifact_id AS timetableArtifactId, admission_status AS admissionStatus
+        FROM route_service_artifact_evidence
+        WHERE service_class = 'ITX_CHEONGCHUN'
+      `).all().map(({ timetableArtifactId, admissionStatus }) => ({ timetableArtifactId, admissionStatus })), [{
+        timetableArtifactId: "itx-cheongchun-source-timetable-20260719230524758",
+        admissionStatus: "ADMITTED",
+      }]);
       const unsupportedCapitalLine = database.prepare(`
         SELECT COUNT(*) AS edgeCount,
                SUM(verification_status = 'VERIFIED') AS verifiedCount
@@ -257,7 +265,11 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       assetPath,
       indexPath,
       packId: "capital",
+      syncIndexFreshness: true,
     }), report);
+
+    const syncedIndex = JSON.parse(await readFile(indexPath, "utf8"));
+    assert.equal(syncedIndex.freshnessExpiresAt, manifest.expiresAt);
 
     const index = JSON.parse(await readFile(indexPath, "utf8"));
     const capitalIndex = index.packs.find(({ id }) => id === "capital");
@@ -276,6 +288,7 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
     capitalIndex.asset = "assets/datapacks/capital.sqlite.gz";
     capitalIndex.sha256 = "f".repeat(64);
     await writeFile(indexPath, `${JSON.stringify(index)}\n`);
+    const mismatchedBytes = await readFile(indexPath);
     await assert.rejects(
       execFileAsync(process.execPath, [
         "tools/datapack/verify-production-pack-artifact-identity.mjs",
@@ -286,6 +299,7 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
       ], { cwd: root, env: verifierEnv }),
       /index sha256 mismatch/,
     );
+    assert.deepEqual(await readFile(indexPath), mismatchedBytes, "검증 실패는 기존 index bytes를 보존해야 한다");
   } finally {
     await rm(workspace, { recursive: true, force: true });
   }

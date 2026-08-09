@@ -190,7 +190,7 @@ const productionEnv = {
 const candidateReplayEnv = {
   ...productionEnv,
   // ponytail: committed fixture replay clock; release workflow keeps actual time.
-  EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-30T00:00:00.000Z",
+  EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-08-09T14:30:00.000Z",
 };
 
 test("데이터팩 생성기는 TEST_ONLY admission fixture를 build input으로 거부한다", async (context) => {
@@ -16124,6 +16124,7 @@ function makeProductionSourceFixtureStrictCoverageValid(fixture) {
 
 function makeProductionSourceFixtureExplicitlyUnavailable(fixture) {
   const pack = fixture.packs[0];
+  pack.routeServiceArtifactEvidence = [];
   for (const edge of pack.networkEdges.filter(({ edgeType }) => ["ENTRY", "EXIT"].includes(edgeType))) {
     edge.stairAccessState = "STEP_FREE";
     edge.accessibilityStatus = "NO_OFFICIAL_FEED";
