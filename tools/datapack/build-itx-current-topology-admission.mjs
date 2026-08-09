@@ -27,11 +27,15 @@ function same(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function compareStrings(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function pairTuples(stationSequences, label) {
   if (!Array.isArray(stationSequences) || stationSequences.length < 2) {
     throw new Error(`${label} must contain up/down station sequences`);
   }
-  const directions = [...new Set(stationSequences.map(({ directionId }) => directionId))].sort();
+  const directions = [...new Set(stationSequences.map(({ directionId }) => directionId))].sort(compareStrings);
   if (!same(directions, ["down", "up"])) {
     throw new Error(`${label} must contain exact up/down directions`);
   }
@@ -64,7 +68,7 @@ function canonicalStationSet(stationSequences, label) {
     }
   }
   if (stationIds.size === 0) throw new Error(`${label} station set is empty`);
-  return [...stationIds].sort();
+  return [...stationIds].sort(compareStrings);
 }
 
 function nextDayMidnightKst(serviceDate) {

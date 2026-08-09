@@ -40,6 +40,10 @@ function same(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
 }
 
+function compareStrings(left, right) {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
 function parseSnapshot(bytes, label) {
   try {
     return JSON.parse(Buffer.from(bytes).toString("utf8"));
@@ -130,7 +134,7 @@ export function withCurrentCapitalTopologyAdmissions({
       }
       observedLines.add(position.lineId);
     }
-    if (!same([...observedLines].sort(), [...evidence.lineIds].sort())) {
+    if (!same([...observedLines].sort(compareStrings), [...evidence.lineIds].sort(compareStrings))) {
       throw new Error(`${source.id} position line coverage mismatch`);
     }
     evidence.currentTopologyAdmission = {
@@ -143,7 +147,7 @@ export function withCurrentCapitalTopologyAdmissions({
       positionSnapshotSha256: evidence.snapshotSha256,
       reviewedAt,
       freshUntil: topology.freshUntil,
-      topologyLineages: [...evidence.lineIds].sort().map((lineId) => ({
+      topologyLineages: [...evidence.lineIds].sort(compareStrings).map((lineId) => ({
         sourceId: topology.sourceId,
         snapshotId: topologySnapshotId,
         contentSha256: topology.contentSha256,
