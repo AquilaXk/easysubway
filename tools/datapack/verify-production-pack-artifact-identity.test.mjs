@@ -295,6 +295,10 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
   const workspace = await mkdtemp(path.join(tmpdir(), "easysubway-network-edge-evidence-"));
   const outputDir = path.join(workspace, "output");
   const spec = JSON.parse(await readFile("tools/datapack/release/candidate-build-spec.json", "utf8"));
+  const networkEdgeEnv = {
+    ...env,
+    EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-08-09T14:30:00.000Z",
+  };
   const runRejectedBuild = async (candidate, pattern) => {
     const specPath = path.join(workspace, `spec-${Date.now()}.json`);
     await writeFile(specPath, `${JSON.stringify(candidate, null, 2)}\n`);
@@ -302,7 +306,7 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       "tools/datapack/build-datapack.mjs",
       "--build-spec", specPath,
       "--output", outputDir,
-    ], { cwd: root, env }), pattern);
+    ], { cwd: root, env: networkEdgeEnv }), pattern);
   };
   const runRejectedContractBuild = async (label, mutate, pattern) => {
     const contract = JSON.parse(await readFile("tools/datapack/itx-cheongchun-coverage-contract.json", "utf8"));
@@ -377,8 +381,8 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
 
     const staleInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
     staleInventory.sources.find(({ routeMapAdmissionEvidence }) =>
-      routeMapAdmissionEvidence?.topologySnapshotId === "capital-route-topology-20260724"
-    ).routeMapAdmissionEvidence.freshUntil = "2026-07-27T00:00:00.000Z";
+      routeMapAdmissionEvidence?.currentTopologyAdmission?.topologySnapshotId === "capital-route-topology-20260809"
+    ).routeMapAdmissionEvidence.currentTopologyAdmission.freshUntil = "2026-08-09T00:00:00.000Z";
     const staleBytes = Buffer.from(`${JSON.stringify(staleInventory, null, 2)}\n`);
     const stalePath = path.join(workspace, "stale-source-inventory.json");
     await writeFile(stalePath, staleBytes);
@@ -389,8 +393,8 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
 
     const futureInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
     futureInventory.sources.find(({ routeMapAdmissionEvidence }) =>
-      routeMapAdmissionEvidence?.topologySnapshotId === "capital-route-topology-20260724"
-    ).routeMapAdmissionEvidence.capturedAt = "2026-07-27T21:38:30.000Z";
+      routeMapAdmissionEvidence?.currentTopologyAdmission?.topologySnapshotId === "capital-route-topology-20260809"
+    ).routeMapAdmissionEvidence.currentTopologyAdmission.reviewedAt = "2026-08-09T14:31:00.000Z";
     const futureInventoryBytes = Buffer.from(`${JSON.stringify(futureInventory, null, 2)}\n`);
     const futureInventoryPath = path.join(workspace, "future-source-inventory.json");
     await writeFile(futureInventoryPath, futureInventoryBytes);
@@ -405,8 +409,8 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
     const earlyInventory = JSON.parse(await readFile("tools/datapack/source-inventory.json", "utf8"));
     earlyInventory.sources.find(({ id, routeMapAdmissionEvidence }) =>
       id === "kric-everline-route-map-positions"
-      && routeMapAdmissionEvidence?.topologySnapshotId === "capital-route-topology-20260724"
-    ).routeMapAdmissionEvidence.freshUntil = "2026-08-01T00:00:00.000Z";
+      && routeMapAdmissionEvidence?.currentTopologyAdmission?.topologySnapshotId === "capital-route-topology-20260809"
+    ).routeMapAdmissionEvidence.currentTopologyAdmission.freshUntil = "2026-08-10T00:00:00.000Z";
     const earlyBytes = Buffer.from(`${JSON.stringify(earlyInventory, null, 2)}\n`);
     const earlyPath = path.join(workspace, "early-source-inventory.json");
     await writeFile(earlyPath, earlyBytes);
@@ -422,14 +426,36 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       "--output", earlyOutputDir,
     ], {
       cwd: root,
-      env: { ...env, EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-31T23:59:59.000Z" },
+      env: { ...env, EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-08-09T23:59:59.000Z" },
     });
     const earlyManifest = JSON.parse(await readFile(path.join(earlyOutputDir, "current.json"), "utf8"));
-    assert.equal(earlyManifest.expiresAt, "2026-08-01T00:00:00.000Z");
+    assert.equal(earlyManifest.expiresAt, "2026-08-10T00:00:00.000Z");
 
     const missingEdgeAdmission = structuredClone(spec);
     delete missingEdgeAdmission.networkEdgeEvidence.capitalTopologyAdmission;
     await runRejectedBuild(missingEdgeAdmission, /production build requires capital topology edge admission/);
+
+    const missingCurrentItxAdmission = structuredClone(spec);
+    delete missingCurrentItxAdmission.networkEdgeEvidence.itxCurrentTopologyAdmission;
+    await runRejectedBuild(
+      missingCurrentItxAdmission,
+      /buildSpec\.networkEdgeEvidence\.itxCurrentTopologyAdmission is required/,
+    );
+
+    const tamperedCurrentItxAdmission = JSON.parse(await readFile(
+      "tools/datapack/itx-current-network-edge-admission-20260810.json",
+      "utf8",
+    ));
+    tamperedCurrentItxAdmission.sourceIssue = 1;
+    const tamperedCurrentItxBytes = Buffer.from(`${JSON.stringify(tamperedCurrentItxAdmission, null, 2)}\n`);
+    const tamperedCurrentItxPath = path.join(workspace, "tampered-current-itx-admission.json");
+    await writeFile(tamperedCurrentItxPath, tamperedCurrentItxBytes);
+    const tamperedCurrentItxSpec = structuredClone(spec);
+    tamperedCurrentItxSpec.networkEdgeEvidence.itxCurrentTopologyAdmission = {
+      path: tamperedCurrentItxPath,
+      sha256: sha256(tamperedCurrentItxBytes),
+    };
+    await runRejectedBuild(tamperedCurrentItxSpec, /ITX current topology admission evidence mismatch/);
 
     const staleEdgeAdmission = structuredClone(spec);
     staleEdgeAdmission.networkEdgeEvidence.capitalTopologyAdmission = {
@@ -468,17 +494,17 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
 
     await runRejectedCompletenessBuild("missing-itx-nested-admission", ({ completeness }) => {
       completeness.sourceTimetableArtifact.status = "MISSING";
-    }, /ITX network edge admission evidence mismatch/);
+    }, /ITX (?:current topology|network edge) admission evidence mismatch/);
 
     await runRejectedCompletenessBuild("drifted-itx-service-dates", ({ completeness }) => {
       completeness.selectedServiceDates["7"] = "20260808";
-    }, /ITX network edge admission evidence mismatch/);
+    }, /ITX (?:current topology|network edge) admission evidence mismatch/);
 
     await runRejectedCompletenessBuild("noncanonical-itx-policy", ({ source, completeness, reference }) => {
       source.policyVersion = "review-probe-v1";
       completeness.sourceTimetableArtifact.policyVersion = source.policyVersion;
       reference.policyVersion = source.policyVersion;
-    }, /ITX network edge admission evidence mismatch/);
+    }, /ITX (?:current topology|network edge) admission evidence mismatch/);
 
     await runRejectedCompletenessBuild("shifted-itx-service-dates", ({ source, completeness, reference }) => {
       source.observedAt = "2026-08-03T07:18:53.886Z";
@@ -488,17 +514,17 @@ test("network edge evidence는 pinned bytes·freshness·fixture projection misma
       source.freshUntil = "2026-08-10T00:00:00+09:00";
       completeness.sourceTimetableArtifact.freshUntil = source.freshUntil;
       reference.freshUntil = source.freshUntil;
-    }, /ITX network edge admission evidence mismatch/);
+    }, /ITX (?:current topology|network edge) admission evidence mismatch/);
 
     await runRejectedCompletenessBuild("unbound-itx-freshness", ({ source, completeness, reference }) => {
       source.freshUntil = "2026-08-04T00:00:00+09:00";
       completeness.sourceTimetableArtifact.freshUntil = source.freshUntil;
       reference.freshUntil = source.freshUntil;
-    }, /ITX network edge admission evidence mismatch/);
+    }, /ITX (?:current topology|network edge) admission evidence mismatch/);
 
     await runRejectedCompletenessBuild("unredacted-itx-source", ({ source }) => {
       source.credentialRedacted = false;
-    }, /ITX network edge admission evidence mismatch/);
+    }, /ITX (?:current topology|network edge) admission evidence mismatch/);
 
     const preverifiedFixture = JSON.parse(await readFile(
       "tools/datapack/release/capital-production-canonical-pack.json",

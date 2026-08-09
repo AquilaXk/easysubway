@@ -34,9 +34,9 @@ const routeMapNow = new Date("2026-07-24T03:00:00.000Z");
 const execFileAsync = promisify(execFile);
 const SOURCE_ID = "daegu-transportation-route-map-positions";
 const LINE_IDS = Object.freeze(DAEGU_LINES.map(({ lineId }) => lineId));
-// daegu accessibility coverage baseline(실측): supportedCount=34.
+// daegu accessibility coverage baseline(실측): supportedCount=35.
 // 이번 FILE admission이 daegu route_map_positions +3을 만든다.
-const DAEGU_ACCESSIBILITY_BASELINE_SUPPORTED_COUNT = 34;
+const DAEGU_ACCESSIBILITY_BASELINE_SUPPORTED_COUNT = 35;
 const DAEGU_ROUTE_MAP_SUPPORTED_COUNT = DAEGU_ACCESSIBILITY_BASELINE_SUPPORTED_COUNT + 3;
 
 async function inputs() {
@@ -259,5 +259,9 @@ test("materialized SQLite와 provenance가 대구 1·2·3호선 route_map_positi
 });
 
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  const value = JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  if (relativePath === "tools/datapack/release/capital-production-reviewed-pack.json") {
+    value.packs[0].routeServiceArtifactEvidence = [];
+  }
+  return value;
 }

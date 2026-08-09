@@ -11995,7 +11995,13 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
     },
   );
   assert.equal(transformed.scheduleProvenance.sourceId, "kric-subway-timetable");
+  assert.equal(transformed.scheduleProvenance.sourceSnapshotId, "kric-subway-timetable-line4-pilot-20260809");
+  assert.equal(transformed.scheduleProvenance.retrievedAt, "2026-08-09T12:04:20.479Z");
   assert.match(transformed.scheduleProvenance.providerRecordHash, /^[a-f0-9]{64}$/);
+  assert.equal(
+    transformed.stationLineRows.find((row) => row.sourceId === "kric-subway-timetable")?.lastVerifiedAt,
+    "2026-08-09T12:04:20.479Z",
+  );
   assert.equal(transformed.serviceCalendarDates.length, 28);
   assert.deepEqual(
     transformed.serviceCalendarDates.filter((row) => row.date === "20261225"),

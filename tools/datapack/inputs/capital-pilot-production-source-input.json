@@ -261,7 +261,7 @@
       "stationCode": "433",
       "lineSequence": 28,
       "platformInfo": "당고개 방면 / 오이도 방면",
-      "lastVerifiedAt": "2026-07-09T00:00:00.000Z",
+      "lastVerifiedAt": "2026-08-09T12:04:20.479Z",
       "providerStationId": "MTRS14433"
     },
     {
@@ -277,7 +277,7 @@
       "stationCode": "448",
       "lineSequence": 43,
       "platformInfo": "당고개 방면 / 오이도 방면",
-      "lastVerifiedAt": "2026-07-09T00:00:00.000Z",
+      "lastVerifiedAt": "2026-08-09T12:04:20.479Z",
       "providerStationId": "MTRKR4448"
     }
   ],
@@ -736,25 +736,25 @@
   "routeServiceArtifactEvidence": [
     {
       "serviceClass": "ITX_CHEONGCHUN",
-      "timetableArtifactId": "itx-cheongchun-completeness-admission-20260714T083544292Z",
-      "timetableArtifactSha256": "347aec507ec951dde65c10a1c4bff9f94454f762d76a5a74064a40662008336c",
+      "timetableArtifactId": "itx-cheongchun-source-timetable-20260719230524758",
+      "timetableArtifactSha256": "e2894d7ce6decb08fc9fec982394e77151799c34d099b83948481080e56d780e",
       "canonicalPackId": "capital",
-      "canonicalPackSha256": "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9",
-      "canonicalPackSqliteSha256": "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03",
-      "admissionStatus": "MISSING",
-      "admissionEligible": false,
-      "freshUntil": "2026-07-20T00:00:00.000Z",
-      "sourceIssue": 2116
+      "canonicalPackSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
+      "canonicalPackSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
+      "admissionStatus": "ADMITTED",
+      "admissionEligible": true,
+      "freshUntil": "2026-07-27T00:00:00+09:00",
+      "sourceIssue": 2135
     }
   ],
   "movementPathCandidates": [],
   "representativeRouteRegressions": [],
   "scheduleProvenance": {
     "sourceId": "kric-subway-timetable",
-    "sourceSnapshotId": "kric-subway-timetable-line4-pilot-20260709",
-    "providerRecordHash": "f05cf6faa53ef451e87e0836c8b414a1c7a1dac2d9bae67da499972aa843a30e",
-    "evidenceHash": "1a3c86070f7e59ebffbfde2b01ce2faa10d84e86759533793dafbed0a77a4ba9",
-    "retrievedAt": "2026-07-09T00:00:00.000Z"
+    "sourceSnapshotId": "kric-subway-timetable-line4-pilot-20260809",
+    "providerRecordHash": "d8ee1a9351ade3465a955ffabeade294eaccf65449fc1fc1998240fdba87e064",
+    "evidenceHash": "4eb89e17e2aea7bdfdcd888dcec2152de85adfbefb3e727f7e228f46a72311ce",
+    "retrievedAt": "2026-08-09T12:04:20.479Z"
   },
   "serviceCalendars": [
     {

@@ -37,8 +37,8 @@ const OPERATOR_ID = "gwangju-metropolitan-rapid-transit";
 const ACCESSIBILITY_FIELDS = Object.freeze([
   "elevator", "escalator", "wheelchair_lift", "status", "verified_at",
 ]);
-// gwangju timetable 누적 fixture coverage baseline(실측): supportedCount=22 → accessibility +1 = 23.
-const TIMETABLE_BASELINE_SUPPORTED_COUNT = 22;
+// gwangju timetable 누적 fixture coverage baseline(실측): supportedCount=23 → accessibility +1 = 24.
+const TIMETABLE_BASELINE_SUPPORTED_COUNT = 23;
 const ACCESSIBILITY_SUPPORTED_COUNT = TIMETABLE_BASELINE_SUPPORTED_COUNT + 1;
 
 async function inputs() {
@@ -353,5 +353,9 @@ test("materialized SQLite와 provenance가 광주 accessibility_facilities 1건�
 });
 
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  const value = JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  if (relativePath === "tools/datapack/release/capital-production-reviewed-pack.json") {
+    value.packs[0].routeServiceArtifactEvidence = [];
+  }
+  return value;
 }

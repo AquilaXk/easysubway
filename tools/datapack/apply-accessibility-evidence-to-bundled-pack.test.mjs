@@ -188,14 +188,23 @@ const reviewedEdge = {
 };
 
 test("canonical and SQLite refresh the reviewed ENTRY/EXIT identity together", () => {
+  const officialOdFareQuotes = [{
+    sourceId: "seoul-metro-official-od-fares",
+    originStationId: "station-sadang",
+    destinationStationId: "station-sangnoksu",
+  }];
+  const unrelatedOfficialOdFareQuote = {
+    sourceId: "busan-transportation-official-od-fares",
+    originStationId: "station-busan-1",
+    destinationStationId: "station-busan-2",
+  };
   const reviewedPack = {
     networkEdges: [reviewedEdge],
-    officialOdFareQuotes: [{ originStationId: "station-sadang", destinationStationId: "station-sangnoksu" }],
+    officialOdFareQuotes,
     routeServiceArtifactEvidence: [{ serviceClass: "ITX_CHEONGCHUN", admissionStatus: "MISSING" }],
     movementPathCandidates: [],
     metadata: { productionCoverageEvidence: "reviewed-accessibility-sources" },
   };
-  const officialOdFareQuotes = [{ originStationId: "station-sadang", destinationStationId: "station-sangnoksu" }];
   const routeServiceArtifactEvidence = [{ serviceClass: "ITX_CHEONGCHUN", admissionStatus: "MISSING" }];
   const canonical = { packs: [{
     id: "capital",
@@ -224,7 +233,10 @@ test("canonical and SQLite refresh the reviewed ENTRY/EXIT identity together", (
       sourceSnapshotId: "baseline-exit-source-capital-20260619",
     }],
     sourceInventory: [{ id: "seoul-metro-official-od-fares" }],
-    officialOdFareQuotes,
+    officialOdFareQuotes: [
+      unrelatedOfficialOdFareQuote,
+      { ...officialOdFareQuotes[0], destinationStationId: "station-stale" },
+    ],
     routeServiceArtifactEvidence,
     movementPathCandidates: [{ id: "legacy-movement-candidate" }],
     metadata: { productionCoverageEvidence: "retired-accessibility-sources" },
@@ -239,7 +251,10 @@ test("canonical and SQLite refresh the reviewed ENTRY/EXIT identity together", (
   assert.deepEqual(synced.packs[0].networkEdges, [reviewedEdge]);
   assert.equal(synced.packs[0].internalRouteEdges[0].accessibilityStatus, "UNKNOWN");
   assert.equal(synced.packs[0].stationExits[0].hasElevatorConnection, false);
-  assert.deepEqual(synced.packs[0].officialOdFareQuotes, officialOdFareQuotes);
+  assert.deepEqual(synced.packs[0].officialOdFareQuotes, [
+    unrelatedOfficialOdFareQuote,
+    ...officialOdFareQuotes,
+  ]);
   assert.deepEqual(synced.packs[0].routeServiceArtifactEvidence, routeServiceArtifactEvidence);
   assert.deepEqual(synced.packs[0].movementPathCandidates, []);
   assert.deepEqual(synced.packs[0].sourceInventory, [{ id: "seoul-metro-official-od-fares" }]);

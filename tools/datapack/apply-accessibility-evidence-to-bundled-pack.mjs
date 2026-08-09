@@ -230,7 +230,10 @@ export function syncCanonicalFixture(canonical, reviewedPack) {
   pack.sourceInventory = pack.sourceInventory
     .filter(({ id }) => !replacedSourceIds.has(id) && id !== "kric-station-convenience-standard")
     .concat(freshSources);
-  pack.officialOdFareQuotes = reviewedPack.officialOdFareQuotes;
+  const reviewedFareSourceIds = new Set(reviewedPack.officialOdFareQuotes.map(({ sourceId }) => sourceId));
+  pack.officialOdFareQuotes = (pack.officialOdFareQuotes ?? [])
+    .filter(({ sourceId }) => !reviewedFareSourceIds.has(sourceId))
+    .concat(reviewedPack.officialOdFareQuotes);
   pack.routeServiceArtifactEvidence = reviewedPack.routeServiceArtifactEvidence;
   pack.movementPathCandidates = reviewedPack.movementPathCandidates;
   pack.metadata.productionCoverageEvidence = reviewedPack.metadata.productionCoverageEvidence;
