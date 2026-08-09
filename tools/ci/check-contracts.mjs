@@ -776,10 +776,10 @@ export function validatePublicSensitivityOwnerReceiptSchema(schema, errors = [],
   const required = ["schemaVersion", "repository", "gitSha", "observedAt", "secretScanningEnabled", "pushProtectionEnabled", "reachableRefAuditComplete", "alertEnumerationComplete", "locationEnumerationComplete", "openAlertCount", "unresolvedAlertCount", "detectorPolicyVersion", "evidenceLocator", "publicArtifactEnumerationComplete", "publicArtifacts"];
   if (schema?.type !== "object" || schema?.additionalProperties !== false || JSON.stringify(schema?.required) !== JSON.stringify(required)) errors.push(`${path}: strict owner receipt top-level schema가 필요하다`);
   const artifact = schema?.properties?.publicArtifacts?.items;
-  const artifactRequired = ["artifactId", "artifactName", "workflowPath", "runId", "archiveDigest", "expiresAt", "detectorPolicyVersion", "scanStatus", "scanReceiptLocator"];
+  const artifactRequired = ["artifactId", "artifactName", "workflowPath", "runId", "archiveDigest", "createdAt", "expiresAt", "detectorPolicyVersion", "scanStatus", "scanReceiptLocator"];
   if (artifact?.additionalProperties !== false || JSON.stringify(artifact?.required) !== JSON.stringify(artifactRequired) || JSON.stringify(artifact?.properties?.scanStatus?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"])) errors.push(`${path}: corrected publicArtifacts exact schema가 필요하다`);
   if (schema?.properties?.openAlertCount?.type !== "integer" || schema?.properties?.unresolvedAlertCount?.type !== "integer" || schema?.properties?.publicArtifacts?.uniqueItems !== true) errors.push(`${path}: receipt count와 artifact uniqueness 계약이 필요하다`);
-  if (artifact?.properties?.artifactId?.pattern !== "^[0-9]+$" || artifact?.properties?.runId?.pattern !== "^[0-9]+$" || !artifact?.properties?.workflowPath?.pattern?.includes("github/workflows") || !artifact?.properties?.scanReceiptLocator?.pattern?.includes("actions/runs")) errors.push(`${path}: artifact identity/locator closed grammar가 필요하다`);
+  if (artifact?.properties?.artifactId?.pattern !== "^[0-9]+$" || artifact?.properties?.runId?.pattern !== "^[0-9]+$" || artifact?.properties?.createdAt?.format !== "date-time" || !artifact?.properties?.workflowPath?.pattern?.includes("github/workflows") || !artifact?.properties?.scanReceiptLocator?.pattern?.includes("actions/runs")) errors.push(`${path}: artifact identity/locator closed grammar가 필요하다`);
   return errors;
 }
 
@@ -801,6 +801,8 @@ export function validatePublicSensitivityAuditReportSchema(schema, errors = [], 
   if (!["scannedSurfaces", "scannedArtifacts", "detectors", "findings", "incomplete"].every((key) => report?.summary?.properties?.[key]?.type === "integer")) errors.push(`${path}: integer summary schema가 필요하다`);
   const parity = schema?.oneOf;
   if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: status/incomplete oneOf parity가 필요하다`);
+  const inputRequired = repositoryList?.items?.required;
+  if (!Array.isArray(inputRequired) || !inputRequired.includes("artifactBeginWatermark") || !inputRequired.includes("artifactEndWatermark") || repositoryList?.items?.properties?.artifactBeginWatermark?.pattern !== "^[0-9a-f]{64}$" || repositoryList?.items?.properties?.artifactEndWatermark?.pattern !== "^[0-9a-f]{64}$") errors.push(`${path}: artifact snapshot watermark input이 필요하다`);
   return errors;
 }
 

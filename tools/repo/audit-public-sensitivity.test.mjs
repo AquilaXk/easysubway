@@ -7,7 +7,7 @@ import { join } from "node:path";
 import { test } from "node:test";
 
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
-import { auditPublicSensitivity, collectActionsArtifacts, collectPublicMetadata, createReport, runAuditCli, scanArtifactArchive, validateReceipt, validateReport, validateScope } from "./audit-public-sensitivity.mjs";
+import { auditPublicSensitivity, collectActionsArtifacts, collectArtifactCatalog, collectPublicMetadata, createReport, runAuditCli, scanArtifactArchive, validateReceipt, validateReport, validateScope } from "./audit-public-sensitivity.mjs";
 
 const REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
 const SHA = "a".repeat(40); const OBSERVED_AT = "2026-08-09T03:00:00.000Z";
@@ -16,6 +16,7 @@ const fingerprint = (repository, surface, identity, detector, ordinal, offset) =
 
 function scope(dispositions = []) { return { schemaVersion: 1, detectorPolicyVersion: "public-sensitivity-v1", repositories: REPOSITORIES.map((repository) => ({ repository, publicEvidencePaths: ["evidence/public"] })), surfaces: ["REPOSITORY_SECURITY_RECEIPT", "ISSUE_TITLE", "ISSUE_BODY", "ISSUE_COMMENT", "PR_TITLE", "PR_BODY", "PR_COMMENT", "PR_REVIEW_BODY", "PR_REVIEW_COMMENT", "COMMIT_COMMENT", "RELEASE_METADATA", "PUBLIC_ARTIFACT"], detectors: ["PRIVATE_KEY_BLOCK", "KNOWN_TOKEN_FORMAT", "AUTHORIZATION_VALUE", "SIGNED_URL_QUERY", "PRIVATE_ABSOLUTE_PATH", "RAW_PROVIDER_PAYLOAD", "RAW_USER_PAYLOAD"], falsePositiveDispositions: dispositions }; }
 function receipt(repository) { return { schemaVersion: 1, repository, gitSha: SHA, observedAt: OBSERVED_AT, secretScanningEnabled: true, pushProtectionEnabled: true, reachableRefAuditComplete: true, alertEnumerationComplete: true, locationEnumerationComplete: true, openAlertCount: 0, unresolvedAlertCount: 0, detectorPolicyVersion: "public-sensitivity-v1", evidenceLocator: locator(repository), publicArtifactEnumerationComplete: true, publicArtifacts: [] }; }
+function catalogArtifact(id, { expired = true, createdAt = "2026-08-08T03:00:00.000Z", expiresAt = "2026-09-09T03:00:00.000Z", digest = `sha256:${"a".repeat(64)}`, name = "artifact", runId = 1 } = {}) { return { id, name, expired, created_at: createdAt, expires_at: expiresAt, digest, workflow_run: { id: runId } }; }
 
 function fakeGh({ body = "safe", next = false } = {}) { return async ({ method, endpoint }) => {
   assert.equal(method, "GET");
@@ -24,7 +25,7 @@ function fakeGh({ body = "safe", next = false } = {}) { return async ({ method, 
   if (endpoint === `repos/${repository}`) return { default_branch: "main" };
   if (endpoint === `repos/${repository}/git/ref/heads/main`) return { object: { sha: SHA } };
   if (endpoint.includes("/git/trees/")) return { truncated: false, tree: [] };
-  if (endpoint.includes("/actions/artifacts")) return { total_count: 0, artifacts: [] };
+  if (endpoint.includes("/actions/artifacts")) return { total_count: 1, artifacts: [catalogArtifact(1, { expired: false, createdAt: "2026-08-09T03:00:00.001Z" })] };
   if (endpoint.includes("/issues?")) return [{ id: 1, number: 1, title: "safe", body: repository === REPOSITORIES[0] ? body : "safe", pull_request: null, updated_at: OBSERVED_AT }];
   if (endpoint.includes("/pulls?")) return [];
   if (endpoint.includes("/issues/comments") || endpoint.includes("/issues/1/comments") || endpoint.includes("/pulls/comments") || endpoint.includes("/pulls/1/reviews") || endpoint.includes("/comments") || endpoint.includes("/releases")) return next ? { body: [], next: true } : [];
@@ -58,10 +59,10 @@ test("D20.1 metadata watermark binds content bytes even when provider revision i
 test("D20.1 F1 scans the declared repository security receipt surface", async () => {
   const raw = "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD";
   const archive = zip([]); const archiveDigest = `sha256:${createHash("sha256").update(archive).digest("hex")}`;
-  const receipts = REPOSITORIES.map((repository) => ({ ...receipt(repository), publicArtifacts: [{ artifactId: "1", artifactName: raw, workflowPath: ".github/workflows/a.yml", runId: "1", archiveDigest, expiresAt: "2026-09-09T03:00:00.000Z", detectorPolicyVersion: "public-sensitivity-v1", scanStatus: "COMPLETE", scanReceiptLocator: locator(repository) }] }));
+  const receipts = REPOSITORIES.map((repository) => ({ ...receipt(repository), evidenceLocator: locator(repository, 2), publicArtifacts: [{ artifactId: "1", artifactName: raw, workflowPath: ".github/workflows/a.yml", runId: "1", archiveDigest, createdAt: "2026-08-08T03:00:00.000Z", expiresAt: "2026-09-09T03:00:00.000Z", detectorPolicyVersion: "public-sensitivity-v1", scanStatus: "COMPLETE", scanReceiptLocator: locator(repository) }] }));
   const gh = async (request) => {
     const repository = REPOSITORIES.find((candidate) => request.endpoint === `repos/${candidate}` || request.endpoint.startsWith(`repos/${candidate}/`));
-    if (request.endpoint.includes("/actions/artifacts?")) return { total_count: 1, artifacts: [{ id: 1, name: raw, expired: false, expires_at: "2026-09-09T03:00:00.000Z", digest: archiveDigest, workflow_run: { id: 1 } }] };
+    if (request.endpoint.includes("/actions/artifacts?")) return { total_count: 2, artifacts: [catalogArtifact(1, { name: raw, expired: false, digest: archiveDigest }), catalogArtifact(2, { expired: false, createdAt: "2026-08-09T03:00:00.001Z" })] };
     if (request.endpoint.endsWith("/actions/runs/1")) return { path: ".github/workflows/a.yml" };
     if (request.endpoint.endsWith("/actions/artifacts/1/zip")) return archive;
     assert.ok(repository);
@@ -217,10 +218,11 @@ test("D20.1 archive finding reaches the aggregate report without raw bytes", asy
   const archive = zip([{ name: "safe.txt", text: raw, method: 8 }]);
   const archiveDigest = `sha256:${createHash("sha256").update(archive).digest("hex")}`;
   const receipts = REPOSITORIES.map(receipt);
-  receipts[0].publicArtifacts = [{ artifactId: "7", artifactName: "sensitivity", workflowPath: ".github/workflows/audit.yml", runId: "1", archiveDigest, expiresAt: "2026-09-09T03:00:00.000Z", detectorPolicyVersion: "public-sensitivity-v1", scanStatus: "COMPLETE", scanReceiptLocator: locator(REPOSITORIES[0], 7) }];
+  receipts[0].evidenceLocator = locator(REPOSITORIES[0], 1);
+  receipts[0].publicArtifacts = [{ artifactId: "7", artifactName: "sensitivity", workflowPath: ".github/workflows/audit.yml", runId: "1", archiveDigest, createdAt: "2026-08-08T03:00:00.000Z", expiresAt: "2026-09-09T03:00:00.000Z", detectorPolicyVersion: "public-sensitivity-v1", scanStatus: "COMPLETE", scanReceiptLocator: locator(REPOSITORIES[0], 7) }];
   const base = fakeGh();
   const execGh = async (request) => {
-    if (request.endpoint === `repos/${REPOSITORIES[0]}/actions/artifacts?per_page=100&page=1`) return { total_count: 1, artifacts: [{ id: 7, name: "sensitivity", expired: false, expires_at: "2026-09-09T03:00:00.000Z", digest: archiveDigest, workflow_run: { id: 1 } }] };
+    if (request.endpoint === `repos/${REPOSITORIES[0]}/actions/artifacts?per_page=100&page=1`) return { total_count: 2, artifacts: [catalogArtifact(7, { name: "sensitivity", expired: false, digest: archiveDigest }), catalogArtifact(1, { expired: false, createdAt: "2026-08-09T03:00:00.001Z" })] };
     if (request.endpoint === `repos/${REPOSITORIES[0]}/actions/runs/1`) return { path: ".github/workflows/audit.yml" };
     if (request.endpoint === `repos/${REPOSITORIES[0]}/actions/artifacts/7/zip`) return archive;
     return base(request);
@@ -240,7 +242,7 @@ test("D20.1 receipt locators and artifact expiry are bound to the exact reposito
 });
 
 test("D20.1 F6 report validator is total and rejects parity, order, enum, and integer mutations", () => {
-  const report = createReport({ observedAt: OBSERVED_AT, inputs: { repositories: REPOSITORIES.map((repository) => ({ repository, defaultBranch: "main", gitSha: SHA, beginWatermark: "b".repeat(64), endWatermark: "b".repeat(64), receiptLocator: locator(repository) })) } });
+  const report = createReport({ observedAt: OBSERVED_AT, inputs: { repositories: REPOSITORIES.map((repository) => ({ repository, defaultBranch: "main", gitSha: SHA, beginWatermark: "b".repeat(64), endWatermark: "b".repeat(64), artifactBeginWatermark: "c".repeat(64), artifactEndWatermark: "c".repeat(64), receiptLocator: locator(repository) })) } });
   assert.deepEqual(validateReport(report), []);
   for (const mutate of [(value) => { value.summary.detectors = 1; }, (value) => { value.status = "COMPLETE"; value.incomplete.push({ stage: "a", code: "b", affectedIdentity: "c" }); }, (value) => { value.inputs.repositories.reverse(); }, (value) => { value.summary.findings = 1.5; }]) { const invalid = structuredClone(report); mutate(invalid); assert.ok(validateReport(invalid).length > 0); }
   assert.doesNotThrow(() => validateReport(null));
@@ -249,14 +251,14 @@ test("D20.1 F6 report validator is total and rejects parity, order, enum, and in
 test("D20.1 Actions artifact pagination consumes exact 101/200/201 catalog totals", async () => {
   for (const total of [101, 200, 201]) {
     const calls = [];
-    const result = await collectActionsArtifacts({ repository: REPOSITORIES[0], receiptArtifacts: [], observedAt: OBSERVED_AT, detectorPolicyVersion: "public-sensitivity-v1", execGh: async ({ endpoint }) => { calls.push(endpoint); const page = Number(endpoint.match(/[?&]page=(\d+)/)?.[1]); return { total_count: total, artifacts: Array.from({ length: Math.max(0, Math.min(100, total - (page - 1) * 100)) }, (_, offset) => ({ id: (page - 1) * 100 + offset, expired: true })) }; } });
+    const result = await collectActionsArtifacts({ repository: REPOSITORIES[0], receiptArtifacts: [], observedAt: OBSERVED_AT, detectorPolicyVersion: "public-sensitivity-v1", execGh: async ({ endpoint }) => { calls.push(endpoint); const page = Number(endpoint.match(/[?&]page=(\d+)/)?.[1]); return { total_count: total, artifacts: Array.from({ length: Math.max(0, Math.min(100, total - (page - 1) * 100)) }, (_, offset) => catalogArtifact((page - 1) * 100 + offset)) }; } });
     assert.deepEqual(result.incomplete, []); assert.equal(calls.length, Math.ceil(total / 100));
   }
 });
 
 test("D20.1 Actions artifact pagination rejects duplicate, drift, mismatch, and cap", async () => {
   for (const mode of ["duplicate", "drift", "short"]) {
-    const result = await collectActionsArtifacts({ repository: REPOSITORIES[0], receiptArtifacts: [], observedAt: OBSERVED_AT, detectorPolicyVersion: "public-sensitivity-v1", execGh: async ({ endpoint }) => { const page = Number(endpoint.match(/[?&]page=(\d+)/)?.[1]); if (mode === "short") return { total_count: 101, artifacts: [] }; return { total_count: mode === "drift" && page === 2 ? 102 : 101, artifacts: Array.from({ length: page === 1 ? 100 : 1 }, (_, offset) => ({ id: mode === "duplicate" && page === 2 ? 0 : (page - 1) * 100 + offset, expired: true })) }; } });
+    const result = await collectActionsArtifacts({ repository: REPOSITORIES[0], receiptArtifacts: [], observedAt: OBSERVED_AT, detectorPolicyVersion: "public-sensitivity-v1", execGh: async ({ endpoint }) => { const page = Number(endpoint.match(/[?&]page=(\d+)/)?.[1]); if (mode === "short") return { total_count: 101, artifacts: [] }; return { total_count: mode === "drift" && page === 2 ? 102 : 101, artifacts: Array.from({ length: page === 1 ? 100 : 1 }, (_, offset) => catalogArtifact(mode === "duplicate" && page === 2 ? 0 : (page - 1) * 100 + offset)) }; } });
     assert.ok(result.incomplete.length > 0);
   }
 });
@@ -264,6 +266,69 @@ test("D20.1 Actions artifact pagination rejects duplicate, drift, mismatch, and 
 test("D20.1 F7 rejects an unknown artifact expiry state", async () => {
   const result = await collectActionsArtifacts({ repository: REPOSITORIES[0], receiptArtifacts: [], observedAt: OBSERVED_AT, detectorPolicyVersion: "public-sensitivity-v1", execGh: async () => ({ total_count: 1, artifacts: [{ id: 1, expired: null }] }) });
   assert.ok(result.incomplete.some(({ code }) => code === "ARTIFACT_CATALOG_INCOMPLETE"));
+});
+
+test("D20.1a scans only a stable eligible artifact and transports the exact post-cutoff receipt evidence", async () => {
+  const archive = zip([{ name: "safe.txt", text: "safe", method: 0 }]); const archiveDigest = `sha256:${createHash("sha256").update(archive).digest("hex")}`;
+  const eligible = catalogArtifact(7, { expired: false, name: "eligible", digest: archiveDigest });
+  const transport = catalogArtifact(9, { expired: false, createdAt: "2026-08-09T03:00:00.001Z" });
+  const receiptArtifact = { artifactId: "7", artifactName: "eligible", workflowPath: ".github/workflows/audit.yml", runId: "1", archiveDigest, createdAt: "2026-08-08T03:00:00.000Z", expiresAt: "2026-09-09T03:00:00.000Z", detectorPolicyVersion: "public-sensitivity-v1", scanStatus: "COMPLETE", scanReceiptLocator: locator(REPOSITORIES[0], 7) };
+  const result = await collectActionsArtifacts({ repository: REPOSITORIES[0], receiptArtifacts: [receiptArtifact], receiptEvidenceLocator: locator(REPOSITORIES[0], 9), observedAt: OBSERVED_AT, detectorPolicyVersion: "public-sensitivity-v1", execGh: async ({ endpoint }) => {
+    if (endpoint.includes("/actions/artifacts?")) return { total_count: 2, artifacts: [eligible, transport] };
+    if (endpoint.endsWith("/actions/runs/1")) return { path: ".github/workflows/audit.yml" };
+    if (endpoint.endsWith("/actions/artifacts/7/zip")) return archive;
+    throw new Error("unexpected request");
+  } });
+  assert.deepEqual(result.incomplete, []); assert.equal(result.scannedArtifacts, 1);
+});
+
+test("D20.1a rejects malformed and boundary-violating createdAt evidence", async () => {
+  const candidate = receipt(REPOSITORIES[0]);
+  candidate.publicArtifacts = [{ artifactId: "1", artifactName: "artifact", workflowPath: ".github/workflows/a.yml", runId: "1", archiveDigest: `sha256:${"a".repeat(64)}`, createdAt: "2026-08-09T03:00:00.001Z", expiresAt: "2026-09-09T03:00:00.000Z", detectorPolicyVersion: "public-sensitivity-v1", scanStatus: "COMPLETE", scanReceiptLocator: locator(REPOSITORIES[0]) }];
+  assert.ok(validateReceipt(candidate, { repository: REPOSITORIES[0], gitSha: SHA, observedAt: OBSERVED_AT, detectorPolicyVersion: "public-sensitivity-v1" }).includes("RECEIPT_ARTIFACT_INVALID"));
+  for (const createdAt of ["not-a-time", "2026-08-09T05:00:00", "2026-08-09"]) {
+    const catalog = await collectArtifactCatalog({ repository: REPOSITORIES[0], execGh: async () => ({ total_count: 1, artifacts: [{ ...catalogArtifact(1), created_at: createdAt }] }) });
+    assert.ok(catalog.incomplete.some(({ code }) => code === "ARTIFACT_CATALOG_INCOMPLETE"));
+  }
+  for (const artifact of [
+    { ...catalogArtifact(1), id: Number.MAX_SAFE_INTEGER + 1 },
+    { ...catalogArtifact(1), name: "" },
+    { ...catalogArtifact(1), digest: "not-a-digest" },
+  ]) {
+    const malformed = await collectArtifactCatalog({ repository: REPOSITORIES[0], execGh: async () => ({ total_count: 1, artifacts: [artifact] }) });
+    assert.ok(malformed.incomplete.some(({ code }) => code === "ARTIFACT_CATALOG_INCOMPLETE"));
+  }
+});
+
+test("D20.1a terminal artifact watermark is collected after eligible archives are scanned", async () => {
+  const archive = zip([{ name: "safe.txt", text: "safe", method: 0 }]); const archiveDigest = `sha256:${createHash("sha256").update(archive).digest("hex")}`;
+  const receipts = REPOSITORIES.map(receipt);
+  receipts[0].evidenceLocator = locator(REPOSITORIES[0], 9);
+  receipts[0].publicArtifacts = [{ artifactId: "7", artifactName: "eligible", workflowPath: ".github/workflows/audit.yml", runId: "1", archiveDigest, createdAt: "2026-08-08T03:00:00.000Z", expiresAt: "2026-09-09T03:00:00.000Z", detectorPolicyVersion: "public-sensitivity-v1", scanStatus: "COMPLETE", scanReceiptLocator: locator(REPOSITORIES[0], 7) }];
+  let archiveScanned = false; const base = fakeGh();
+  const execGh = async (request) => {
+    if (request.endpoint === `repos/${REPOSITORIES[0]}/actions/artifacts?per_page=100&page=1`) return { total_count: 2, artifacts: [catalogArtifact(7, { expired: false, name: "eligible", digest: archiveScanned ? `sha256:${"b".repeat(64)}` : archiveDigest }), catalogArtifact(9, { expired: false, createdAt: "2026-08-09T03:00:00.001Z" })] };
+    if (request.endpoint === `repos/${REPOSITORIES[0]}/actions/runs/1`) return { path: ".github/workflows/audit.yml" };
+    if (request.endpoint === `repos/${REPOSITORIES[0]}/actions/artifacts/7/zip`) { archiveScanned = true; return archive; }
+    return base(request);
+  };
+  const audit = await auditPublicSensitivity({ scope: scope(), receipts, observedAt: OBSERVED_AT, execGh });
+  assert.ok(audit.incomplete.some(({ code }) => code === "ARTIFACT_WATERMARK_DRIFT"));
+});
+
+test("D20.1a preserves stable double catalog watermarks and rejects same-count drift", async () => {
+  for (const drift of [false, true]) {
+    const reads = new Map();
+    const gh = async (request) => {
+      const repository = REPOSITORIES.find((candidate) => request.endpoint === `repos/${candidate}` || request.endpoint.startsWith(`repos/${candidate}/`));
+      if (request.endpoint.includes("/actions/artifacts?")) { const count = (reads.get(repository) ?? 0) + 1; reads.set(repository, count); const page = Number(request.endpoint.match(/[?&]page=(\d+)/)?.[1]); return { total_count: 101, artifacts: Array.from({ length: page === 1 ? 100 : 1 }, (_, offset) => catalogArtifact((page - 1) * 100 + offset, { createdAt: "2026-08-09T03:00:00.001Z", digest: drift && count > 2 ? `sha256:${"b".repeat(64)}` : `sha256:${"a".repeat(64)}` })) }; }
+      return fakeGh()(request);
+    };
+    const audit = await auditPublicSensitivity({ scope: scope(), receipts: REPOSITORIES.map(receipt), observedAt: OBSERVED_AT, execGh: gh });
+    const report = createReport({ observedAt: OBSERVED_AT, ...audit });
+    assert.equal(report.inputs.repositories.every((entry) => /^[0-9a-f]{64}$/.test(entry.artifactBeginWatermark) && /^[0-9a-f]{64}$/.test(entry.artifactEndWatermark)), true);
+    assert.equal(audit.incomplete.some(({ code }) => code === "ARTIFACT_WATERMARK_DRIFT"), drift);
+  }
 });
 
 function zip(entries) {

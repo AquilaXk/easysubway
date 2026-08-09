@@ -24,13 +24,14 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["artifactId", "artifactName", "workflowPath", "runId", "archiveDigest", "expiresAt", "detectorPolicyVersion", "scanStatus", "scanReceiptLocator"],
+        "required": ["artifactId", "artifactName", "workflowPath", "runId", "archiveDigest", "createdAt", "expiresAt", "detectorPolicyVersion", "scanStatus", "scanReceiptLocator"],
         "properties": {
           "artifactId": { "type": "string", "pattern": "^[0-9]+$" },
           "artifactName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$" },
           "workflowPath": { "type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9._/-]+\\.ya?ml$" },
           "runId": { "type": "string", "pattern": "^[0-9]+$" },
           "archiveDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "createdAt": { "type": "string", "format": "date-time" },
           "expiresAt": { "type": "string", "format": "date-time" },
           "detectorPolicyVersion": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
           "scanStatus": { "type": "string", "enum": ["COMPLETE", "AUDIT_INCOMPLETE"] },
