@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "builtAt": "2026-07-29T00:47:36.105Z",
+  "builtAt": "2026-08-09T09:13:01.996Z",
   "qualityAsOf": "2026-07-28T18:45:03.338Z",
   "freshnessExpiresAt": "2026-08-02T15:00:00.000Z",
-  "sourceSnapshotSetHash": "cd85827d6f90e7084f76ac63e376758eb72dd76f3247f46d5b9c77ec267f498e",
+  "sourceSnapshotSetHash": "c109f97040ff1a5d7ff04c4082264d7faeddf0d1c391d3e49744378d43ac72f5",
   "schemaIdentity": "catalog-schema-v1",
   "packs": [
     {

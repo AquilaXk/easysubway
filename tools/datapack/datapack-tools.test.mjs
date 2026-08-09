@@ -11511,6 +11511,28 @@ test("공식 source ingest adapter는 provenance 전용 source를 production row
   }
 });
 
+test("공식 source ingest adapter는 tracked production input의 OD fare와 ITX route artifact evidence를 결정적으로 보존한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-retained-evidence-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  const generated = await importOfficialSourceInput(outputDir, input);
+
+  assert.deepEqual(generated.packs[0].officialOdFareQuotes, input.officialOdFareQuotes);
+  assert.deepEqual(generated.packs[0].routeServiceArtifactEvidence, input.routeServiceArtifactEvidence);
+  assert.equal(generated.packs[0].officialOdFareQuotes.length, 2);
+  assert.equal(generated.packs[0].routeServiceArtifactEvidence.length, 1);
+});
+
+test("공식 source ingest adapter는 production timetable provenance snapshot이 selected source admission과 다르면 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-schedule-snapshot-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  input.scheduleProvenance.sourceSnapshotId = "kric-subway-timetable-wrong-snapshot";
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /scheduleProvenance.sourceSnapshotId must match selected source admission snapshot: kric-subway-timetable/,
+  );
+});
+
 test("공식 source ingest adapter는 selected source가 claim한 coverage evidence 누락을 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-coverage-evidence-claim-missing-${Date.now()}`);
   const input = productionSourceIngestInput();
@@ -11632,14 +11654,6 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
           sourceDomains: ["accessibility_facilities"],
         },
       },
-      {
-        id: "kric-station-elevator-movement",
-        coverageScope: generated.packs[0].sourceInventory[3].coverageScope,
-      },
-      {
-        id: "kric-wheelchair-lift-movement",
-        coverageScope: generated.packs[0].sourceInventory[3].coverageScope,
-      },
     ],
   );
   assert.deepEqual(JSON.parse(generated.packs[0].metadata.productionCoverageEvidence), [
@@ -11647,11 +11661,7 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
       regionId: "capital",
       operatorId: "seoul-metro",
       sourceDomain: "accessibility_facilities",
-      sourceIds: [
-        "kric-station-convenience-standard",
-        "kric-station-elevator-movement",
-        "kric-wheelchair-lift-movement",
-      ],
+      sourceIds: ["kric-station-convenience-standard"],
     },
     {
       regionId: "capital",
@@ -11670,6 +11680,7 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
     facilities: 6,
     station_facility_evidence: 6,
   });
+  assert.deepEqual(generated.packs[0].movementPathCandidates, []);
   assert.deepEqual(
     generated.packs[0].stationFacilityEvidence.map(({ stationId, lineId, facilityType, evidenceKind }) => ({
       stationId,
@@ -15378,8 +15389,6 @@ function productionSourceIngestInput() {
     "molit-urban-rail-full-route",
     "seoulmetro-station-line-info",
     "kric-station-convenience-standard",
-    "kric-station-elevator-movement",
-    "kric-wheelchair-lift-movement",
   ];
   input.supportedV1Scope = {
     scopeId: "capital_pilot_android_v1",
@@ -15499,41 +15508,7 @@ function productionSourceIngestInput() {
     evidenceHash: sha256(`evidence:${id}:${sourceId}:2026-06-22T00:00:00.000Z`),
     confidence: 80,
   }));
-  input.movementPathCandidates = [
-    {
-      sourceId: "kric-station-elevator-movement",
-      id: "movement-sangnoksu-elevator-kric-1",
-      station: {
-        sourceId: "molit-urban-rail-full-route",
-        sourceStationCode: "MOLIT-SEOUL-4-448",
-        lineId: "seoul-4",
-      },
-      facilityType: "ELEVATOR",
-      fromLabel: "출입구",
-      toLabel: "승강장",
-      movementOrder: 1,
-      instruction: "KRIC 엘리베이터 이동동선 후보",
-    },
-    {
-      sourceId: "kric-wheelchair-lift-movement",
-      id: "movement-sangnoksu-wheelchair-lift-kric-1",
-      station: {
-        sourceId: "molit-urban-rail-full-route",
-        sourceStationCode: "MOLIT-SEOUL-4-448",
-        lineId: "seoul-4",
-      },
-      facilityType: "WHEELCHAIR_LIFT",
-      fromLabel: "대합실",
-      toLabel: "승강장",
-      movementOrder: 2,
-      instruction: "KRIC 휠체어리프트 이동동선 후보",
-    },
-  ].map((row) => ({
-    ...row,
-    sourceSnapshotId: `${row.sourceId}-snapshot-20260622`,
-    providerRecordHash: sha256(`provider:${row.id}:${row.sourceId}`),
-    evidenceHash: sha256(`evidence:${row.id}:${row.sourceId}:2026-06-22T00:00:00.000Z`),
-  }));
+  input.movementPathCandidates = [];
   input.minimumProductionCoverage = {
     stations: 2,
     stationLines: 2,
@@ -15578,12 +15553,8 @@ function productionSourceIngestInput() {
       regionId: "capital",
       operatorId: "seoul-metro",
       sourceDomain: "accessibility_facilities",
-      sourceIds: [
-        "kric-station-convenience-standard",
-        "kric-station-elevator-movement",
-        "kric-wheelchair-lift-movement",
-      ],
-      evidence: "국가철도공단 접근성 시설 위치와 이동동선 source inventory coverageScope",
+      sourceIds: ["kric-station-convenience-standard"],
+      evidence: "국가철도공단 접근성 시설 위치 source inventory coverageScope",
     },
   ];
   return input;
@@ -16106,11 +16077,11 @@ function makeProductionSourceFixtureStrictCoverageValid(fixture) {
   const pack = fixture.packs[0];
   for (const edge of pack.networkEdges.filter((row) => ["ENTRY", "EXIT"].includes(row.edgeType))) {
     edge.accessibilityStatus = "AVAILABLE";
-    edge.sourceId = "kric-station-elevator-movement";
-    edge.sourceSnapshotId = "kric-station-elevator-movement-snapshot-20260622";
-    edge.providerRecordHash = sha256(`provider:${edge.id}:kric-station-elevator-movement`);
-    edge.evidenceHash = sha256(`evidence:${edge.id}:kric-station-elevator-movement:2026-06-22T00:00:00.000Z`);
-    edge.lastVerifiedAt = "2026-06-22T00:00:00.000Z";
+    edge.sourceId = "kric-station-convenience-standard";
+    edge.sourceSnapshotId = "kric-station-convenience-standard-20260728T184503338Z";
+    edge.providerRecordHash = sha256(`provider:${edge.id}:kric-station-convenience-standard`);
+    edge.evidenceHash = sha256(`evidence:${edge.id}:kric-station-convenience-standard:2026-07-28T18:45:03.338Z`);
+    edge.lastVerifiedAt = "2026-07-28T18:45:03.338Z";
   }
   for (const evidence of pack.stationFacilityEvidence) {
     evidence.operationalStatus = "AVAILABLE";
@@ -16119,9 +16090,9 @@ function makeProductionSourceFixtureStrictCoverageValid(fixture) {
     evidence.strictRouteEligibleReason = "FACILITY_OPERATION_VERIFIED";
   }
   addApprovedMovementPathwayEvidence(pack, {
-    sourceId: "kric-station-elevator-movement",
-    sourceSnapshotId: "kric-station-elevator-movement-snapshot-20260622",
-    verifiedAt: "2026-06-22T00:00:00.000Z",
+    sourceId: "kric-station-convenience-standard",
+    sourceSnapshotId: "kric-station-convenience-standard-20260728T184503338Z",
+    verifiedAt: "2026-07-28T18:45:03.338Z",
   });
 }
 

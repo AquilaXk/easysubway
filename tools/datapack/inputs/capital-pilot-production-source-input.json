@@ -22,11 +22,10 @@
     "molit-urban-rail-full-route",
     "seoulmetro-station-line-info",
     "seoulmetro-cyberstation-route-map",
-    "kric-station-elevator-movement",
-    "kric-wheelchair-lift-movement",
     "kric-subway-timetable",
     "seoul-metro-accessibility",
-    "kric-station-convenience-standard"
+    "kric-station-convenience-standard",
+    "seoul-metro-official-od-fares"
   ],
   "supportedV1Scope": {
     "scopeId": "capital_pilot_android_v1",
@@ -85,11 +84,9 @@
       "sourceDomain": "accessibility_facilities",
       "sourceIds": [
         "kric-station-convenience-standard",
-        "kric-station-elevator-movement",
-        "kric-wheelchair-lift-movement",
         "seoul-metro-accessibility"
       ],
-      "evidence": "국가철도공단 접근성 시설 위치와 이동동선 source inventory coverageScope"
+      "evidence": "국가철도공단 접근성 시설 위치와 서울교통공사 운행상황 source inventory coverageScope"
     },
     {
       "regionId": "capital",
@@ -99,6 +96,15 @@
         "kric-subway-timetable"
       ],
       "evidence": "KRIC subwayTimetableExp 4호선 상록수-사당 pilot 수집 및 trip/stop sequence 재구성 evidence"
+    },
+    {
+      "regionId": "capital",
+      "operatorId": "seoul-metro",
+      "sourceDomain": "official_od_fares",
+      "sourceIds": [
+        "seoul-metro-official-od-fares"
+      ],
+      "evidence": "상록수-사당 양방향 승인 공식 OD 운임 snapshot"
     }
   ],
   "retiredStationIds": [
@@ -699,42 +705,49 @@
       "note": "서울교통공사 전체 승강기 운행상황 snapshot 실측."
     }
   ],
-  "movementPathCandidates": [
+  "officialOdFareQuotes": [
     {
-      "sourceId": "kric-station-elevator-movement",
-      "id": "movement-sangnoksu-elevator-kric-1",
-      "station": {
-        "sourceId": "molit-urban-rail-full-route",
-        "sourceStationCode": "MOLIT-SEOUL-4-448",
-        "lineId": "seoul-4"
-      },
-      "facilityType": "ELEVATOR",
-      "sourceSnapshotId": "kric-station-elevator-movement-snapshot-20260622",
-      "providerRecordHash": "425dd4503d963c2954792cbfe7946a4932899873bcfeda20b4ab8309ffbe1b12",
-      "evidenceHash": "51b4ac1b21da7a911bc49e64d7b32f26dbc86dc8ec47e3a9880786277ce9e31c",
-      "fromLabel": "출입구",
-      "toLabel": "승강장",
-      "movementOrder": 1,
-      "instruction": "KRIC 엘리베이터 이동동선 후보이며 검수 전 route edge로 승격하지 않습니다."
+      "originStationId": "station-sangnoksu",
+      "destinationStationId": "station-sadang",
+      "sourceId": "seoul-metro-official-od-fares",
+      "snapshotId": "seoul-metro-official-od-fares-20260712",
+      "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
+      "gnrlCardFare": 1950,
+      "gnrlCashFare": 2050,
+      "yungCardFare": 1220,
+      "yungCashFare": 2050,
+      "childCardFare": 750,
+      "childCashFare": 750
     },
     {
-      "sourceId": "kric-wheelchair-lift-movement",
-      "id": "movement-sangnoksu-wheelchair-lift-kric-1",
-      "station": {
-        "sourceId": "molit-urban-rail-full-route",
-        "sourceStationCode": "MOLIT-SEOUL-4-448",
-        "lineId": "seoul-4"
-      },
-      "facilityType": "WHEELCHAIR_LIFT",
-      "sourceSnapshotId": "kric-wheelchair-lift-movement-snapshot-20260622",
-      "providerRecordHash": "2991c4a0ad58d6c1b035028e6747e05a4ab8af3f3c5cd3a644f9e3a64e144d67",
-      "evidenceHash": "368d8d883e75d402355e29c26154869b5ae0434db9ba6cbe0020193c7e4af2b3",
-      "fromLabel": "대합실",
-      "toLabel": "승강장",
-      "movementOrder": 2,
-      "instruction": "KRIC 휠체어리프트 이동동선 후보이며 검수 전 route edge로 승격하지 않습니다."
+      "originStationId": "station-sadang",
+      "destinationStationId": "station-sangnoksu",
+      "sourceId": "seoul-metro-official-od-fares",
+      "snapshotId": "seoul-metro-official-od-fares-20260712",
+      "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
+      "gnrlCardFare": 1950,
+      "gnrlCashFare": 2050,
+      "yungCardFare": 1220,
+      "yungCashFare": 2050,
+      "childCardFare": 750,
+      "childCashFare": 750
     }
   ],
+  "routeServiceArtifactEvidence": [
+    {
+      "serviceClass": "ITX_CHEONGCHUN",
+      "timetableArtifactId": "itx-cheongchun-completeness-admission-20260714T083544292Z",
+      "timetableArtifactSha256": "347aec507ec951dde65c10a1c4bff9f94454f762d76a5a74064a40662008336c",
+      "canonicalPackId": "capital",
+      "canonicalPackSha256": "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9",
+      "canonicalPackSqliteSha256": "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03",
+      "admissionStatus": "MISSING",
+      "admissionEligible": false,
+      "freshUntil": "2026-07-20T00:00:00.000Z",
+      "sourceIssue": 2116
+    }
+  ],
+  "movementPathCandidates": [],
   "representativeRouteRegressions": [],
   "scheduleProvenance": {
     "sourceId": "kric-subway-timetable",

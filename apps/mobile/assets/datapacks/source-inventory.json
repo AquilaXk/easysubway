@@ -4440,7 +4440,8 @@
           "accessibility_facilities"
         ]
       },
-      "requiredForProductionPack": true,
+      "requiredForProductionPack": false,
+      "productionUseAllowed": false,
       "updateFrequency": "realtime",
       "observedDataUpdatedAt": "2026-06-22",
       "retrievedAt": "2026-06-22",
@@ -4482,7 +4483,7 @@
         },
         "facility": {
           "status": "SUPPORTED",
-          "productionUseAllowed": true,
+          "productionUseAllowed": false,
           "coverageStatus": "SOURCE_INVENTORY_COVERED",
           "updateFrequency": "realtime",
           "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"
@@ -6001,7 +6002,8 @@
           "accessibility_facilities"
         ]
       },
-      "requiredForProductionPack": true,
+      "requiredForProductionPack": false,
+      "productionUseAllowed": false,
       "updateFrequency": "realtime",
       "observedDataUpdatedAt": "2026-06-22",
       "retrievedAt": "2026-06-22",
@@ -6043,7 +6045,7 @@
         },
         "facility": {
           "status": "SUPPORTED",
-          "productionUseAllowed": true,
+          "productionUseAllowed": false,
           "coverageStatus": "SOURCE_INVENTORY_COVERED",
           "updateFrequency": "realtime",
           "unsupportedNotes": "production use is limited to official accessibility facility evidence and listed coverageScope regions/operators"

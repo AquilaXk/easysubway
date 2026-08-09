@@ -9,7 +9,7 @@
   "networkEdgeEvidence": {
     "sourceInventory": {
       "path": "tools/datapack/source-inventory.json",
-      "sha256": "69cdbd88a169d77ef4941d197c5bae5a0ab26999418ce513778903abbe7d70d2"
+      "sha256": "1eb2f5673ab23aaff955a5c7f978e229d17ef9a7d2b67d4e5f65920f4dce5424"
     },
     "capitalTopology": {
       "path": "tools/datapack/sources/capital-route-topology-20260724.json",
@@ -35,9 +35,6 @@
   "sourceSnapshotIds": [
     "molit-urban-rail-full-route-capital-admission-20260712",
     "seoulmetro-station-line-info-capital-admission-20260712",
-    "seoulmetro-cyberstation-route-map-capital-admission-20260712",
-    "kric-station-elevator-movement-capital-admission-20260712",
-    "kric-wheelchair-lift-movement-capital-admission-20260712",
     "kric-subway-timetable-line4-pilot-20260709",
     "seoul-metro-accessibility-20260728",
     "kric-station-convenience-standard-20260728T184503338Z"
@@ -73,57 +70,6 @@
       "snapshotStatus": "LOCKED",
       "credentialRedacted": true,
       "freshnessExpiresAt": "2026-08-11T00:00:00.000Z",
-      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
-      "governancePolicyVersion": "2026-07-15",
-      "governancePolicySha256": "96fb678f2ec5da7f555d81d9d2009ac838e6145cc48ed2ae4757bce42c90ef70"
-    },
-    {
-      "snapshotId": "seoulmetro-cyberstation-route-map-capital-admission-20260712",
-      "sourceId": "seoulmetro-cyberstation-route-map",
-      "rawObjectUri": "s3://easysubway-datapack-sources/seoulmetro-cyberstation-route-map/20260712.json",
-      "rawSha256": "ce6499be2b634fad8f0cd0d2f1edf074ed0452de897f9460e3472850d4ba91ba",
-      "redactedRequestFingerprint": "65aa48cbac712c535244716d5cd8b5457ec884f810e2696071d78ad09dd93f86",
-      "schemaFingerprint": "3ef53470a34e1d44db931b0bc2b7ac333fb2640f3e297902c4ee554688ef9052",
-      "licenseStatus": "PASS",
-      "redistributionAllowed": true,
-      "adminReviewRecordHash": "4ea77265d144baa6b06e8f10152743420006f7581b24ffd68b21367341aa1b6c",
-      "snapshotStatus": "LOCKED",
-      "credentialRedacted": true,
-      "freshnessExpiresAt": "2027-07-12T00:00:00.000Z",
-      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
-      "governancePolicyVersion": "2026-07-15",
-      "governancePolicySha256": "96fb678f2ec5da7f555d81d9d2009ac838e6145cc48ed2ae4757bce42c90ef70"
-    },
-    {
-      "snapshotId": "kric-station-elevator-movement-capital-admission-20260712",
-      "sourceId": "kric-station-elevator-movement",
-      "rawObjectUri": "s3://easysubway-datapack-sources/kric-station-elevator-movement/20260712.json",
-      "rawSha256": "cb4549da44ccd3cd0719bb419190b94414616e3b7dcef0e6e4bb152a9fa9a616",
-      "redactedRequestFingerprint": "ccc9a5c3b1f1e84333c094886f84a568acf5c40dbcad03e41b4822261a62416e",
-      "schemaFingerprint": "d5946746d486d093a2338fe5f1ddc20f7d9cdac689a81d5ff4c070b6be9b1e9c",
-      "licenseStatus": "PASS",
-      "redistributionAllowed": true,
-      "adminReviewRecordHash": "045aad6dd616b4c408ba3addbfd208adcb5c7ffd92dacd1cf1ccbb2d362da6c0",
-      "snapshotStatus": "LOCKED",
-      "credentialRedacted": true,
-      "freshnessExpiresAt": "2026-10-10T00:00:00.000Z",
-      "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
-      "governancePolicyVersion": "2026-07-15",
-      "governancePolicySha256": "96fb678f2ec5da7f555d81d9d2009ac838e6145cc48ed2ae4757bce42c90ef70"
-    },
-    {
-      "snapshotId": "kric-wheelchair-lift-movement-capital-admission-20260712",
-      "sourceId": "kric-wheelchair-lift-movement",
-      "rawObjectUri": "s3://easysubway-datapack-sources/kric-wheelchair-lift-movement/20260712.json",
-      "rawSha256": "3eeffa8386368a74b066868efdbbd2b8adc9a36a28106ce8135a4a98998721e0",
-      "redactedRequestFingerprint": "3315b6be8ea37bb66f44d7a2ce9f368187d5e907fa18f89b0a5d9a810b71dfd8",
-      "schemaFingerprint": "d5946746d486d093a2338fe5f1ddc20f7d9cdac689a81d5ff4c070b6be9b1e9c",
-      "licenseStatus": "PASS",
-      "redistributionAllowed": true,
-      "adminReviewRecordHash": "8309bcbe21eb1f153db99f33ad4c332c1475e23a0ff0dcfda89044efa87701ba",
-      "snapshotStatus": "LOCKED",
-      "credentialRedacted": true,
-      "freshnessExpiresAt": "2026-10-10T00:00:00.000Z",
       "rawRetentionExpiresAt": "2026-10-10T00:00:00.000Z",
       "governancePolicyVersion": "2026-07-15",
       "governancePolicySha256": "96fb678f2ec5da7f555d81d9d2009ac838e6145cc48ed2ae4757bce42c90ef70"
@@ -180,12 +126,12 @@
       "governancePolicySha256": "96fb678f2ec5da7f555d81d9d2009ac838e6145cc48ed2ae4757bce42c90ef70"
     }
   ],
-  "sourceSnapshotSetHash": "cd85827d6f90e7084f76ac63e376758eb72dd76f3247f46d5b9c77ec267f498e",
+  "sourceSnapshotSetHash": "c109f97040ff1a5d7ff04c4082264d7faeddf0d1c391d3e49744378d43ac72f5",
   "approvedAliasLedgerHash": "9a74e31d64e53f38ab575d6a7731f72138523dd34f1f6756dbed8573e3bdeabc",
   "facilityEvidenceLedgerHash": "b3ffc88b4a9ce3515340366885beaace718c70058608567513f378e198935981",
   "routeEvidenceLedgerHash": "da884d0ff0138e009587753ec541997c29da57370e056dd8d3f6ad2687ad9fa9",
   "approvedOverrideSetHash": "ee5364319442d0bb4590d83e149631635c65ab59f1f3254fdbf196e04ec0f3cd",
-  "sourceInventorySha256": "892d051d61f629ca9c4938303b81c79eefd1e696de41db34c0d3098d57e9dd24",
+  "sourceInventorySha256": "6f757efd9a0141fe9b8798cb5c95aef3c2542f077e706abd8f8817ceef7ea13e",
   "builderGitSha": "6492e35ba435925a219b0de232f977395344afe6",
   "builderVersion": "build-datapack.mjs@23",
   "officialOdFareEvidence": {
