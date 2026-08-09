@@ -40,7 +40,7 @@ export function validateReceipt(receipt, expected, errors = []) {
   if (!canonicalUtc(receipt?.observedAt)) errors.push("RECEIPT_INVALID_TIME");
   for (const artifact of receipt?.publicArtifacts ?? []) {
     const identity = artifactIdentity(artifact);
-    if (identity <= previous || !safeArtifactFields(artifact) || artifact?.detectorPolicyVersion !== expected.detectorPolicyVersion || !canonicalUtc(artifact?.expiresAt) || artifact.expiresAt <= expected.observedAt || !safeArtifactLocator(receipt?.repository, artifact)) errors.push("RECEIPT_ARTIFACT_INVALID");
+    if (identity <= previous || !safeArtifactFields(artifact) || artifact?.detectorPolicyVersion !== expected.detectorPolicyVersion || !canonicalUtc(artifact?.createdAt) || !canonicalUtc(artifact?.expiresAt) || instant(artifact.createdAt) > instant(expected.observedAt) || instant(expected.observedAt) >= instant(artifact.expiresAt) || !safeArtifactLocator(receipt?.repository, artifact)) errors.push("RECEIPT_ARTIFACT_INVALID");
     previous = identity;
   }
   if (!Array.isArray(receipt?.publicArtifacts)) errors.push("RECEIPT_ARTIFACTS_MISSING");
@@ -117,9 +117,9 @@ export async function auditPublicSensitivity({ scope, receipts, observedAt, exec
   for (const receipt of Array.isArray(receipts) ? receipts : []) { if (receiptMap.has(receipt?.repository)) incomplete.push(incompleteEntry("receipt", "DUPLICATE_RECEIPT", receipt?.repository ?? "unknown")); receiptMap.set(receipt?.repository, receipt); }
   if (receiptMap.size !== REPOSITORIES.length) incomplete.push(incompleteEntry("receipt", "RECEIPT_SET_INCOMPLETE", "five-repositories"));
   for (const repository of REPOSITORIES) {
-    let first; let last; let metadata = { items: [], incomplete: [] };
+    let first; let last; let metadata = { items: [], incomplete: [] }; let artifactBegin = { catalog: [], watermark: digestBytes(""), incomplete: [] }; let artifactEnd = artifactBegin;
     let finalMetadata;
-    try { first = await repositoryIdentity(repository, execGh); metadata = await collectPublicMetadata({ repository, execGh }); last = await repositoryIdentity(repository, execGh); finalMetadata = await collectPublicMetadata({ repository, execGh }); } catch { incomplete.push(incompleteEntry("provider", "PROVIDER_UNAVAILABLE", repository)); continue; }
+    try { first = await repositoryIdentity(repository, execGh); artifactBegin = await collectArtifactCatalog({ repository, execGh }); metadata = await collectPublicMetadata({ repository, execGh }); last = await repositoryIdentity(repository, execGh); finalMetadata = await collectPublicMetadata({ repository, execGh }); } catch { incomplete.push(incompleteEntry("provider", "PROVIDER_UNAVAILABLE", repository)); continue; }
     const receipt = receiptMap.get(repository); const receiptErrors = validateReceipt(receipt, { repository, gitSha: first.gitSha, observedAt, detectorPolicyVersion: scope?.detectorPolicyVersion });
     if (receiptErrors.length) incomplete.push(incompleteEntry("receipt", "INVALID_RECEIPT", repository));
     if (receipt != null) {
@@ -128,15 +128,18 @@ export async function auditPublicSensitivity({ scope, receipts, observedAt, exec
     }
     const beginDigest = metadataDigest(metadata.items); const endDigest = metadataDigest(finalMetadata.items);
     if (first.gitSha !== last.gitSha || first.defaultBranch !== last.defaultBranch || beginDigest !== endDigest) incomplete.push(incompleteEntry("watermark", "WATERMARK_DRIFT", repository));
-    incomplete.push(...metadata.incomplete, ...finalMetadata.incomplete);
+    incomplete.push(...metadata.incomplete, ...finalMetadata.incomplete, ...artifactBegin.incomplete);
     for (const item of metadata.items) { scannedSurfaces += 1; candidates.push(...detect(item.text, item, scope)); }
     const evidence = await collectEvidenceBlobs({ repository, gitSha: first.gitSha, paths: scope?.repositories?.find((entry) => entry?.repository === repository)?.publicEvidencePaths ?? [], execGh });
     incomplete.push(...evidence.incomplete);
     for (const item of evidence.items) { scannedArtifacts += 1; candidates.push(...detect(item.text, item, scope)); }
-    const artifacts = await collectActionsArtifacts({ repository, execGh, receiptArtifacts: receipt?.publicArtifacts ?? [], observedAt, detectorPolicyVersion: scope?.detectorPolicyVersion });
+    const artifacts = await collectActionsArtifacts({ repository, execGh, catalog: artifactBegin.catalog, receiptArtifacts: receipt?.publicArtifacts ?? [], receiptEvidenceLocator: receipt?.evidenceLocator, observedAt, detectorPolicyVersion: scope?.detectorPolicyVersion });
     incomplete.push(...artifacts.incomplete);
     scannedArtifacts += artifacts.scannedArtifacts; candidates.push(...artifacts.findings);
-    inputs.push({ repository, defaultBranch: first.defaultBranch, gitSha: first.gitSha, beginWatermark: beginDigest, endWatermark: endDigest, receiptLocator: safeLocatorForRepository(receipt?.evidenceLocator, repository) ? receipt.evidenceLocator : safeReceiptLocator(repository) });
+    artifactEnd = await collectArtifactCatalog({ repository, execGh });
+    if (artifactBegin.watermark !== artifactEnd.watermark) incomplete.push(incompleteEntry("artifacts", "ARTIFACT_WATERMARK_DRIFT", repository));
+    incomplete.push(...artifactEnd.incomplete);
+    inputs.push({ repository, defaultBranch: first.defaultBranch, gitSha: first.gitSha, beginWatermark: beginDigest, endWatermark: endDigest, artifactBeginWatermark: artifactBegin.watermark, artifactEndWatermark: artifactEnd.watermark, receiptLocator: safeLocatorForRepository(receipt?.evidenceLocator, repository) ? receipt.evidenceLocator : safeReceiptLocator(repository) });
   }
   const dispositionKeys = new Set(candidates.map((item) => `${item.locationFingerprint}\u0000${item.detectorId}`));
   const observed = instant(observedAt);
@@ -169,27 +172,40 @@ async function collectEvidenceBlobs({ repository, gitSha, paths, execGh }) {
   return { items, incomplete };
 }
 
-export async function collectActionsArtifacts({ repository, execGh, receiptArtifacts, observedAt, detectorPolicyVersion }) {
-  const incomplete = []; const findings = []; let scannedArtifacts = 0;
+export async function collectArtifactCatalog({ repository, execGh }) {
   try {
     const catalog = []; const ids = new Set(); let expectedTotal = null; let page = 1;
     while (page <= PAGE_LIMIT) {
       const response = await execGh({ method: "GET", endpoint: `repos/${repository}/actions/artifacts?per_page=100&page=${page}` });
-      if (!Array.isArray(response?.artifacts) || !Number.isInteger(response?.total_count) || response.total_count < 0 || (expectedTotal != null && expectedTotal !== response.total_count)) return { findings, scannedArtifacts, incomplete: [incompleteEntry("artifacts", "ARTIFACT_CATALOG_INCOMPLETE", repository)] };
+      if (!Array.isArray(response?.artifacts) || !Number.isInteger(response?.total_count) || response.total_count < 0 || (expectedTotal != null && expectedTotal !== response.total_count)) return invalidArtifactCatalog(repository);
       expectedTotal ??= response.total_count;
-      for (const artifact of response.artifacts) { if (!Number.isInteger(artifact?.id) || ids.has(artifact.id)) return { findings, scannedArtifacts, incomplete: [incompleteEntry("artifacts", "ARTIFACT_CATALOG_INCOMPLETE", repository)] }; ids.add(artifact.id); catalog.push(artifact); }
+      for (const raw of response.artifacts) {
+        const artifact = normalizeCatalogArtifact(raw);
+        if (artifact == null || ids.has(artifact.id)) return invalidArtifactCatalog(repository);
+        ids.add(artifact.id); catalog.push(artifact);
+      }
       if (catalog.length === expectedTotal) break;
-      if (response.artifacts.length < 100 || catalog.length > expectedTotal) return { findings, scannedArtifacts, incomplete: [incompleteEntry("artifacts", "ARTIFACT_CATALOG_INCOMPLETE", repository)] };
+      if (response.artifacts.length < 100 || catalog.length > expectedTotal) return invalidArtifactCatalog(repository);
       page += 1;
     }
-    if (page > PAGE_LIMIT || catalog.length !== expectedTotal) return { findings, scannedArtifacts, incomplete: [incompleteEntry("artifacts", "ARTIFACT_CATALOG_INCOMPLETE", repository)] };
-    if (catalog.some((artifact) => typeof artifact?.expired !== "boolean")) incomplete.push(incompleteEntry("artifacts", "ARTIFACT_CATALOG_INCOMPLETE", repository));
-    const current = catalog.filter((artifact) => artifact?.expired === false);
-    if (current.length !== receiptArtifacts.length || JSON.stringify(current.map((artifact) => String(artifact.id)).sort()) !== JSON.stringify(receiptArtifacts.map((artifact) => artifact.artifactId).sort())) incomplete.push(incompleteEntry("artifacts", "ARTIFACT_CATALOG_MISMATCH", repository));
+    if (page > PAGE_LIMIT || catalog.length !== expectedTotal) return invalidArtifactCatalog(repository);
+    return { catalog, watermark: artifactCatalogWatermark(catalog), incomplete: [] };
+  } catch { return invalidArtifactCatalog(repository); }
+}
+
+export async function collectActionsArtifacts({ repository, execGh, catalog: suppliedCatalog, receiptArtifacts, receiptEvidenceLocator, observedAt, detectorPolicyVersion }) {
+  const incomplete = []; const findings = []; let scannedArtifacts = 0;
+  try {
+    const collected = suppliedCatalog == null ? await collectArtifactCatalog({ repository, execGh }) : { catalog: suppliedCatalog, incomplete: [] };
+    if (collected.incomplete.length) return { findings, scannedArtifacts, incomplete: collected.incomplete };
+    const catalog = collected.catalog;
+    const eligible = catalog.filter((artifact) => artifact.expired === false && instant(artifact.createdAt) <= instant(observedAt));
+    if (!validReceiptTransport({ catalog, repository, receiptEvidenceLocator, observedAt })) incomplete.push(incompleteEntry("artifacts", "ARTIFACT_TRANSPORT_INVALID", repository));
+    if (eligible.length !== receiptArtifacts.length || JSON.stringify(eligible.map((artifact) => String(artifact.id)).sort()) !== JSON.stringify(receiptArtifacts.map((artifact) => artifact.artifactId).sort())) incomplete.push(incompleteEntry("artifacts", "ARTIFACT_CATALOG_MISMATCH", repository));
     const runs = new Map();
-    for (const artifact of current) {
+    for (const artifact of eligible) {
       const receipt = receiptArtifacts.find((entry) => entry.artifactId === String(artifact.id));
-      if (receipt == null || receipt.detectorPolicyVersion !== detectorPolicyVersion || receipt.scanStatus !== "COMPLETE" || receipt.expiresAt <= observedAt || receipt.expiresAt !== artifact.expires_at) { incomplete.push(incompleteEntry("artifacts", "ARTIFACT_CATALOG_MISMATCH", repository)); continue; }
+      if (!validReceiptArtifact({ receipt, artifact, observedAt, detectorPolicyVersion })) { incomplete.push(incompleteEntry("artifacts", "ARTIFACT_CATALOG_MISMATCH", repository)); continue; }
       const runId = artifact.workflow_run?.id; let run = runs.get(runId);
       if (run == null) { run = await execGh({ method: "GET", endpoint: `repos/${repository}/actions/runs/${runId}` }); runs.set(runId, run); }
       if (receipt.workflowPath !== run?.path || receipt.runId !== String(artifact.workflow_run?.id) || receipt.artifactName !== artifact.name || receipt.archiveDigest !== artifact.digest) { incomplete.push(incompleteEntry("artifacts", "ARTIFACT_CATALOG_MISMATCH", repository)); continue; }
@@ -246,7 +262,7 @@ export function validateReport(report, errors = []) {
   if (!canonicalUtc(report?.observedAt) || !["COMPLETE", "AUDIT_INCOMPLETE"].includes(report?.status)) errors.push("INVALID_REPORT_STATUS");
   if (![report?.inputs?.policyDigest, report?.inputs?.schemaDigest, report?.inputs?.runnerDigest].every((value) => /^[0-9a-f]{64}$/.test(value ?? ""))
     || JSON.stringify(repositories.map(({ repository }) => repository)) !== JSON.stringify(REPOSITORIES)
-    || repositories.some((entry) => !safeBranch(entry?.defaultBranch) || !validSha(entry?.gitSha) || !/^[0-9a-f]{64}$/.test(entry?.beginWatermark) || !/^[0-9a-f]{64}$/.test(entry?.endWatermark) || !safeLocatorForRepository(entry?.receiptLocator, entry?.repository))) errors.push("INVALID_REPORT_INPUTS");
+    || repositories.some((entry) => !safeBranch(entry?.defaultBranch) || !validSha(entry?.gitSha) || !/^[0-9a-f]{64}$/.test(entry?.beginWatermark) || !/^[0-9a-f]{64}$/.test(entry?.endWatermark) || !/^[0-9a-f]{64}$/.test(entry?.artifactBeginWatermark) || !/^[0-9a-f]{64}$/.test(entry?.artifactEndWatermark) || !safeLocatorForRepository(entry?.receiptLocator, entry?.repository))) errors.push("INVALID_REPORT_INPUTS");
   if ((report?.status === "COMPLETE") !== (incomplete.length === 0)) errors.push("STATUS_INCOMPLETE_PARITY");
   const summaryValues = [report?.summary?.findings, report?.summary?.incomplete, report?.summary?.detectors, report?.summary?.scannedSurfaces, report?.summary?.scannedArtifacts];
   if (!summaryValues.every((value) => Number.isInteger(value) && value >= 0) || report?.summary?.detectors !== DETECTORS.length || report?.summary?.findings !== findings.length || report?.summary?.incomplete !== incomplete.length) errors.push("SUMMARY_MISMATCH");
@@ -266,7 +282,23 @@ function publicItem({ repository, surface, id, revision = null, text }) { return
 function metadataDigest(items) { return digestBytes(JSON.stringify([...items.map(({ repository, surface, immutableSourceIdentity, text }) => ({ repository, surface, immutableSourceIdentity, contentDigest: digestBytes(text) }))].sort((left, right) => codepointCompare(JSON.stringify(left), JSON.stringify(right))))); }
 function unpackPage(response) { if (Array.isArray(response)) return { body: response, next: false, expectedCount: null }; if (!response || !Array.isArray(response.body)) return null; return { body: response.body, next: response.next === true, expectedCount: response.totalCount ?? null }; }
 function disposed(finding, entries, observedAt) { const observed = instant(observedAt); return entries.some((entry) => { const verified = instant(entry.verifiedAt); const expires = instant(entry.expiresAt); return entry.locationFingerprint === finding.locationFingerprint && entry.detectorId === finding.detectorId && observed != null && verified != null && expires != null && verified <= observed && expires > observed; }); }
-function artifactIdentity(item) { return [item?.artifactId, item?.artifactName, item?.workflowPath, item?.runId, item?.archiveDigest, item?.expiresAt, item?.detectorPolicyVersion, item?.scanStatus, item?.scanReceiptLocator].join("\u0000"); }
+function artifactIdentity(item) { return [item?.artifactId, item?.artifactName, item?.workflowPath, item?.runId, item?.archiveDigest, item?.createdAt, item?.expiresAt, item?.detectorPolicyVersion, item?.scanStatus, item?.scanReceiptLocator].join("\u0000"); }
+function invalidArtifactCatalog(repository) { return { catalog: [], watermark: digestBytes(""), incomplete: [incompleteEntry("artifacts", "ARTIFACT_CATALOG_INCOMPLETE", repository)] }; }
+function normalizeCatalogArtifact(raw) {
+  const createdAt = normalizeTimestamp(raw?.created_at); const expiresAt = normalizeTimestamp(raw?.expires_at);
+  if (!Number.isSafeInteger(raw?.id) || raw.id < 0 || typeof raw?.expired !== "boolean" || createdAt == null || expiresAt == null || instant(expiresAt) <= instant(createdAt) || !/^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$/.test(raw?.name ?? "") || !Number.isSafeInteger(raw?.workflow_run?.id) || raw.workflow_run.id < 0 || !/^sha256:[0-9a-f]{64}$/.test(raw?.digest ?? "")) return null;
+  return { id: raw.id, expired: raw.expired, createdAt, expiresAt, name: raw.name, digest: raw.digest, workflow_run: { id: raw.workflow_run.id } };
+}
+function artifactCatalogWatermark(catalog) { return digestBytes(JSON.stringify([...catalog].sort((left, right) => left.id - right.id).map(({ id, createdAt, expiresAt, expired, digest, name, workflow_run }) => ({ id, createdAt, expiresAt, expired, digest, name, workflowRunId: workflow_run.id })))); }
+function artifactLocator(repository, artifact) { return `https://github.com/${repository}/actions/runs/${artifact.workflow_run.id}/artifacts/${artifact.id}`; }
+function validReceiptTransport({ catalog, repository, receiptEvidenceLocator, observedAt }) {
+  if (receiptEvidenceLocator === undefined) return true;
+  const transport = catalog.find((artifact) => artifactLocator(repository, artifact) === receiptEvidenceLocator);
+  return transport?.expired === false && instant(transport.createdAt) > instant(observedAt);
+}
+function validReceiptArtifact({ receipt, artifact, observedAt, detectorPolicyVersion }) {
+  return receipt != null && receipt.detectorPolicyVersion === detectorPolicyVersion && receipt.scanStatus === "COMPLETE" && receipt.createdAt === artifact.createdAt && receipt.expiresAt === artifact.expiresAt && instant(receipt.createdAt) <= instant(observedAt) && instant(observedAt) < instant(receipt.expiresAt);
+}
 function incompleteEntry(stage, code, affectedIdentity) { return { stage, code, affectedIdentity: safeIdentity(affectedIdentity) ? affectedIdentity : "redacted" }; }
 function safeLocator(value) { return /^https:\/\/github\.com\/AquilaXk\/easysubway(?:-(?:backend|data|mobile|platform))?\/actions\/runs\/\d+\/artifacts\/\d+$/.test(value ?? ""); }
 function safeLocatorForRepository(value, repository) { return safeLocator(value) && value.startsWith(`https://github.com/${repository}/actions/runs/`); }
@@ -280,6 +312,15 @@ function safeBranch(value) { return typeof value === "string" && /^[A-Za-z0-9._/
 function safePathToken(value) { return typeof value === "string" && value.length > 0 && !isAbsolute(value) && !value.split(/[\\/]/).includes(".."); }
 function validSha(value) { return /^[0-9a-f]{40}$/.test(value ?? ""); }
 function canonicalUtc(value) { if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(value ?? "")) return false; try { return new Date(value).toISOString() === value; } catch { return false; } }
+function normalizeTimestamp(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/.exec(value ?? "");
+  if (match == null) return null;
+  const [year, month, day, hour, minute, second] = match.slice(1, 7).map(Number);
+  const offset = match[7]; const offsetHour = offset === "Z" ? 0 : Number(offset.slice(1, 3)); const offsetMinute = offset === "Z" ? 0 : Number(offset.slice(4, 6));
+  if (month < 1 || month > 12 || day < 1 || day > new Date(Date.UTC(year, month, 0)).getUTCDate() || hour > 23 || minute > 59 || second > 59 || offsetHour > 23 || offsetMinute > 59) return null;
+  const parsed = instant(value);
+  return parsed == null ? null : new Date(parsed).toISOString();
+}
 function instant(value) { if (typeof value !== "string") return null; const parsed = Date.parse(value); return Number.isFinite(parsed) ? parsed : null; }
 function digestBytes(value) { return createHash("sha256").update(value).digest("hex"); }
 function crc32(bytes) { let crc = 0xffffffff; for (const byte of bytes) { crc ^= byte; for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1)); } return (crc ^ 0xffffffff) >>> 0; }
@@ -350,7 +391,7 @@ export async function runAuditCli(args = process.argv.slice(2)) {
     return 2;
   }
 }
-function failureInputs(scopeText, schemaText, runnerText) { return { policyDigest: digestBytes(scopeText), schemaDigest: digestBytes(schemaText), runnerDigest: digestBytes(runnerText), repositories: REPOSITORIES.map((repository) => ({ repository, defaultBranch: "main", gitSha: "0".repeat(40), beginWatermark: "0".repeat(64), endWatermark: "0".repeat(64), receiptLocator: safeReceiptLocator(repository) })) }; }
+function failureInputs(scopeText, schemaText, runnerText) { return { policyDigest: digestBytes(scopeText), schemaDigest: digestBytes(schemaText), runnerDigest: digestBytes(runnerText), repositories: REPOSITORIES.map((repository) => ({ repository, defaultBranch: "main", gitSha: "0".repeat(40), beginWatermark: "0".repeat(64), endWatermark: "0".repeat(64), artifactBeginWatermark: "0".repeat(64), artifactEndWatermark: "0".repeat(64), receiptLocator: safeReceiptLocator(repository) })) }; }
 function parseArgs(args) { if (args.length !== 10 || args[0] !== "--scope" || args[2] !== "--owner-receipts" || args[4] !== "--observed-at" || args[6] !== "--repository-root" || args[8] !== "--output" || !canonicalUtc(args[5])) throw new Error("invalid arguments"); return { scope: args[1], receipts: args[3], observedAt: args[5], root: args[7], output: args[9] }; }
 async function containedPath(root, candidate, output = false) { if (!safePathToken(candidate)) throw new Error("unsafe path"); const path = resolve(root, candidate); if (relative(root, path).startsWith("..")) throw new Error("unsafe path"); const boundary = output ? dirname(path) : path; const real = await realpath(boundary); if (real !== root && !real.startsWith(`${root}/`)) throw new Error("unsafe path"); const parts = relative(root, boundary).split("/").filter(Boolean); let cursor = root; for (const part of parts) { cursor = resolve(cursor, part); if ((await lstat(cursor)).isSymbolicLink()) throw new Error("unsafe path"); } if (!output && (await lstat(path)).isSymbolicLink()) throw new Error("unsafe path"); return path; }
 if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await runAuditCli();

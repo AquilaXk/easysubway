@@ -71,6 +71,7 @@ test("public sensitivity contracts bind the exact scope and corrected owner rece
     (value) => { value.properties.openAlertCount.type = "number"; },
     (value) => { value.properties.publicArtifacts.uniqueItems = false; },
     (value) => { value.properties.publicArtifacts.items.properties.artifactId.pattern = ".+"; },
+    (value) => { delete value.properties.publicArtifacts.items.properties.createdAt; },
   ]) {
     const weakened = structuredClone(receiptSchema);
     mutate(weakened);
@@ -82,6 +83,7 @@ test("public sensitivity contracts bind the exact scope and corrected owner rece
     (value) => { value.properties.findings.uniqueItems = false; },
     (value) => { value.properties.findings.items.properties.detectorId = { type: "string" }; },
     (value) => { value.properties.inputs.properties.repositories.minItems = 0; },
+    (value) => { value.properties.inputs.properties.repositories.items.required = value.properties.inputs.properties.repositories.items.required.filter((field) => field !== "artifactBeginWatermark"); },
   ]) {
     const weakened = structuredClone(reportSchema);
     mutate(weakened);

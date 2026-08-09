@@ -23,13 +23,15 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
-            "required": ["repository", "defaultBranch", "gitSha", "beginWatermark", "endWatermark", "receiptLocator"],
+            "required": ["repository", "defaultBranch", "gitSha", "beginWatermark", "endWatermark", "artifactBeginWatermark", "artifactEndWatermark", "receiptLocator"],
             "properties": {
               "repository": { "type": "string", "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
               "defaultBranch": { "type": "string", "pattern": "^[A-Za-z0-9._/-]+$" },
               "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
               "beginWatermark": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
               "endWatermark": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "artifactBeginWatermark": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "artifactEndWatermark": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
               "receiptLocator": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway(?:-(?:backend|data|mobile|platform))?/actions/runs/[0-9]+/artifacts/[0-9]+$" }
             }
           }
