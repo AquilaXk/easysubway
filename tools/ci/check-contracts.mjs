@@ -766,7 +766,8 @@ export function validatePublicSensitivityAuditScope(scope, errors = [], path = "
     const identity = `${disposition?.locationFingerprint}\u0000${disposition?.detectorId}`;
     if (identity <= previous) errors.push(`${path}: falsePositiveDisposition은 codepoint sorted-unique여야 한다`);
     previous = identity;
-    if (!(typeof disposition?.verifiedAt === "string" && typeof disposition?.expiresAt === "string" && disposition.verifiedAt < disposition.expiresAt)) errors.push(`${path}: falsePositiveDisposition current revalidation/expiry가 필요하다`);
+    const verifiedAt = Date.parse(disposition?.verifiedAt); const expiresAt = Date.parse(disposition?.expiresAt);
+    if (!Number.isFinite(verifiedAt) || !Number.isFinite(expiresAt) || verifiedAt >= expiresAt) errors.push(`${path}: falsePositiveDisposition current revalidation/expiry가 필요하다`);
   }
   return errors;
 }

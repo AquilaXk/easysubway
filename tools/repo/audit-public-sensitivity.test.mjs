@@ -55,6 +55,52 @@ test("D20.1 metadata watermark binds content bytes even when provider revision i
   assert.ok(result.incomplete.some(({ code }) => code === "WATERMARK_DRIFT"));
 });
 
+test("D20.1 F1 scans the declared repository security receipt surface", async () => {
+  const raw = "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD";
+  const archive = zip([]); const archiveDigest = `sha256:${createHash("sha256").update(archive).digest("hex")}`;
+  const receipts = REPOSITORIES.map((repository) => ({ ...receipt(repository), publicArtifacts: [{ artifactId: "1", artifactName: raw, workflowPath: ".github/workflows/a.yml", runId: "1", archiveDigest, expiresAt: "2026-09-09T03:00:00.000Z", detectorPolicyVersion: "public-sensitivity-v1", scanStatus: "COMPLETE", scanReceiptLocator: locator(repository) }] }));
+  const gh = async (request) => {
+    const repository = REPOSITORIES.find((candidate) => request.endpoint === `repos/${candidate}` || request.endpoint.startsWith(`repos/${candidate}/`));
+    if (request.endpoint.includes("/actions/artifacts?")) return { total_count: 1, artifacts: [{ id: 1, name: raw, expired: false, expires_at: "2026-09-09T03:00:00.000Z", digest: archiveDigest, workflow_run: { id: 1 } }] };
+    if (request.endpoint.endsWith("/actions/runs/1")) return { path: ".github/workflows/a.yml" };
+    if (request.endpoint.endsWith("/actions/artifacts/1/zip")) return archive;
+    assert.ok(repository);
+    return fakeGh()(request);
+  };
+  const result = await auditPublicSensitivity({ scope: scope(), receipts, observedAt: OBSERVED_AT, execGh: gh });
+  assert.equal(result.findings.filter(({ surface }) => surface === "REPOSITORY_SECURITY_RECEIPT").length, REPOSITORIES.length);
+  assert.equal(JSON.stringify(createReport({ observedAt: OBSERVED_AT, ...result })).includes(raw), false);
+});
+
+test("D20.1 F2 skips configured directory nodes and scans descendant blobs", async () => {
+  const gh = async (request) => {
+    if (request.endpoint.includes("/git/trees/")) return { truncated: false, tree: [{ path: "evidence/public", type: "tree", mode: "040000" }, { path: "evidence/public/report.json", type: "blob", mode: "100644", sha: "b".repeat(40) }] };
+    if (request.endpoint.includes("/git/blobs/")) return { encoding: "base64", content: Buffer.from("safe").toString("base64") };
+    return fakeGh()(request);
+  };
+  const result = await auditPublicSensitivity({ scope: scope(), receipts: REPOSITORIES.map(receipt), observedAt: OBSERVED_AT, execGh: gh });
+  assert.equal(result.incomplete.some(({ code }) => code === "UNSUPPORTED_BLOB"), false);
+  assert.equal(result.scannedArtifacts, REPOSITORIES.length);
+});
+
+test("D20.1 F3 compares disposition timestamps as instants", async () => {
+  const raw = "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD";
+  const identity = `github:AquilaXk/easysubway:ISSUE_BODY:1:${OBSERVED_AT}`;
+  const first = fingerprint(REPOSITORIES[0], "ISSUE_BODY", identity, "KNOWN_TOKEN_FORMAT", 1, 0);
+  const dispositions = [{ locationFingerprint: first, detectorId: "KNOWN_TOKEN_FORMAT", reason: "reviewed", owner: "owner", verifiedAt: "2026-08-08T00:00:00+09:00", expiresAt: "2026-08-09T04:00:00+09:00" }];
+  const result = await auditPublicSensitivity({ scope: scope(dispositions), receipts: REPOSITORIES.map(receipt), observedAt: OBSERVED_AT, execGh: fakeGh({ body: raw }) });
+  assert.equal(result.findings.filter(({ detectorId }) => detectorId === "KNOWN_TOKEN_FORMAT").length, 2);
+  assert.ok(result.incomplete.some(({ code }) => code === "INVALID_FALSE_POSITIVE_DISPOSITION"));
+});
+
+test("D20.1 F4 binds release fields to updated_at", async () => {
+  const updatedAt = "2026-08-09T02:00:00.000Z"; const publishedAt = "2026-08-01T02:00:00.000Z";
+  const result = await collectPublicMetadata({ repository: REPOSITORIES[0], execGh: async (request) => request.endpoint.includes("/releases?") ? [{ id: 9, name: "name", tag_name: "v1", body: "body", updated_at: updatedAt, published_at: publishedAt }] : fakeGh()(request) });
+  const releases = result.items.filter(({ surface }) => surface === "RELEASE_METADATA");
+  assert.equal(releases.length, 3);
+  assert.ok(releases.every(({ immutableSourceIdentity }) => immutableSourceIdentity.endsWith(updatedAt)));
+});
+
 test("D20.1 F3-F6 same-source matches use ordinal fingerprints and a disposition cannot suppress another", async () => {
   const identity = `github:AquilaXk/easysubway:ISSUE_BODY:1:${OBSERVED_AT}`;
   const raw = "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD";
@@ -84,6 +130,20 @@ test("D20.1 F2/F7 contract failure writes a schema-valid wx incomplete report wi
     assert.equal(validateSchema(reportSchema, parsed).ok, true);
     assert.deepEqual(validateReport(parsed), []);
     assert.equal(await runAuditCli(args), 2, "wx refuses overwrite");
+  } finally { rmSync(root, { recursive: true, force: true }); }
+});
+
+test("D20.1 F8 missing input still writes a schema-valid incomplete report", async () => {
+  const root = mkdtempSync(join(tmpdir(), "public-sensitivity-missing-input-"));
+  try {
+    mkdirSync(join(root, "out"));
+    writeFileSync(join(root, "receipts.json"), JSON.stringify(REPOSITORIES.map(receipt)));
+    const args = ["--scope", "missing-scope.json", "--owner-receipts", "receipts.json", "--observed-at", OBSERVED_AT, "--repository-root", root, "--output", "out/report.json"];
+    assert.equal(await runAuditCli(args), 2);
+    const parsed = JSON.parse(readFileSync(join(root, "out/report.json"), "utf8"));
+    const reportSchema = JSON.parse(readFileSync("contracts/documentation/public-sensitivity-audit-report.schema.json", "utf8"));
+    assert.equal(validateSchema(reportSchema, parsed).ok, true);
+    assert.deepEqual(validateReport(parsed), []);
   } finally { rmSync(root, { recursive: true, force: true }); }
 });
 
@@ -121,6 +181,24 @@ test("D20.1 archive scanner finds stored and deflate payloads and rejects unsafe
   for (const archive of [Buffer.from("504b0506", "hex"), zip([{ name: "safe.txt", text: "safe", method: 0, flags: 1 }]), zip([{ name: "safe.txt", text: "safe", method: 99 }]), zip([{ name: "safe.txt", bytes: Buffer.from([0xc3, 0x28]), method: 0 }]), zip(Array.from({ length: 257 }, (_, id) => ({ name: `f${id}`, text: "", method: 0 })) )]) {
     assert.ok(scanArtifactArchive({ repository: REPOSITORIES[0], artifactId: "1", bytes: archive, scope: scope() }).incomplete.length > 0);
   }
+});
+
+test("D20.1 F5 rejects unconsumed central-directory bytes", () => {
+  const end = Buffer.alloc(22); end.writeUInt32LE(0x06054b50, 0); end.writeUInt32LE(1, 12);
+  const result = scanArtifactArchive({ repository: REPOSITORIES[0], artifactId: "1", bytes: Buffer.concat([Buffer.from([0]), end]), scope: scope() });
+  assert.ok(result.incomplete.some(({ code }) => code === "ARCHIVE_MALFORMED"));
+});
+
+test("D20.1 F6 detects a default-branch change at the same commit", async () => {
+  const identityReads = new Map();
+  const gh = async (request) => {
+    const repository = REPOSITORIES.find((candidate) => request.endpoint === `repos/${candidate}` || request.endpoint.startsWith(`repos/${candidate}/`));
+    if (repository != null && request.endpoint === `repos/${repository}`) { const count = (identityReads.get(repository) ?? 0) + 1; identityReads.set(repository, count); return { default_branch: count === 1 ? "main" : "stable" }; }
+    if (repository != null && request.endpoint.startsWith(`repos/${repository}/git/ref/heads/`)) return { object: { sha: SHA } };
+    return fakeGh()(request);
+  };
+  const result = await auditPublicSensitivity({ scope: scope(), receipts: REPOSITORIES.map(receipt), observedAt: OBSERVED_AT, execGh: gh });
+  assert.equal(result.incomplete.filter(({ code }) => code === "WATERMARK_DRIFT").length, REPOSITORIES.length);
 });
 
 test("D20.1 archive finding reaches the aggregate report without raw bytes", async () => {
@@ -170,6 +248,11 @@ test("D20.1 Actions artifact pagination rejects duplicate, drift, mismatch, and 
     const result = await collectActionsArtifacts({ repository: REPOSITORIES[0], receiptArtifacts: [], observedAt: OBSERVED_AT, detectorPolicyVersion: "public-sensitivity-v1", execGh: async ({ endpoint }) => { const page = Number(endpoint.match(/[?&]page=(\d+)/)?.[1]); if (mode === "short") return { total_count: 101, artifacts: [] }; return { total_count: mode === "drift" && page === 2 ? 102 : 101, artifacts: Array.from({ length: page === 1 ? 100 : 1 }, (_, offset) => ({ id: mode === "duplicate" && page === 2 ? 0 : (page - 1) * 100 + offset, expired: true })) }; } });
     assert.ok(result.incomplete.length > 0);
   }
+});
+
+test("D20.1 F7 rejects an unknown artifact expiry state", async () => {
+  const result = await collectActionsArtifacts({ repository: REPOSITORIES[0], receiptArtifacts: [], observedAt: OBSERVED_AT, detectorPolicyVersion: "public-sensitivity-v1", execGh: async () => ({ total_count: 1, artifacts: [{ id: 1, expired: null }] }) });
+  assert.ok(result.incomplete.some(({ code }) => code === "ARTIFACT_CATALOG_INCOMPLETE"));
 });
 
 function zip(entries) {
