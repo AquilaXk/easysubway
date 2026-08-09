@@ -13,6 +13,12 @@ const REFERENCE_CLASSES = ["ARTIFACT_IMMUTABLE_REFERENCE", "EXTERNAL_INPUT_PENDI
 const GH_TIMEOUT_MS = 30_000;
 const GH_MAX_BUFFER = 64 * 1024 * 1024;
 const PLAN_OWNERS = new Set(["PLAN-DOC", "PLAN-REPO", "PLAN-JOURNEY"]);
+const BARE_REFERENCE_EXTENSIONS = new Set([".json", ".md", ".yaml", ".yml"]);
+const QUALIFIED_REPOSITORIES = new Map([
+  ["Hub", "AquilaXk/easysubway"], ["Data", "AquilaXk/easysubway-data"],
+  ["Backend", "AquilaXk/easysubway-backend"], ["Mobile", "AquilaXk/easysubway-mobile"],
+  ["Platform", "AquilaXk/easysubway-platform"],
+]);
 const execFileAsync = promisify(execFile);
 
 export function parseArguments(argv) {
@@ -48,6 +54,9 @@ export function validateScope(scope) {
   }
   const classes = scope?.referenceClasses;
   if (!Array.isArray(classes) || JSON.stringify(classes) !== JSON.stringify(REFERENCE_CLASSES)) errors.push("referenceClasses must be exact codepoint sorted inventory");
+  const classification = scope?.contentClassification;
+  if (scope?.schemaVersion !== 2) errors.push("schemaVersion must be 2");
+  if (JSON.stringify(classification?.knownBinaryExtensions) !== JSON.stringify([".gz", ".png"]) || JSON.stringify(classification?.bareReferenceExtensions) !== JSON.stringify([...BARE_REFERENCE_EXTENSIONS])) errors.push("contentClassification must be exact known binary and bare reference extension inventories");
   return errors;
 }
 
@@ -91,7 +100,7 @@ export function createReport({ observedAt, sourceSha, scopeText, ledgerText, ame
   const sortedFindings = [...findings].sort(compareSerializable);
   const sortedIncomplete = [...incomplete].map(sanitizeIncomplete).sort(compareSerializable);
   return {
-    schemaVersion: 1, status: sortedIncomplete.length === 0 ? "COMPLETE" : "AUDIT_INCOMPLETE", observedAt,
+    schemaVersion: 2, status: sortedIncomplete.length === 0 ? "COMPLETE" : "AUDIT_INCOMPLETE", observedAt,
     inputs: {
       repositories: [...repositories].sort((a, b) => codepointCompare(a.repository, b.repository)),
       migration: { ledgerSha256: sha256(ledgerText), amendmentsSha256: sha256(amendmentsText) }, scopeSha256: sha256(scopeText), sourceSha,
@@ -124,7 +133,7 @@ export async function execGh(args, execute = execFileAsync) {
   return stdout;
 }
 
-export async function discoverRepository({ repository, roots, execGh: runGh }) {
+export async function discoverRepository({ repository, roots, contentClassification = { knownBinaryExtensions: [] }, execGh: runGh }) {
   const details = parseJson(await runGh(["api", `repos/${repository}`]));
   const branch = details.default_branch;
   if (typeof branch !== "string" || branch === "") throw new Error("invalid default branch");
@@ -142,14 +151,14 @@ export async function discoverRepository({ repository, roots, execGh: runGh }) {
     selected.push(...blobs);
   }
   if (selected.some((entry) => !/^[0-9a-f]{40}$/.test(entry.sha))) throw new Error("invalid selected blob");
-  return { repository, defaultBranch: branch, gitSha: sha, selected: [...new Map(selected.map(({ path, sha: blobSha }) => [path, { path, blobSha }])).values()].sort((a, b) => codepointCompare(a.path, b.path)) };
+  return { repository, defaultBranch: branch, gitSha: sha, selected: [...new Map(selected.map(({ path, sha: blobSha }) => [path, { path, blobSha, contentClass: contentClassForPath(path, contentClassification.knownBinaryExtensions) }])).values()].sort((a, b) => codepointCompare(a.path, b.path)) };
 }
 
 export async function collectCurrentInputs({ scope, execGh: runGh }) {
   const repositories = [];
   const incomplete = [];
   for (const entry of scope.repositories) {
-    try { repositories.push(await discoverRepository({ repository: entry.repository, roots: entry.trackedDiscoveryRoots, execGh: runGh })); }
+    try { repositories.push(await discoverRepository({ repository: entry.repository, roots: entry.trackedDiscoveryRoots, contentClassification: scope.contentClassification, execGh: runGh })); }
     catch (error) { incomplete.push({ stage: "github", code: errorCode(error), affectedIdentity: entry.repository }); }
   }
   return { repositories, incomplete };
@@ -162,16 +171,74 @@ export function extractReferences(text, source) {
   const references = [];
   for (const line of String(text).split(/\r?\n/)) {
     const markers = parseMarkers(line);
-    const matcher = /https:\/\/github\.com\/([^/]+\/[^/]+)\/(issues|pull)\/([1-9]\d*)(?![A-Za-z0-9_])|(?<![A-Za-z0-9_/])#([1-9]\d*)(?![A-Za-z0-9_])/g;
-    for (const match of line.matchAll(matcher)) {
-    const target = match[4] == null
-      ? { repository: match[1], type: match[2] === "pull" ? "PR" : "ISSUE", number: Number(match[3]) }
-      : { repository, type: "ISSUE", number: Number(match[4]) };
-    const displayedTitle = displayedTitleFor(line, match[0], target);
-    references.push({ source: { ...normalizedSource, locator: match[0] }, target, markers, displayedTitle });
+    const occupied = [];
+    const add = (start, end, locator, target) => {
+      if (occupied.some(([left, right]) => start < right && end > left)) return;
+      occupied.push([start, end]);
+      references.push({ source: { ...normalizedSource, locator }, target, markers, displayedTitle: displayedTitleFor(line, locator, target) });
+    };
+    const parseUrl = (value) => {
+      const match = /^https:\/\/github\.com\/([^/]+\/[^/]+)\/(issues|pull)\/([1-9]\d*)(?![A-Za-z0-9_])/.exec(value);
+      return match == null ? null : {
+        locator: match[0],
+        target: { repository: match[1], type: match[2] === "pull" ? "PR" : "ISSUE", number: Number(match[3]) },
+      };
+    };
+    for (const link of markdownGitHubLinkSpans(line)) {
+      const parsed = parseUrl(link.url);
+      if (parsed != null) add(link.start, link.end, link.url, parsed.target);
+    }
+    for (const match of line.matchAll(/https:\/\/github\.com\/[^\s)]+/g)) {
+      const parsed = parseUrl(match[0]);
+      if (parsed != null) add(match.index, match.index + match[0].length, parsed.locator, parsed.target);
+    }
+    for (const match of line.matchAll(/\b(?:(Hub|Data|Backend|Mobile|Platform)\s+(?:(Issue|PR)\s+)?|(Issue|PR)\s+)#([1-9]\d*)(?![A-Za-z0-9_])/g)) {
+      const kind = match[2] ?? match[3] ?? "Issue";
+      add(match.index, match.index + match[0].length, match[0], { repository: match[1] == null ? repository : QUALIFIED_REPOSITORIES.get(match[1]), type: kind === "PR" ? "PR" : "ISSUE", number: Number(match[4]) });
+    }
+    if (allowsBareReferences(normalizedSource) || Object.keys(markers).length > 0) {
+      for (const match of line.matchAll(/(?<![A-Za-z0-9_/])#([1-9]\d*)(?![A-Za-z0-9_])/g)) {
+        add(match.index, match.index + match[0].length, match[0], { repository, type: "ISSUE_OR_PR", number: Number(match[1]) });
+      }
     }
   }
   return references;
+}
+
+function markdownGitHubLinkSpans(line) {
+  const links = [];
+  let labelStart = -1;
+  let urlStart = -1;
+  for (let index = 0; index < line.length; index += 1) {
+    const character = line[index];
+    if (urlStart !== -1) {
+      if (character === ")") {
+        links.push({ start: labelStart, end: index + 1, url: line.slice(urlStart, index) });
+        labelStart = -1;
+        urlStart = -1;
+      }
+      continue;
+    }
+    if (character === "[") {
+      labelStart = index;
+      continue;
+    }
+    if (labelStart !== -1 && character === "]") {
+      if (line[index + 1] === "(" && line.startsWith("https://github.com/", index + 2)) urlStart = index + 2;
+      else labelStart = -1;
+    }
+  }
+  return links;
+}
+
+function contentClassForPath(path, knownBinaryExtensions) {
+  return (knownBinaryExtensions ?? []).some((extension) => path.endsWith(extension)) ? "NON_REFERENCE_BINARY" : "AUDITABLE_TEXT";
+}
+
+function allowsBareReferences(source) {
+  if (["ISSUE", "PR"].includes(source?.kind)) return true;
+  const path = source?.kind === "PATH" ? source.path : null;
+  return typeof path === "string" && [...BARE_REFERENCE_EXTENSIONS].some((extension) => path.endsWith(extension));
 }
 
 export function parseMarkers(line) {
@@ -236,23 +303,24 @@ function displayedTitleFor(line, locator, target) {
 export function classifyReference(reference, { ledger, amendments, openHubIssues = new Set(), referenceClass = "ISSUE_NONCLOSING_DEPENDENCY", item = null }) {
   const { source, target } = reference;
   const explicitClass = REFERENCE_CLASSES.includes(reference.markers?.REFERENCE_CLASS);
-  referenceClass = explicitClass ? reference.markers.REFERENCE_CLASS : referenceClass;
+  referenceClass = explicitClass ? reference.markers.REFERENCE_CLASS : defaultReferenceClass(reference, referenceClass);
   if (reference.markers?.REFERENCE_CLASS !== undefined && !explicitClass) return makeFinding("UNKNOWN_OR_INVALID", referenceClass, reference, item, null, "REFERENCE_CLASS is unknown or overlapping");
   if (reference.markers?.PLAN_OWNER !== undefined && !PLAN_OWNERS.has(reference.markers.PLAN_OWNER)) return makeFinding("PLAN_OWNER_OVERLAP", referenceClass, reference, item, null, "PLAN_OWNER must be an exact known plan route");
   if (explicitClass && reference.markers?.PLAN_OWNER === "__OVERLAP__") return makeFinding("PLAN_OWNER_OVERLAP", referenceClass, reference, item, null, "multiple plan owner markers");
   if (item == null) return makeFinding("BROKEN_OR_UNRESOLVED_REFERENCE", referenceClass, reference, null, null, "referenced item is missing");
+  if (target.type === "ISSUE_OR_PR") target.type = item.type;
   if (item.type !== target.type) return makeFinding("ISSUE_PR_TYPE_CONFUSION", referenceClass, reference, item, null, "referenced item type differs");
   if (explicitClass && reference.displayedTitle != null && reference.displayedTitle !== item.title) return makeFinding("DISPLAYED_TITLE_DRIFT", referenceClass, reference, item, null, "displayed title differs");
   for (const [marker, field, code] of [["STATE", "state", "DIRECT_OWNER_BODY_STATE_DRIFT"], ["STATE_REASON", "stateReason", "DIRECT_OWNER_BODY_STATE_DRIFT"], ["PRIORITY", "priority", "PRIORITY_LABEL_MILESTONE_DRIFT"], ["MILESTONE", "milestone", "PRIORITY_LABEL_MILESTONE_DRIFT"]]) {
     const expected = reference.markers?.[marker];
     if (expected !== undefined && expected !== "__OVERLAP__" && String(item[field] ?? "null") !== expected) return makeFinding(code, referenceClass, reference, item, null, `${marker} differs`);
   }
-  if (explicitClass && ((referenceClass.startsWith("PR_") && (target.type !== "PR" || item.type !== "PR")) || (referenceClass.startsWith("ISSUE_") && (target.type !== "ISSUE" || item.type !== "ISSUE")))) return makeFinding("ISSUE_PR_TYPE_CONFUSION", referenceClass, reference, item, null, "reference class and target type differ");
+  if (explicitClass && ((referenceClass.startsWith("PR_") && item.type !== "PR") || (referenceClass.startsWith("ISSUE_") && item.type !== "ISSUE"))) return makeFinding("ISSUE_PR_TYPE_CONFUSION", referenceClass, reference, item, null, "reference class and target type differ");
   if (["PR_EVIDENCE_ONLY", "PATH_HISTORICAL_OR_SUPERSEDED"].includes(referenceClass)) return null;
   if (explicitClass && item.state !== "OPEN" && reference.markers?.STATE !== "CLOSED") return makeFinding("CLOSED_NOT_PLANNED_USED_AS_ACTIVE", referenceClass, reference, item, null, "closed item is used as active reference");
   if (reference.markers?.PARENT_STATE !== undefined && reference.markers.PARENT_STATE !== "__OVERLAP__" && item.state !== reference.markers.PARENT_STATE) return makeFinding("PARENT_CHILD_STATE_DRIFT", referenceClass, reference, item, null, "PARENT_STATE differs");
   if (reference.markers?.COPIED_STATE !== undefined && reference.markers.COPIED_STATE !== "__OVERLAP__" && item.state !== reference.markers.COPIED_STATE) return makeFinding("PARENT_CHILD_STATE_DRIFT", referenceClass, reference, item, null, "COPIED_STATE differs");
-  if (target.type !== "ISSUE") return null;
+  if (!ownerClass(referenceClass) || target.type !== "ISSUE") return null;
   const effective = target.repository === "AquilaXk/easysubway"
     ? resolveLatestEffectiveRecord({ ledger, amendments, sourceIssue: target.number })
     : resolveSplitChildRecord({ ledger, target });
@@ -274,6 +342,15 @@ export function classifyReference(reference, { ledger, amendments, openHubIssues
     return makeFinding("WRONG_REPOSITORY_OR_OWNER", referenceClass, reference, item, effective, "reference is not latest-effective canonical owner");
   }
   return null;
+}
+
+function defaultReferenceClass(reference, fallback) {
+  return reference.source?.kind === "PATH" && allowsBareReferences(reference.source) && reference.source.locator?.startsWith("#")
+    ? "ISSUE_CURRENT_OWNER" : fallback;
+}
+
+function ownerClass(referenceClass) {
+  return ["ISSUE_CURRENT_OWNER", "ISSUE_TERMINAL_IMPLEMENTATION", "ISSUE_PARENT_OR_COORDINATOR"].includes(referenceClass);
 }
 
 function makeFinding(code, referenceClass, reference, referenced, latestEffective, reason) {
@@ -377,8 +454,9 @@ export async function auditReferences({ scope, ledger, amendments, repositories,
     owners.set(owner, reference); planOwners.set(identity, owners);
   };
   for (const input of repositories) {
-    try {
-      for (const selected of input.selected) {
+    for (const selected of input.selected) {
+      if (selected.contentClass === "NON_REFERENCE_BINARY") continue;
+      try {
         const text = await readBlob(input.repository, selected.blobSha, runGh);
         findings.push(...extractArtifactFindings(text, { kind: "PATH", repository: input.repository, path: selected.path, blobSha: selected.blobSha }));
         findings.push(...extractCanonicalPathFindings(text, { kind: "PATH", repository: input.repository, path: selected.path, blobSha: selected.blobSha }, repositories));
@@ -392,8 +470,10 @@ export async function auditReferences({ scope, ledger, amendments, repositories,
           else validated += 1;
           collectPlanOwner(reference);
         }
+      } catch (error) {
+        incomplete.push({ stage: "reference-discovery", code: errorCode(error), affectedIdentity: `${input.repository}:${input.gitSha ?? "unknown"}:${selected.path}:${selected.blobSha}` });
       }
-    } catch (error) { incomplete.push({ stage: "reference-discovery", code: errorCode(error), affectedIdentity: input.repository }); }
+    }
   }
   for (const item of [...metadata.values()].sort((left, right) => codepointCompare(`${left.repository}#${left.number}`, `${right.repository}#${right.number}`))) {
     for (const [kind, text] of [["title", item.title], ["body", item.body]]) {

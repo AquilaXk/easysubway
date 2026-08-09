@@ -684,6 +684,11 @@ export function validateReferenceAuditScope(scope, errors = [], path = "referenc
   ];
   const repositories = scope?.repositories;
   const actual = Array.isArray(repositories) ? repositories.map((entry) => entry?.repository) : [];
+  if (scope?.schemaVersion !== 2) errors.push(`${path}: schemaVersion은 2여야 한다`);
+  if (JSON.stringify(scope?.contentClassification?.knownBinaryExtensions) !== JSON.stringify([".gz", ".png"])
+    || JSON.stringify(scope?.contentClassification?.bareReferenceExtensions) !== JSON.stringify([".json", ".md", ".yaml", ".yml"])) {
+    errors.push(`${path}: contentClassification extension inventory는 exact여야 한다`);
+  }
   if (JSON.stringify(actual) !== JSON.stringify(expected)) errors.push(`${path}: repository inventory는 exact codepoint sorted 5개여야 한다`);
   for (const entry of Array.isArray(repositories) ? repositories : []) {
     for (const root of entry?.trackedDiscoveryRoots ?? []) {
@@ -700,6 +705,7 @@ export function validateReferenceAuditReportSchema(schema, errors = [], path = "
   const inputs = report?.inputs?.properties;
   const finding = report?.findings?.items;
   if (schema?.type !== "object" || schema?.additionalProperties !== false || !Array.isArray(schema?.required)) errors.push(`${path}: strict report object schema가 필요하다`);
+  if (report?.schemaVersion?.const !== 2) errors.push(`${path}: schemaVersion 2 contract가 필요하다`);
   if (!Array.isArray(report?.observedAt?.type) && report?.observedAt?.format !== "date-time") errors.push(`${path}: observedAt canonical timestamp contract가 필요하다`);
   if (!Array.isArray(report?.inputs?.required) || !report.inputs.required.includes("sourceSha") || (inputs?.sourceSha?.pattern !== "^[0-9a-f]{40}$" && inputs?.sourceSha?.$ref !== "#/$defs/sha")) errors.push(`${path}: sourceSha input identity가 필요하다`);
   if (finding?.additionalProperties !== false || !["code", "referenceClass", "source", "target", "reason"].every((key) => finding?.required?.includes(key))) errors.push(`${path}: strict finding shape가 필요하다`);
@@ -717,6 +723,9 @@ export function validateReferenceAuditReportSchema(schema, errors = [], path = "
   const expectedOwners = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform", null];
   if (JSON.stringify(finding?.properties?.directOwner?.enum) !== JSON.stringify(expectedOwners)) errors.push(`${path}: directOwner enum schema가 필요하다`);
   if (JSON.stringify(finding?.properties?.consumerRoute?.enum) !== JSON.stringify(["PLAN-DOC", "PLAN-REPO", "PLAN-JOURNEY", null])) errors.push(`${path}: consumerRoute enum schema가 필요하다`);
+  const selected = inputs?.repositories?.items?.properties?.selected?.items;
+  if (!Array.isArray(selected?.required) || !selected.required.includes("contentClass")
+    || JSON.stringify(selected?.properties?.contentClass?.enum) !== JSON.stringify(["AUDITABLE_TEXT", "NON_REFERENCE_BINARY"])) errors.push(`${path}: selected contentClass schema가 필요하다`);
   return errors;
 }
 

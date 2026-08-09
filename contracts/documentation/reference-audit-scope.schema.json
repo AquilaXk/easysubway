@@ -3,10 +3,10 @@
   "$id": "https://easysubway.local/schema/reference-audit-scope.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "repositories", "githubDiscovery", "referenceClasses"],
+  "required": ["schemaVersion", "repositories", "contentClassification", "githubDiscovery", "referenceClasses"],
   "properties": {
     "$schema": { "type": "string" },
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "repositories": {
       "type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true,
       "items": {
@@ -16,6 +16,14 @@
           "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
           "trackedDiscoveryRoots": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
         }
+      }
+    },
+    "contentClassification": {
+      "type": "object", "additionalProperties": false,
+      "required": ["knownBinaryExtensions", "bareReferenceExtensions"],
+      "properties": {
+        "knownBinaryExtensions": { "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": { "enum": [".gz", ".png"] } },
+        "bareReferenceExtensions": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "enum": [".json", ".md", ".yaml", ".yml"] } }
       }
     },
     "githubDiscovery": {

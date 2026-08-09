@@ -39,10 +39,20 @@ test("reference audit scope requires the exact five-repository inventory", () =>
   assert.ok(errors.some((error) => error.includes("안전한 repository-relative")));
 });
 
+test("reference audit scope schema rejects unapproved content classification extensions", () => {
+  const schema = loadJson("contracts/documentation/reference-audit-scope.schema.json");
+  const scope = loadJson("contracts/documentation/reference-audit-scope.json");
+  for (const [field, value] of [["knownBinaryExtensions", [".gif", ".zip"]], ["bareReferenceExtensions", [".json", ".txt", ".yaml", ".yml"]]]) {
+    const candidate = structuredClone(scope);
+    candidate.contentClassification[field] = value;
+    assert.equal(validateSchema(schema, candidate).ok, false);
+  }
+});
+
 test("reference audit report schema requires source identity and strict findings", () => {
   const errors = [];
   validateReferenceAuditReportSchema({ type: "object", additionalProperties: false, required: [], properties: { observedAt: {}, inputs: { properties: {} }, findings: { items: {} } } }, errors);
-  assert.equal(errors.length, 10);
+  assert.equal(errors.length, 12);
 });
 
 test("F15 reference audit scope validation is total and skips semantics after schema failure", () => {
