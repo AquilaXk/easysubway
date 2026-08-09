@@ -1325,10 +1325,12 @@ test("게이트 evidence는 SUPPORTED를 근거 성격별로 나눠 기록하고
     "official-source": 46,
     "owner-authored-canonical": 36,
   });
-  assert.deepEqual(evidence.variants.baseline.supportedByEvidenceModel, {});
+  assert.deepEqual(evidence.variants.baseline.supportedByEvidenceModel, {
+    "owner-authored-canonical": 1,
+  });
 
   // owner-authored-canonical 선언은 판정을 열어 주지 않는다: baseline에서 그 도메인 키는 재기술 전
-  // MISSING이고 분모·차단 임계는 lineScoped와 같다(선언이 아니라 근거가 판정을 낸다).
+  // 인천 키는 MISSING이고 분모·차단 임계는 lineScoped와 같다(선언이 아니라 근거가 판정을 낸다).
   const routeMapKey = `capital:seoul-metro:${INCHEON_LINE7_ID}:route_map_positions`;
   const requirementNamed = (variant) =>
     evidence.variants[variant].pilotRequirements.find((entry) => entry.requirementKey === routeMapKey);
@@ -1364,19 +1366,28 @@ test("인천 13 requirement는 체인 편입으로 전이하고 7호선 구간�
 
   // 선언된 non-transition은 evidence에 그대로 남고, 사유 코드가 요구한 실측 술어도 함께 기록된다.
   // 수치를 따로 못박아 이 축이 조용히 늘면 evidence diff와 이 회귀가 함께 걸리게 한다.
-  assert.equal(evidence.declaredNonTransitions.count, 1);
+  assert.equal(evidence.declaredNonTransitions.count, 2);
   assert.equal(evidence.declaredNonTransitions.entries.length, evidence.declaredNonTransitions.count);
-  assert.deepEqual(evidence.declaredNonTransitions.entries, [{
+  assert.deepEqual(
+    evidence.declaredNonTransitions.entries.map(({ requirementKey }) => requirementKey).sort(),
+    [PILOT_REQUIREMENT_KEY, INCHEON_NON_TRANSITION_KEY].sort(),
+  );
+  const incheonNonTransition = evidence.declaredNonTransitions.entries.find(
+    ({ requirementKey }) => requirementKey === INCHEON_NON_TRANSITION_KEY,
+  );
+  assert.deepEqual(incheonNonTransition, {
     requirementKey: INCHEON_NON_TRANSITION_KEY,
     sourceId: INCHEON_STATION_INFO_SOURCE_ID,
     sourceDomain: "route_graph_topology",
     reasonCode: "NO_SUPPORTING_ROWS_FOR_LINE",
-    reasonKo: evidence.declaredNonTransitions.entries[0].reasonKo,
+    reasonKo: incheonNonTransition.reasonKo,
     before: "MISSING",
     after: "MISSING",
+    baselineSourceIds: [],
+    lineScopedSourceIds: [],
     supportingRecordCountByField: { network_edges: 0, duration_seconds: 0, distance_meters: 0 },
-  }]);
-  assert.match(evidence.declaredNonTransitions.entries[0].reasonKo, /network_edges/);
+  });
+  assert.match(incheonNonTransition.reasonKo, /network_edges/);
   // 선언 키는 전이 목록에 없고 SUPPORTED 집합에도 없다 — 선언이 SUPPORTED 수를 늘리지 못한다.
   assert.equal(
     evidence.transitions.some(({ requirementKey }) => requirementKey === INCHEON_NON_TRANSITION_KEY),
@@ -1519,7 +1530,7 @@ test("declared transition seam은 실제 SUPPORTED non-transition을 거부한�
   assert.throws(
     () => assertDeclaredTransitionsMatchVariants(spec, evidence.variants),
     new RegExp(
-      "requirements declared as non-transitioning must not be SUPPORTED after the line-scope redescription: "
+      "requirements declared as NO_SUPPORTING_ROWS_FOR_LINE must not be SUPPORTED: "
         + `capital:incheon-transit:${INCHEON_LINE1_ID}:route_graph_topology`,
     ),
   );

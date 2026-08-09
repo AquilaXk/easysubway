@@ -12739,6 +12739,7 @@ test("데이터팩 검증기는 AVAILABLE accessibility edge의 station-line sou
   const fixturePath = path.join(outputDir, "fixture.json");
   const packOutputDir = path.join(outputDir, "pack");
   const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  projectFixtureWithoutUnmaterializedItxAdmission(fixture);
   // 빌드 후 edge를 AVAILABLE로 바꾸고 source를 accessibility_facilities 미지원(역-노선)으로 우회 → validator 거부.
   const builtEntry = fixture.packs[0].networkEdges.find((edge) => edge.id === "edge-entry-sadang-seoul-4");
   builtEntry.accessibilityStatus = "AVAILABLE";
@@ -12775,6 +12776,7 @@ test("데이터팩 검증기는 AVAILABLE accessibility edge의 station-line ope
   const fixturePath = path.join(outputDir, "fixture.json");
   const packOutputDir = path.join(outputDir, "pack");
   const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  projectFixtureWithoutUnmaterializedItxAdmission(fixture);
   const edge = fixture.packs[0].networkEdges.find((row) => row.id === "edge-entry-sadang-seoul-4");
   edge.accessibilityStatus = "AVAILABLE";
   edge.stairAccessState = "STEP_FREE";
@@ -12879,6 +12881,7 @@ test("station status probe가 route evidence가 아니면 production edge covera
   const outputDir = path.join(tmpdir(), `easysubway-accessibility-verified-states-${Date.now()}`);
   const packOutputDir = path.join(outputDir, "pack");
   const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  projectFixtureWithoutUnmaterializedItxAdmission(fixture);
   const fixturePath = path.join(outputDir, "fixture.json");
   // 서울 station status와 KRIC feed absence는 route pathway 증거가 아니므로 strict route로 승격하지 않는다.
   const sadangEntry = fixture.packs[0].networkEdges.find((e) => e.id === "edge-entry-sadang-seoul-4");
@@ -12929,6 +12932,7 @@ test("field provenance는 materialized facility와 EXISTS evidence를 중복 집
   const outputDir = path.join(tmpdir(), `easysubway-accessibility-provenance-dedup-${Date.now()}`);
   const packOutputDir = path.join(outputDir, "pack");
   const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  projectFixtureWithoutUnmaterializedItxAdmission(fixture);
   const fixturePath = path.join(outputDir, "fixture.json");
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
   await execFileAsync(
@@ -13087,6 +13091,8 @@ test("수도권 pilot source coverage는 완결되지만 route coverage는 edge 
     { cwd: root },
   );
   const importedFixture = JSON.parse(await readFile(importedFixturePath, "utf8"));
+  projectFixtureWithoutUnmaterializedItxAdmission(importedFixture);
+  await writeFile(importedFixturePath, `${JSON.stringify(importedFixture, null, 2)}\n`);
   assert.equal(importedFixture.packs[0].requiredTables.includes("route_map_positions"), true);
   assert.equal(importedFixture.packs[0].minimumTableRows.route_map_positions, 2);
   assert.equal(importedFixture.packs[0].routeMapPositions.length, 2);
@@ -13183,6 +13189,8 @@ test("수도권 pilot source coverage는 완결되지만 route coverage는 edge 
     { cwd: root },
   );
   const scheduleExtrasFixture = JSON.parse(await readFile(scheduleExtrasFixturePath, "utf8"));
+  projectFixtureWithoutUnmaterializedItxAdmission(scheduleExtrasFixture);
+  await writeFile(scheduleExtrasFixturePath, `${JSON.stringify(scheduleExtrasFixture, null, 2)}\n`);
   assert.equal(scheduleExtrasFixture.packs[0].serviceCalendarDates[0].sourceId, "kric-subway-timetable");
   assert.equal(scheduleExtrasFixture.packs[0].transitFrequencies[0].sourceId, "kric-subway-timetable");
   await execFileAsync(
@@ -16140,6 +16148,18 @@ function makeProductionSourceFixtureExplicitlyUnavailable(fixture) {
     evidence.strictRouteEligible = false;
     evidence.strictRouteEligibleReason = "NO_OFFICIAL_STATUS_FEED";
   }
+}
+
+function projectFixtureWithoutUnmaterializedItxAdmission(fixture) {
+  const pack = fixture.packs[0];
+  assert.equal(
+    [...(pack.transitTrips ?? []), ...(pack.networkEdges ?? [])]
+      .some(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN"),
+    false,
+    "test fixture must not discard an admission for materialized ITX rows",
+  );
+  pack.routeServiceArtifactEvidence = [];
+  return fixture;
 }
 
 function addApprovedMovementPathwayEvidence(pack, { sourceId, sourceSnapshotId, verifiedAt }) {
