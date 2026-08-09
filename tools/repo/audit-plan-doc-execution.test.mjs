@@ -111,6 +111,37 @@ test("plan-doc execution audit fail closes malformed or partial provider respons
   assert.equal(report.summary.incomplete, 1);
 });
 
+test("plan-doc execution audit preserves both sides of a rename without treating one PR file as two", async () => {
+  const recordByPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
+  const provider = async ([, endpoint]) => {
+    if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}/pulls`) return JSON.stringify([{ number: 2798 }]);
+    const prMatch = endpoint.match(/^repos\/AquilaXk\/easysubway\/pulls\/(\d+)$/);
+    if (prMatch != null) {
+      const prNumber = Number(prMatch[1]);
+      const record = recordByPr.get(prNumber) ?? { issueNumber: 2797, relation: "CLOSES", mergeSha: SHA };
+      return JSON.stringify({ number: prNumber, merged: true, merge_commit_sha: record.mergeSha, base: { repo: { full_name: SCOPE.executionRepository } }, changed_files: 1, body: record.relation === "CLOSES" ? `Closes #${record.issueNumber}` : `Refs #${record.issueNumber}`, merged_at: OBSERVED_AT });
+    }
+    const filesMatch = endpoint.match(/^repos\/AquilaXk\/easysubway\/pulls\/(\d+)\/files\?per_page=100&page=(\d+)$/);
+    if (filesMatch != null) {
+      if (Number(filesMatch[2]) !== 1) return "[]";
+      return JSON.stringify(Number(filesMatch[1]) === 2749
+        ? [{ filename: "contracts/documentation/renamed.json", previous_filename: "apps/mobile/lib/old.dart" }]
+        : [{ filename: "contracts/documentation/example.json" }]);
+    }
+    const eventMatch = endpoint.match(/^repos\/AquilaXk\/easysubway\/issues\/(\d+)\/events\?per_page=100&page=(\d+)$/);
+    if (eventMatch != null) {
+      const issueNumber = Number(eventMatch[1]);
+      const record = [...recordByPr.values()].find((candidate) => candidate.issueNumber === issueNumber && candidate.relation === "CLOSES") ?? (issueNumber === 2797 ? { mergeSha: SHA } : null);
+      return JSON.stringify(Number(eventMatch[2]) === 1 && record != null ? [{ event: "closed", commit_id: record.mergeSha }] : []);
+    }
+    throw new Error(`unexpected provider request: ${endpoint}`);
+  };
+
+  const live = await collectPlanDocExecutionLive({ scope: SCOPE, sourceSha: SHA, execGh: provider });
+  assert.deepEqual(live.records[0].changedFiles, ["apps/mobile/lib/old.dart", "contracts/documentation/renamed.json"]);
+  assert.deepEqual(auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }).filter(({ code }) => code === "TARGET_PATH_MODIFICATION"), [{ code: "TARGET_PATH_MODIFICATION", identity: "pr:2749:apps/mobile/lib/old.dart" }]);
+});
+
 test("plan-doc execution audit CLI writes one schema-valid report for success, finding, and sanitized provider failure", async () => {
   const directory = mkdtempSync(join(tmpdir(), "plan-doc-execution-audit-"));
   const schema = JSON.parse(readFileSync("contracts/documentation/plan-doc-execution-audit-report.schema.json", "utf8"));
@@ -142,5 +173,28 @@ test("plan-doc execution audit CLI writes one schema-valid report for success, f
     writeFileSync(join(directory, "exists.json"), "existing\n");
     assert.equal((await runAuditCli({ argv: argv("exists.json"), collectLive: async () => matchingLive() })).exitCode, 2);
     assert.equal(readFileSync(join(directory, "exists.json"), "utf8"), "existing\n");
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("plan-doc execution audit CLI emits one sanitized incomplete report for invalid scope values", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "plan-doc-execution-audit-invalid-scope-"));
+  const schema = JSON.parse(readFileSync("contracts/documentation/plan-doc-execution-audit-report.schema.json", "utf8"));
+  const argv = (name) => [
+    "--scope", "scope", "--scope-schema", "scope-schema", "--report-schema", "report-schema",
+    "--source-sha", SHA, "--observed-at", OBSERVED_AT, "--output", join(directory, name),
+  ];
+  const read = async (path) => ({
+    "scope-schema": readFileSync("contracts/documentation/plan-doc-execution-audit-scope.schema.json", "utf8"),
+    "report-schema": readFileSync("contracts/documentation/plan-doc-execution-audit-report.schema.json", "utf8"),
+  })[path];
+  try {
+    for (const [name, scopeText] of [["invalid", "{"], ["null", "null"], ["missing", "{}"], ["wrong-repository", JSON.stringify({ ...SCOPE, executionRepository: "AquilaXk/easysubway-mobile" })]]) {
+      const result = await runAuditCli({ argv: argv(`${name}.json`), read: async (path) => path === "scope" ? scopeText : read(path), collectLive: async () => matchingLive() });
+      assert.equal(result.exitCode, 2, name);
+      const reportText = readFileSync(join(directory, `${name}.json`), "utf8");
+      const report = JSON.parse(reportText);
+      assert.equal(validateSchema(schema, report).ok, true, name);
+      assert.deepEqual([report.status, report.inputs.executionRepository, report.summary.incomplete], ["AUDIT_INCOMPLETE", "AquilaXk/easysubway", 1], name);
+    }
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });

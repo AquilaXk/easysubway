@@ -830,9 +830,13 @@ export function validatePlanDocExecutionAuditScope(scope, errors = [], path = "p
 
 export function validatePlanDocExecutionAuditReportSchema(schema, errors = [], path = "plan-doc-execution-audit-report.schema") {
   const report = schema?.properties;
+  const record = report?.records?.items;
+  const finding = report?.findings?.items;
+  const incomplete = report?.incomplete?.items;
   if (schema?.type !== "object" || schema?.additionalProperties !== false || JSON.stringify(schema?.required) !== JSON.stringify(["schemaVersion", "status", "observedAt", "inputs", "summary", "records", "findings", "incomplete"])) errors.push(`${path}: strict report schema가 필요하다`);
   if (report?.schemaVersion?.const !== 1 || JSON.stringify(report?.status?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"]) || report?.inputs?.properties?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || report?.inputs?.properties?.executionRepository?.const !== "AquilaXk/easysubway") errors.push(`${path}: source/repository status contract가 필요하다`);
-  if (report?.records?.items?.additionalProperties !== false || report?.findings?.items?.additionalProperties !== false || report?.incomplete?.items?.additionalProperties !== false || report?.findings?.uniqueItems !== true || report?.incomplete?.uniqueItems !== true) errors.push(`${path}: strict finding/incomplete records가 필요하다`);
+  if (record?.additionalProperties !== false || finding?.additionalProperties !== false || incomplete?.additionalProperties !== false || report?.findings?.uniqueItems !== true || report?.incomplete?.uniqueItems !== true) errors.push(`${path}: strict finding/incomplete records가 필요하다`);
+  if (JSON.stringify(record?.required) !== JSON.stringify(["kind", "issueNumber", "prNumber", "repository", "mergeSha", "changedFiles"]) || JSON.stringify(finding?.required) !== JSON.stringify(["code", "identity"]) || JSON.stringify(incomplete?.required) !== JSON.stringify(["stage", "code", "affectedIdentity"])) errors.push(`${path}: records/findings/incomplete exact required lists가 필요하다`);
   const parity = schema?.oneOf;
   if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: incomplete fail-closed parity가 필요하다`);
   return errors;

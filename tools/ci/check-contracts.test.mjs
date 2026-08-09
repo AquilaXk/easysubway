@@ -110,6 +110,15 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
   assert.ok(validatePlanDocExecutionAuditScope(invalid).length > 0);
   const weakened = structuredClone(reportSchema); delete weakened.oneOf;
   assert.ok(validatePlanDocExecutionAuditReportSchema(weakened).length > 0);
+  for (const [name, mutate] of [
+    ["records", (schema) => { schema.properties.records.items.required = schema.properties.records.items.required.filter((field) => field !== "changedFiles"); }],
+    ["findings", (schema) => { schema.properties.findings.items.required = schema.properties.findings.items.required.filter((field) => field !== "identity"); }],
+    ["incomplete", (schema) => { schema.properties.incomplete.items.required = schema.properties.incomplete.items.required.filter((field) => field !== "affectedIdentity"); }],
+  ]) {
+    const mutated = structuredClone(reportSchema);
+    mutate(mutated);
+    assert.ok(validatePlanDocExecutionAuditReportSchema(mutated).length > 0, name);
+  }
 });
 
 test("F15 reference audit scope validation is total and skips semantics after schema failure", () => {

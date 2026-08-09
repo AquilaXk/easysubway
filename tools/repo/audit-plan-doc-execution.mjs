@@ -83,8 +83,9 @@ export async function collectPlanDocExecutionLive({ scope, sourceSha, execGh = r
 async function collectRecord({ issueNumber, prNumber, execGh }) {
   const pr = parseJson(await execGh(["api", `repos/${REPOSITORY}/pulls/${prNumber}`]), `pr:${prNumber}`);
   if (pr?.number !== prNumber || pr?.merged !== true || !/^[0-9a-f]{40}$/.test(pr?.merge_commit_sha) || pr?.base?.repo?.full_name !== REPOSITORY || !Number.isInteger(pr?.changed_files) || pr.changed_files < 0 || pr.changed_files > MAX_ITEMS) throw new AuditIncomplete("PROVIDER_MALFORMED", `pr:${prNumber}`);
-  const changedFiles = await collectPages(`repos/${REPOSITORY}/pulls/${prNumber}/files`, `pr:${prNumber}:files`, execGh, (entry) => typeof entry?.filename === "string" && entry.filename !== "", (entry) => entry.filename);
-  if (changedFiles.length !== pr.changed_files) throw new AuditIncomplete("PROVIDER_PARTIAL", `pr:${prNumber}:files`);
+  const changedFileEntries = await collectPages(`repos/${REPOSITORY}/pulls/${prNumber}/files`, `pr:${prNumber}:files`, execGh, (entry) => typeof entry?.filename === "string" && entry.filename !== "" && (entry.previous_filename == null || (typeof entry.previous_filename === "string" && entry.previous_filename !== "")), (entry) => entry.filename);
+  if (changedFileEntries.length !== pr.changed_files) throw new AuditIncomplete("PROVIDER_PARTIAL", `pr:${prNumber}:files`);
+  const changedFiles = [...new Set(changedFileEntries.flatMap(({ filename, previous_filename: previousFilename }) => previousFilename == null ? [filename] : [previousFilename, filename]))].sort(codepointCompare);
   const events = await collectPages(`repos/${REPOSITORY}/issues/${issueNumber}/events`, `issue:${issueNumber}:events`, execGh, (entry) => typeof entry?.event === "string", (entry) => JSON.stringify(entry));
   return { issueNumber, prNumber, repository: pr.base.repo.full_name, mergeSha: pr.merge_commit_sha, mergedAt: pr.merged_at, changedFiles, relationText: String(pr.body ?? ""), closedByMerge: events.some((event) => event.event === "closed" && event.commit_id === pr.merge_commit_sha) };
 }
@@ -107,7 +108,7 @@ export function createPlanDocExecutionReport({ scope, scopeText, sourceSha, obse
   const normalizedIncomplete = incomplete.map(sanitizeIncomplete).sort(compareIncomplete);
   const records = live == null ? [] : [...live.records.map((record) => reportRecord("HISTORICAL", record)), reportRecord("SELF", live.self)].sort((a, b) => a.prNumber - b.prNumber);
   const sortedFindings = [...findings].sort(compare);
-  return { schemaVersion: 1, status: normalizedIncomplete.length === 0 ? "COMPLETE" : "AUDIT_INCOMPLETE", observedAt, inputs: { sourceSha, scopeSha256: sha256(scopeText), executionRepository: scope.executionRepository }, summary: { records: records.length, findings: sortedFindings.length, incomplete: normalizedIncomplete.length }, records, findings: sortedFindings, incomplete: normalizedIncomplete };
+  return { schemaVersion: 1, status: normalizedIncomplete.length === 0 ? "COMPLETE" : "AUDIT_INCOMPLETE", observedAt, inputs: { sourceSha, scopeSha256: sha256(scopeText), executionRepository: REPOSITORY }, summary: { records: records.length, findings: sortedFindings.length, incomplete: normalizedIncomplete.length }, records, findings: sortedFindings, incomplete: normalizedIncomplete };
 }
 function reportRecord(kind, record) { return { kind, issueNumber: record.issueNumber, prNumber: record.prNumber, repository: record.repository, mergeSha: record.mergeSha, changedFiles: [...record.changedFiles].sort() }; }
 function sanitizeIncomplete({ stage, code, affectedIdentity }) { return { stage: String(stage).replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "") || "unknown", code: String(code).replace(/[^A-Z0-9_]/g, "_"), affectedIdentity: String(affectedIdentity).replace(/[^A-Za-z0-9:._/-]/g, "_") }; }
