@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "repository", "releaseDecision", "parents", "mobilePrivacyGate", "declaredJitChildren"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "repository": { "const": "AquilaXk/easysubway" },
+    "releaseDecision": { "type": "object", "additionalProperties": false, "required": ["repository", "number"], "properties": { "repository": { "const": "AquilaXk/easysubway" }, "number": { "const": 1020 } } },
+    "mobilePrivacyGate": { "type": "object", "additionalProperties": false, "required": ["repository", "number"], "properties": { "repository": { "const": "AquilaXk/easysubway-mobile" }, "number": { "const": 36 } } },
+    "parents": { "type": "object", "additionalProperties": false, "required": ["fieldResearch", "privacyMetrics"], "properties": { "fieldResearch": { "type": "object", "additionalProperties": false, "required": ["repository", "number", "activationMarker", "blockedMarkers"], "properties": { "repository": { "const": "AquilaXk/easysubway" }, "number": { "const": 2766 }, "activationMarker": { "type": "string" }, "blockedMarkers": { "type": "array", "minItems": 2, "maxItems": 2, "uniqueItems": true, "items": { "type": "string" } } } }, "privacyMetrics": { "type": "object", "additionalProperties": false, "required": ["repository", "number", "activationMarker", "blockedMarkers"], "properties": { "repository": { "const": "AquilaXk/easysubway" }, "number": { "const": 2768 }, "activationMarker": { "type": "string" }, "blockedMarkers": { "type": "array", "minItems": 4, "maxItems": 4, "uniqueItems": true, "items": { "type": "string" } } } } } },
+    "declaredJitChildren": { "type": "array", "maxItems": 0, "uniqueItems": true }
+  }
+}

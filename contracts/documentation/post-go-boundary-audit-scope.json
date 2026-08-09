@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "repository": "AquilaXk/easysubway",
+  "releaseDecision": { "repository": "AquilaXk/easysubway", "number": 1020 },
+  "parents": {
+    "fieldResearch": { "repository": "AquilaXk/easysubway", "number": 2766, "activationMarker": "activation      Hub #1020 GO + stable public release scope", "blockedMarkers": ["stable public release      NOT_PROVEN", "activation                 NOT_PROVEN"] },
+    "privacyMetrics": { "repository": "AquilaXk/easysubway", "number": 2768, "activationMarker": "activation      Mobile #36 terminal + public release + exact product question", "blockedMarkers": ["Mobile #36 terminal        NOT_PROVEN", "stable public release      NOT_PROVEN", "exact product question     NOT_PROVEN", "activation                 NOT_PROVEN"] }
+  },
+  "mobilePrivacyGate": { "repository": "AquilaXk/easysubway-mobile", "number": 36 },
+  "declaredJitChildren": []
+}
