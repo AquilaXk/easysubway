@@ -421,8 +421,22 @@ test("post-snapshot amendments는 snapshot 밖 hub issue의 분류를 기록한�
   assert.deepEqual(validateSchema(amendmentsSchema(), amendments).errors, []);
   assert.deepEqual(validateAmendments(amendments, { ledger }), []);
   assert.deepEqual(amendments.amendments.map(({ sourceIssue }) => sourceIssue), [
-    2700, 2705, 2710, 2712, 2714, 2720, 2727, 2728,
+    1685, 2649, 2700, 2705, 2710, 2712, 2714, 2720, 2727, 2728, 2729,
+    2731, 2732, 2734, 2739, 2740, 2741, 2742, 2743, 2747, 2748, 2764,
+    2765, 2766, 2767, 2768, 2776,
   ]);
+  assert.deepEqual(
+    Object.fromEntries(
+      amendments.amendments
+        .filter(({ sourceIssue }) => [2727, 2728, 2743].includes(sourceIssue))
+        .map(({ sourceIssue, title }) => [sourceIssue, title]),
+    ),
+    {
+      2727: "[CI][Architecture][P2] target Dependabot 완료·Hub /backend 중복 제거",
+      2728: "[Architecture][P0] Mobile source-file pin → Journey V3 mobile component manifest 전환",
+      2743: "[Architecture][P0][No-Fallback] 5개 레포 구현상 semantic fallback 영구 금지·재도입 방지",
+    },
+  );
   assert.deepEqual(
     amendments.amendments.filter(({ disposition }) => disposition === "TRANSFER"),
     [{
@@ -449,16 +463,18 @@ test("amendments는 snapshot ledger sourceIssue와 겹치면 무효화한다", (
 test("amendments 안의 sourceIssue 중복은 무효화한다", () => {
   const ledger = ledgerFixture();
   const amendments = amendmentsFixture();
-  amendments.amendments.push(structuredClone(amendments.amendments[1]));
+  const duplicate = structuredClone(amendments.amendments[1]);
+  amendments.amendments.push(duplicate);
 
-  assert.deepEqual(validateAmendments(amendments, { ledger }), ["amendments: sourceIssue 2705 중복"]);
+  assert.deepEqual(validateAmendments(amendments, { ledger }), [`amendments: sourceIssue ${duplicate.sourceIssue} 중복`]);
 });
 
 test("amendments TRANSFER는 targetRepository와 일치하는 실행 필드를 요구한다", () => {
   const ledger = ledgerFixture();
-  const executionError = "amendments[0].execution: TRANSFER는 targetRepository와 일치하는 targetUrl과 transferredAt이 필요함";
+  const transferIndex = amendmentsFixture().amendments.findIndex(({ sourceIssue }) => sourceIssue === 2700);
+  const executionError = `amendments[${transferIndex}].execution: TRANSFER는 targetRepository와 일치하는 targetUrl과 transferredAt이 필요함`;
   const mismatchedRepository = amendmentsFixture();
-  mismatchedRepository.amendments[0].targetUrl = "https://github.com/AquilaXk/easysubway-backend/issues/45";
+  mismatchedRepository.amendments[transferIndex].targetUrl = "https://github.com/AquilaXk/easysubway-backend/issues/45";
 
   // 스키마는 승인된 4개 target repository URL을 모두 허용하므로 target↔URL 결속은 semantic 검증이 잡는다.
   assert.deepEqual(validateSchema(amendmentsSchema(), mismatchedRepository).errors, []);
@@ -470,10 +486,10 @@ test("amendments TRANSFER는 targetRepository와 일치하는 실행 필드를 �
     (entry) => { entry.transferredAt = "2026-08-32T16:08:48Z"; },
   ]) {
     const amendments = amendmentsFixture();
-    mutate(amendments.amendments[0]);
+    mutate(amendments.amendments[transferIndex]);
     assert.deepEqual(validateAmendments(amendments, { ledger }), [executionError]);
     assert.ok(validateSchema(amendmentsSchema(), amendments).errors.some(
-      (error) => error.includes("$.amendments.0: oneOf 분기 정확히 하나와 일치해야 함"),
+      (error) => error.includes(`$.amendments.${transferIndex}: oneOf 분기 정확히 하나와 일치해야 함`),
     ));
   }
 });
