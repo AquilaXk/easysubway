@@ -500,6 +500,7 @@ async function syncReleaseEvidence({ check }) {
     spec: path.join(root, "tools/datapack/release/candidate-build-spec.json"),
     snapshots: path.join(root, "tools/datapack/release/source-snapshots.json"),
     inventory: path.join(root, "tools/datapack/source-inventory.json"),
+    mobileInventory: path.join(root, "apps/mobile/assets/datapacks/source-inventory.json"),
     request: path.join(root, "tools/datapack/release/release-request.json"),
     hashes: path.join(root, "tools/datapack/release/hash-evidence.json"),
     canonical: path.join(root, "tools/datapack/release/capital-production-canonical-pack.json"),
@@ -507,7 +508,7 @@ async function syncReleaseEvidence({ check }) {
     governance: path.join(root, "tools/datapack/source-governance-policy.json"),
     freshness: path.join(root, "release/product-gates/datapack-freshness-sla.json"),
   };
-  const [specBytes, snapshotBytes, inventoryBytes, requestBytes, hashBytes, canonicalBytes, productionScopeBytes, governanceBytes, freshnessBytes] = await Promise.all(
+  const [specBytes, snapshotBytes, inventoryBytes, mobileInventoryBytes, requestBytes, hashBytes, canonicalBytes, productionScopeBytes, governanceBytes, freshnessBytes] = await Promise.all(
     Object.values(paths).map((file) => readFile(file)),
   );
   const spec = JSON.parse(specBytes);
@@ -590,6 +591,7 @@ async function syncReleaseEvidence({ check }) {
   if (check) {
     for (const [label, actual, expected] of [
       ["candidate build spec", specBytes, nextSpecBytes],
+      ["mobile source inventory", mobileInventoryBytes, inventoryBytes],
       ["release request", requestBytes, nextRequestBytes],
       ["hash evidence", hashBytes, nextHashBytes],
     ]) if (!actual.equals(expected)) throw new Error(`${label} is stale`);
@@ -597,6 +599,7 @@ async function syncReleaseEvidence({ check }) {
   }
   await Promise.all([
     writeFile(paths.spec, nextSpecBytes),
+    writeFile(paths.mobileInventory, inventoryBytes),
     writeFile(paths.request, nextRequestBytes),
     writeFile(paths.hashes, nextHashBytes),
   ]);
