@@ -8483,8 +8483,8 @@ test("운영 관측성과 알림 기준선은 필수 release 신호와 심볼 �
     currentImplementation: {
       status: "SATISFIED",
       fields: ["snapshotSha256", "freshUntil"],
-      snapshotId: "server-timetable-snapshot-cb3cbcc4a5ab6727",
-      snapshotSha256: "cb3cbcc4a5ab6727d1097df25f33c3a8bebe3a3946ae5b4c3386955b0966d79f",
+      snapshotId: "server-timetable-snapshot-4c5edd51c10fb187",
+      snapshotSha256: "4c5edd51c10fb187e6d09122b89ddd8b35343b2f54404773f4ed8e245236bfe8",
       freshUntil: "2026-08-03T00:00:00+09:00",
       evidencePath: "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json",
     },
