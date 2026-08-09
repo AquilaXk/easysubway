@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
 import { open, readFile, realpath, lstat } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
 
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
@@ -129,7 +130,7 @@ export async function auditPublicSensitivity({ scope, receipts, observedAt, exec
     if (first.gitSha !== last.gitSha || first.defaultBranch !== last.defaultBranch || beginDigest !== endDigest) incomplete.push(incompleteEntry("watermark", "WATERMARK_DRIFT", repository));
     incomplete.push(...metadata.incomplete, ...finalMetadata.incomplete);
     for (const item of metadata.items) { scannedSurfaces += 1; candidates.push(...detect(item.text, item, scope)); }
-    const evidence = await collectEvidenceBlobs({ repository, gitSha: first.gitSha, paths: scope.repositories.find((entry) => entry.repository === repository)?.publicEvidencePaths ?? [], execGh });
+    const evidence = await collectEvidenceBlobs({ repository, gitSha: first.gitSha, paths: scope?.repositories?.find((entry) => entry?.repository === repository)?.publicEvidencePaths ?? [], execGh });
     incomplete.push(...evidence.incomplete);
     for (const item of evidence.items) { scannedArtifacts += 1; candidates.push(...detect(item.text, item, scope)); }
     const artifacts = await collectActionsArtifacts({ repository, execGh, receiptArtifacts: receipt?.publicArtifacts ?? [], observedAt, detectorPolicyVersion: scope?.detectorPolicyVersion });
@@ -257,7 +258,7 @@ export function validateReport(report, errors = []) {
 function detect(text, identity, scope) {
   const rules = [["PRIVATE_KEY_BLOCK", /-----BEGIN (?:[A-Z ]*PRIVATE KEY)-----/g], ["KNOWN_TOKEN_FORMAT", /(?:gh[opsu]_|github_pat_|sk-)[A-Za-z0-9_-]{16,}/g], ["AUTHORIZATION_VALUE", /authorization\s*:\s*(?:bearer|basic)\s+\S+/gi], ["SIGNED_URL_QUERY", /[?&](?:X-Amz-Signature|Signature|sig|token)=[^\s&#]+/gi], ["PRIVATE_ABSOLUTE_PATH", /(?:\/Users\/|\/home\/|[A-Za-z]:\\Users\\)/g], ["RAW_PROVIDER_PAYLOAD", /"(?:access_token|client_secret|private_key)"\s*:/gi], ["RAW_USER_PAYLOAD", /"(?:password|authorization)"\s*:/gi]];
   const findings = [];
-  for (const [detectorId, pattern] of rules) { let match; let ordinal = 0; while ((match = pattern.exec(text)) != null) { ordinal += 1; findings.push({ code: "SENSITIVE_RAW_EVIDENCE", detectorId, repository: identity.repository, surface: identity.surface, immutableSourceIdentity: identity.immutableSourceIdentity, locationFingerprint: digestBytes(`${identity.repository}\u0000${identity.surface}\u0000${identity.immutableSourceIdentity}\u0000${detectorId}\u0000${ordinal}\u0000${match.index}`) }); if (match[0] === "") break; } }
+  for (const [detectorId, pattern] of rules) { if (!scope?.detectors?.includes(detectorId)) continue; let match; let ordinal = 0; while ((match = pattern.exec(text)) != null) { ordinal += 1; findings.push({ code: "SENSITIVE_RAW_EVIDENCE", detectorId, repository: identity.repository, surface: identity.surface, immutableSourceIdentity: identity.immutableSourceIdentity, locationFingerprint: digestBytes(`${identity.repository}\u0000${identity.surface}\u0000${identity.immutableSourceIdentity}\u0000${detectorId}\u0000${ordinal}\u0000${match.index}`) }); if (match[0] === "") break; } }
   return findings;
 }
 
@@ -288,8 +289,68 @@ function sortedUnique(items) { return Array.isArray(items) && items.every((item,
 function codepointCompare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 
 async function boundedGh({ method, endpoint, binary = false }) { if (method !== "GET" || !/^repos\/AquilaXk\/easysubway(?:-(?:backend|data|mobile|platform))?(?:\/|$)/.test(endpoint)) throw new Error("invalid provider request"); return new Promise((resolvePromise, reject) => { const child = spawn("gh", ["api", "--method", "GET", endpoint], { stdio: ["ignore", "pipe", "ignore"] }); const chunks = []; let length = 0; const limit = binary ? BINARY_OUTPUT_LIMIT : OUTPUT_LIMIT; const timer = setTimeout(() => child.kill(), 30_000); child.stdout.on("data", (chunk) => { chunks.push(chunk); length += chunk.length; if (length > limit) child.kill(); }); child.on("error", reject); child.on("close", (code) => { clearTimeout(timer); if (code !== 0 || length > limit) reject(new Error("provider unavailable")); else { const output = Buffer.concat(chunks); try { resolvePromise(binary ? output : JSON.parse(output.toString("utf8"))); } catch { reject(new Error("malformed response")); } } }); }); }
-export async function runAuditCli(args = process.argv.slice(2)) { let parsed; let root; let output; let scopeText = ""; let scopeSchemaText = ""; let receiptSchemaText = ""; let reportSchemaText = ""; let runnerText = ""; try { parsed = parseArgs(args); root = await realpath(parsed.root); output = await containedPath(root, parsed.output, true); [scopeSchemaText, receiptSchemaText, reportSchemaText, runnerText] = await Promise.all([readFile(new URL("../../contracts/documentation/public-sensitivity-audit-scope.schema.json", import.meta.url), "utf8"), readFile(new URL("../../contracts/documentation/public-sensitivity-owner-receipt.schema.json", import.meta.url), "utf8"), readFile(new URL("../../contracts/documentation/public-sensitivity-audit-report.schema.json", import.meta.url), "utf8"), readFile(new URL(import.meta.url), "utf8")]); let receiptText; [scopeText, receiptText] = await Promise.all([readFile(await containedPath(root, parsed.scope), "utf8"), readFile(await containedPath(root, parsed.receipts), "utf8")]); const scope = JSON.parse(scopeText); const receipts = JSON.parse(receiptText); const errors = [...validateSchema(JSON.parse(scopeSchemaText), scope).errors, ...validateScope(scope), ...(Array.isArray(receipts) ? receipts : [null]).flatMap((receipt) => validateSchema(JSON.parse(receiptSchemaText), receipt).errors)]; const audit = errors.length ? { inputs: failureInputs(scopeText, `${scopeSchemaText}${receiptSchemaText}${reportSchemaText}`, runnerText), findings: [], incomplete: errors.map((_, index) => incompleteEntry("contract", "INVALID_CONTRACT", `contract-${index + 1}`)) } : await auditPublicSensitivity({ scope, receipts, observedAt: parsed.observedAt, sourceBytes: { scope: scopeText, schema: `${scopeSchemaText}${receiptSchemaText}${reportSchemaText}`, runner: runnerText } }); const report = createReport({ observedAt: parsed.observedAt, ...audit }); if (!validateSchema(JSON.parse(reportSchemaText), report).ok || validateReport(report).length) throw new Error("report invalid"); const file = await open(output, "wx"); await file.writeFile(`${JSON.stringify(report, null, 2)}\n`); await file.close(); return report.status === "AUDIT_INCOMPLETE" ? 2 : report.findings.length ? 1 : 0; } catch { if (output != null) { try { const report = createReport({ observedAt: parsed?.observedAt ?? "1970-01-01T00:00:00.000Z", inputs: failureInputs(scopeText, `${scopeSchemaText}${receiptSchemaText}${reportSchemaText}`, runnerText), incomplete: [incompleteEntry("audit", "AUDIT_FAILURE", "audit")] }); const schema = JSON.parse(reportSchemaText); if (!validateSchema(schema, report).ok || validateReport(report).length) throw new Error("failure report invalid"); const file = await open(output, "wx"); await file.writeFile(`${JSON.stringify(report, null, 2)}\n`); await file.close(); } catch {} } return 2; } }
+
+async function readContracts() {
+  const [scopeSchemaText, receiptSchemaText, reportSchemaText, runnerText] = await Promise.all([
+    readFile(new URL("../../contracts/documentation/public-sensitivity-audit-scope.schema.json", import.meta.url), "utf8"),
+    readFile(new URL("../../contracts/documentation/public-sensitivity-owner-receipt.schema.json", import.meta.url), "utf8"),
+    readFile(new URL("../../contracts/documentation/public-sensitivity-audit-report.schema.json", import.meta.url), "utf8"),
+    readFile(new URL(import.meta.url), "utf8"),
+  ]);
+  return { scopeSchemaText, receiptSchemaText, reportSchemaText, runnerText };
+}
+
+async function writeReport(output, report, reportSchemaText) {
+  if (!validateSchema(JSON.parse(reportSchemaText), report).ok || validateReport(report).length) throw new Error("report invalid");
+  const file = await open(output, "wx");
+  try { await file.writeFile(`${JSON.stringify(report, null, 2)}\n`); } finally { await file.close(); }
+}
+
+async function writeFailureReport({ output, observedAt, scopeText, scopeSchemaText, receiptSchemaText, reportSchemaText, runnerText }) {
+  const report = createReport({
+    observedAt: observedAt ?? "1970-01-01T00:00:00.000Z",
+    inputs: failureInputs(scopeText, `${scopeSchemaText}${receiptSchemaText}${reportSchemaText}`, runnerText),
+    incomplete: [incompleteEntry("audit", "AUDIT_FAILURE", "audit")],
+  });
+  await writeReport(output, report, reportSchemaText);
+}
+
+export async function runAuditCli(args = process.argv.slice(2)) {
+  let parsed; let output;
+  let scopeText = ""; let scopeSchemaText = ""; let receiptSchemaText = ""; let reportSchemaText = ""; let runnerText = "";
+  try {
+    parsed = parseArgs(args);
+    const root = await realpath(parsed.root);
+    output = await containedPath(root, parsed.output, true);
+    ({ scopeSchemaText, receiptSchemaText, reportSchemaText, runnerText } = await readContracts());
+    const [loadedScopeText, receiptText] = await Promise.all([
+      readFile(await containedPath(root, parsed.scope), "utf8"),
+      readFile(await containedPath(root, parsed.receipts), "utf8"),
+    ]);
+    scopeText = loadedScopeText;
+    const scope = JSON.parse(scopeText); const receipts = JSON.parse(receiptText);
+    const errors = [
+      ...validateSchema(JSON.parse(scopeSchemaText), scope).errors,
+      ...validateScope(scope),
+      ...(Array.isArray(receipts) ? receipts : [null]).flatMap((receipt) => validateSchema(JSON.parse(receiptSchemaText), receipt).errors),
+    ];
+    const schemaText = `${scopeSchemaText}${receiptSchemaText}${reportSchemaText}`;
+    const audit = errors.length
+      ? { inputs: failureInputs(scopeText, schemaText, runnerText), findings: [], incomplete: errors.map((_, index) => incompleteEntry("contract", "INVALID_CONTRACT", `contract-${index + 1}`)) }
+      : await auditPublicSensitivity({ scope, receipts, observedAt: parsed.observedAt, sourceBytes: { scope: scopeText, schema: schemaText, runner: runnerText } });
+    const report = createReport({ observedAt: parsed.observedAt, ...audit });
+    await writeReport(output, report, reportSchemaText);
+    return report.status === "AUDIT_INCOMPLETE" ? 2 : report.findings.length ? 1 : 0;
+  } catch {
+    process.stderr.write("AUDIT_INCOMPLETE\n");
+    if (output != null && reportSchemaText !== "") {
+      try { await writeFailureReport({ output, observedAt: parsed?.observedAt, scopeText, scopeSchemaText, receiptSchemaText, reportSchemaText, runnerText }); }
+      catch { process.stderr.write("AUDIT_INCOMPLETE_REPORT_UNAVAILABLE\n"); }
+    }
+    return 2;
+  }
+}
 function failureInputs(scopeText, schemaText, runnerText) { return { policyDigest: digestBytes(scopeText), schemaDigest: digestBytes(schemaText), runnerDigest: digestBytes(runnerText), repositories: REPOSITORIES.map((repository) => ({ repository, defaultBranch: "main", gitSha: "0".repeat(40), beginWatermark: "0".repeat(64), endWatermark: "0".repeat(64), receiptLocator: safeReceiptLocator(repository) })) }; }
 function parseArgs(args) { if (args.length !== 10 || args[0] !== "--scope" || args[2] !== "--owner-receipts" || args[4] !== "--observed-at" || args[6] !== "--repository-root" || args[8] !== "--output" || !canonicalUtc(args[5])) throw new Error("invalid arguments"); return { scope: args[1], receipts: args[3], observedAt: args[5], root: args[7], output: args[9] }; }
 async function containedPath(root, candidate, output = false) { if (!safePathToken(candidate)) throw new Error("unsafe path"); const path = resolve(root, candidate); if (relative(root, path).startsWith("..")) throw new Error("unsafe path"); const boundary = output ? dirname(path) : path; const real = await realpath(boundary); if (real !== root && !real.startsWith(`${root}/`)) throw new Error("unsafe path"); const parts = relative(root, boundary).split("/").filter(Boolean); let cursor = root; for (const part of parts) { cursor = resolve(cursor, part); if ((await lstat(cursor)).isSymbolicLink()) throw new Error("unsafe path"); } if (!output && (await lstat(path)).isSymbolicLink()) throw new Error("unsafe path"); return path; }
-if (process.argv[1] === new URL(import.meta.url).pathname) process.exitCode = await runAuditCli();
+if (process.argv[1] === fileURLToPath(import.meta.url)) process.exitCode = await runAuditCli();

@@ -25,7 +25,7 @@ function fakeGh({ body = "safe", next = false } = {}) { return async ({ method, 
   if (endpoint === `repos/${repository}/git/ref/heads/main`) return { object: { sha: SHA } };
   if (endpoint.includes("/git/trees/")) return { truncated: false, tree: [] };
   if (endpoint.includes("/actions/artifacts")) return { total_count: 0, artifacts: [] };
-  if (endpoint.includes("/issues?")) return [{ id: 1, title: "safe", body: repository === REPOSITORIES[0] ? body : "safe", pull_request: null, updated_at: OBSERVED_AT }];
+  if (endpoint.includes("/issues?")) return [{ id: 1, number: 1, title: "safe", body: repository === REPOSITORIES[0] ? body : "safe", pull_request: null, updated_at: OBSERVED_AT }];
   if (endpoint.includes("/pulls?")) return [];
   if (endpoint.includes("/issues/comments") || endpoint.includes("/issues/1/comments") || endpoint.includes("/pulls/comments") || endpoint.includes("/pulls/1/reviews") || endpoint.includes("/comments") || endpoint.includes("/releases")) return next ? { body: [], next: true } : [];
   throw new Error("unapproved endpoint");
@@ -135,7 +135,9 @@ test("D20.1 F2/F7 contract failure writes a schema-valid wx incomplete report wi
 
 test("D20.1 F8 missing input still writes a schema-valid incomplete report", async () => {
   const root = mkdtempSync(join(tmpdir(), "public-sensitivity-missing-input-"));
+  const diagnostics = []; const originalWrite = process.stderr.write;
   try {
+    process.stderr.write = (chunk) => { diagnostics.push(String(chunk)); return true; };
     mkdirSync(join(root, "out"));
     writeFileSync(join(root, "receipts.json"), JSON.stringify(REPOSITORIES.map(receipt)));
     const args = ["--scope", "missing-scope.json", "--owner-receipts", "receipts.json", "--observed-at", OBSERVED_AT, "--repository-root", root, "--output", "out/report.json"];
@@ -144,7 +146,8 @@ test("D20.1 F8 missing input still writes a schema-valid incomplete report", asy
     const reportSchema = JSON.parse(readFileSync("contracts/documentation/public-sensitivity-audit-report.schema.json", "utf8"));
     assert.equal(validateSchema(reportSchema, parsed).ok, true);
     assert.deepEqual(validateReport(parsed), []);
-  } finally { rmSync(root, { recursive: true, force: true }); }
+    assert.deepEqual(diagnostics, ["AUDIT_INCOMPLETE\n"]);
+  } finally { process.stderr.write = originalWrite; rmSync(root, { recursive: true, force: true }); }
 });
 
 test("D20.1 scope keeps the exact closed inventory", () => { assert.deepEqual(validateScope(scope()), []); });
@@ -168,6 +171,14 @@ test("D20.1 closure pagination follows a full first page and rejects cross-page 
 test("D20.1 archive scanner handles stored and deflate entries without exporting entry bytes", () => {
   const archive = Buffer.from("504b0506000000000000000000000000000000000000", "hex");
   const result = scanArtifactArchive({ repository: REPOSITORIES[0], artifactId: "1", bytes: archive, scope: scope() });
+  assert.deepEqual(result.findings, []);
+  assert.deepEqual(result.incomplete, []);
+});
+
+test("D20.1 archive scanner honors the configured detector inventory", () => {
+  const configuredScope = { ...scope(), detectors: ["PRIVATE_KEY_BLOCK"] };
+  const archive = zip([{ name: "safe.txt", text: "ghp_abcdefghijklmnopqrstuvwxyz0123456789ABCD", method: 0 }]);
+  const result = scanArtifactArchive({ repository: REPOSITORIES[0], artifactId: "1", bytes: archive, scope: configuredScope });
   assert.deepEqual(result.findings, []);
   assert.deepEqual(result.incomplete, []);
 });
