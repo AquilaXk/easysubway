@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "repository", "gitSha", "observedAt", "secretScanningEnabled", "pushProtectionEnabled", "reachableRefAuditComplete", "alertEnumerationComplete", "locationEnumerationComplete", "openAlertCount", "unresolvedAlertCount", "detectorPolicyVersion", "evidenceLocator", "publicArtifactEnumerationComplete", "publicArtifacts"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "repository": { "type": "string", "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
+    "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "observedAt": { "type": "string", "format": "date-time" },
+    "secretScanningEnabled": { "const": true },
+    "pushProtectionEnabled": { "const": true },
+    "reachableRefAuditComplete": { "const": true },
+    "alertEnumerationComplete": { "const": true },
+    "locationEnumerationComplete": { "const": true },
+    "openAlertCount": { "type": "integer", "minimum": 0 },
+    "unresolvedAlertCount": { "type": "integer", "minimum": 0 },
+    "detectorPolicyVersion": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+    "evidenceLocator": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway(?:-(?:backend|data|mobile|platform))?/actions/runs/[0-9]+/artifacts/[0-9]+$" },
+    "publicArtifactEnumerationComplete": { "const": true },
+    "publicArtifacts": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifactId", "artifactName", "workflowPath", "runId", "archiveDigest", "expiresAt", "detectorPolicyVersion", "scanStatus", "scanReceiptLocator"],
+        "properties": {
+          "artifactId": { "type": "string", "pattern": "^[0-9]+$" },
+          "artifactName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._ -]{0,127}$" },
+          "workflowPath": { "type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9._/-]+\\.ya?ml$" },
+          "runId": { "type": "string", "pattern": "^[0-9]+$" },
+          "archiveDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+          "expiresAt": { "type": "string", "format": "date-time" },
+          "detectorPolicyVersion": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+          "scanStatus": { "type": "string", "enum": ["COMPLETE", "AUDIT_INCOMPLETE"] },
+          "scanReceiptLocator": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway(?:-(?:backend|data|mobile|platform))?/actions/runs/[0-9]+/artifacts/[0-9]+$" }
+        }
+      }
+    }
+  }
+}

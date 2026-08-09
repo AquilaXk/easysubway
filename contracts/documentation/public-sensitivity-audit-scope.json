@@ -1,0 +1,14 @@
+{
+  "schemaVersion": 1,
+  "detectorPolicyVersion": "public-sensitivity-v1",
+  "repositories": [
+    { "repository": "AquilaXk/easysubway", "publicEvidencePaths": ["evidence/public"] },
+    { "repository": "AquilaXk/easysubway-backend", "publicEvidencePaths": ["evidence/public"] },
+    { "repository": "AquilaXk/easysubway-data", "publicEvidencePaths": ["evidence/public"] },
+    { "repository": "AquilaXk/easysubway-mobile", "publicEvidencePaths": ["evidence/public"] },
+    { "repository": "AquilaXk/easysubway-platform", "publicEvidencePaths": ["evidence/public"] }
+  ],
+  "surfaces": ["REPOSITORY_SECURITY_RECEIPT", "ISSUE_TITLE", "ISSUE_BODY", "ISSUE_COMMENT", "PR_TITLE", "PR_BODY", "PR_COMMENT", "PR_REVIEW_BODY", "PR_REVIEW_COMMENT", "COMMIT_COMMENT", "RELEASE_METADATA", "PUBLIC_ARTIFACT"],
+  "detectors": ["PRIVATE_KEY_BLOCK", "KNOWN_TOKEN_FORMAT", "AUTHORIZATION_VALUE", "SIGNED_URL_QUERY", "PRIVATE_ABSOLUTE_PATH", "RAW_PROVIDER_PAYLOAD", "RAW_USER_PAYLOAD"],
+  "falsePositiveDispositions": []
+}

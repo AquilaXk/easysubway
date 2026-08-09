@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "detectorPolicyVersion", "repositories", "surfaces", "detectors", "falsePositiveDispositions"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "detectorPolicyVersion": { "type": "string", "pattern": "^[a-z0-9][a-z0-9.-]*$" },
+    "repositories": { "type": "array", "minItems": 5, "maxItems": 5, "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["repository", "publicEvidencePaths"], "properties": { "repository": { "type": "string", "pattern": "^AquilaXk/easysubway(?:-(?:backend|data|mobile|platform))?$" }, "publicEvidencePaths": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } } } } },
+    "surfaces": { "type": "array", "minItems": 12, "maxItems": 12, "uniqueItems": true, "items": { "type": "string", "enum": ["REPOSITORY_SECURITY_RECEIPT", "ISSUE_TITLE", "ISSUE_BODY", "ISSUE_COMMENT", "PR_TITLE", "PR_BODY", "PR_COMMENT", "PR_REVIEW_BODY", "PR_REVIEW_COMMENT", "COMMIT_COMMENT", "RELEASE_METADATA", "PUBLIC_ARTIFACT"] } },
+    "detectors": { "type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": { "type": "string", "enum": ["PRIVATE_KEY_BLOCK", "KNOWN_TOKEN_FORMAT", "AUTHORIZATION_VALUE", "SIGNED_URL_QUERY", "PRIVATE_ABSOLUTE_PATH", "RAW_PROVIDER_PAYLOAD", "RAW_USER_PAYLOAD"] } },
+    "falsePositiveDispositions": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["locationFingerprint", "detectorId", "reason", "owner", "verifiedAt", "expiresAt"], "properties": { "locationFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "detectorId": { "type": "string", "enum": ["PRIVATE_KEY_BLOCK", "KNOWN_TOKEN_FORMAT", "AUTHORIZATION_VALUE", "SIGNED_URL_QUERY", "PRIVATE_ABSOLUTE_PATH", "RAW_PROVIDER_PAYLOAD", "RAW_USER_PAYLOAD"] }, "reason": { "type": "string", "minLength": 1 }, "owner": { "type": "string", "minLength": 1 }, "verifiedAt": { "type": "string", "format": "date-time" }, "expiresAt": { "type": "string", "format": "date-time" } } } }
+  }
+}

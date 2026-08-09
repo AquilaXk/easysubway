@@ -1,0 +1,87 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "observedAt", "inputs", "summary", "findings", "incomplete"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "status": { "type": "string", "enum": ["COMPLETE", "AUDIT_INCOMPLETE"] },
+    "observedAt": { "type": "string", "format": "date-time" },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["policyDigest", "schemaDigest", "runnerDigest", "repositories"],
+      "properties": {
+        "policyDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "schemaDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "runnerDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "repositories": {
+          "type": "array",
+          "minItems": 5,
+          "maxItems": 5,
+          "uniqueItems": true,
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["repository", "defaultBranch", "gitSha", "beginWatermark", "endWatermark", "receiptLocator"],
+            "properties": {
+              "repository": { "type": "string", "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
+              "defaultBranch": { "type": "string", "pattern": "^[A-Za-z0-9._/-]+$" },
+              "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+              "beginWatermark": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "endWatermark": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "receiptLocator": { "type": "string", "pattern": "^https://github\\.com/AquilaXk/easysubway(?:-(?:backend|data|mobile|platform))?/actions/runs/[0-9]+/artifacts/[0-9]+$" }
+            }
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scannedSurfaces", "scannedArtifacts", "detectors", "findings", "incomplete"],
+      "properties": {
+        "scannedSurfaces": { "type": "integer", "minimum": 0 },
+        "scannedArtifacts": { "type": "integer", "minimum": 0 },
+        "detectors": { "type": "integer", "minimum": 0 },
+        "findings": { "type": "integer", "minimum": 0 },
+        "incomplete": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "findings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "detectorId", "repository", "surface", "immutableSourceIdentity", "locationFingerprint"],
+        "properties": {
+          "code": { "const": "SENSITIVE_RAW_EVIDENCE" },
+          "detectorId": { "type": "string", "enum": ["PRIVATE_KEY_BLOCK", "KNOWN_TOKEN_FORMAT", "AUTHORIZATION_VALUE", "SIGNED_URL_QUERY", "PRIVATE_ABSOLUTE_PATH", "RAW_PROVIDER_PAYLOAD", "RAW_USER_PAYLOAD"] },
+          "repository": { "type": "string", "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
+          "surface": { "type": "string", "enum": ["REPOSITORY_SECURITY_RECEIPT", "ISSUE_TITLE", "ISSUE_BODY", "ISSUE_COMMENT", "PR_TITLE", "PR_BODY", "PR_COMMENT", "PR_REVIEW_BODY", "PR_REVIEW_COMMENT", "COMMIT_COMMENT", "RELEASE_METADATA", "PUBLIC_ARTIFACT"] },
+          "immutableSourceIdentity": { "type": "string", "pattern": "^[A-Za-z0-9:._/-]{1,512}$" },
+          "locationFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+        }
+      }
+    },
+    "incomplete": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "code", "affectedIdentity"],
+        "properties": {
+          "stage": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "affectedIdentity": { "type": "string", "pattern": "^[A-Za-z0-9:._/-]{1,512}$" }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "type": "object", "properties": { "status": { "const": "COMPLETE" }, "incomplete": { "type": "array", "maxItems": 0 } } },
+    { "type": "object", "properties": { "status": { "const": "AUDIT_INCOMPLETE" }, "incomplete": { "type": "array", "minItems": 1 } } }
+  ]
+}
