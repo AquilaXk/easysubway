@@ -3,6 +3,7 @@ import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import { open, readFile } from "node:fs/promises";
 import { promisify } from "node:util";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isMainModule } from "../lib/is-main-module.mjs";
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
 
@@ -67,8 +68,8 @@ function relationMatches(record, observed) {
   return record.relation === "CLOSES" ? exactCloses && observed.closedByMerge === true : exactRefs && observed.closedByMerge === false;
 }
 
-function duplicateValues(values) { return [...new Set(values.filter((value, index) => values.indexOf(value) !== index))].sort((a, b) => String(a).localeCompare(String(b))); }
-function compare(left, right) { return `${left.code}\0${left.identity}`.localeCompare(`${right.code}\0${right.identity}`); }
+function duplicateValues(values) { return [...new Set(values.filter((value, index) => values.indexOf(value) !== index))].sort((a, b) => codepointCompare(String(a), String(b))); }
+function compare(left, right) { return codepointCompare(`${left.code}\0${left.identity}`, `${right.code}\0${right.identity}`); }
 
 export async function collectPlanDocExecutionLive({ scope, sourceSha, execGh = runGh }) {
   const records = [];
@@ -110,7 +111,7 @@ export function createPlanDocExecutionReport({ scope, scopeText, sourceSha, obse
 }
 function reportRecord(kind, record) { return { kind, issueNumber: record.issueNumber, prNumber: record.prNumber, repository: record.repository, mergeSha: record.mergeSha, changedFiles: [...record.changedFiles].sort() }; }
 function sanitizeIncomplete({ stage, code, affectedIdentity }) { return { stage: String(stage).replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "") || "unknown", code: String(code).replace(/[^A-Z0-9_]/g, "_"), affectedIdentity: String(affectedIdentity).replace(/[^A-Za-z0-9:._/-]/g, "_") }; }
-function compareIncomplete(a, b) { return `${a.stage}\0${a.code}\0${a.affectedIdentity}`.localeCompare(`${b.stage}\0${b.code}\0${b.affectedIdentity}`); }
+function compareIncomplete(a, b) { return codepointCompare(`${a.stage}\0${a.code}\0${a.affectedIdentity}`, `${b.stage}\0${b.code}\0${b.affectedIdentity}`); }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 
 export async function runGh(args, execute = execFileAsync) {
