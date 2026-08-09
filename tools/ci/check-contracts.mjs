@@ -6,6 +6,7 @@ import { createHash } from "node:crypto";
 import { basename, dirname, isAbsolute, join, relative, resolve, win32 } from "node:path";
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
 import { validateAmendments, validateLedger } from "../repo/issue-migration-ledger.mjs";
+import { validatePlanDocExecutionScope as validatePlanDocExecutionAuditInventory } from "../repo/audit-plan-doc-execution.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isDeepStrictEqual } from "node:util";
@@ -88,6 +89,8 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     publicSensitivityAuditScope: workspace.publicSensitivityAuditScope == null ? null : resolveWorkspacePath(workspace.publicSensitivityAuditScope),
     publicSensitivityOwnerReceiptSchema: workspace.publicSensitivityOwnerReceiptSchema == null ? null : resolveWorkspacePath(workspace.publicSensitivityOwnerReceiptSchema),
     publicSensitivityAuditReportSchema: workspace.publicSensitivityAuditReportSchema == null ? null : resolveWorkspacePath(workspace.publicSensitivityAuditReportSchema),
+    planDocExecutionAuditScope: workspace.planDocExecutionAuditScope == null ? null : resolveWorkspacePath(workspace.planDocExecutionAuditScope),
+    planDocExecutionAuditReportSchema: workspace.planDocExecutionAuditReportSchema == null ? null : resolveWorkspacePath(workspace.planDocExecutionAuditReportSchema),
   };
 }
 
@@ -182,6 +185,16 @@ export function collectContractErrors(
           } catch { errors.push(`${path}: 유효한 JSON이 필요하다`); }
         }
       }
+    }
+  }
+  const planDocAuditEntries = [workspace.planDocExecutionAuditScope, workspace.planDocExecutionAuditReportSchema];
+  if (planDocAuditEntries.some((entry) => entry != null)) {
+    if (planDocAuditEntries.some((entry) => entry == null)) errors.push("plan-doc execution audit workspace entries는 함께 필요하다");
+    else {
+      const scopeValid = validateJson(contract("documentation/plan-doc-execution-audit-scope.schema.json"), workspace.planDocExecutionAuditScope, errors);
+      if (scopeValid) validatePlanDocExecutionAuditScope(loadJson(workspace.planDocExecutionAuditScope), errors, workspace.planDocExecutionAuditScope);
+      if (!existsSync(workspace.planDocExecutionAuditReportSchema)) errors.push(`${workspace.planDocExecutionAuditReportSchema} 누락`);
+      else { try { validatePlanDocExecutionAuditReportSchema(loadJson(workspace.planDocExecutionAuditReportSchema), errors, workspace.planDocExecutionAuditReportSchema); } catch { errors.push(`${workspace.planDocExecutionAuditReportSchema}: 유효한 JSON이 필요하다`); } }
     }
   }
   let currentArchitectureDecisions = [];
@@ -803,6 +816,25 @@ export function validatePublicSensitivityAuditReportSchema(schema, errors = [], 
   if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: status/incomplete oneOf parity가 필요하다`);
   const inputRequired = repositoryList?.items?.required;
   if (!Array.isArray(inputRequired) || !inputRequired.includes("artifactBeginWatermark") || !inputRequired.includes("artifactEndWatermark") || repositoryList?.items?.properties?.artifactBeginWatermark?.pattern !== "^[0-9a-f]{64}$" || repositoryList?.items?.properties?.artifactEndWatermark?.pattern !== "^[0-9a-f]{64}$") errors.push(`${path}: artifact snapshot watermark input이 필요하다`);
+  return errors;
+}
+
+export function validatePlanDocExecutionAuditScope(scope, errors = [], path = "plan-doc-execution-audit-scope") {
+  if (scope?.schemaVersion !== 1 || scope?.executionRepository !== "AquilaXk/easysubway" || scope?.planOwner !== "PLAN-DOC" || scope?.self?.issueNumber !== 2797 || scope?.self?.planOwner !== "PLAN-DOC") errors.push(`${path}: exact PLAN-DOC self binding이 필요하다`);
+  if (JSON.stringify(scope?.forbiddenTargetPathPrefixes) !== JSON.stringify(["apps/mobile/", "backend/", "infra/", "tools/datapack/", "tools/ops/", "tools/release/"])) errors.push(`${path}: target path deny inventory는 exact여야 한다`);
+  const records = scope?.historical;
+  if (!Array.isArray(records) || records.length !== 16 || new Set(records.map(({ prNumber }) => prNumber)).size !== 16 || new Set(records.map(({ mergeSha }) => mergeSha)).size !== 16 || records.some((record) => record?.planOwner !== "PLAN-DOC" || record?.changedPathClass !== "HUB_GOVERNANCE_ONLY")) errors.push(`${path}: exact historical PLAN-DOC inventory가 필요하다`);
+  errors.push(...validatePlanDocExecutionAuditInventory(scope).map((error) => `${path}: ${error}`));
+  return errors;
+}
+
+export function validatePlanDocExecutionAuditReportSchema(schema, errors = [], path = "plan-doc-execution-audit-report.schema") {
+  const report = schema?.properties;
+  if (schema?.type !== "object" || schema?.additionalProperties !== false || JSON.stringify(schema?.required) !== JSON.stringify(["schemaVersion", "status", "observedAt", "inputs", "summary", "records", "findings", "incomplete"])) errors.push(`${path}: strict report schema가 필요하다`);
+  if (report?.schemaVersion?.const !== 1 || JSON.stringify(report?.status?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"]) || report?.inputs?.properties?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || report?.inputs?.properties?.executionRepository?.const !== "AquilaXk/easysubway") errors.push(`${path}: source/repository status contract가 필요하다`);
+  if (report?.records?.items?.additionalProperties !== false || report?.findings?.items?.additionalProperties !== false || report?.incomplete?.items?.additionalProperties !== false || report?.findings?.uniqueItems !== true || report?.incomplete?.uniqueItems !== true) errors.push(`${path}: strict finding/incomplete records가 필요하다`);
+  const parity = schema?.oneOf;
+  if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: incomplete fail-closed parity가 필요하다`);
   return errors;
 }
 

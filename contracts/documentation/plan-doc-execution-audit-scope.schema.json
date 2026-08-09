@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://easysubway.local/schema/plan-doc-execution-audit-scope.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "executionRepository", "planOwner", "forbiddenTargetPathPrefixes", "historical", "self"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "executionRepository": { "const": "AquilaXk/easysubway" },
+    "planOwner": { "const": "PLAN-DOC" },
+    "forbiddenTargetPathPrefixes": { "type": "array", "minItems": 6, "maxItems": 6, "uniqueItems": true, "items": { "enum": ["apps/mobile/", "backend/", "infra/", "tools/datapack/", "tools/ops/", "tools/release/"] } },
+    "historical": {
+      "type": "array", "minItems": 16, "maxItems": 16,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["issueNumber", "prNumber", "mergeSha", "relation", "planOwner", "changedPathClass"],
+        "properties": {
+          "issueNumber": { "type": "integer", "minimum": 1 },
+          "prNumber": { "type": "integer", "minimum": 1 },
+          "mergeSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+          "relation": { "enum": ["CLOSES", "COORDINATOR_FOLLOWUP"] },
+          "planOwner": { "const": "PLAN-DOC" },
+          "changedPathClass": { "const": "HUB_GOVERNANCE_ONLY" }
+        }
+      }
+    },
+    "self": {
+      "type": "object", "additionalProperties": false,
+      "required": ["issueNumber", "planOwner"],
+      "properties": { "issueNumber": { "const": 2797 }, "planOwner": { "const": "PLAN-DOC" } }
+    }
+  }
+}
