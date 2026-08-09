@@ -91,6 +91,8 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     publicSensitivityAuditReportSchema: workspace.publicSensitivityAuditReportSchema == null ? null : resolveWorkspacePath(workspace.publicSensitivityAuditReportSchema),
     planDocExecutionAuditScope: workspace.planDocExecutionAuditScope == null ? null : resolveWorkspacePath(workspace.planDocExecutionAuditScope),
     planDocExecutionAuditReportSchema: workspace.planDocExecutionAuditReportSchema == null ? null : resolveWorkspacePath(workspace.planDocExecutionAuditReportSchema),
+    postGoBoundaryAuditScope: workspace.postGoBoundaryAuditScope == null ? null : resolveWorkspacePath(workspace.postGoBoundaryAuditScope),
+    postGoBoundaryAuditReportSchema: workspace.postGoBoundaryAuditReportSchema == null ? null : resolveWorkspacePath(workspace.postGoBoundaryAuditReportSchema),
   };
 }
 
@@ -195,6 +197,16 @@ export function collectContractErrors(
       if (scopeValid) validatePlanDocExecutionAuditScope(loadJson(workspace.planDocExecutionAuditScope), errors, workspace.planDocExecutionAuditScope);
       if (!existsSync(workspace.planDocExecutionAuditReportSchema)) errors.push(`${workspace.planDocExecutionAuditReportSchema} 누락`);
       else { try { validatePlanDocExecutionAuditReportSchema(loadJson(workspace.planDocExecutionAuditReportSchema), errors, workspace.planDocExecutionAuditReportSchema); } catch { errors.push(`${workspace.planDocExecutionAuditReportSchema}: 유효한 JSON이 필요하다`); } }
+    }
+  }
+  const postGoEntries = [workspace.postGoBoundaryAuditScope, workspace.postGoBoundaryAuditReportSchema];
+  if (postGoEntries.some((entry) => entry != null)) {
+    if (postGoEntries.some((entry) => entry == null)) errors.push("post-GO boundary audit workspace entries는 함께 필요하다");
+    else {
+      const scopeValid = validateJson(contract("documentation/post-go-boundary-audit-scope.schema.json"), workspace.postGoBoundaryAuditScope, errors);
+      if (scopeValid) validatePostGoBoundaryAuditScope(loadJson(workspace.postGoBoundaryAuditScope), errors, workspace.postGoBoundaryAuditScope);
+      if (!existsSync(workspace.postGoBoundaryAuditReportSchema)) errors.push(`${workspace.postGoBoundaryAuditReportSchema} 누락`);
+      else { try { validatePostGoBoundaryAuditReportSchema(loadJson(workspace.postGoBoundaryAuditReportSchema), errors, workspace.postGoBoundaryAuditReportSchema); } catch { errors.push(`${workspace.postGoBoundaryAuditReportSchema}: 유효한 JSON이 필요하다`); } }
     }
   }
   let currentArchitectureDecisions = [];
@@ -840,6 +852,19 @@ export function validatePlanDocExecutionAuditReportSchema(schema, errors = [], p
   if (JSON.stringify(record?.required) !== JSON.stringify(["kind", "issueNumber", "prNumber", "repository", "mergeSha", "changedFiles"]) || JSON.stringify(finding?.required) !== JSON.stringify(["code", "identity"]) || JSON.stringify(incomplete?.required) !== JSON.stringify(["stage", "code", "affectedIdentity"])) errors.push(`${path}: records/findings/incomplete exact required lists가 필요하다`);
   const parity = schema?.oneOf;
   if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: incomplete fail-closed parity가 필요하다`);
+  return errors;
+}
+
+export function validatePostGoBoundaryAuditScope(scope, errors = [], path = "post-go-boundary-audit-scope") {
+  if (scope?.schemaVersion !== 1 || scope?.repository !== "AquilaXk/easysubway" || scope?.releaseDecision?.number !== 1020 || scope?.mobilePrivacyGate?.repository !== "AquilaXk/easysubway-mobile" || scope?.mobilePrivacyGate?.number !== 36) errors.push(`${path}: exact prerequisite binding이 필요하다`);
+  if (scope?.parents?.fieldResearch?.number !== 2766 || scope?.parents?.fieldResearch?.activationMarker !== "activation      Hub #1020 GO + stable public release scope" || scope?.parents?.privacyMetrics?.number !== 2768 || scope?.parents?.privacyMetrics?.activationMarker !== "activation      Mobile #36 terminal + public release + exact product question" || JSON.stringify(scope?.parents?.fieldResearch?.blockedMarkers) !== JSON.stringify(["stable public release      NOT_PROVEN", "activation                 NOT_PROVEN"]) || JSON.stringify(scope?.parents?.privacyMetrics?.blockedMarkers) !== JSON.stringify(["Mobile #36 terminal        NOT_PROVEN", "stable public release      NOT_PROVEN", "exact product question     NOT_PROVEN", "activation                 NOT_PROVEN"]) || !Array.isArray(scope?.declaredJitChildren) || scope.declaredJitChildren.length !== 0) errors.push(`${path}: exact parent/JIT inventory가 필요하다`);
+  return errors;
+}
+export function validatePostGoBoundaryAuditReportSchema(schema, errors = [], path = "post-go-boundary-audit-report.schema") {
+  const p = schema?.properties;
+  if (schema?.type !== "object" || schema?.additionalProperties !== false || JSON.stringify(schema?.required) !== JSON.stringify(["schemaVersion", "status", "observedAt", "inputs", "summary", "lanes", "findings", "incomplete"])) errors.push(`${path}: strict report schema가 필요하다`);
+  if (JSON.stringify(p?.inputs?.required) !== JSON.stringify(["sourceSha", "scopeSha256", "repository", "stateBeginSha256", "stateEndSha256"]) || p?.inputs?.properties?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || p?.inputs?.properties?.scopeSha256?.pattern !== "^[0-9a-f]{64}$" || !["stateBeginSha256", "stateEndSha256"].every((key) => JSON.stringify(p?.inputs?.properties?.[key]?.type) === JSON.stringify(["string", "null"]) && p.inputs.properties[key]?.pattern === "^[0-9a-f]{64}$") || p?.findings?.items?.properties?.code?.const !== "JIT_CHILD_CREATED_BEFORE_ACTIVATION") errors.push(`${path}: immutable source/finding contract가 필요하다`);
+  if (JSON.stringify(p?.status?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"]) || p?.lanes?.minItems !== 2 || p?.lanes?.maxItems !== 2 || JSON.stringify(p?.lanes?.items?.required) !== JSON.stringify(["parent", "status", "declaredJitChildren"]) || JSON.stringify(p?.lanes?.items?.properties?.status?.enum) !== JSON.stringify(["START_BLOCKED", "NOT_PROVEN"]) || p?.findings?.uniqueItems !== true || p?.incomplete?.uniqueItems !== true || !Array.isArray(schema?.oneOf) || schema.oneOf.length !== 2 || schema.oneOf[0]?.properties?.status?.const !== "COMPLETE" || schema.oneOf[0]?.properties?.incomplete?.maxItems !== 0 || schema.oneOf[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || schema.oneOf[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: fail-closed report parity가 필요하다`);
   return errors;
 }
 

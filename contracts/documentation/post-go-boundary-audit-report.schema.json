@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object", "additionalProperties": false,
+  "required": ["schemaVersion", "status", "observedAt", "inputs", "summary", "lanes", "findings", "incomplete"],
+  "properties": {
+    "schemaVersion": { "const": 1 }, "status": { "enum": ["COMPLETE", "AUDIT_INCOMPLETE"] }, "observedAt": { "type": "string", "format": "date-time" },
+    "inputs": { "type": "object", "additionalProperties": false, "required": ["sourceSha", "scopeSha256", "repository", "stateBeginSha256", "stateEndSha256"], "properties": { "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }, "scopeSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "repository": { "const": "AquilaXk/easysubway" }, "stateBeginSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }, "stateEndSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" } } },
+    "summary": { "type": "object", "additionalProperties": false, "required": ["declaredJitChildren", "findings", "incomplete"], "properties": { "declaredJitChildren": { "type": "integer", "minimum": 0 }, "findings": { "type": "integer", "minimum": 0 }, "incomplete": { "type": "integer", "minimum": 0 } } },
+    "lanes": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "object", "additionalProperties": false, "required": ["parent", "status", "declaredJitChildren"], "properties": { "parent": { "enum": ["fieldResearch", "privacyMetrics"] }, "status": { "enum": ["START_BLOCKED", "NOT_PROVEN"] }, "declaredJitChildren": { "type": "integer", "minimum": 0 } } } },
+    "findings": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["code", "identity"], "properties": { "code": { "const": "JIT_CHILD_CREATED_BEFORE_ACTIVATION" }, "identity": { "type": "string", "pattern": "^[A-Za-z0-9:._/-]+$" } } } },
+    "incomplete": { "type": "array", "uniqueItems": true, "items": { "type": "object", "additionalProperties": false, "required": ["stage", "code", "affectedIdentity"], "properties": { "stage": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" }, "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" }, "affectedIdentity": { "type": "string", "pattern": "^[A-Za-z0-9:._/-]+$" } } } }
+  },
+  "oneOf": [{ "type": "object", "properties": { "status": { "const": "COMPLETE" }, "incomplete": { "type": "array", "maxItems": 0 } } }, { "type": "object", "properties": { "status": { "const": "AUDIT_INCOMPLETE" }, "incomplete": { "type": "array", "minItems": 1 } } }]
+}
