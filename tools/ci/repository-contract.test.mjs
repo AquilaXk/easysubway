@@ -21040,9 +21040,12 @@ test("plan-doc execution audit workflow binds merged source SHA to a write-once 
   assert.match(workflow, /permissions:\n      contents: read\n      issues: read\n      pull-requests: read/);
   assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /set -euo pipefail/);
   assert.match(workflow, /node tools\/repo\/audit-plan-doc-execution\.mjs/);
-  for (const input of ["--scope contracts/documentation/plan-doc-execution-audit-scope.json", "--scope-schema contracts/documentation/plan-doc-execution-audit-scope.schema.json", "--report-schema contracts/documentation/plan-doc-execution-audit-report.schema.json", "--source-sha \"${GITHUB_SHA}\""]) assert.match(workflow, new RegExp(input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  for (const input of ["--scope contracts/documentation/plan-doc-execution-audit-scope.json", "--scope-schema contracts/documentation/plan-doc-execution-audit-scope.schema.json", "--report-schema contracts/documentation/plan-doc-execution-audit-report.schema.json", "--source-sha \"${GITHUB_SHA}\"", "--observed-at \"${OBSERVED_AT}\"", "--output \"${REPORT_PATH}\""]) assert.match(workflow, new RegExp(input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
   assert.match(workflow, /test ! -e "\$\{REPORT_PATH\}"/);
   assert.match(workflow, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
-  assert.doesNotMatch(workflow, /continue-on-error|cache|git (?:add|commit|push)/i);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.match(workflow, /retention-days: 14/);
+  assert.doesNotMatch(workflow, /continue-on-error|uses:\s*actions\/cache@|git (?:add|commit|push)/i);
 });

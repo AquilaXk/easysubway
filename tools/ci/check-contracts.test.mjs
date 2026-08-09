@@ -111,6 +111,10 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
   const weakened = structuredClone(reportSchema); delete weakened.oneOf;
   assert.ok(validatePlanDocExecutionAuditReportSchema(weakened).length > 0);
   for (const [name, mutate] of [
+    ["scopeSha256", (schema) => { schema.properties.inputs.properties.scopeSha256.pattern = ".+"; }],
+    ["record repository", (schema) => { schema.properties.records.items.properties.repository.const = "AquilaXk/other"; }],
+    ["mergeSha", (schema) => { schema.properties.records.items.properties.mergeSha.pattern = ".+"; }],
+    ["changedFiles uniqueness", (schema) => { schema.properties.records.items.properties.changedFiles.uniqueItems = false; }],
     ["records", (schema) => { schema.properties.records.items.required = schema.properties.records.items.required.filter((field) => field !== "changedFiles"); }],
     ["findings", (schema) => { schema.properties.findings.items.required = schema.properties.findings.items.required.filter((field) => field !== "identity"); }],
     ["incomplete", (schema) => { schema.properties.incomplete.items.required = schema.properties.incomplete.items.required.filter((field) => field !== "affectedIdentity"); }],

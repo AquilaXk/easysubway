@@ -110,7 +110,7 @@ export function createPlanDocExecutionReport({ scope, scopeText, sourceSha, obse
   const sortedFindings = [...findings].sort(compare);
   return { schemaVersion: 1, status: normalizedIncomplete.length === 0 ? "COMPLETE" : "AUDIT_INCOMPLETE", observedAt, inputs: { sourceSha, scopeSha256: sha256(scopeText), executionRepository: REPOSITORY }, summary: { records: records.length, findings: sortedFindings.length, incomplete: normalizedIncomplete.length }, records, findings: sortedFindings, incomplete: normalizedIncomplete };
 }
-function reportRecord(kind, record) { return { kind, issueNumber: record.issueNumber, prNumber: record.prNumber, repository: record.repository, mergeSha: record.mergeSha, changedFiles: [...record.changedFiles].sort() }; }
+function reportRecord(kind, record) { return { kind, issueNumber: record.issueNumber, prNumber: record.prNumber, repository: record.repository, mergeSha: record.mergeSha, changedFiles: [...record.changedFiles].sort(codepointCompare) }; }
 function sanitizeIncomplete({ stage, code, affectedIdentity }) { return { stage: String(stage).replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "") || "unknown", code: String(code).replace(/[^A-Z0-9_]/g, "_"), affectedIdentity: String(affectedIdentity).replace(/[^A-Za-z0-9:._/-]/g, "_") }; }
 function compareIncomplete(a, b) { return codepointCompare(`${a.stage}\0${a.code}\0${a.affectedIdentity}`, `${b.stage}\0${b.code}\0${b.affectedIdentity}`); }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }

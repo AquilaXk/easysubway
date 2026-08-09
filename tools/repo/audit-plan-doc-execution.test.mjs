@@ -142,6 +142,20 @@ test("plan-doc execution audit preserves both sides of a rename without treating
   assert.deepEqual(auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }).filter(({ code }) => code === "TARGET_PATH_MODIFICATION"), [{ code: "TARGET_PATH_MODIFICATION", identity: "pr:2749:apps/mobile/lib/old.dart" }]);
 });
 
+test("plan-doc execution audit report uses the repository codepoint comparator", () => {
+  const live = matchingLive();
+  live.self.changedFiles = ["contracts/😀.json", "contracts/\uE000.json"];
+
+  const report = createPlanDocExecutionReport({
+    scope: SCOPE, scopeText: JSON.stringify(SCOPE), sourceSha: SHA, observedAt: OBSERVED_AT, live,
+  });
+
+  assert.deepEqual(
+    report.records.find((record) => record.kind === "SELF").changedFiles,
+    ["contracts/😀.json", "contracts/\uE000.json"],
+  );
+});
+
 test("plan-doc execution audit CLI writes one schema-valid report for success, finding, and sanitized provider failure", async () => {
   const directory = mkdtempSync(join(tmpdir(), "plan-doc-execution-audit-"));
   const schema = JSON.parse(readFileSync("contracts/documentation/plan-doc-execution-audit-report.schema.json", "utf8"));
