@@ -2948,6 +2948,14 @@ test("route map admission evidence는 승인 필드 외 값을 거부한다", ()
   assert.ok(validateSchema(schema, inventory).errors.some((error) => (
     error.includes("routeMapAdmissionEvidence.serviceKey")
   )));
+
+  const currentTopologySource = inventory.sources.find((source) =>
+    source.routeMapAdmissionEvidence?.currentTopologyAdmission != null);
+  currentTopologySource.routeMapAdmissionEvidence.currentTopologyAdmission.serviceKey = "must-never-enter-contract";
+
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("currentTopologyAdmission.serviceKey")
+  )));
 });
 
 test("boundaries.json이 스스로 정합하다", () => {
