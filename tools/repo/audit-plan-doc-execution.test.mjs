@@ -27,6 +27,8 @@ const REFRESH_RECORDS = new Map([
   [2808, [2807, "3b0076e04df4f6947f33c37c09949ad6b7487238"]],
   [2810, [2809, "12a4a4753dbaf733fc436ff645a2f2a1d73b4048"]],
   [2813, [2729, "1c7521f0186b365b0a43cdb8fa25b35e06bafdbb", "COORDINATOR_FOLLOWUP"]],
+  [2815, [2814, "dc256a4e0f0759f572cdfb00233e6699840642e6"]],
+  [2817, [2816, "4f94f3fd794f61bd06c9b8f0cbfb6b7ec713da9c"]],
 ]);
 
 function matchingLive(scope = SCOPE) {
@@ -53,8 +55,8 @@ function matchingLive(scope = SCOPE) {
 }
 
 test("plan-doc execution audit scope fixes the exact historical inventory and self binding", () => {
-  assert.equal(SCOPE.historical.length, 24);
-  assert.equal(SCOPE.self.issueNumber, 2814);
+  assert.equal(SCOPE.historical.length, 26);
+  assert.equal(SCOPE.self.issueNumber, 2818);
   const byPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
   for (const [prNumber, [issueNumber, mergeSha, relation = "CLOSES"]] of REFRESH_RECORDS) {
     assert.deepEqual(byPr.get(prNumber), {
