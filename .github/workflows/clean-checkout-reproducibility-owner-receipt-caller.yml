@@ -1,0 +1,14 @@
+name: D13 Hub Clean Checkout Owner Receipt
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  owner-receipt:
+    permissions:
+      contents: read
+    uses: AquilaXk/easysubway/.github/workflows/clean-checkout-reproducibility-owner-receipt.yml@c84a23f981516640a530ab3119152c239597b6c6
+    with:
+      contract_path: contracts/documentation/clean-checkout-reproducibility-owner-contract.json

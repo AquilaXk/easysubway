@@ -1,0 +1,63 @@
+{
+  "schemaVersion": 1,
+  "repository": "AquilaXk/easysubway",
+  "variants": [
+    {
+      "variantId": "hub-documentation-contracts",
+      "runnerImage": "ubuntu-24.04",
+      "toolchainDigest": "2bafa62df07a90cbc8501e2cc9c7f7abdcbb99069462893ab7f0c2ce02b31ac1",
+      "phases": [
+        {
+          "phase": "SETUP",
+          "entrypoint": "tools/ci/run-clean-checkout-reproducibility-phase.mjs",
+          "arguments": [
+            "setup",
+            "24",
+            "2bafa62df07a90cbc8501e2cc9c7f7abdcbb99069462893ab7f0c2ce02b31ac1"
+          ],
+          "workingDirectory": ".",
+          "requiredEnvironment": [],
+          "networkPolicy": "NONE",
+          "timeoutSeconds": 60,
+          "expectedExitCode": 0
+        },
+        {
+          "phase": "BUILD",
+          "entrypoint": "tools/ci/run-clean-checkout-reproducibility-phase.mjs",
+          "arguments": [
+            "build"
+          ],
+          "workingDirectory": ".",
+          "requiredEnvironment": [],
+          "networkPolicy": "NONE",
+          "timeoutSeconds": 120,
+          "expectedExitCode": 0
+        },
+        {
+          "phase": "TEST",
+          "entrypoint": "tools/ci/run-clean-checkout-reproducibility-phase.mjs",
+          "arguments": [
+            "test"
+          ],
+          "workingDirectory": ".",
+          "requiredEnvironment": [],
+          "networkPolicy": "NONE",
+          "timeoutSeconds": 300,
+          "expectedExitCode": 0
+        },
+        {
+          "phase": "DEBUG",
+          "entrypoint": "tools/ci/run-clean-checkout-reproducibility-phase.mjs",
+          "arguments": [
+            "debug"
+          ],
+          "workingDirectory": ".",
+          "requiredEnvironment": [],
+          "networkPolicy": "LOCAL_ONLY",
+          "timeoutSeconds": 60,
+          "expectedExitCode": 0
+        }
+      ]
+    }
+  ]
+}
