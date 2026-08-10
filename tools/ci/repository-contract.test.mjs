@@ -21088,3 +21088,33 @@ test("external terminal locator audit workflow binds main SHA to a write-once sa
   assert.match(workflow, /external-terminal-locator-audit-\$\{\{ github\.sha \}\}/);
   assert.doesNotMatch(workflow, /continue-on-error|cache|previous report|git (?:add|commit|push)/i);
 });
+
+test("clean checkout reproducibility audit workflow binds main SHA to a write-once sanitized report", () => {
+  const workflow = read(".github/workflows/clean-checkout-reproducibility-audit.yml");
+  assert.match(workflow, /^on:\n  push:\n    branches: \[main\]$/m);
+  assert.doesNotMatch(workflow, /^\s+paths:/m);
+  assert.match(workflow, /permissions:\n      contents: read\n      issues: read\n      actions: read/);
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /set -euo pipefail/);
+  assert.match(workflow, /test ! -e "\$\{REPORT_PATH\}"/);
+  for (const input of [
+    "tools/repo/audit-clean-checkout-reproducibility.mjs",
+    "--scope contracts/documentation/clean-checkout-reproducibility-audit-scope.json",
+    "--scope-schema contracts/documentation/clean-checkout-reproducibility-audit-scope.schema.json",
+    "--owner-contract-schema contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json",
+    "--owner-receipt-schema contracts/documentation/clean-checkout-reproducibility-owner-receipt.schema.json",
+    "--report-schema contracts/documentation/clean-checkout-reproducibility-audit-report.schema.json",
+    "--source-sha \"${GITHUB_SHA}\"",
+    "--observed-at \"${OBSERVED_AT}\"",
+    "--output \"${REPORT_PATH}\"",
+  ]) assert.match(workflow, new RegExp(input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(workflow, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(workflow, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(workflow, /name: clean-checkout-reproducibility-audit-\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /path: audit-evidence\/clean-checkout-reproducibility-audit-report\.json/);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.match(workflow, /include-hidden-files: false/);
+  assert.match(workflow, /retention-days: 14/);
+  assert.doesNotMatch(workflow, /continue-on-error|uses:\s*actions\/cache@|previous report|git (?:add|commit|push)/i);
+});

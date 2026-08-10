@@ -8,6 +8,7 @@ import { validateSourceGovernancePolicy } from "../datapack/source-governance-po
 import { validateAmendments, validateLedger } from "../repo/issue-migration-ledger.mjs";
 import { validatePlanDocExecutionScope as validatePlanDocExecutionAuditInventory } from "../repo/audit-plan-doc-execution.mjs";
 import { validateExternalTerminalLocatorScope as validateExternalTerminalLocatorAuditInventory } from "../repo/audit-external-terminal-locators.mjs";
+import { validateCleanCheckoutReproducibilityScope as validateCleanCheckoutReproducibilityAuditInventory } from "../repo/audit-clean-checkout-reproducibility.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isDeepStrictEqual } from "node:util";
@@ -96,6 +97,10 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     externalTerminalLocatorAuditReportSchema: workspace.externalTerminalLocatorAuditReportSchema == null ? null : resolveWorkspacePath(workspace.externalTerminalLocatorAuditReportSchema),
     postGoBoundaryAuditScope: workspace.postGoBoundaryAuditScope == null ? null : resolveWorkspacePath(workspace.postGoBoundaryAuditScope),
     postGoBoundaryAuditReportSchema: workspace.postGoBoundaryAuditReportSchema == null ? null : resolveWorkspacePath(workspace.postGoBoundaryAuditReportSchema),
+    cleanCheckoutReproducibilityAuditScope: workspace.cleanCheckoutReproducibilityAuditScope == null ? null : resolveWorkspacePath(workspace.cleanCheckoutReproducibilityAuditScope),
+    cleanCheckoutReproducibilityOwnerContractSchema: workspace.cleanCheckoutReproducibilityOwnerContractSchema == null ? null : resolveWorkspacePath(workspace.cleanCheckoutReproducibilityOwnerContractSchema),
+    cleanCheckoutReproducibilityOwnerReceiptSchema: workspace.cleanCheckoutReproducibilityOwnerReceiptSchema == null ? null : resolveWorkspacePath(workspace.cleanCheckoutReproducibilityOwnerReceiptSchema),
+    cleanCheckoutReproducibilityAuditReportSchema: workspace.cleanCheckoutReproducibilityAuditReportSchema == null ? null : resolveWorkspacePath(workspace.cleanCheckoutReproducibilityAuditReportSchema),
   };
 }
 
@@ -220,6 +225,27 @@ export function collectContractErrors(
       if (scopeValid) validateExternalTerminalLocatorAuditScope(loadJson(workspace.externalTerminalLocatorAuditScope), errors, workspace.externalTerminalLocatorAuditScope);
       if (!existsSync(workspace.externalTerminalLocatorAuditReportSchema)) errors.push(`${workspace.externalTerminalLocatorAuditReportSchema} 누락`);
       else { try { validateExternalTerminalLocatorAuditReportSchema(loadJson(workspace.externalTerminalLocatorAuditReportSchema), errors, workspace.externalTerminalLocatorAuditReportSchema); } catch { errors.push(`${workspace.externalTerminalLocatorAuditReportSchema}: 유효한 JSON이 필요하다`); } }
+    }
+  }
+  const reproducibilityEntries = [workspace.cleanCheckoutReproducibilityAuditScope, workspace.cleanCheckoutReproducibilityOwnerContractSchema, workspace.cleanCheckoutReproducibilityOwnerReceiptSchema, workspace.cleanCheckoutReproducibilityAuditReportSchema];
+  if (reproducibilityEntries.some((entry) => entry != null)) {
+    if (reproducibilityEntries.some((entry) => entry == null)) errors.push("clean checkout reproducibility audit workspace entries는 함께 필요하다");
+    else {
+      const reproducibilityScopeSchemaPath = contract("documentation/clean-checkout-reproducibility-audit-scope.schema.json");
+      const scopeValid = validateJson(reproducibilityScopeSchemaPath, workspace.cleanCheckoutReproducibilityAuditScope, errors);
+      if (existsSync(reproducibilityScopeSchemaPath)) validateCleanCheckoutReproducibilityAuditScopeSchema(loadJson(reproducibilityScopeSchemaPath), errors, reproducibilityScopeSchemaPath);
+      if (scopeValid) validateCleanCheckoutReproducibilityAuditScope(loadJson(workspace.cleanCheckoutReproducibilityAuditScope), errors, workspace.cleanCheckoutReproducibilityAuditScope);
+      for (const [kind, path] of [["owner contract", workspace.cleanCheckoutReproducibilityOwnerContractSchema], ["owner receipt", workspace.cleanCheckoutReproducibilityOwnerReceiptSchema], ["report", workspace.cleanCheckoutReproducibilityAuditReportSchema]]) {
+        if (!existsSync(path)) errors.push(`${path} 누락`);
+        else {
+          try {
+            const schema = loadJson(path);
+            if (kind === "owner contract") validateCleanCheckoutReproducibilityOwnerContractSchema(schema, errors, path);
+            else if (kind === "owner receipt") validateCleanCheckoutReproducibilityOwnerReceiptSchema(schema, errors, path);
+            else validateCleanCheckoutReproducibilityAuditReportSchema(schema, errors, path);
+          } catch { errors.push(`${path}: 유효한 JSON이 필요하다`); }
+        }
+      }
     }
   }
   let currentArchitectureDecisions = [];
@@ -896,6 +922,78 @@ export function validateExternalTerminalLocatorAuditReportSchema(schema, errors 
   if (p?.slots?.type !== "array" || p?.slots?.minItems !== 8 || p?.slots?.maxItems !== 8 || slot?.type !== "object" || slot?.additionalProperties !== false || !Array.isArray(slot?.required)) errors.push(`${path}: strict eight-slot array schema가 필요하다`);
   if (slot?.additionalProperties !== false || JSON.stringify(slot?.properties?.ownerRepository?.enum) !== JSON.stringify(["AquilaXk/easysubway", "AquilaXk/easysubway-platform", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-data"]) || slot?.properties?.ownerIssue?.type !== "integer" || slot?.properties?.ownerIssue?.minimum !== 1 || JSON.stringify(slot?.properties?.accountablePlan?.enum) !== JSON.stringify(["PLAN-REPO", "PLAN-JOURNEY"]) || JSON.stringify(slot?.properties?.state?.enum) !== JSON.stringify(["PENDING", "READY"]) || !strictExternalTerminalLocator(locator)) errors.push(`${path}: exact eight-slot locator schema가 필요하다`);
   if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.inputs?.properties?.stateBeginSha256?.type !== "string" || parity[0]?.properties?.inputs?.properties?.stateEndSha256?.type !== "string" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: incomplete fail-closed parity가 필요하다`);
+  return errors;
+}
+
+const REPRODUCIBILITY_REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
+const REPRODUCIBILITY_PHASES = ["SETUP", "BUILD", "TEST", "DEBUG"];
+const REPRODUCIBILITY_TOP_REQUIRED = ["schemaVersion", "repository", "sourceSha", "variants"];
+const REPRODUCIBILITY_VARIANT_REQUIRED = ["variantId", "runnerImage", "toolchainDigest", "phases"];
+const REPRODUCIBILITY_PHASE_REQUIRED = ["phase", "entrypoint", "arguments", "workingDirectory", "requiredEnvironment", "networkPolicy", "timeoutSeconds", "expectedExitCode"];
+const REPRODUCIBILITY_RESULT_REQUIRED = ["phase", "commandSha256", "startedAt", "completedAt", "exitCode", "timedOut", "unexpectedProcessCount"];
+const REPRODUCIBILITY_PATH_PATTERN = "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$";
+const REPRODUCIBILITY_WORKFLOW_PATTERN = "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])\\.github/workflows/[A-Za-z0-9][A-Za-z0-9._/-]*\\.ya?ml$";
+const strictSchemaObject = (value, required) => value?.type === "object" && value?.additionalProperties === false && JSON.stringify(value?.required) === JSON.stringify(required);
+
+function strictReproducibilityGitLocator(schema) {
+  const [nil, locator] = schema?.oneOf ?? [];
+  return nil?.type === "null" && strictSchemaObject(locator, ["kind", "repository", "commitSha", "path", "blobSha"])
+    && locator?.properties?.kind?.const === "GIT_BLOB" && JSON.stringify(locator?.properties?.repository?.enum) === JSON.stringify(REPRODUCIBILITY_REPOSITORIES)
+    && locator?.properties?.commitSha?.pattern === "^[0-9a-f]{40}$" && locator?.properties?.path?.pattern === REPRODUCIBILITY_PATH_PATTERN && locator?.properties?.blobSha?.pattern === "^[0-9a-f]{40}$";
+}
+
+function strictReproducibilityArtifactLocator(schema) {
+  const [nil, locator] = schema?.oneOf ?? [];
+  return nil?.type === "null" && strictSchemaObject(locator, ["kind", "repository", "runId", "artifactId", "artifactName", "archiveDigest", "workflowPath", "headSha", "createdAt", "expiresAt"])
+    && locator?.properties?.kind?.const === "ACTIONS_ARTIFACT" && JSON.stringify(locator?.properties?.repository?.enum) === JSON.stringify(REPRODUCIBILITY_REPOSITORIES)
+    && locator?.properties?.runId?.type === "integer" && locator?.properties?.runId?.minimum === 1 && locator?.properties?.artifactId?.type === "integer" && locator?.properties?.artifactId?.minimum === 1
+    && locator?.properties?.artifactName?.pattern === "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" && locator?.properties?.archiveDigest?.pattern === "^sha256:[0-9a-f]{64}$"
+    && locator?.properties?.workflowPath?.pattern === REPRODUCIBILITY_WORKFLOW_PATTERN && locator?.properties?.headSha?.pattern === "^[0-9a-f]{40}$"
+    && locator?.properties?.createdAt?.pattern === "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$" && locator?.properties?.expiresAt?.pattern === "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$";
+}
+
+export function validateCleanCheckoutReproducibilityAuditScope(scope, errors = [], path = "clean-checkout-reproducibility-audit-scope") {
+  errors.push(...validateCleanCheckoutReproducibilityAuditInventory(scope).map((error) => `${path}: ${error}`));
+  return errors;
+}
+
+export function validateCleanCheckoutReproducibilityAuditScopeSchema(schema, errors = [], path = "clean-checkout-reproducibility-audit-scope.schema") {
+  const p = schema?.properties; const slot = p?.slots?.items;
+  if (!strictSchemaObject(schema, ["schemaVersion", "slots"]) || p?.schemaVersion?.const !== 1 || p?.slots?.type !== "array" || p?.slots?.minItems !== 5 || p?.slots?.maxItems !== 5 || !strictSchemaObject(slot, ["repository", "state", "ownerIssue", "contractLocator", "receiptLocator"])) errors.push(`${path}: strict five-slot scope schema가 필요하다`);
+  if (JSON.stringify(slot?.properties?.repository?.enum) !== JSON.stringify(REPRODUCIBILITY_REPOSITORIES) || JSON.stringify(slot?.properties?.state?.enum) !== JSON.stringify(["PENDING", "READY"]) || JSON.stringify(slot?.properties?.ownerIssue?.type) !== JSON.stringify(["integer", "null"]) || slot?.properties?.ownerIssue?.minimum !== 1 || !strictReproducibilityGitLocator(slot?.properties?.contractLocator) || !strictReproducibilityArtifactLocator(slot?.properties?.receiptLocator)) errors.push(`${path}: exact PENDING/READY locator schema가 필요하다`);
+  const parity = slot?.oneOf;
+  if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.state?.const !== "PENDING" || parity[0]?.properties?.ownerIssue?.type !== "null" || parity[0]?.properties?.contractLocator?.type !== "null" || parity[0]?.properties?.receiptLocator?.type !== "null" || parity[1]?.properties?.state?.const !== "READY" || parity[1]?.properties?.ownerIssue?.type !== "integer" || parity[1]?.properties?.contractLocator?.type !== "object" || parity[1]?.properties?.receiptLocator?.type !== "object") errors.push(`${path}: state/null parity가 필요하다`);
+  return errors;
+}
+
+export function validateCleanCheckoutReproducibilityOwnerContractSchema(schema, errors = [], path = "clean-checkout-reproducibility-owner-contract.schema") {
+  const p = schema?.properties; const variant = p?.variants?.items; const phase = variant?.properties?.phases?.items;
+  if (!strictSchemaObject(schema, REPRODUCIBILITY_TOP_REQUIRED) || p?.schemaVersion?.const !== 1 || JSON.stringify(p?.repository?.enum) !== JSON.stringify(REPRODUCIBILITY_REPOSITORIES) || p?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || p?.variants?.type !== "array" || p?.variants?.minItems !== 1 || p?.variants?.maxItems !== 16) errors.push(`${path}: strict owner contract root가 필요하다`);
+  if (!strictSchemaObject(variant, REPRODUCIBILITY_VARIANT_REQUIRED) || variant?.properties?.variantId?.pattern !== "^[a-z0-9][a-z0-9._-]{0,63}$" || variant?.properties?.runnerImage?.pattern !== "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" || variant?.properties?.toolchainDigest?.pattern !== "^[0-9a-f]{64}$" || variant?.properties?.phases?.minItems !== 4 || variant?.properties?.phases?.maxItems !== 4) errors.push(`${path}: strict variant schema가 필요하다`);
+  if (!strictSchemaObject(phase, REPRODUCIBILITY_PHASE_REQUIRED) || JSON.stringify(phase?.properties?.phase?.enum) !== JSON.stringify(REPRODUCIBILITY_PHASES) || phase?.properties?.entrypoint?.pattern !== REPRODUCIBILITY_PATH_PATTERN || phase?.properties?.arguments?.maxItems !== 32 || phase?.properties?.arguments?.items?.pattern !== "^(?!.*[?#])(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/@:+-]{1,256}$" || phase?.properties?.workingDirectory?.pattern !== "^(?:\\.|(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*)$" || phase?.properties?.requiredEnvironment?.maxItems !== 32 || phase?.properties?.requiredEnvironment?.items?.pattern !== "^[A-Z][A-Z0-9_]{0,127}$" || JSON.stringify(phase?.properties?.networkPolicy?.enum) !== JSON.stringify(["NONE", "DEPENDENCY_FETCH", "LOCAL_ONLY"]) || phase?.properties?.timeoutSeconds?.minimum !== 1 || phase?.properties?.timeoutSeconds?.maximum !== 3600 || phase?.properties?.expectedExitCode?.const !== 0) errors.push(`${path}: strict four-phase command schema가 필요하다`);
+  return errors;
+}
+
+export function validateCleanCheckoutReproducibilityOwnerReceiptSchema(schema, errors = [], path = "clean-checkout-reproducibility-owner-receipt.schema") {
+  const p = schema?.properties; const checkout = p?.cleanCheckout; const variant = p?.variants?.items; const result = variant?.properties?.phases?.items;
+  const rootRequired = ["schemaVersion", "repository", "sourceSha", "contractSha256", "observedAt", "cleanCheckout", "variants"];
+  if (!strictSchemaObject(schema, rootRequired) || p?.schemaVersion?.const !== 1 || JSON.stringify(p?.repository?.enum) !== JSON.stringify(REPRODUCIBILITY_REPOSITORIES) || p?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || p?.contractSha256?.pattern !== "^[0-9a-f]{64}$" || p?.observedAt?.pattern !== "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$") errors.push(`${path}: strict owner receipt root가 필요하다`);
+  if (!strictSchemaObject(checkout, ["repository", "sourceSha", "initialTrackedDiffCount", "initialUntrackedCount"]) || JSON.stringify(checkout?.properties?.repository?.enum) !== JSON.stringify(REPRODUCIBILITY_REPOSITORIES) || checkout?.properties?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || !["initialTrackedDiffCount", "initialUntrackedCount"].every((key) => checkout?.properties?.[key]?.type === "integer" && checkout?.properties?.[key]?.minimum === 0)) errors.push(`${path}: clean checkout identity가 필요하다`);
+  if (p?.variants?.minItems !== 1 || p?.variants?.maxItems !== 16 || !strictSchemaObject(variant, REPRODUCIBILITY_VARIANT_REQUIRED) || variant?.properties?.variantId?.pattern !== "^[a-z0-9][a-z0-9._-]{0,63}$" || variant?.properties?.runnerImage?.pattern !== "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" || variant?.properties?.toolchainDigest?.pattern !== "^[0-9a-f]{64}$" || variant?.properties?.phases?.minItems !== 4 || variant?.properties?.phases?.maxItems !== 4 || !strictSchemaObject(result, REPRODUCIBILITY_RESULT_REQUIRED) || JSON.stringify(result?.properties?.phase?.enum) !== JSON.stringify(REPRODUCIBILITY_PHASES) || result?.properties?.commandSha256?.pattern !== "^[0-9a-f]{64}$" || result?.properties?.startedAt?.pattern !== "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" || result?.properties?.completedAt?.pattern !== "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$" || result?.properties?.exitCode?.type !== "integer" || result?.properties?.timedOut?.type !== "boolean" || result?.properties?.unexpectedProcessCount?.type !== "integer" || result?.properties?.unexpectedProcessCount?.minimum !== 0) errors.push(`${path}: strict result matrix가 필요하다`);
+  return errors;
+}
+
+export function validateCleanCheckoutReproducibilityAuditReportSchema(schema, errors = [], path = "clean-checkout-reproducibility-audit-report.schema") {
+  const p = schema?.properties; const inputs = p?.inputs; const summary = p?.summary; const slot = p?.slots?.items;
+  if (!strictSchemaObject(schema, ["schemaVersion", "status", "observedAt", "inputs", "summary", "slots", "findings", "incomplete"]) || p?.schemaVersion?.const !== 1 || JSON.stringify(p?.status?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"])) errors.push(`${path}: strict report root가 필요하다`);
+  if (!strictSchemaObject(inputs, ["sourceSha", "scopeSha256", "stateBeginSha256", "stateEndSha256"]) || inputs?.properties?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || inputs?.properties?.scopeSha256?.pattern !== "^[0-9a-f]{64}$" || !["stateBeginSha256", "stateEndSha256"].every((key) => JSON.stringify(inputs?.properties?.[key]?.type) === JSON.stringify(["string", "null"]) && inputs?.properties?.[key]?.pattern === "^[0-9a-f]{64}$")) errors.push(`${path}: immutable input watermark schema가 필요하다`);
+  if (!strictSchemaObject(summary, ["pending", "ready", "findings", "incomplete"]) || !["pending", "ready", "findings", "incomplete"].every((key) => summary?.properties?.[key]?.type === "integer" && summary?.properties?.[key]?.minimum === 0)) errors.push(`${path}: strict summary schema가 필요하다`);
+  if (p?.slots?.type !== "array" || p?.slots?.minItems !== 5 || p?.slots?.maxItems !== 5 || !strictSchemaObject(slot, ["repository", "state", "currentHead", "ownerIssue", "contractLocator", "receiptLocator", "evidenceState"]) || JSON.stringify(slot?.properties?.repository?.enum) !== JSON.stringify(REPRODUCIBILITY_REPOSITORIES) || JSON.stringify(slot?.properties?.state?.enum) !== JSON.stringify(["PENDING", "READY"]) || JSON.stringify(slot?.properties?.currentHead?.type) !== JSON.stringify(["string", "null"]) || slot?.properties?.currentHead?.pattern !== "^[0-9a-f]{40}$" || JSON.stringify(slot?.properties?.ownerIssue?.type) !== JSON.stringify(["integer", "null"]) || slot?.properties?.ownerIssue?.minimum !== 1 || !strictReproducibilityGitLocator(slot?.properties?.contractLocator) || !strictReproducibilityArtifactLocator(slot?.properties?.receiptLocator) || JSON.stringify(slot?.properties?.evidenceState?.enum) !== JSON.stringify(["PENDING", "VERIFIED", "FINDING", "UNAVAILABLE"])) errors.push(`${path}: strict five-slot result schema가 필요하다`);
+  const slotParity = slot?.oneOf;
+  if (!Array.isArray(slotParity) || slotParity.length !== 2 || slotParity[0]?.properties?.state?.const !== "PENDING" || slotParity[0]?.properties?.ownerIssue?.type !== "null" || slotParity[0]?.properties?.contractLocator?.type !== "null" || slotParity[0]?.properties?.receiptLocator?.type !== "null" || JSON.stringify(slotParity[0]?.properties?.evidenceState?.enum) !== JSON.stringify(["PENDING", "UNAVAILABLE"]) || slotParity[1]?.properties?.state?.const !== "READY" || slotParity[1]?.properties?.ownerIssue?.type !== "integer" || slotParity[1]?.properties?.contractLocator?.type !== "object" || slotParity[1]?.properties?.receiptLocator?.type !== "object" || JSON.stringify(slotParity[1]?.properties?.evidenceState?.enum) !== JSON.stringify(["VERIFIED", "FINDING", "UNAVAILABLE"])) errors.push(`${path}: slot state/evidence parity가 필요하다`);
+  if (p?.findings?.uniqueItems !== true || p?.findings?.items?.additionalProperties !== false || JSON.stringify(p?.findings?.items?.required) !== JSON.stringify(["code", "repository"]) || p?.incomplete?.uniqueItems !== true || p?.incomplete?.items?.additionalProperties !== false || JSON.stringify(p?.incomplete?.items?.required) !== JSON.stringify(["stage", "code", "affectedIdentity"])) errors.push(`${path}: strict sanitized finding/incomplete schema가 필요하다`);
+  const parity = schema?.oneOf;
+  if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.inputs?.properties?.stateBeginSha256?.type !== "string" || parity[0]?.properties?.inputs?.properties?.stateEndSha256?.type !== "string" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: fail-closed status parity가 필요하다`);
   return errors;
 }
 
