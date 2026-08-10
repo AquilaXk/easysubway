@@ -16,6 +16,7 @@ const SHA = /^[0-9a-f]{40}$/;
 const DIGEST = /^sha256:[0-9a-f]{64}$/;
 const SAFE_PATH = /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$/;
 const SAFE_OCI_PATH = /^[a-z0-9][a-z0-9._-]*(?:\/[a-z0-9][a-z0-9._-]*)*$/;
+const WORKFLOW_PATH = /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*[?#])\.github\/workflows\/[A-Za-z0-9][A-Za-z0-9._\/-]*\.ya?ml$/;
 const OCI_ACCEPT = "application/vnd.oci.image.manifest.v1+json, application/vnd.oci.image.index.v1+json, application/vnd.docker.distribution.manifest.v2+json, application/vnd.docker.distribution.manifest.list.v2+json";
 const execFileAsync = promisify(execFile);
 
@@ -31,6 +32,7 @@ const exactKeys = (value, keys) => value != null && typeof value === "object" &&
 const canonicalUtc = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 const canonicalProviderUtc = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === (value.includes(".") ? value : value.replace(/Z$/, ".000Z"));
 const safePath = (value) => typeof value === "string" && SAFE_PATH.test(value);
+const safeWorkflowPath = (value) => typeof value === "string" && WORKFLOW_PATH.test(value);
 const fallbackScope = () => ({ schemaVersion: 1, slots: EXPECTED.map(([ownerRepository, ownerIssue, accountablePlan]) => ({ ownerRepository, ownerIssue, accountablePlan, state: "PENDING", terminalLocator: null })) });
 
 function locatorErrors(slot, locator) {
@@ -42,7 +44,7 @@ function locatorErrors(slot, locator) {
     if (!exactKeys(locator, ["kind", "registry", "repositoryPath", "digest"]) || locator.registry !== "ghcr.io" || !SAFE_OCI_PATH.test(locator.repositoryPath) || !DIGEST.test(locator.digest)) errors.push("OCI locator mismatch");
   } else if (locator.kind === "ACTIONS_ARTIFACT") {
     if (!exactKeys(locator, ["kind", "repository", "runId", "artifactId", "artifactName", "archiveDigest", "workflowPath", "headSha", "createdAt", "expiresAt"])
-      || !APPROVED_REPOSITORIES.has(locator.repository) || !Number.isInteger(locator.runId) || locator.runId < 1 || !Number.isInteger(locator.artifactId) || locator.artifactId < 1 || typeof locator.artifactName !== "string" || locator.artifactName.length === 0 || !DIGEST.test(locator.archiveDigest) || !safePath(locator.workflowPath) || !locator.workflowPath.startsWith(".github/workflows/") || !/\.ya?ml$/.test(locator.workflowPath) || !SHA.test(locator.headSha) || !canonicalProviderUtc(locator.createdAt) || !canonicalProviderUtc(locator.expiresAt) || Date.parse(locator.createdAt) >= Date.parse(locator.expiresAt)) errors.push("Actions locator mismatch");
+      || !APPROVED_REPOSITORIES.has(locator.repository) || !Number.isInteger(locator.runId) || locator.runId < 1 || !Number.isInteger(locator.artifactId) || locator.artifactId < 1 || typeof locator.artifactName !== "string" || locator.artifactName.length === 0 || !DIGEST.test(locator.archiveDigest) || !safeWorkflowPath(locator.workflowPath) || !SHA.test(locator.headSha) || !canonicalProviderUtc(locator.createdAt) || !canonicalProviderUtc(locator.expiresAt) || Date.parse(locator.createdAt) >= Date.parse(locator.expiresAt)) errors.push("Actions locator mismatch");
   } else errors.push("locator kind mismatch");
   return errors;
 }
@@ -119,8 +121,27 @@ export async function verifyReadyLocator({ slot, ghGet, fetchImpl = fetch, downl
     return blob.sha === locator.blobSha ? { identity, ok: true } : { identity, ok: false, code: "GIT_BLOB_MISMATCH" };
   }
   if (locator?.kind === "OCI_DIGEST") {
-    let response; try { response = await fetchImpl(`https://ghcr.io/v2/${locator.repositoryPath}/manifests/${locator.digest}`, { method: "HEAD", headers: { Accept: OCI_ACCEPT }, redirect: "error", signal: AbortSignal.timeout(30_000) }); } catch (error) { providerFailure(error, identity, "OCI"); }
+    const manifestUrl = `https://ghcr.io/v2/${locator.repositoryPath}/manifests/${locator.digest}`;
+    const request = (authorization = null) => fetchImpl(manifestUrl, { method: "HEAD", headers: authorization == null ? { Accept: OCI_ACCEPT } : { Accept: OCI_ACCEPT, Authorization: authorization }, redirect: "error", signal: AbortSignal.timeout(30_000) });
+    let response; try { response = await request(); } catch (error) { providerFailure(error, identity, "OCI"); }
     if (!Number.isInteger(response?.status) || typeof response.headers?.get !== "function") throw new AuditIncomplete("PROVIDER_MALFORMED", identity);
+    if (response.status === 401) {
+      const challenge = response.headers.get("WWW-Authenticate");
+      const expectedScope = `repository:${locator.repositoryPath}:pull`;
+      const match = /^Bearer realm="([^"]+)",service="([^"]+)",scope="([^"]+)"$/.exec(challenge ?? "");
+      if (match == null || match[1] !== "https://ghcr.io/token" || match[2] !== "ghcr.io" || match[3] !== expectedScope) throw new AuditIncomplete("OCI_AUTH_CHALLENGE_INVALID", identity);
+      const tokenUrl = new URL(match[1]);
+      if (tokenUrl.origin !== "https://ghcr.io" || tokenUrl.pathname !== "/token" || tokenUrl.search !== "") throw new AuditIncomplete("OCI_AUTH_CHALLENGE_INVALID", identity);
+      tokenUrl.search = new URLSearchParams({ service: match[2], scope: match[3] }).toString();
+      let tokenResponse; try { tokenResponse = await fetchImpl(tokenUrl.toString(), { method: "GET", redirect: "error", signal: AbortSignal.timeout(30_000) }); } catch (error) { providerFailure(error, identity, "OCI_AUTH"); }
+      if (!Number.isInteger(tokenResponse?.status) || typeof tokenResponse?.json !== "function") throw new AuditIncomplete("PROVIDER_MALFORMED", identity);
+      if (tokenResponse.status !== 200) throw new AuditIncomplete(`OCI_AUTH_HTTP_${tokenResponse.status}`, identity);
+      let token; try { token = await tokenResponse.json(); } catch { throw new AuditIncomplete("OCI_AUTH_MALFORMED", identity); }
+      if (typeof token?.token !== "string" || token.token.length === 0) throw new AuditIncomplete("OCI_AUTH_MALFORMED", identity);
+      try { response = await request(`Bearer ${token.token}`); } catch (error) { providerFailure(error, identity, "OCI"); }
+      if (!Number.isInteger(response?.status) || typeof response.headers?.get !== "function") throw new AuditIncomplete("PROVIDER_MALFORMED", identity);
+    }
+    if (response.status === 404) return { identity, ok: false, code: "OCI_DIGEST_MISMATCH" };
     if (response.status !== 200) throw new AuditIncomplete(`OCI_HTTP_${response.status}`, identity);
     return response.headers.get("Docker-Content-Digest") === locator.digest ? { identity, ok: true } : { identity, ok: false, code: "OCI_DIGEST_MISMATCH" };
   }
@@ -183,7 +204,10 @@ export async function gh(args, execute = execFileAsync) {
     if (refStart < 0 || !safePath(endpoint.slice(contentStart + "/contents/".length, refStart))) throw new Error("gh read-only allowlist violation");
   }
   if (args?.[0] !== "api" || !allowed.test(endpoint)) throw new Error("gh read-only allowlist violation");
-  return (await execute("gh", args, { encoding: "utf8", timeout: 30_000, killSignal: "SIGTERM", maxBuffer: 1024 * 1024 })).stdout;
+  try { return (await execute("gh", args, { encoding: "utf8", timeout: 30_000, killSignal: "SIGTERM", maxBuffer: 1024 * 1024 })).stdout; } catch (error) {
+    if (/(?:^|\D)HTTP 404(?:\D|$)/.test(String(error?.stderr ?? ""))) throw Object.assign(new Error("gh API returned HTTP 404"), { status: 404 });
+    throw error;
+  }
 }
 
 export async function ghArtifactDownload(repository, artifactId, execute = execFileAsync) {
@@ -201,9 +225,9 @@ export function parseArguments(argv) {
 
 function validCode(value) { return typeof value === "string" && /^[A-Z][A-Z0-9_]*$/.test(value); }
 function sanitizeIncomplete(error, fallbackInputs = {}) { return { stage: error instanceof AuditIncomplete && error.code === "SCOPE_INVALID" ? "scope" : error instanceof AuditIncomplete && error.code === "REPORT_SCHEMA_INVALID" ? "schema" : "provider", code: validCode(error?.code) ? error.code : "AUDIT_FAILURE", affectedIdentity: String(error?.identity ?? "audit").replace(/[^A-Za-z0-9:._/-]/g, "_") || "audit", inputs: error instanceof AuditIncomplete ? error.inputs : fallbackInputs }; }
-function createFallbackReport({ sourceSha, observedAt, scopeText, error }) {
-  const scope = fallbackScope(); const slots = scope.slots.map((slot) => ({ ...slot, issueState: "UNAVAILABLE" })); const incomplete = sanitizeIncomplete(error);
-  return { schemaVersion: 1, status: "AUDIT_INCOMPLETE", observedAt, inputs: { sourceSha, scopeSha256: sha256(scopeText), stateBeginSha256: incomplete.inputs.stateBeginSha256 ?? null, stateEndSha256: incomplete.inputs.stateEndSha256 ?? null }, summary: { pending: 8, ready: 0, findings: 0, incomplete: 1 }, slots, findings: [], incomplete: [{ stage: incomplete.stage, code: incomplete.code, affectedIdentity: incomplete.affectedIdentity }] };
+function createFallbackReport({ sourceSha, observedAt, scopeText, scope: validatedScope = null, error }) {
+  const scope = validatedScope ?? fallbackScope(); const slots = scope.slots.map((slot) => ({ ...slot, issueState: "UNAVAILABLE" })); const incomplete = sanitizeIncomplete(error); const pending = slots.filter(({ state }) => state === "PENDING").length;
+  return { schemaVersion: 1, status: "AUDIT_INCOMPLETE", observedAt, inputs: { sourceSha, scopeSha256: sha256(scopeText), stateBeginSha256: incomplete.inputs.stateBeginSha256 ?? null, stateEndSha256: incomplete.inputs.stateEndSha256 ?? null }, summary: { pending, ready: slots.length - pending, findings: 0, incomplete: 1 }, slots, findings: [], incomplete: [{ stage: incomplete.stage, code: incomplete.code, affectedIdentity: incomplete.affectedIdentity }] };
 }
 
 export function validateExternalTerminalLocatorReport(report, errors = []) {
@@ -233,19 +257,20 @@ function reportSchemaIsStrict(schema) {
 }
 
 export async function runAuditCli({ argv, collectIssues = collectLive, read = readFile, openFile = open } = {}) {
-  let args; let scopeText = ""; let report = null; let exitCode = 2;
+  let args; let scopeText = ""; let scope = null; let report = null; let exitCode = 2;
   try {
-    args = parseArguments(argv); scopeText = await read(args.scopePath, "utf8"); const scope = JSON.parse(scopeText);
+    args = parseArguments(argv); scopeText = await read(args.scopePath, "utf8"); const parsedScope = JSON.parse(scopeText);
     const [scopeSchemaText, reportSchemaText] = await Promise.all([read(args.scopeSchemaPath, "utf8"), read(args.reportSchemaPath, "utf8")]);
     const scopeSchema = JSON.parse(scopeSchemaText); const reportSchema = JSON.parse(reportSchemaText);
-    if (!validateSchema(scopeSchema, scope).ok || validateExternalTerminalLocatorScope(scope).length !== 0) throw new AuditIncomplete("SCOPE_INVALID", "scope");
+    if (!validateSchema(scopeSchema, parsedScope).ok || validateExternalTerminalLocatorScope(parsedScope).length !== 0) throw new AuditIncomplete("SCOPE_INVALID", "scope");
+    scope = parsedScope;
     if (!reportSchemaIsStrict(reportSchema)) throw new AuditIncomplete("REPORT_SCHEMA_INVALID", "report");
     const live = await collectIssues(scope, { sourceSha: args.sourceSha });
     report = auditExternalTerminalLocators({ scope, scopeText, sourceSha: args.sourceSha, observedAt: args.observedAt, ...live });
     if (!validateSchema(reportSchema, report).ok || validateExternalTerminalLocatorReport(report).length !== 0) throw new AuditIncomplete("REPORT_INVALID", "report");
     exitCode = report.summary.findings === 0 ? 0 : 1;
   } catch (error) {
-    if (args != null) { report = createFallbackReport({ sourceSha: args.sourceSha, observedAt: args.observedAt, scopeText, error }); if (validateExternalTerminalLocatorReport(report).length !== 0) return { exitCode: 2, report: null, outputWritten: false }; }
+    if (args != null) { report = createFallbackReport({ sourceSha: args.sourceSha, observedAt: args.observedAt, scopeText, scope, error }); if (validateExternalTerminalLocatorReport(report).length !== 0) return { exitCode: 2, report: null, outputWritten: false }; }
   }
   if (args == null || report == null) return { exitCode: 2, report: null, outputWritten: false };
   try { const handle = await openFile(args.outputPath, "wx"); try { await handle.writeFile(`${JSON.stringify(report)}\n`); } finally { await handle.close(); } } catch { return { exitCode: 2, report: null, outputWritten: false }; }

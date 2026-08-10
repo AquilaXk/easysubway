@@ -21068,13 +21068,13 @@ test("post-GO boundary audit workflow pins merged SHA, write-once report, and al
 
 test("external terminal locator audit workflow binds main SHA to a write-once sanitized report", () => {
   const workflow = read(".github/workflows/external-terminal-locator-audit.yml");
-  assert.match(workflow, /^on:\n  push:\n    branches: \[main\]\n    paths:$/m);
+  assert.match(workflow, /^on:\n  push:\n    branches: \[main\]$/m);
+  assert.doesNotMatch(workflow, /^\s+paths:/m);
   for (const input of [
-    "contracts/documentation/external-terminal-locator-audit-scope.schema.json",
     "contracts/documentation/external-terminal-locator-audit-scope.json",
+    "contracts/documentation/external-terminal-locator-audit-scope.schema.json",
     "contracts/documentation/external-terminal-locator-audit-report.schema.json",
     "tools/repo/audit-external-terminal-locators.mjs",
-    "tools/repo/audit-external-terminal-locators.test.mjs",
     "--source-sha \"${GITHUB_SHA}\"",
     "--output \"${REPORT_PATH}\"",
   ]) assert.match(workflow, new RegExp(input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));

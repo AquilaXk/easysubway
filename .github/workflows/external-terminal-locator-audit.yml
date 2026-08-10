@@ -3,13 +3,6 @@ name: External terminal locator audit
 on:
   push:
     branches: [main]
-    paths:
-      - .github/workflows/external-terminal-locator-audit.yml
-      - contracts/documentation/external-terminal-locator-audit-scope.schema.json
-      - contracts/documentation/external-terminal-locator-audit-scope.json
-      - contracts/documentation/external-terminal-locator-audit-report.schema.json
-      - tools/repo/audit-external-terminal-locators.mjs
-      - tools/repo/audit-external-terminal-locators.test.mjs
 
 jobs:
   audit:

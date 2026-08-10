@@ -60,6 +60,51 @@ test("external terminal locator audit records a Git blob identity mismatch as a 
   assert.deepEqual(await verifyReadyLocator({ slot, ghGet: async () => { throw Object.assign(new Error("not found"), { status: 404 }); } }), { identity: "AquilaXk/easysubway#2764", ok: false, code: "GIT_BLOB_MISMATCH" });
 });
 
+test("external terminal locator audit maps exact gh HTTP 404 without retaining command stderr", async () => {
+  const failure = Object.assign(new Error("command failed"), { stderr: "gh: Not Found (HTTP 404)\nprivate provider detail" });
+  await assert.rejects(
+    () => gh(["api", `repos/AquilaXk/easysubway/contents/contracts/x.json?ref=${"a".repeat(40)}`], async () => { throw failure; }),
+    (error) => error.status === 404 && error.message === "gh API returned HTTP 404" && !error.message.includes("private provider detail"),
+  );
+});
+
+test("external terminal locator audit uses one bounded strict GHCR Bearer retry", async () => {
+  const locator = { kind: "OCI_DIGEST", registry: "ghcr.io", repositoryPath: "aquilaxk/example", digest: "sha256:" + "d".repeat(64) };
+  const calls = [];
+  const result = await verifyReadyLocator({
+    slot: { ...SCOPE.slots[0], state: "READY", terminalLocator: locator },
+    fetchImpl: async (url, init) => {
+      calls.push([url, init]);
+      if (calls.length === 1) return { status: 401, headers: new Headers({ "WWW-Authenticate": 'Bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:aquilaxk/example:pull"' }) };
+      if (calls.length === 2) return { status: 200, headers: new Headers(), json: async () => ({ token: "bounded-token" }) };
+      return { status: 200, headers: new Headers({ "Docker-Content-Digest": locator.digest }) };
+    },
+  });
+  assert.deepEqual(result, { identity: "AquilaXk/easysubway#2764", ok: true });
+  assert.deepEqual(calls.map(([url, init]) => [url, init.method, init.redirect, init.headers?.Authorization ?? null]), [
+    [`https://ghcr.io/v2/aquilaxk/example/manifests/${locator.digest}`, "HEAD", "error", null],
+    ["https://ghcr.io/token?service=ghcr.io&scope=repository%3Aaquilaxk%2Fexample%3Apull", "GET", "error", null],
+    [`https://ghcr.io/v2/aquilaxk/example/manifests/${locator.digest}`, "HEAD", "error", "Bearer bounded-token"],
+  ]);
+  await assert.rejects(
+    () => verifyReadyLocator({ slot: { ...SCOPE.slots[0], state: "READY", terminalLocator: locator }, fetchImpl: async () => ({ status: 401, headers: new Headers({ "WWW-Authenticate": 'Bearer realm="https://example.test/token",service="ghcr.io",scope="repository:aquilaxk/example:pull"' }) }) }),
+    (error) => error instanceof AuditIncomplete && error.code === "OCI_AUTH_CHALLENGE_INVALID",
+  );
+});
+
+test("external terminal locator audit classifies direct and authenticated OCI 404 as identity mismatches", async () => {
+  const locator = { kind: "OCI_DIGEST", registry: "ghcr.io", repositoryPath: "aquilaxk/example", digest: "sha256:" + "d".repeat(64) };
+  const slot = { ...SCOPE.slots[0], state: "READY", terminalLocator: locator };
+  assert.deepEqual(await verifyReadyLocator({ slot, fetchImpl: async () => ({ status: 404, headers: new Headers() }) }), { identity: "AquilaXk/easysubway#2764", ok: false, code: "OCI_DIGEST_MISMATCH" });
+  let calls = 0;
+  assert.deepEqual(await verifyReadyLocator({ slot, fetchImpl: async () => {
+    calls += 1;
+    if (calls === 1) return { status: 401, headers: new Headers({ "WWW-Authenticate": 'Bearer realm="https://ghcr.io/token",service="ghcr.io",scope="repository:aquilaxk/example:pull"' }) };
+    if (calls === 2) return { status: 200, headers: new Headers(), json: async () => ({ token: "bounded-token" }) };
+    return { status: 404, headers: new Headers() };
+  } }), { identity: "AquilaXk/easysubway#2764", ok: false, code: "OCI_DIGEST_MISMATCH" });
+});
+
 test("external terminal locator audit normalizes lowercase GitHub issue states", async () => {
   const issues = await collectLiveIssues(SCOPE, async ([, endpoint]) => JSON.stringify({ number: Number(endpoint.split("/").at(-1)), repository_url: `https://api.github.com/repos/${endpoint.split("/").slice(1, 3).join("/")}`, state: "open" }));
   assert.ok(issues.every((issue) => issue.state === "OPEN"));
@@ -162,6 +207,22 @@ test("external terminal locator audit CLI writes an exact fallback report for ma
     const existing = join(directory, "existing.json"); writeFileSync(existing, "existing\n");
     assert.equal((await runAuditCli({ argv: argv("existing.json"), read: async (path) => ({ scope: JSON.stringify(SCOPE), "scope-schema": canonicalScopeSchema, "report-schema": JSON.stringify(canonicalReportSchema) })[path], collectIssues: async () => ({ issues: SCOPE.slots.map((slot) => ({ repository: slot.ownerRepository, number: slot.ownerIssue, state: "OPEN" })), providerResults: [] }) })).exitCode, 2);
     assert.equal(readFileSync(existing, "utf8"), "existing\n");
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
+test("external terminal locator audit fallback preserves a validated READY scope", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "external-terminal-locator-ready-fallback-"));
+  const output = join(directory, "report.json");
+  const ready = structuredClone(SCOPE);
+  ready.slots[0] = { ...ready.slots[0], state: "READY", terminalLocator: { kind: "GIT_BLOB", repository: "AquilaXk/easysubway", commitSha: "b".repeat(40), path: "contracts/x.json", blobSha: "c".repeat(40) } };
+  const scopeSchema = readFileSync("contracts/documentation/external-terminal-locator-audit-scope.schema.json", "utf8");
+  const reportSchema = readFileSync("contracts/documentation/external-terminal-locator-audit-report.schema.json", "utf8");
+  const argv = ["--scope", "scope", "--scope-schema", "scope-schema", "--report-schema", "report-schema", "--source-sha", "a".repeat(40), "--observed-at", "2026-08-10T00:00:00.000Z", "--output", output];
+  try {
+    const result = await runAuditCli({ argv, read: async (path) => ({ scope: JSON.stringify(ready), "scope-schema": scopeSchema, "report-schema": reportSchema })[path], collectIssues: async () => { throw new AuditIncomplete("PROVIDER_TIMEOUT", "AquilaXk/easysubway#2764"); } });
+    const report = JSON.parse(readFileSync(output, "utf8"));
+    assert.equal(result.exitCode, 2);
+    assert.deepEqual([report.summary.pending, report.summary.ready, report.slots[0].state, report.slots[0].terminalLocator], [7, 1, "READY", ready.slots[0].terminalLocator]);
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
