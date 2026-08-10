@@ -214,6 +214,8 @@ test("clean checkout reproducibility audit contracts fix the exact five-owner pe
 
   const invalidScope = structuredClone(scope); invalidScope.slots[0].ownerIssue = 2816;
   assert.ok(validateCleanCheckoutReproducibilityAuditScope(invalidScope).length > 0);
+  assert.deepEqual(contractSchema.required, ["schemaVersion", "repository", "variants"]);
+  assert.equal(Object.hasOwn(contractSchema.properties, "sourceSha"), false);
   for (const mutate of [
     (value) => { value.properties.slots.minItems = 4; },
     (value) => { value.properties.slots.items.properties.repository.enum.pop(); },
@@ -224,6 +226,7 @@ test("clean checkout reproducibility audit contracts fix the exact five-owner pe
 
   for (const mutate of [
     (value) => { value.additionalProperties = true; },
+    (value) => { value.required.splice(2, 0, "sourceSha"); value.properties.sourceSha = { type: "string", pattern: "^[0-9a-f]{40}$" }; },
     (value) => { value.properties.repository.enum = ["AquilaXk/easysubway"]; },
     (value) => { value.properties.variants.maxItems = 17; },
     (value) => { value.properties.variants.items.properties.phases.minItems = 3; },

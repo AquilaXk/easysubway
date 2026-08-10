@@ -60,7 +60,6 @@ const phase = (name, overrides = {}) => ({
 const ownerContract = (repository = REPOSITORIES[0]) => ({
   schemaVersion: 1,
   repository,
-  sourceSha: SOURCE_SHA,
   variants: [{
     variantId: "linux-default",
     runnerImage: "ubuntu-24.04",
@@ -78,12 +77,12 @@ const commandDigest = (item) => createHash("sha256").update(stableJson({
 const ownerReceipt = (contract = ownerContract()) => ({
   schemaVersion: 1,
   repository: contract.repository,
-  sourceSha: contract.sourceSha,
+  sourceSha: SOURCE_SHA,
   contractSha256: CONTRACT_DIGEST,
   observedAt: OBSERVED_AT,
   cleanCheckout: {
     repository: contract.repository,
-    sourceSha: contract.sourceSha,
+    sourceSha: SOURCE_SHA,
     initialTrackedDiffCount: 0,
     initialUntrackedCount: 0,
   },
@@ -172,6 +171,13 @@ const verifiedEvidence = (contract = ownerContract(), receipt = ownerReceipt(con
 test("clean checkout reproducibility audit accepts exact PENDING and owner contract shapes", () => {
   assert.deepEqual(validateCleanCheckoutReproducibilityScope(SCOPE), []);
   assert.deepEqual(validateOwnerContract(ownerContract()), []);
+  const contractSchema = JSON.parse(readFileSync("contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json", "utf8"));
+  assert.deepEqual(contractSchema.required, ["schemaVersion", "repository", "variants"]);
+  assert.equal(Object.keys(contractSchema.properties).length, 3);
+  assert.equal(["schemaVersion", "repository", "variants"].every((key) => Object.hasOwn(contractSchema.properties, key)), true);
+  assert.equal(contractSchema.additionalProperties, false);
+  const legacySelfReferentialContract = { ...ownerContract(), sourceSha: SOURCE_SHA };
+  assert.notDeepEqual(validateOwnerContract(legacySelfReferentialContract), []);
   assert.deepEqual(validateOwnerReceipt(ownerReceipt()), []);
   const invalidScope = structuredClone(SCOPE);
   invalidScope.slots[0].ownerIssue = 123;

@@ -108,7 +108,7 @@ function validatePhase(item, errors, identity) {
 }
 
 export function validateOwnerContract(contract, errors = []) {
-  if (!exactKeys(contract, ["schemaVersion", "repository", "sourceSha", "variants"]) || contract.schemaVersion !== 1 || !REPOSITORY_SET.has(contract.repository) || !SHA.test(contract.sourceSha ?? "") || !Array.isArray(contract.variants) || contract.variants.length < 1 || contract.variants.length > 16) return [...errors, "owner contract shape mismatch"];
+  if (!exactKeys(contract, ["schemaVersion", "repository", "variants"]) || contract.schemaVersion !== 1 || !REPOSITORY_SET.has(contract.repository) || !Array.isArray(contract.variants) || contract.variants.length < 1 || contract.variants.length > 16) return [...errors, "owner contract shape mismatch"];
   const ids = contract.variants.map((variant) => variant?.variantId);
   if (!unique(ids)) errors.push("duplicate contract variant");
   for (const variant of contract.variants) {
@@ -159,7 +159,7 @@ export function evaluateReadyEvidence({ slot, evidence, now = new Date().toISOSt
   if (validateOwnerContract(evidence?.contract).length) add("OWNER_CONTRACT_INVALID");
   if (validateOwnerReceipt(evidence?.receipt).length) add("OWNER_RECEIPT_INVALID");
   const contract = evidence?.contract; const receipt = evidence?.receipt;
-  if (contract?.repository !== repository || receipt?.repository !== repository || contract?.sourceSha !== evidence?.currentHead || receipt?.sourceSha !== evidence?.currentHead) add("OWNER_SOURCE_IDENTITY_MISMATCH");
+  if (contract?.repository !== repository || receipt?.repository !== repository || receipt?.sourceSha !== evidence?.currentHead) add("OWNER_SOURCE_IDENTITY_MISMATCH");
   if (receipt?.contractSha256 !== evidence?.contractSha256) add("CONTRACT_RECEIPT_DIGEST_MISMATCH");
   if (receipt?.cleanCheckout?.repository !== repository || receipt?.cleanCheckout?.sourceSha !== evidence?.currentHead || receipt?.cleanCheckout?.initialTrackedDiffCount !== 0 || receipt?.cleanCheckout?.initialUntrackedCount !== 0) add("CLEAN_CHECKOUT_DIRTY");
   const run = evidence?.run; const artifact = evidence?.artifact;
