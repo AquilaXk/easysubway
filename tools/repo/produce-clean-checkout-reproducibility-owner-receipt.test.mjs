@@ -305,6 +305,29 @@ test("CLI diagnostics are sanitized and an existing output remains unaltered", a
   assert.equal(await absent(fixture.outputPath), true);
 });
 
+function validateImmutableEngineCheckoutBoundary(workflow) {
+  const validationName = "- name: Validate immutable D13 engine identity";
+  const checkoutName = "- name: Checkout immutable D13 engine";
+  assert.equal(workflow.split(validationName).length - 1, 1);
+  assert.ok(workflow.indexOf(validationName) < workflow.indexOf(checkoutName));
+  assert.equal(
+    (workflow.match(/fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'repository'\)\]/g) ?? []).length,
+    1,
+  );
+  assert.equal(
+    (workflow.match(/fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'sha'\)\]/g) ?? []).length,
+    1,
+  );
+  assert.ok(workflow.includes('if [[ ! "${D13_ENGINE_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then'));
+  assert.ok(workflow.includes('if [[ ! "${D13_ENGINE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then'));
+  assert.ok(workflow.includes("printf 'repository=%s\\n' \"${D13_ENGINE_REPOSITORY}\""));
+  assert.ok(workflow.includes("printf 'sha=%s\\n' \"${D13_ENGINE_SHA}\""));
+  assert.match(workflow, /repository: \$\{\{ steps\.d13-engine-identity\.outputs\.repository \}\}\n          ref: \$\{\{ steps\.d13-engine-identity\.outputs\.sha \}\}\n          path: d13-engine\n          persist-credentials: false/);
+
+  const checkoutBlock = workflow.match(/- name: Checkout immutable D13 engine[\s\S]*?persist-credentials: false/)?.[0] ?? "";
+  assert.doesNotMatch(checkoutBlock, /fromJSON\(toJSON\(job\)\)|github\.(?:repository|sha)/);
+}
+
 test("reusable workflow and composite action freeze the dual-checkout single-artifact boundary", async () => {
   const action = await readFile(path.join(root, ".github/actions/clean-checkout-reproducibility-owner-receipt/action.yml"), "utf8");
   const workflow = await readFile(path.join(root, ".github/workflows/clean-checkout-reproducibility-owner-receipt.yml"), "utf8");
@@ -323,7 +346,7 @@ test("reusable workflow and composite action freeze the dual-checkout single-art
   assert.match(workflow, /actions\/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1/);
   assert.match(workflow, /python-version: "3\.13\.15"/);
   assert.match(workflow, /repository: \$\{\{ github\.repository \}\}\n          ref: \$\{\{ github\.sha \}\}\n          path: owner-source\n          persist-credentials: false/);
-  assert.match(workflow, /repository: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'repository'\)\] \}\}\n          ref: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'sha'\)\] \}\}\n          path: d13-engine\n          persist-credentials: false/);
+  validateImmutableEngineCheckoutBoundary(workflow);
   assert.match(workflow, /uses: \.\/d13-engine\/\.github\/actions\/clean-checkout-reproducibility-owner-receipt/);
   assert.match(workflow, /contract-path: \$\{\{ inputs\.contract_path \}\}/);
   assert.match(workflow, /repository: \$\{\{ github\.repository \}\}/);
@@ -345,4 +368,19 @@ test("reusable workflow and composite action freeze the dual-checkout single-art
   assert.doesNotMatch(producer, /snapshotLinuxProcesses|PROCESS_SCOPE_ENV/);
   assert.match(producer, /await snapshotEntrypoint\(ownerRoot, prepared\.contract\.entrypoint\)/);
   assert.match(producer, /await snapshotWorkingDirectory\(ownerRoot, prepared\.contract\.workingDirectory\)/);
+});
+
+test("reusable workflow rejects unvalidated or weak D13 engine identities", async () => {
+  const workflow = await readFile(path.join(root, ".github/workflows/clean-checkout-reproducibility-owner-receipt.yml"), "utf8");
+  const mutations = [
+    workflow.replace("- name: Validate immutable D13 engine identity", "- name: Skip immutable D13 engine identity validation"),
+    workflow.replace("repository: ${{ steps.d13-engine-identity.outputs.repository }}", "repository: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'repository')] }}"),
+    workflow.replace("ref: ${{ steps.d13-engine-identity.outputs.sha }}", "ref: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'sha')] }}"),
+    workflow.replace("^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$", "^.+$"),
+    workflow.replace("^[0-9a-f]{40}$", "^.+$"),
+    workflow.replace("printf 'repository=%s\\n' \"${D13_ENGINE_REPOSITORY}\"", "printf 'repository=%s\\n' \"${GITHUB_REPOSITORY}\""),
+  ];
+  for (const mutation of mutations) {
+    assert.throws(() => validateImmutableEngineCheckoutBoundary(mutation));
+  }
 });

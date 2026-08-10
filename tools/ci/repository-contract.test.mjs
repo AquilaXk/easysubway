@@ -21134,7 +21134,12 @@ test("clean checkout reproducibility owner receipt preserves caller identity and
   assert.equal((workflow.match(/actions\/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1/g) ?? []).length, 1);
   assert.match(workflow, /python-version: "3\.13\.15"/);
   assert.match(workflow, /repository: \$\{\{ github\.repository \}\}\n          ref: \$\{\{ github\.sha \}\}\n          path: owner-source\n          persist-credentials: false/);
-  assert.match(workflow, /repository: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'repository'\)\] \}\}\n          ref: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'sha'\)\] \}\}\n          path: d13-engine\n          persist-credentials: false/);
+  assert.match(workflow, /- name: Validate immutable D13 engine identity\n        id: d13-engine-identity/);
+  assert.match(workflow, /D13_ENGINE_REPOSITORY: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'repository'\)\] \}\}/);
+  assert.match(workflow, /D13_ENGINE_SHA: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'sha'\)\] \}\}/);
+  assert.match(workflow, /\^\[A-Za-z0-9_\.\-\]\+\/\[A-Za-z0-9_\.\-\]\+\$/);
+  assert.match(workflow, /\^\[0-9a-f\]\{40\}\$/);
+  assert.match(workflow, /repository: \$\{\{ steps\.d13-engine-identity\.outputs\.repository \}\}\n          ref: \$\{\{ steps\.d13-engine-identity\.outputs\.sha \}\}\n          path: d13-engine\n          persist-credentials: false/);
   assert.match(workflow, /uses: \.\/d13-engine\/\.github\/actions\/clean-checkout-reproducibility-owner-receipt/);
   assert.match(workflow, /owner-root: \$\{\{ github\.workspace \}\}\/owner-source/);
   assert.match(workflow, /contract-path: \$\{\{ inputs\.contract_path \}\}/);

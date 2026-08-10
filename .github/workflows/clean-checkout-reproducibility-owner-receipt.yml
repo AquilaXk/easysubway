@@ -24,11 +24,32 @@ jobs:
           path: owner-source
           persist-credentials: false
 
+      - name: Validate immutable D13 engine identity
+        id: d13-engine-identity
+        shell: bash
+        env:
+          D13_ENGINE_REPOSITORY: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'repository')] }}
+          D13_ENGINE_SHA: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'sha')] }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${D13_ENGINE_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "D13 engine repository identity is unavailable or malformed." >&2
+            exit 1
+          fi
+          if [[ ! "${D13_ENGINE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "D13 engine SHA identity is unavailable or malformed." >&2
+            exit 1
+          fi
+          {
+            printf 'repository=%s\n' "${D13_ENGINE_REPOSITORY}"
+            printf 'sha=%s\n' "${D13_ENGINE_SHA}"
+          } >> "${GITHUB_OUTPUT}"
+
       - name: Checkout immutable D13 engine
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
         with:
-          repository: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'repository')] }}
-          ref: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'sha')] }}
+          repository: ${{ steps.d13-engine-identity.outputs.repository }}
+          ref: ${{ steps.d13-engine-identity.outputs.sha }}
           path: d13-engine
           persist-credentials: false
 
