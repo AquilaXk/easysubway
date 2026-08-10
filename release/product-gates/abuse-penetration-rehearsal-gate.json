@@ -178,7 +178,7 @@
     "policyKo": "#1022는 Play-generated/Play-installed artifact와 deployed production-like backend/object-storage rehearsal 증거가 없으면 preflight, local selected test, static contract만으로 완료 처리하지 않는다."
   },
   "buildIdentityPolicy": {
-    "requiredIssueLinks": ["#1015", "#1016", "#1020", "#1914"],
+    "requiredIssueLinks": ["#1015", "Mobile #8", "#1020", "#1914"],
     "acceptedArtifactSources": ["rc-aab", "play-generated-apk", "play-installed-build", "backend-release-image"],
     "requiredIdentityFields": [
       "gitSha",
