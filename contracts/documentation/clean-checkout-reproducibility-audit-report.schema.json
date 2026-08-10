@@ -1,0 +1,127 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://easysubway.local/schema/clean-checkout-reproducibility-audit-report.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "status", "observedAt", "inputs", "summary", "slots", "findings", "incomplete"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "status": { "enum": ["COMPLETE", "AUDIT_INCOMPLETE"] },
+    "observedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$", "format": "date-time" },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["sourceSha", "scopeSha256", "stateBeginSha256", "stateEndSha256"],
+      "properties": {
+        "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+        "scopeSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+        "stateBeginSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" },
+        "stateEndSha256": { "type": ["string", "null"], "pattern": "^[0-9a-f]{64}$" }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["pending", "ready", "findings", "incomplete"],
+      "properties": {
+        "pending": { "type": "integer", "minimum": 0 },
+        "ready": { "type": "integer", "minimum": 0 },
+        "findings": { "type": "integer", "minimum": 0 },
+        "incomplete": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "slots": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["repository", "state", "currentHead", "ownerIssue", "contractLocator", "receiptLocator", "evidenceState"],
+        "properties": {
+          "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
+          "state": { "enum": ["PENDING", "READY"] },
+          "currentHead": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
+          "ownerIssue": { "type": ["integer", "null"], "minimum": 1 },
+          "contractLocator": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "object", "additionalProperties": false, "required": ["kind", "repository", "commitSha", "path", "blobSha"], "properties": {
+                "kind": { "const": "GIT_BLOB" },
+                "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
+                "commitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+                "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$" },
+                "blobSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }
+              } }
+            ]
+          },
+          "receiptLocator": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "object", "additionalProperties": false, "required": ["kind", "repository", "runId", "artifactId", "artifactName", "archiveDigest", "workflowPath", "headSha", "createdAt", "expiresAt"], "properties": {
+                "kind": { "const": "ACTIONS_ARTIFACT" },
+                "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
+                "runId": { "type": "integer", "minimum": 1 },
+                "artifactId": { "type": "integer", "minimum": 1 },
+                "artifactName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+                "archiveDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+                "workflowPath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])\\.github/workflows/[A-Za-z0-9][A-Za-z0-9._/-]*\\.ya?ml$" },
+                "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+                "createdAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$", "format": "date-time" },
+                "expiresAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$", "format": "date-time" }
+              } }
+            ]
+          },
+          "evidenceState": { "enum": ["PENDING", "VERIFIED", "FINDING", "UNAVAILABLE"] }
+        },
+        "oneOf": [
+          { "type": "object", "properties": {
+            "state": { "const": "PENDING" },
+            "ownerIssue": { "type": "null" },
+            "contractLocator": { "type": "null" },
+            "receiptLocator": { "type": "null" },
+            "evidenceState": { "enum": ["PENDING", "UNAVAILABLE"] }
+          } },
+          { "type": "object", "properties": {
+            "state": { "const": "READY" },
+            "ownerIssue": { "type": "integer", "minimum": 1 },
+            "contractLocator": { "type": "object" },
+            "receiptLocator": { "type": "object" },
+            "evidenceState": { "enum": ["VERIFIED", "FINDING", "UNAVAILABLE"] }
+          } }
+        ]
+      }
+    },
+    "findings": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["code", "repository"],
+        "properties": {
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] }
+        }
+      }
+    },
+    "incomplete": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["stage", "code", "affectedIdentity"],
+        "properties": {
+          "stage": { "type": "string", "pattern": "^[a-z][a-z0-9-]*$" },
+          "code": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+          "affectedIdentity": { "type": "string", "pattern": "^[A-Za-z0-9:._/-]+$" }
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "type": "object", "properties": { "status": { "const": "COMPLETE" }, "inputs": { "type": "object", "properties": { "stateBeginSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "stateEndSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" } } }, "incomplete": { "type": "array", "maxItems": 0 } } },
+    { "type": "object", "properties": { "status": { "const": "AUDIT_INCOMPLETE" }, "incomplete": { "type": "array", "minItems": 1 } } }
+  ]
+}

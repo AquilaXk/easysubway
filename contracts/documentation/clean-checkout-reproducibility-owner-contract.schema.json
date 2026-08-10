@@ -1,0 +1,47 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://easysubway.local/schema/clean-checkout-reproducibility-owner-contract.schema.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "repository", "sourceSha", "variants"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
+    "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "variants": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["variantId", "runnerImage", "toolchainDigest", "phases"],
+        "properties": {
+          "variantId": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]{0,63}$" },
+          "runnerImage": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$" },
+          "toolchainDigest": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "phases": {
+            "type": "array",
+            "minItems": 4,
+            "maxItems": 4,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": ["phase", "entrypoint", "arguments", "workingDirectory", "requiredEnvironment", "networkPolicy", "timeoutSeconds", "expectedExitCode"],
+              "properties": {
+                "phase": { "enum": ["SETUP", "BUILD", "TEST", "DEBUG"] },
+                "entrypoint": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$" },
+                "arguments": { "type": "array", "maxItems": 32, "items": { "type": "string", "pattern": "^(?!.*[?#])(?!.*(?:^|/)\\.\\.(?:/|$))[A-Za-z0-9._/@:+-]{1,256}$" } },
+                "workingDirectory": { "type": "string", "pattern": "^(?:\\.|(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*)$" },
+                "requiredEnvironment": { "type": "array", "maxItems": 32, "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]{0,127}$" } },
+                "networkPolicy": { "enum": ["NONE", "DEPENDENCY_FETCH", "LOCAL_ONLY"] },
+                "timeoutSeconds": { "type": "integer", "minimum": 1, "maximum": 3600 },
+                "expectedExitCode": { "const": 0 }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
