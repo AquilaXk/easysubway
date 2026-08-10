@@ -233,7 +233,11 @@ export function collectContractErrors(
     else {
       const reproducibilityScopeSchemaPath = contract("documentation/clean-checkout-reproducibility-audit-scope.schema.json");
       const scopeValid = validateJson(reproducibilityScopeSchemaPath, workspace.cleanCheckoutReproducibilityAuditScope, errors);
-      if (existsSync(reproducibilityScopeSchemaPath)) validateCleanCheckoutReproducibilityAuditScopeSchema(loadJson(reproducibilityScopeSchemaPath), errors, reproducibilityScopeSchemaPath);
+      if (!existsSync(reproducibilityScopeSchemaPath)) errors.push(`${reproducibilityScopeSchemaPath} 누락`);
+      else {
+        try { validateCleanCheckoutReproducibilityAuditScopeSchema(loadJson(reproducibilityScopeSchemaPath), errors, reproducibilityScopeSchemaPath); }
+        catch { errors.push(`${reproducibilityScopeSchemaPath}: 유효한 JSON이 필요하다`); }
+      }
       if (scopeValid) validateCleanCheckoutReproducibilityAuditScope(loadJson(workspace.cleanCheckoutReproducibilityAuditScope), errors, workspace.cleanCheckoutReproducibilityAuditScope);
       for (const [kind, path] of [["owner contract", workspace.cleanCheckoutReproducibilityOwnerContractSchema], ["owner receipt", workspace.cleanCheckoutReproducibilityOwnerReceiptSchema], ["report", workspace.cleanCheckoutReproducibilityAuditReportSchema]]) {
         if (!existsSync(path)) errors.push(`${path} 누락`);

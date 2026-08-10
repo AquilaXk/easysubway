@@ -205,6 +205,11 @@ test("clean checkout reproducibility audit verifies one READY evidence path and 
     [(evidence) => { evidence.receipt.variants[0].phases[0].exitCode = 1; }, "PHASE_RESULT_MISMATCH"],
     [(evidence) => { evidence.receiptArchiveDigest = `sha256:${"0".repeat(64)}`; }, "RECEIPT_ARCHIVE_DIGEST_MISMATCH"],
     [(evidence) => { evidence.artifactCatalog = []; }, "ACTIONS_ARTIFACT_CATALOG_MISMATCH"],
+    [(evidence) => { evidence.entrypoints[0].mode = "100644"; }, "ENTRYPOINT_NOT_EXECUTABLE"],
+    [(evidence) => { evidence.run.conclusion = "failure"; }, "ACTIONS_RUN_MISMATCH"],
+    [(evidence) => { evidence.contractSha256 = "9".repeat(64); }, "CONTRACT_RECEIPT_DIGEST_MISMATCH"],
+    [(evidence) => { evidence.receipt.observedAt = "2026-08-10T00:20:00.000Z"; }, "RECEIPT_TIME_MISMATCH"],
+    [(evidence) => { evidence.receipt.variants[0].phases[0].commandSha256 = "9".repeat(64); }, "CONTRACT_RECEIPT_PHASE_MISMATCH"],
   ]) {
     const evidence = verifiedEvidence();
     mutate(evidence);

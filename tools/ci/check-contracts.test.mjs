@@ -257,6 +257,35 @@ test("clean checkout reproducibility audit contracts fix the exact five-owner pe
   ]) { const invalid = structuredClone(reportSchema); mutate(invalid); assert.ok(validateCleanCheckoutReproducibilityAuditReportSchema(invalid).length > 0); }
 });
 
+test("clean checkout reproducibility contract collection reports malformed or missing scope schema without throwing", () => {
+  const fixture = createExternalWorkspace();
+  try {
+    cpSync("contracts", join(fixture.directory, "contracts"), { recursive: true });
+    const workspace = loadJson(fixture.workspacePath);
+    Object.assign(workspace, {
+      contracts: "contracts",
+      cleanCheckoutReproducibilityAuditScope: "contracts/documentation/clean-checkout-reproducibility-audit-scope.json",
+      cleanCheckoutReproducibilityOwnerContractSchema: "contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json",
+      cleanCheckoutReproducibilityOwnerReceiptSchema: "contracts/documentation/clean-checkout-reproducibility-owner-receipt.schema.json",
+      cleanCheckoutReproducibilityAuditReportSchema: "contracts/documentation/clean-checkout-reproducibility-audit-report.schema.json",
+    });
+    writeFileSync(fixture.workspacePath, JSON.stringify(workspace));
+    const scopeSchemaPath = join(fixture.directory, "contracts/documentation/clean-checkout-reproducibility-audit-scope.schema.json");
+
+    writeFileSync(scopeSchemaPath, "{");
+    let malformedErrors;
+    assert.doesNotThrow(() => { malformedErrors = collectContractErrors(fixture.workspacePath); });
+    assert.ok(malformedErrors.some((error) => error.includes("clean-checkout-reproducibility-audit-scope.schema.json: 유효한 JSON")));
+
+    rmSync(scopeSchemaPath);
+    let missingErrors;
+    assert.doesNotThrow(() => { missingErrors = collectContractErrors(fixture.workspacePath); });
+    assert.ok(missingErrors.some((error) => error.includes("clean-checkout-reproducibility-audit-scope.schema.json 누락")));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
 test("post-GO boundary audit contracts bind current blockers and strict report", () => {
   const scope = loadJson("contracts/documentation/post-go-boundary-audit-scope.json");
   const scopeSchema = loadJson("contracts/documentation/post-go-boundary-audit-scope.schema.json");

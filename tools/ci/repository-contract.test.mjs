@@ -21093,6 +21093,8 @@ test("clean checkout reproducibility audit workflow binds main SHA to a write-on
   const workflow = read(".github/workflows/clean-checkout-reproducibility-audit.yml");
   assert.match(workflow, /^on:\n  push:\n    branches: \[main\]$/m);
   assert.doesNotMatch(workflow, /^\s+paths:/m);
+  assert.match(workflow, /^permissions: \{\}$/m);
+  assert.match(workflow, /^concurrency:\n  group: clean-checkout-reproducibility-audit-\$\{\{ github\.ref \}\}\n  cancel-in-progress: false$/m);
   assert.match(workflow, /permissions:\n      contents: read\n      issues: read\n      actions: read/);
   assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /persist-credentials: false/);
