@@ -19,7 +19,13 @@
     { "issueNumber": 2748, "prNumber": 2789, "mergeSha": "90a169d9b35e4845bfd03d518522544b66dd189f", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
     { "issueNumber": 2790, "prNumber": 2791, "mergeSha": "40d1bb13906a6a96a3c7342b0923ad180d290234", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
     { "issueNumber": 2792, "prNumber": 2793, "mergeSha": "3d1590baa98c929ceabd0d2d44414cebcc643c6f", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2795, "prNumber": 2796, "mergeSha": "b853fe6101c7848a8d556bf21b882b3f0e3060a9", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" }
+    { "issueNumber": 2795, "prNumber": 2796, "mergeSha": "b853fe6101c7848a8d556bf21b882b3f0e3060a9", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2797, "prNumber": 2798, "mergeSha": "7e1cc3d33d579ead965322fe2fa023409aba8c6b", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2797, "prNumber": 2799, "mergeSha": "01ce0b2e4572f65b86ea4f2c91a32c9ff6a2fae1", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2800, "prNumber": 2801, "mergeSha": "f89c284f76654fef5e32387304edaac64618fce2", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2802, "prNumber": 2803, "mergeSha": "b96e8753cb406de6067bbf22a0da158b96b4d898", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2805, "prNumber": 2806, "mergeSha": "fa2f2602573651af6694e7f56077414b685987b9", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2807, "prNumber": 2808, "mergeSha": "3b0076e04df4f6947f33c37c09949ad6b7487238", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" }
   ],
-  "self": { "issueNumber": 2797, "planOwner": "PLAN-DOC" }
+  "self": { "issueNumber": 2809, "planOwner": "PLAN-DOC" }
 }

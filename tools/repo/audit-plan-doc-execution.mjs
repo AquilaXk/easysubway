@@ -16,6 +16,9 @@ const execFileAsync = promisify(execFile);
 const CLOSING_ISSUES_QUERY = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { number merged mergeCommit { oid } closingIssuesReferences(first: 100) { totalCount pageInfo { hasNextPage } nodes { number state repository { nameWithOwner } } } } } }`;
 const EXPECTED_RECORDS = new Map([
   [2749, [2748, "5ad660a7f07563999c1c076790614e7e717e0ea7", "COORDINATOR_FOLLOWUP"]], [2755, [2754, "0568c2195ccac35f0d46f6bb3594093471310977", "CLOSES"]], [2757, [2756, "2b102c1b50f495d628617e61ae95f81944b69c20", "CLOSES"]], [2759, [2758, "00c6109bf91e052fc0d9944a84fde1601c1c50c1", "CLOSES"]], [2761, [2760, "decc1072aa8c8facbfa0143fa1f8fe7646bc016d", "CLOSES"]], [2763, [2762, "560e07239e9ef99b3bfea2ab4bf758b5115acb43", "CLOSES"]], [2730, [2729, "4ccf78d8bf60db2d25233d6fe744daf805c7b0ac", "COORDINATOR_FOLLOWUP"]], [2775, [2733, "96119c4d723d9c60fcd8999da8e58af0731b0847", "CLOSES"]], [2782, [2781, "6194860b5cb13334b91410374fd2504ee056684c", "CLOSES"]], [2784, [2783, "3ea7ef2929ce680268783a1a14476138beb2b521", "CLOSES"]], [2787, [2785, "79bcd0b8e05eb90907c411bdde9b30e24592ce53", "CLOSES"]], [2788, [2729, "a44259fcbdd5538586f4aabaa9a6cb844a41dc03", "COORDINATOR_FOLLOWUP"]], [2789, [2748, "90a169d9b35e4845bfd03d518522544b66dd189f", "COORDINATOR_FOLLOWUP"]], [2791, [2790, "40d1bb13906a6a96a3c7342b0923ad180d290234", "CLOSES"]], [2793, [2792, "3d1590baa98c929ceabd0d2d44414cebcc643c6f", "CLOSES"]], [2796, [2795, "b853fe6101c7848a8d556bf21b882b3f0e3060a9", "CLOSES"]],
+  [2798, [2797, "7e1cc3d33d579ead965322fe2fa023409aba8c6b", "CLOSES"]], [2799, [2797, "01ce0b2e4572f65b86ea4f2c91a32c9ff6a2fae1", "CLOSES"]],
+  [2801, [2800, "f89c284f76654fef5e32387304edaac64618fce2", "CLOSES"]], [2803, [2802, "b96e8753cb406de6067bbf22a0da158b96b4d898", "CLOSES"]],
+  [2806, [2805, "fa2f2602573651af6694e7f56077414b685987b9", "CLOSES"]], [2808, [2807, "3b0076e04df4f6947f33c37c09949ad6b7487238", "CLOSES"]],
 ]);
 
 export class AuditIncomplete extends Error {
@@ -25,7 +28,7 @@ export class AuditIncomplete extends Error {
 export function validatePlanDocExecutionScope(scope, errors = []) {
   if (scope?.schemaVersion !== 1 || scope?.executionRepository !== REPOSITORY || scope?.planOwner !== "PLAN-DOC") errors.push("scope header mismatch");
   if (JSON.stringify(scope?.forbiddenTargetPathPrefixes) !== JSON.stringify(["apps/mobile/", "backend/", "infra/", "tools/datapack/", "tools/ops/", "tools/release/"])) errors.push("forbidden target prefix mismatch");
-  if (scope?.self?.issueNumber !== 2797 || scope?.self?.planOwner !== "PLAN-DOC") errors.push("self binding mismatch");
+  if (scope?.self?.issueNumber !== 2809 || scope?.self?.planOwner !== "PLAN-DOC") errors.push("self binding mismatch");
   const records = scope?.historical;
   if (!Array.isArray(records) || records.length !== EXPECTED_RECORDS.size) return [...errors, "historical inventory count mismatch"];
   const actual = new Map(records.map((record) => [record?.prNumber, record]));
