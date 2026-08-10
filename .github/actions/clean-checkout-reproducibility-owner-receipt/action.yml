@@ -1,0 +1,46 @@
+name: Clean Checkout Reproducibility Owner Receipt
+description: Execute an owner-declared clean-checkout contract and create one sanitized receipt.
+
+inputs:
+  owner-root:
+    description: Absolute caller checkout root.
+    required: true
+  contract-path:
+    description: Safe repository-relative owner contract path.
+    required: true
+  repository:
+    description: Exact caller repository identity.
+    required: true
+  source-sha:
+    description: Exact caller source commit.
+    required: true
+  runner-image:
+    description: Exact runner image declared by the owner contract.
+    required: true
+  output:
+    description: Create-only receipt output path.
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Create sanitized owner receipt
+      shell: bash
+      env:
+        D13_OWNER_ROOT: ${{ inputs.owner-root }}
+        D13_CONTRACT_PATH: ${{ inputs.contract-path }}
+        D13_REPOSITORY: ${{ inputs.repository }}
+        D13_SOURCE_SHA: ${{ inputs.source-sha }}
+        D13_RUNNER_IMAGE: ${{ inputs.runner-image }}
+        D13_OUTPUT: ${{ inputs.output }}
+      run: |
+        set -euo pipefail
+        node "${GITHUB_ACTION_PATH}/../../../tools/repo/produce-clean-checkout-reproducibility-owner-receipt.mjs" \
+          --owner-root "${D13_OWNER_ROOT}" \
+          --contract "${D13_CONTRACT_PATH}" \
+          --contract-schema "${GITHUB_ACTION_PATH}/../../../contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json" \
+          --receipt-schema "${GITHUB_ACTION_PATH}/../../../contracts/documentation/clean-checkout-reproducibility-owner-receipt.schema.json" \
+          --repository "${D13_REPOSITORY}" \
+          --source-sha "${D13_SOURCE_SHA}" \
+          --runner-image "${D13_RUNNER_IMAGE}" \
+          --output "${D13_OUTPUT}"

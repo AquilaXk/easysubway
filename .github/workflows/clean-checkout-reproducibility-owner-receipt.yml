@@ -1,0 +1,85 @@
+name: Clean Checkout Reproducibility Owner Receipt
+
+on:
+  workflow_call:
+    inputs:
+      contract_path:
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  owner-receipt:
+    permissions:
+      contents: read
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - name: Checkout caller source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: ${{ github.repository }}
+          ref: ${{ github.sha }}
+          path: owner-source
+          persist-credentials: false
+
+      - name: Validate immutable D13 engine identity
+        id: d13-engine-identity
+        shell: bash
+        env:
+          # Dynamic lookup tolerates actionlint's older job schema; the guard below fails closed when the provider omits either field.
+          D13_ENGINE_REPOSITORY: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'repository')] }}
+          D13_ENGINE_SHA: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'sha')] }}
+        run: |
+          set -euo pipefail
+          if [[ ! "${D13_ENGINE_REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+            echo "D13 engine repository identity is unavailable or malformed." >&2
+            exit 1
+          fi
+          if [[ ! "${D13_ENGINE_SHA}" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "D13 engine SHA identity is unavailable or malformed." >&2
+            exit 1
+          fi
+          {
+            printf 'repository=%s\n' "${D13_ENGINE_REPOSITORY}"
+            printf 'sha=%s\n' "${D13_ENGINE_SHA}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Checkout immutable D13 engine
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: ${{ steps.d13-engine-identity.outputs.repository }}
+          ref: ${{ steps.d13-engine-identity.outputs.sha }}
+          path: d13-engine
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Set up Python subreaper runtime
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: "3.13.15"
+
+      - name: Execute owner contract
+        uses: ./d13-engine/.github/actions/clean-checkout-reproducibility-owner-receipt
+        with:
+          owner-root: ${{ github.workspace }}/owner-source
+          contract-path: ${{ inputs.contract_path }}
+          repository: ${{ github.repository }}
+          source-sha: ${{ github.sha }}
+          runner-image: ubuntu-24.04
+          output: ${{ runner.temp }}/clean-checkout-reproducibility-owner-receipt.json
+
+      - name: Upload owner receipt
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: clean-checkout-reproducibility-owner-receipt-${{ github.sha }}
+          path: ${{ runner.temp }}/clean-checkout-reproducibility-owner-receipt.json
+          if-no-files-found: error
+          include-hidden-files: false
+          overwrite: false
+          retention-days: 14

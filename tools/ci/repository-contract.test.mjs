@@ -21120,3 +21120,64 @@ test("clean checkout reproducibility audit workflow binds main SHA to a write-on
   assert.match(workflow, /retention-days: 14/);
   assert.doesNotMatch(workflow, /continue-on-error|uses:\s*actions\/cache@|previous report|git (?:add|commit|push)/i);
 });
+
+test("clean checkout reproducibility owner receipt preserves caller identity and one sanitized artifact", () => {
+  const action = read(".github/actions/clean-checkout-reproducibility-owner-receipt/action.yml");
+  const workflow = read(".github/workflows/clean-checkout-reproducibility-owner-receipt.yml");
+  const producer = read("tools/repo/produce-clean-checkout-reproducibility-owner-receipt.mjs");
+
+  assert.match(workflow, /^on:\n  workflow_call:\n    inputs:\n      contract_path:\n        required: true\n        type: string$/m);
+  assert.doesNotMatch(workflow, /^\s{4}secrets:/m);
+  assert.match(workflow, /^permissions: \{\}$/m);
+  assert.match(workflow, /^  owner-receipt:\n    permissions:\n      contents: read\n    runs-on: ubuntu-24\.04$/m);
+  assert.equal((workflow.match(/actions\/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd/g) ?? []).length, 2);
+  assert.equal((workflow.match(/actions\/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1/g) ?? []).length, 1);
+  assert.match(workflow, /python-version: "3\.13\.15"/);
+  assert.match(workflow, /repository: \$\{\{ github\.repository \}\}\n          ref: \$\{\{ github\.sha \}\}\n          path: owner-source\n          persist-credentials: false/);
+  assert.match(workflow, /- name: Validate immutable D13 engine identity\n        id: d13-engine-identity/);
+  assert.match(workflow, /D13_ENGINE_REPOSITORY: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'repository'\)\] \}\}/);
+  assert.match(workflow, /D13_ENGINE_SHA: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'sha'\)\] \}\}/);
+  assert.match(workflow, /\^\[A-Za-z0-9_\.\-\]\+\/\[A-Za-z0-9_\.\-\]\+\$/);
+  assert.match(workflow, /\^\[0-9a-f\]\{40\}\$/);
+  assert.match(workflow, /repository: \$\{\{ steps\.d13-engine-identity\.outputs\.repository \}\}\n          ref: \$\{\{ steps\.d13-engine-identity\.outputs\.sha \}\}\n          path: d13-engine\n          persist-credentials: false/);
+  assert.match(workflow, /uses: \.\/d13-engine\/\.github\/actions\/clean-checkout-reproducibility-owner-receipt/);
+  assert.match(workflow, /owner-root: \$\{\{ github\.workspace \}\}\/owner-source/);
+  assert.match(workflow, /contract-path: \$\{\{ inputs\.contract_path \}\}/);
+  assert.match(workflow, /repository: \$\{\{ github\.repository \}\}/);
+  assert.match(workflow, /source-sha: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /runner-image: ubuntu-24\.04/);
+  assert.equal((workflow.match(/actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/g) ?? []).length, 1);
+  assert.match(workflow, /name: clean-checkout-reproducibility-owner-receipt-\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /path: \$\{\{ runner\.temp \}\}\/clean-checkout-reproducibility-owner-receipt\.json/);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.match(workflow, /include-hidden-files: false/);
+  assert.match(workflow, /overwrite: false/);
+  assert.match(workflow, /retention-days: 14/);
+  assert.doesNotMatch(workflow, /secrets:|secrets\.|inherit|continue-on-error|actions\/cache|previous|fallback|git (?:add|commit|push)/i);
+
+  for (const input of ["owner-root", "contract-path", "repository", "source-sha", "runner-image", "output"]) {
+    assert.match(action, new RegExp(`^  ${input}:\\n    description: [^\\n]+\\n    required: true$`, "m"));
+  }
+  assert.match(action, /^runs:\n  using: composite$/m);
+  assert.match(action, /node "\$\{GITHUB_ACTION_PATH\}\/\.\.\/\.\.\/\.\.\/tools\/repo\/produce-clean-checkout-reproducibility-owner-receipt\.mjs"/);
+  assert.match(action, /--contract-schema "\$\{GITHUB_ACTION_PATH\}\/\.\.\/\.\.\/\.\.\/contracts\/documentation\/clean-checkout-reproducibility-owner-contract\.schema\.json"/);
+  assert.match(action, /--receipt-schema "\$\{GITHUB_ACTION_PATH\}\/\.\.\/\.\.\/\.\.\/contracts\/documentation\/clean-checkout-reproducibility-owner-receipt\.schema\.json"/);
+  assert.doesNotMatch(action, /secrets|inherit|cache|continue-on-error|curl|gh api/i);
+
+  assert.match(producer, /const executable = linuxSupervisor \? "python3" : entrypoint;/);
+  assert.match(producer, /child = spawnProcess\(executable, spawnArguments, \{/);
+  assert.match(producer, /^import \{ execFile, spawn \} from "node:child_process";$/m);
+  assert.match(producer, /shell: false/);
+  assert.match(producer, /detached: true/);
+  assert.match(producer, /stdio: \["ignore", "ignore", "ignore"\]/);
+  assert.match(producer, /PR_SET_CHILD_SUBREAPER = 36/);
+  assert.match(producer, /ctypes\.CDLL\(None, use_errno=True\)/);
+  assert.match(producer, /subprocess\.Popen\(/);
+  assert.match(producer, /shell=False/);
+  assert.match(producer, /start_new_session=True/);
+  assert.doesNotMatch(producer, /snapshotLinuxProcesses|PROCESS_SCOPE_ENV/);
+  assert.match(producer, /await snapshotEntrypoint\(ownerRoot, prepared\.contract\.entrypoint\)/);
+  assert.match(producer, /await snapshotWorkingDirectory\(ownerRoot, prepared\.contract\.workingDirectory\)/);
+  assert.match(producer, /open\(outputPath, "wx"\)/);
+  assert.doesNotMatch(producer, /stdio: \[[^\]]*"pipe"|console\.(?:log|error)|spawn\([^\n]+shell:\s*true/);
+});
