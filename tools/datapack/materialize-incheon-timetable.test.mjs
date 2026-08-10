@@ -41,8 +41,8 @@ const OPERATOR_ID = "incheon-transit";
 const LINE1 = "line-98718184f016";
 const LINE2 = "line-42b5805f3b5a";
 const LINE7 = "line-15b3b8a93259";
-// accessibility 누적 fixture coverage baseline(실측): supportedCount=34 → timetable +2 = 36.
-const ACCESSIBILITY_SUPPORTED_COUNT = 34;
+// accessibility 누적 fixture coverage baseline(실측): supportedCount=35 → timetable +2 = 37.
+const ACCESSIBILITY_SUPPORTED_COUNT = 35;
 const TIMETABLE_SUPPORTED_COUNT = ACCESSIBILITY_SUPPORTED_COUNT + 2;
 
 async function inputs() {
@@ -356,5 +356,9 @@ test("materialized SQLite와 provenance가 인천 schedule_timetable 2건을 SUP
 });
 
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  const value = JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  if (relativePath === "tools/datapack/release/capital-production-reviewed-pack.json") {
+    value.packs[0].routeServiceArtifactEvidence = [];
+  }
+  return value;
 }

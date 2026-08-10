@@ -550,27 +550,23 @@ test("canary runner dotenv parser는 키가 없으면 fail-closed로 거부한�
   }
 });
 
-test("canary runner --test-expected-candidate는 정합된 operations-release-evidence.json과 timetable evidence에서 checked-in RC candidate를 resolve한다", async () => {
+test("canary runner --test-expected-candidate는 stale checked-in timetable evidence를 거부한다", async () => {
   // release/product-gates/operations-release-evidence.json's
-  // routeV2Readiness.timetableSnapshotCache.currentImplementation is now
-  // reconciled with the checked-in timetable evidence file this runner actually
-  // reads (backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json)
-  // — the earlier known drift was reconciled in #2095. resolveExpectedCandidate()
-  // therefore resolves the SAME checked-in RC candidate from the two matching
-  // evidences instead of fail-closing on a snapshot mismatch.
+  // The checked-in timetable evidence still binds the same bytes, but its
+  // freshness window has elapsed. Matching identities must not turn stale
+  // release evidence into a deployable candidate.
   const [operations, timetable] = await Promise.all([
     readFile(operationsEvidencePath, "utf8").then(JSON.parse),
     readFile(timetableEvidencePath, "utf8").then(JSON.parse),
   ]);
-  const resolved = resolveExpectedCandidate(operations, timetable);
-  assert.equal(resolved.timetableSnapshotId, timetable.snapshotId);
-  assert.equal(resolved.timetableSnapshotSha256, timetable.snapshotSha256);
-  assert.equal(
-    resolved.backendDeploySha,
-    operations.backendControlPlane.publicApiSurface.routeV2Readiness.realisticLoadEvidence.candidate
-      .candidateGitSha,
+  assert.throws(
+    () => resolveExpectedCandidate(operations, timetable),
+    /timetableSnapshotCache is not SATISFIED/,
   );
-  await execFileAsync("bash", [runnerPath, "--test-expected-candidate"]);
+  await assert.rejects(
+    execFileAsync("bash", [runnerPath, "--test-expected-candidate"]),
+    /timetableSnapshotCache is not SATISFIED/,
+  );
 });
 
 test("resolveExpectedCandidate는 operations-release-evidence.json과 timetable evidence의 snapshot 일치 여부를 검증한다", () => {
@@ -587,7 +583,7 @@ test("resolveExpectedCandidate는 operations-release-evidence.json과 timetable 
     },
   });
   const boundSnapshot = { snapshotSha256: "b".repeat(64), freshUntil: "2026-07-20T00:00:00+09:00" };
-  const operations = buildOperations({ currentImplementation: boundSnapshot });
+  const operations = buildOperations({ status: "SATISFIED", currentImplementation: { status: "SATISFIED", ...boundSnapshot } });
   const matchingTimetable = {
     snapshotId: "server-timetable-snapshot-x",
     snapshotSha256: "b".repeat(64),
@@ -597,6 +593,12 @@ test("resolveExpectedCandidate는 operations-release-evidence.json과 timetable 
   };
   const resolved = resolveExpectedCandidate(operations, matchingTimetable);
   assert.equal(resolved.timetableSnapshotSha256, "b".repeat(64));
+
+  const staleOperations = buildOperations({ status: "STALE", currentImplementation: { status: "STALE", ...boundSnapshot } });
+  assert.throws(
+    () => resolveExpectedCandidate(staleOperations, matchingTimetable),
+    /timetableSnapshotCache is not SATISFIED/,
+  );
 
   const mismatchedSha = { ...matchingTimetable, snapshotSha256: "c".repeat(64) };
   assert.throws(
@@ -610,10 +612,10 @@ test("resolveExpectedCandidate는 operations-release-evidence.json과 timetable 
     /timetableSnapshotCache does not match the timetable evidence file/,
   );
 
-  const missingBoundSnapshot = buildOperations(undefined);
+  const missingBoundSnapshot = buildOperations({ status: "SATISFIED" });
   assert.throws(
     () => resolveExpectedCandidate(missingBoundSnapshot, matchingTimetable),
-    /timetableSnapshotCache does not match the timetable evidence file/,
+    /timetableSnapshotCache is not SATISFIED/,
   );
 });
 

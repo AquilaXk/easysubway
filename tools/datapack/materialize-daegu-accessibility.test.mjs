@@ -35,8 +35,8 @@ const LINE_IDS = Object.freeze(DAEGU_LINES.map(({ lineId }) => lineId));
 const ACCESSIBILITY_FIELDS = Object.freeze([
   "elevator", "escalator", "wheelchair_lift", "status", "verified_at",
 ]);
-// daegu timetable coverage baseline(실측): supportedCount=31 → accessibility +3 = 34.
-const TIMETABLE_BASELINE_SUPPORTED_COUNT = 31;
+// daegu timetable coverage baseline(실측): supportedCount=32 → accessibility +3 = 35.
+const TIMETABLE_BASELINE_SUPPORTED_COUNT = 32;
 const ACCESSIBILITY_SUPPORTED_COUNT = TIMETABLE_BASELINE_SUPPORTED_COUNT + 3;
 
 async function inputs() {
@@ -333,5 +333,9 @@ test("materialized SQLite와 provenance가 대구 accessibility_facilities 3건�
 });
 
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  const value = JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  if (relativePath === "tools/datapack/release/capital-production-reviewed-pack.json") {
+    value.packs[0].routeServiceArtifactEvidence = [];
+  }
+  return value;
 }

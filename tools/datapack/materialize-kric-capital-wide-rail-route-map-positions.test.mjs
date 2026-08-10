@@ -39,7 +39,11 @@ const SAMPLE_LINE_ID = "line-e9e9a5b520a4";
 const SAMPLE_OPERATOR_ID = "operator-8134e61f8dbd";
 
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  const value = JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  if (relativePath === "tools/datapack/release/capital-production-reviewed-pack.json") {
+    value.packs[0].routeServiceArtifactEvidence = [];
+  }
+  return value;
 }
 
 async function inputs() {

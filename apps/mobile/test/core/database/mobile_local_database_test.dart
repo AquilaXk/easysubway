@@ -605,7 +605,7 @@ void main() {
     final opener = CatalogDatabaseOpener(
       databaseDirectory: directory,
       assetBundle: rootBundle,
-      now: () => DateTime.utc(2026, 8, 2, 15),
+      now: () => DateTime.utc(2026, 8, 10, 12, 4, 20, 479),
     );
     final database = await opener.open();
     expect(opener.openedBundledDataPack, isTrue);
@@ -623,14 +623,14 @@ void main() {
     expect(state['status'], 'STALE');
     expect(state['reasonCode'], 'BUNDLED_PACK_EXPIRED');
     expect(state['labelKo'], '저장된 데이터 기준 · 갱신 필요');
-    expect(state['freshnessExpiresAt'], '2026-08-02T15:00:00.000Z');
+    expect(state['freshnessExpiresAt'], '2026-08-10T12:04:20.479Z');
     final freshness = await BundledDataPackFreshness.read(directory);
     expect(freshness.staleLabel, '저장된 데이터 기준 · 갱신 필요');
 
     final reopened = await CatalogDatabaseOpener(
       databaseDirectory: directory,
       assetBundle: rootBundle,
-      now: () => DateTime.utc(2026, 8, 2, 15),
+      now: () => DateTime.utc(2026, 8, 10, 12, 4, 20, 479),
     ).open();
     addTearDown(reopened.close);
     expect(sha256.convert(await installedPack.readAsBytes()), firstHash);

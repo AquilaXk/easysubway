@@ -28,8 +28,8 @@ const topologyNow = new Date("2026-07-19T18:14:03.004Z");
 const routeMapNow = new Date("2026-07-20T11:13:18.000Z");
 const accessibilityNow = new Date("2026-07-24T12:00:00.000Z");
 const SOURCE_ID = "busan-transportation-accessibility";
-// route-map 누적 fixture coverage baseline(실측): supportedCount=19 → accessibility +4 = 23.
-const ROUTE_MAP_BASELINE_SUPPORTED_COUNT = 19;
+// route-map 누적 fixture coverage baseline(실측): supportedCount=20 → accessibility +4 = 24.
+const ROUTE_MAP_BASELINE_SUPPORTED_COUNT = 20;
 const ACCESSIBILITY_SUPPORTED_COUNT = ROUTE_MAP_BASELINE_SUPPORTED_COUNT + 4;
 const BUSAN_LINE_IDS = Object.freeze([
   "line-ab1a041f6266",
@@ -347,5 +347,9 @@ test("materialized SQLite와 provenance가 부산 accessibility_facilities 4건�
 });
 
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  const value = JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  if (relativePath === "tools/datapack/release/capital-production-reviewed-pack.json") {
+    value.packs[0].routeServiceArtifactEvidence = [];
+  }
+  return value;
 }

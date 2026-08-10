@@ -22,11 +22,10 @@
     "molit-urban-rail-full-route",
     "seoulmetro-station-line-info",
     "seoulmetro-cyberstation-route-map",
-    "kric-station-elevator-movement",
-    "kric-wheelchair-lift-movement",
     "kric-subway-timetable",
     "seoul-metro-accessibility",
-    "kric-station-convenience-standard"
+    "kric-station-convenience-standard",
+    "seoul-metro-official-od-fares"
   ],
   "supportedV1Scope": {
     "scopeId": "capital_pilot_android_v1",
@@ -85,11 +84,9 @@
       "sourceDomain": "accessibility_facilities",
       "sourceIds": [
         "kric-station-convenience-standard",
-        "kric-station-elevator-movement",
-        "kric-wheelchair-lift-movement",
         "seoul-metro-accessibility"
       ],
-      "evidence": "국가철도공단 접근성 시설 위치와 이동동선 source inventory coverageScope"
+      "evidence": "국가철도공단 접근성 시설 위치와 서울교통공사 운행상황 source inventory coverageScope"
     },
     {
       "regionId": "capital",
@@ -99,6 +96,15 @@
         "kric-subway-timetable"
       ],
       "evidence": "KRIC subwayTimetableExp 4호선 상록수-사당 pilot 수집 및 trip/stop sequence 재구성 evidence"
+    },
+    {
+      "regionId": "capital",
+      "operatorId": "seoul-metro",
+      "sourceDomain": "official_od_fares",
+      "sourceIds": [
+        "seoul-metro-official-od-fares"
+      ],
+      "evidence": "상록수-사당 양방향 승인 공식 OD 운임 snapshot"
     }
   ],
   "retiredStationIds": [
@@ -255,7 +261,7 @@
       "stationCode": "433",
       "lineSequence": 28,
       "platformInfo": "당고개 방면 / 오이도 방면",
-      "lastVerifiedAt": "2026-07-09T00:00:00.000Z",
+      "lastVerifiedAt": "2026-08-09T12:04:20.479Z",
       "providerStationId": "MTRS14433"
     },
     {
@@ -271,7 +277,7 @@
       "stationCode": "448",
       "lineSequence": 43,
       "platformInfo": "당고개 방면 / 오이도 방면",
-      "lastVerifiedAt": "2026-07-09T00:00:00.000Z",
+      "lastVerifiedAt": "2026-08-09T12:04:20.479Z",
       "providerStationId": "MTRKR4448"
     }
   ],
@@ -699,49 +705,56 @@
       "note": "서울교통공사 전체 승강기 운행상황 snapshot 실측."
     }
   ],
-  "movementPathCandidates": [
+  "officialOdFareQuotes": [
     {
-      "sourceId": "kric-station-elevator-movement",
-      "id": "movement-sangnoksu-elevator-kric-1",
-      "station": {
-        "sourceId": "molit-urban-rail-full-route",
-        "sourceStationCode": "MOLIT-SEOUL-4-448",
-        "lineId": "seoul-4"
-      },
-      "facilityType": "ELEVATOR",
-      "sourceSnapshotId": "kric-station-elevator-movement-snapshot-20260622",
-      "providerRecordHash": "425dd4503d963c2954792cbfe7946a4932899873bcfeda20b4ab8309ffbe1b12",
-      "evidenceHash": "51b4ac1b21da7a911bc49e64d7b32f26dbc86dc8ec47e3a9880786277ce9e31c",
-      "fromLabel": "출입구",
-      "toLabel": "승강장",
-      "movementOrder": 1,
-      "instruction": "KRIC 엘리베이터 이동동선 후보이며 검수 전 route edge로 승격하지 않습니다."
+      "originStationId": "station-sangnoksu",
+      "destinationStationId": "station-sadang",
+      "sourceId": "seoul-metro-official-od-fares",
+      "snapshotId": "seoul-metro-official-od-fares-20260712",
+      "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
+      "gnrlCardFare": 1950,
+      "gnrlCashFare": 2050,
+      "yungCardFare": 1220,
+      "yungCashFare": 2050,
+      "childCardFare": 750,
+      "childCashFare": 750
     },
     {
-      "sourceId": "kric-wheelchair-lift-movement",
-      "id": "movement-sangnoksu-wheelchair-lift-kric-1",
-      "station": {
-        "sourceId": "molit-urban-rail-full-route",
-        "sourceStationCode": "MOLIT-SEOUL-4-448",
-        "lineId": "seoul-4"
-      },
-      "facilityType": "WHEELCHAIR_LIFT",
-      "sourceSnapshotId": "kric-wheelchair-lift-movement-snapshot-20260622",
-      "providerRecordHash": "2991c4a0ad58d6c1b035028e6747e05a4ab8af3f3c5cd3a644f9e3a64e144d67",
-      "evidenceHash": "368d8d883e75d402355e29c26154869b5ae0434db9ba6cbe0020193c7e4af2b3",
-      "fromLabel": "대합실",
-      "toLabel": "승강장",
-      "movementOrder": 2,
-      "instruction": "KRIC 휠체어리프트 이동동선 후보이며 검수 전 route edge로 승격하지 않습니다."
+      "originStationId": "station-sadang",
+      "destinationStationId": "station-sangnoksu",
+      "sourceId": "seoul-metro-official-od-fares",
+      "snapshotId": "seoul-metro-official-od-fares-20260712",
+      "mappingLedgerHash": "4a487cf9eaacf211a38549f33035555917010b7e6fb0ba6e9a92c30dae50661a",
+      "gnrlCardFare": 1950,
+      "gnrlCashFare": 2050,
+      "yungCardFare": 1220,
+      "yungCashFare": 2050,
+      "childCardFare": 750,
+      "childCashFare": 750
     }
   ],
+  "routeServiceArtifactEvidence": [
+    {
+      "serviceClass": "ITX_CHEONGCHUN",
+      "timetableArtifactId": "itx-cheongchun-source-timetable-20260719230524758",
+      "timetableArtifactSha256": "e2894d7ce6decb08fc9fec982394e77151799c34d099b83948481080e56d780e",
+      "canonicalPackId": "capital",
+      "canonicalPackSha256": "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
+      "canonicalPackSqliteSha256": "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
+      "admissionStatus": "ADMITTED",
+      "admissionEligible": true,
+      "freshUntil": "2026-07-27T00:00:00+09:00",
+      "sourceIssue": 2135
+    }
+  ],
+  "movementPathCandidates": [],
   "representativeRouteRegressions": [],
   "scheduleProvenance": {
     "sourceId": "kric-subway-timetable",
-    "sourceSnapshotId": "kric-subway-timetable-line4-pilot-20260709",
-    "providerRecordHash": "f05cf6faa53ef451e87e0836c8b414a1c7a1dac2d9bae67da499972aa843a30e",
-    "evidenceHash": "1a3c86070f7e59ebffbfde2b01ce2faa10d84e86759533793dafbed0a77a4ba9",
-    "retrievedAt": "2026-07-09T00:00:00.000Z"
+    "sourceSnapshotId": "kric-subway-timetable-line4-pilot-20260809",
+    "providerRecordHash": "d8ee1a9351ade3465a955ffabeade294eaccf65449fc1fc1998240fdba87e064",
+    "evidenceHash": "4eb89e17e2aea7bdfdcd888dcec2152de85adfbefb3e727f7e228f46a72311ce",
+    "retrievedAt": "2026-08-09T12:04:20.479Z"
   },
   "serviceCalendars": [
     {

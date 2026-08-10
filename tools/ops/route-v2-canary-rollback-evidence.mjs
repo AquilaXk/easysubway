@@ -229,6 +229,12 @@ export function resolveExpectedCandidate(operationsEvidence, timetableEvidence) 
   // evidences; it does not correct either one — reconciling which value is
   // authoritative is a separate, follow-up binding change.
   const boundSnapshot = readiness?.timetableSnapshotCache?.currentImplementation;
+  if (readiness?.timetableSnapshotCache?.status !== "SATISFIED"
+    || boundSnapshot?.status !== "SATISFIED") {
+    throw new Error(
+      "operations-release-evidence.json timetableSnapshotCache is not SATISFIED; refusing to resolve a stale candidate",
+    );
+  }
   const boundFreshUntilMs = Date.parse(boundSnapshot?.freshUntil);
   const timetableFreshUntilMs = Date.parse(timetableFreshUntil);
   const timetableEvidenceMatchesBoundSnapshot =

@@ -190,7 +190,7 @@ const productionEnv = {
 const candidateReplayEnv = {
   ...productionEnv,
   // ponytail: committed fixture replay clock; release workflow keeps actual time.
-  EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-30T00:00:00.000Z",
+  EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-08-09T14:30:00.000Z",
 };
 
 test("데이터팩 생성기는 TEST_ONLY admission fixture를 build input으로 거부한다", async (context) => {
@@ -11511,6 +11511,39 @@ test("공식 source ingest adapter는 provenance 전용 source를 production row
   }
 });
 
+test("공식 source ingest adapter는 tracked production input의 OD fare와 ITX route artifact evidence를 결정적으로 보존한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-retained-evidence-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  const generated = await importOfficialSourceInput(outputDir, input);
+
+  assert.deepEqual(generated.packs[0].officialOdFareQuotes, input.officialOdFareQuotes);
+  assert.deepEqual(generated.packs[0].routeServiceArtifactEvidence, input.routeServiceArtifactEvidence);
+  assert.equal(generated.packs[0].officialOdFareQuotes.length, 2);
+  assert.equal(generated.packs[0].routeServiceArtifactEvidence.length, 1);
+});
+
+test("공식 source ingest adapter는 선택되지 않은 source의 OD fare quote를 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-unselected-fare-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  input.officialOdFareQuotes[0].sourceId = "unselected-official-fare";
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /officialOdFareQuotes sourceId must be selected: unselected-official-fare/,
+  );
+});
+
+test("공식 source ingest adapter는 production timetable provenance snapshot이 selected source admission과 다르면 거부한다", async () => {
+  const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-schedule-snapshot-${Date.now()}`);
+  const input = await capitalPilotProductionSourceInput();
+  input.scheduleProvenance.sourceSnapshotId = "kric-subway-timetable-wrong-snapshot";
+
+  await assert.rejects(
+    importOfficialSourceInput(outputDir, input),
+    /scheduleProvenance.sourceSnapshotId must match selected source admission snapshot: kric-subway-timetable/,
+  );
+});
+
 test("공식 source ingest adapter는 selected source가 claim한 coverage evidence 누락을 거부한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-ingest-production-coverage-evidence-claim-missing-${Date.now()}`);
   const input = productionSourceIngestInput();
@@ -11632,14 +11665,6 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
           sourceDomains: ["accessibility_facilities"],
         },
       },
-      {
-        id: "kric-station-elevator-movement",
-        coverageScope: generated.packs[0].sourceInventory[3].coverageScope,
-      },
-      {
-        id: "kric-wheelchair-lift-movement",
-        coverageScope: generated.packs[0].sourceInventory[3].coverageScope,
-      },
     ],
   );
   assert.deepEqual(JSON.parse(generated.packs[0].metadata.productionCoverageEvidence), [
@@ -11647,11 +11672,7 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
       regionId: "capital",
       operatorId: "seoul-metro",
       sourceDomain: "accessibility_facilities",
-      sourceIds: [
-        "kric-station-convenience-standard",
-        "kric-station-elevator-movement",
-        "kric-wheelchair-lift-movement",
-      ],
+      sourceIds: ["kric-station-convenience-standard"],
     },
     {
       regionId: "capital",
@@ -11670,6 +11691,7 @@ test("공식 source ingest adapter는 production coverage 기준을 manifest 최
     facilities: 6,
     station_facility_evidence: 6,
   });
+  assert.deepEqual(generated.packs[0].movementPathCandidates, []);
   assert.deepEqual(
     generated.packs[0].stationFacilityEvidence.map(({ stationId, lineId, facilityType, evidenceKind }) => ({
       stationId,
@@ -11890,35 +11912,49 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
       },
     ];
   });
-  const fillerTrips = Array.from({ length: 895 - fixtureTrips.length }, (_, index) => ({
-    id: `route-seoul-4-filler-${index}`,
-    routeId: index % 2 === 0 ? "route-seoul-4-up" : "route-seoul-4-down",
-    serviceId: "weekday-kric",
-    tripHeadsign: "station-seoul-4-456",
-    directionId: index % 2 === 0 ? "up" : "down",
-    servicePattern: "LOCAL",
-  }));
-  const fillerStopTimes = Array.from({ length: 33062 - fixtureStopTimes.length }, (_, index) => ({
-    tripId: fillerTrips[index % fillerTrips.length].id,
+  const fillerStopTimes = Array.from({ length: 22004 - fixtureStopTimes.length }, (_, index) => ({
+    tripId: fixtureTrips[index % fixtureTrips.length].id,
     stopSequence: index + 1,
     stationId: `station-seoul-4-filler-${index}`,
     lineId: "seoul-4",
     arrivalSeconds: 18000 + index,
     departureSeconds: 18000 + index,
   }));
+  const rawResponses = Array.from({ length: 153 }, (_, index) => {
+    const bytes = Buffer.from(`response-${index}`);
+    return {
+      requestKey: `subwayTimetableExp|fixture-${index}`,
+      rawSha256: createHash("sha256").update(bytes).digest("hex"),
+      byteSize: bytes.length,
+      bodyBase64: bytes.toString("base64"),
+    };
+  });
   await writeFile(
     artifactPath,
     `${JSON.stringify({
       artifactKind: "kric-line4-timetable-collection",
       sourceId: "kric-subway-timetable",
       lineId: "seoul-4",
-      capturedAt: "2026-07-09",
+      operation: "subwayTimetableExp",
+      collectedAt: "2026-08-09T12:04:20.479Z",
+      capturedAt: "2026-08-09",
       requestCount: 153,
       failedRequestCount: 0,
+      expectedNoDataRequestCount: 51,
       intermediateRowCount: 33062,
-      transitTripCount: 895,
-      transitStopTimeCount: 33062,
-      transitTrips: [...fixtureTrips, ...fillerTrips],
+      excludedOutsidePilotGroupCount: 429,
+      excludedOutsidePilotGroups: Array.from({ length: 429 }, (_, index) => ({ reason: "OUTSIDE_PILOT_CORRIDOR", index })),
+      excludedNonStopRowCount: 42,
+      excludedNonStopRows: Array.from({ length: 42 }, (_, index) => ({ reason: "EXPRESS_NO_ARRIVAL", index })),
+      reconstructionRowCount: 22004,
+      transitTripCount: 466,
+      transitStopTimeCount: 22004,
+      rawResponseInventory: {
+        responseCount: rawResponses.length,
+        inventorySha256: createHash("sha256").update(JSON.stringify(rawResponses)).digest("hex"),
+        responses: rawResponses,
+      },
+      transitTrips: fixtureTrips,
       transitStopTimes: [...fixtureStopTimes, ...fillerStopTimes],
     }, null, 2)}\n`,
   );
@@ -11970,7 +12006,13 @@ test("KRIC 4호선 pilot 시간표 transformer는 상록수-사당 stop_times를
     },
   );
   assert.equal(transformed.scheduleProvenance.sourceId, "kric-subway-timetable");
+  assert.equal(transformed.scheduleProvenance.sourceSnapshotId, "kric-subway-timetable-line4-pilot-20260809");
+  assert.equal(transformed.scheduleProvenance.retrievedAt, "2026-08-09T12:04:20.479Z");
   assert.match(transformed.scheduleProvenance.providerRecordHash, /^[a-f0-9]{64}$/);
+  assert.equal(
+    transformed.stationLineRows.find((row) => row.sourceId === "kric-subway-timetable")?.lastVerifiedAt,
+    "2026-08-09T12:04:20.479Z",
+  );
   assert.equal(transformed.serviceCalendarDates.length, 28);
   assert.deepEqual(
     transformed.serviceCalendarDates.filter((row) => row.date === "20261225"),
@@ -11993,12 +12035,17 @@ test("KRIC 4호선 pilot 시간표 transformer는 summary counter만 복사된 �
       artifactKind: "kric-line4-timetable-collection",
       sourceId: "kric-subway-timetable",
       lineId: "seoul-4",
+      operation: "subwayTimetableExp",
       capturedAt: "2026-07-09",
       requestCount: 153,
       failedRequestCount: 0,
+      expectedNoDataRequestCount: 51,
       intermediateRowCount: 33062,
-      transitTripCount: 895,
-      transitStopTimeCount: 33062,
+      excludedOutsidePilotGroupCount: 429,
+      excludedNonStopRowCount: 42,
+      reconstructionRowCount: 22004,
+      transitTripCount: 466,
+      transitStopTimeCount: 22004,
       transitTrips: [],
       transitStopTimes: [],
     }, null, 2)}\n`,
@@ -12018,7 +12065,7 @@ test("KRIC 4호선 pilot 시간표 transformer는 summary counter만 복사된 �
       ],
       { cwd: root, env: productionEnv },
     ),
-    /KRIC pilot artifact transitTrips\.length mismatch: 0 !== 895/,
+    /KRIC pilot artifact transitTrips\.length mismatch: 0 !== 466/,
   );
 });
 
@@ -12034,6 +12081,7 @@ test("KRIC 4호선 pilot 시간표 transformer는 부분 수집 artifact를 prod
       artifactKind: "kric-line4-timetable-collection",
       sourceId: "kric-subway-timetable",
       lineId: "seoul-4",
+      operation: "subwayTimetableExp",
       capturedAt: "2026-07-09",
       requestCount: 153,
       failedRequestCount: 1,
@@ -12702,6 +12750,7 @@ test("데이터팩 검증기는 AVAILABLE accessibility edge의 station-line sou
   const fixturePath = path.join(outputDir, "fixture.json");
   const packOutputDir = path.join(outputDir, "pack");
   const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  projectFixtureWithoutUnmaterializedItxAdmission(fixture);
   // 빌드 후 edge를 AVAILABLE로 바꾸고 source를 accessibility_facilities 미지원(역-노선)으로 우회 → validator 거부.
   const builtEntry = fixture.packs[0].networkEdges.find((edge) => edge.id === "edge-entry-sadang-seoul-4");
   builtEntry.accessibilityStatus = "AVAILABLE";
@@ -12738,6 +12787,7 @@ test("데이터팩 검증기는 AVAILABLE accessibility edge의 station-line ope
   const fixturePath = path.join(outputDir, "fixture.json");
   const packOutputDir = path.join(outputDir, "pack");
   const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  projectFixtureWithoutUnmaterializedItxAdmission(fixture);
   const edge = fixture.packs[0].networkEdges.find((row) => row.id === "edge-entry-sadang-seoul-4");
   edge.accessibilityStatus = "AVAILABLE";
   edge.stairAccessState = "STEP_FREE";
@@ -12842,6 +12892,7 @@ test("station status probe가 route evidence가 아니면 production edge covera
   const outputDir = path.join(tmpdir(), `easysubway-accessibility-verified-states-${Date.now()}`);
   const packOutputDir = path.join(outputDir, "pack");
   const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  projectFixtureWithoutUnmaterializedItxAdmission(fixture);
   const fixturePath = path.join(outputDir, "fixture.json");
   // 서울 station status와 KRIC feed absence는 route pathway 증거가 아니므로 strict route로 승격하지 않는다.
   const sadangEntry = fixture.packs[0].networkEdges.find((e) => e.id === "edge-entry-sadang-seoul-4");
@@ -12892,6 +12943,7 @@ test("field provenance는 materialized facility와 EXISTS evidence를 중복 집
   const outputDir = path.join(tmpdir(), `easysubway-accessibility-provenance-dedup-${Date.now()}`);
   const packOutputDir = path.join(outputDir, "pack");
   const fixture = await importOfficialSourceInput(outputDir, await capitalPilotProductionSourceInput());
+  projectFixtureWithoutUnmaterializedItxAdmission(fixture);
   const fixturePath = path.join(outputDir, "fixture.json");
   await writeFile(fixturePath, `${JSON.stringify(fixture, null, 2)}\n`);
   await execFileAsync(
@@ -13050,6 +13102,8 @@ test("수도권 pilot source coverage는 완결되지만 route coverage는 edge 
     { cwd: root },
   );
   const importedFixture = JSON.parse(await readFile(importedFixturePath, "utf8"));
+  projectFixtureWithoutUnmaterializedItxAdmission(importedFixture);
+  await writeFile(importedFixturePath, `${JSON.stringify(importedFixture, null, 2)}\n`);
   assert.equal(importedFixture.packs[0].requiredTables.includes("route_map_positions"), true);
   assert.equal(importedFixture.packs[0].minimumTableRows.route_map_positions, 2);
   assert.equal(importedFixture.packs[0].routeMapPositions.length, 2);
@@ -13146,6 +13200,8 @@ test("수도권 pilot source coverage는 완결되지만 route coverage는 edge 
     { cwd: root },
   );
   const scheduleExtrasFixture = JSON.parse(await readFile(scheduleExtrasFixturePath, "utf8"));
+  projectFixtureWithoutUnmaterializedItxAdmission(scheduleExtrasFixture);
+  await writeFile(scheduleExtrasFixturePath, `${JSON.stringify(scheduleExtrasFixture, null, 2)}\n`);
   assert.equal(scheduleExtrasFixture.packs[0].serviceCalendarDates[0].sourceId, "kric-subway-timetable");
   assert.equal(scheduleExtrasFixture.packs[0].transitFrequencies[0].sourceId, "kric-subway-timetable");
   await execFileAsync(
@@ -15378,8 +15434,6 @@ function productionSourceIngestInput() {
     "molit-urban-rail-full-route",
     "seoulmetro-station-line-info",
     "kric-station-convenience-standard",
-    "kric-station-elevator-movement",
-    "kric-wheelchair-lift-movement",
   ];
   input.supportedV1Scope = {
     scopeId: "capital_pilot_android_v1",
@@ -15499,41 +15553,7 @@ function productionSourceIngestInput() {
     evidenceHash: sha256(`evidence:${id}:${sourceId}:2026-06-22T00:00:00.000Z`),
     confidence: 80,
   }));
-  input.movementPathCandidates = [
-    {
-      sourceId: "kric-station-elevator-movement",
-      id: "movement-sangnoksu-elevator-kric-1",
-      station: {
-        sourceId: "molit-urban-rail-full-route",
-        sourceStationCode: "MOLIT-SEOUL-4-448",
-        lineId: "seoul-4",
-      },
-      facilityType: "ELEVATOR",
-      fromLabel: "출입구",
-      toLabel: "승강장",
-      movementOrder: 1,
-      instruction: "KRIC 엘리베이터 이동동선 후보",
-    },
-    {
-      sourceId: "kric-wheelchair-lift-movement",
-      id: "movement-sangnoksu-wheelchair-lift-kric-1",
-      station: {
-        sourceId: "molit-urban-rail-full-route",
-        sourceStationCode: "MOLIT-SEOUL-4-448",
-        lineId: "seoul-4",
-      },
-      facilityType: "WHEELCHAIR_LIFT",
-      fromLabel: "대합실",
-      toLabel: "승강장",
-      movementOrder: 2,
-      instruction: "KRIC 휠체어리프트 이동동선 후보",
-    },
-  ].map((row) => ({
-    ...row,
-    sourceSnapshotId: `${row.sourceId}-snapshot-20260622`,
-    providerRecordHash: sha256(`provider:${row.id}:${row.sourceId}`),
-    evidenceHash: sha256(`evidence:${row.id}:${row.sourceId}:2026-06-22T00:00:00.000Z`),
-  }));
+  input.movementPathCandidates = [];
   input.minimumProductionCoverage = {
     stations: 2,
     stationLines: 2,
@@ -15578,12 +15598,8 @@ function productionSourceIngestInput() {
       regionId: "capital",
       operatorId: "seoul-metro",
       sourceDomain: "accessibility_facilities",
-      sourceIds: [
-        "kric-station-convenience-standard",
-        "kric-station-elevator-movement",
-        "kric-wheelchair-lift-movement",
-      ],
-      evidence: "국가철도공단 접근성 시설 위치와 이동동선 source inventory coverageScope",
+      sourceIds: ["kric-station-convenience-standard"],
+      evidence: "국가철도공단 접근성 시설 위치 source inventory coverageScope",
     },
   ];
   return input;
@@ -16106,11 +16122,11 @@ function makeProductionSourceFixtureStrictCoverageValid(fixture) {
   const pack = fixture.packs[0];
   for (const edge of pack.networkEdges.filter((row) => ["ENTRY", "EXIT"].includes(row.edgeType))) {
     edge.accessibilityStatus = "AVAILABLE";
-    edge.sourceId = "kric-station-elevator-movement";
-    edge.sourceSnapshotId = "kric-station-elevator-movement-snapshot-20260622";
-    edge.providerRecordHash = sha256(`provider:${edge.id}:kric-station-elevator-movement`);
-    edge.evidenceHash = sha256(`evidence:${edge.id}:kric-station-elevator-movement:2026-06-22T00:00:00.000Z`);
-    edge.lastVerifiedAt = "2026-06-22T00:00:00.000Z";
+    edge.sourceId = "kric-station-convenience-standard";
+    edge.sourceSnapshotId = "kric-station-convenience-standard-20260728T184503338Z";
+    edge.providerRecordHash = sha256(`provider:${edge.id}:kric-station-convenience-standard`);
+    edge.evidenceHash = sha256(`evidence:${edge.id}:kric-station-convenience-standard:2026-07-28T18:45:03.338Z`);
+    edge.lastVerifiedAt = "2026-07-28T18:45:03.338Z";
   }
   for (const evidence of pack.stationFacilityEvidence) {
     evidence.operationalStatus = "AVAILABLE";
@@ -16119,14 +16135,15 @@ function makeProductionSourceFixtureStrictCoverageValid(fixture) {
     evidence.strictRouteEligibleReason = "FACILITY_OPERATION_VERIFIED";
   }
   addApprovedMovementPathwayEvidence(pack, {
-    sourceId: "kric-station-elevator-movement",
-    sourceSnapshotId: "kric-station-elevator-movement-snapshot-20260622",
-    verifiedAt: "2026-06-22T00:00:00.000Z",
+    sourceId: "kric-station-convenience-standard",
+    sourceSnapshotId: "kric-station-convenience-standard-20260728T184503338Z",
+    verifiedAt: "2026-07-28T18:45:03.338Z",
   });
 }
 
 function makeProductionSourceFixtureExplicitlyUnavailable(fixture) {
   const pack = fixture.packs[0];
+  pack.routeServiceArtifactEvidence = [];
   for (const edge of pack.networkEdges.filter(({ edgeType }) => ["ENTRY", "EXIT"].includes(edgeType))) {
     edge.stairAccessState = "STEP_FREE";
     edge.accessibilityStatus = "NO_OFFICIAL_FEED";
@@ -16142,6 +16159,18 @@ function makeProductionSourceFixtureExplicitlyUnavailable(fixture) {
     evidence.strictRouteEligible = false;
     evidence.strictRouteEligibleReason = "NO_OFFICIAL_STATUS_FEED";
   }
+}
+
+function projectFixtureWithoutUnmaterializedItxAdmission(fixture) {
+  const pack = fixture.packs[0];
+  assert.equal(
+    [...(pack.transitTrips ?? []), ...(pack.networkEdges ?? [])]
+      .some(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN"),
+    false,
+    "test fixture must not discard an admission for materialized ITX rows",
+  );
+  pack.routeServiceArtifactEvidence = [];
+  return fixture;
 }
 
 function addApprovedMovementPathwayEvidence(pack, { sourceId, sourceSnapshotId, verifiedAt }) {

@@ -16,13 +16,12 @@ const root = path.resolve(import.meta.dirname, "../..");
 const stationIds = ["station-sadang", "station-sangnoksu"];
 const facilityTypes = ["ELEVATOR", "ESCALATOR", "WHEELCHAIR_LIFT", "ACCESSIBILITY_STATUS_PROBE"];
 const accessibilityRouteSourceId = "seoul-metro-accessibility";
-const directRouteEvidenceSourceIds = new Set([
-  "kric-station-elevator-movement",
-  "kric-wheelchair-lift-movement",
-]);
+const directRouteEvidenceSourceIds = new Set();
 const replacedSourceIds = new Set([
   "kric-station-elevator",
+  "kric-station-elevator-movement",
   "kric-station-escalator",
+  "kric-wheelchair-lift-movement",
   "kric-wheelchair-lift-location",
   "seoul-metro-accessibility",
 ]);
@@ -231,6 +230,12 @@ export function syncCanonicalFixture(canonical, reviewedPack) {
   pack.sourceInventory = pack.sourceInventory
     .filter(({ id }) => !replacedSourceIds.has(id) && id !== "kric-station-convenience-standard")
     .concat(freshSources);
+  const reviewedFareSourceIds = new Set(reviewedPack.officialOdFareQuotes.map(({ sourceId }) => sourceId));
+  pack.officialOdFareQuotes = (pack.officialOdFareQuotes ?? [])
+    .filter(({ sourceId }) => !reviewedFareSourceIds.has(sourceId))
+    .concat(reviewedPack.officialOdFareQuotes);
+  pack.routeServiceArtifactEvidence = reviewedPack.routeServiceArtifactEvidence;
+  pack.movementPathCandidates = reviewedPack.movementPathCandidates;
   pack.metadata.productionCoverageEvidence = reviewedPack.metadata.productionCoverageEvidence;
   pack.minimumTableRows.facilities = pack.facilities.length;
   pack.minimumTableRows.station_facility_evidence = pack.stationFacilityEvidence.length;
@@ -399,6 +404,7 @@ export function normalizeUnprovenStationExitElevatorClaims(database, { check }) 
 function incompleteRouteProvenanceSql(columns) {
   const incomplete = incompleteProvenanceSql(columns);
   if (incomplete === "1") return incomplete;
+  if (directRouteEvidenceSourceIds.size === 0) return "1";
   const allowedSources = [...directRouteEvidenceSourceIds].map((sourceId) => `'${sourceId}'`).join(",");
   return `(${incomplete}) OR source_id NOT IN (${allowedSources})`;
 }
@@ -494,13 +500,15 @@ async function syncReleaseEvidence({ check }) {
     spec: path.join(root, "tools/datapack/release/candidate-build-spec.json"),
     snapshots: path.join(root, "tools/datapack/release/source-snapshots.json"),
     inventory: path.join(root, "tools/datapack/source-inventory.json"),
+    mobileInventory: path.join(root, "apps/mobile/assets/datapacks/source-inventory.json"),
     request: path.join(root, "tools/datapack/release/release-request.json"),
     hashes: path.join(root, "tools/datapack/release/hash-evidence.json"),
     canonical: path.join(root, "tools/datapack/release/capital-production-canonical-pack.json"),
+    productionScope: path.join(root, "release/product-gates/production-datapack-scope.json"),
     governance: path.join(root, "tools/datapack/source-governance-policy.json"),
     freshness: path.join(root, "release/product-gates/datapack-freshness-sla.json"),
   };
-  const [specBytes, snapshotBytes, inventoryBytes, requestBytes, hashBytes, canonicalBytes, governanceBytes, freshnessBytes] = await Promise.all(
+  const [specBytes, snapshotBytes, inventoryBytes, mobileInventoryBytes, requestBytes, hashBytes, canonicalBytes, productionScopeBytes, governanceBytes, freshnessBytes] = await Promise.all(
     Object.values(paths).map((file) => readFile(file)),
   );
   const spec = JSON.parse(specBytes);
@@ -508,11 +516,25 @@ async function syncReleaseEvidence({ check }) {
   const inventory = JSON.parse(inventoryBytes);
   const request = JSON.parse(requestBytes);
   const hashes = JSON.parse(hashBytes);
+  const productionScope = JSON.parse(productionScopeBytes);
   const governance = JSON.parse(governanceBytes);
   const freshness = JSON.parse(freshnessBytes);
+  const capitalTopology = spec.networkEdgeEvidence?.capitalTopology;
+  if (typeof capitalTopology?.path !== "string" || capitalTopology.path.length === 0) {
+    throw new Error("candidate build spec capital topology path is missing");
+  }
+  const capitalTopologyPath = path.resolve(root, capitalTopology.path);
+  if (!capitalTopologyPath.startsWith(`${root}${path.sep}`)) {
+    throw new Error("candidate build spec capital topology path escapes repository root");
+  }
+  capitalTopology.sha256 = sha256(await readFile(capitalTopologyPath));
   const inventoryBySource = new Map(inventory.sources.map((entry) => [entry.id, entry]));
   const { headsBySource } = validateLineage(snapshots);
-  const releaseSnapshots = snapshots.filter((snapshot) => headsBySource[snapshot.sourceId] === snapshot.snapshotId);
+  const requiredSourceIds = new Set(productionScope.productionSourceSet?.requiredSourceIds ?? []);
+  if (requiredSourceIds.size === 0) throw new Error("production scope requiredSourceIds is missing");
+  const releaseSnapshots = snapshots.filter((snapshot) =>
+    requiredSourceIds.has(snapshot.sourceId) && headsBySource[snapshot.sourceId] === snapshot.snapshotId,
+  );
   spec.sourceSnapshotIds = releaseSnapshots.map(({ snapshotId }) => snapshotId);
   spec.sourceSnapshots = releaseSnapshots.map((snapshot) => {
     const source = inventoryBySource.get(snapshot.sourceId);
@@ -560,12 +582,12 @@ async function syncReleaseEvidence({ check }) {
   hashes.truthfulnessRule = "모든 값은 tracked canonical fixture·inventory·official snapshot에서 결정적으로 재산출한다. 2026-07-28 신규 KRIC standard·서울 snapshot을 소비 claim에 결속하고 route 가용성은 추론하지 않는다.";
   hashes.sourceSnapshotSetHash.value = spec.sourceSnapshotSetHash;
   hashes.sourceSnapshotSetHash.contract = `source별 head ${releaseSnapshots.length}종의 byte-ordered JSON hash와 build spec·release request가 일치해야 한다.`;
-  hashes.sourceSnapshotSetHash.reproductionCommand = "node -e \"import('./tools/datapack/source-snapshot-policy.mjs').then(({validateLineage})=>{const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),h=validateLineage(s).headsBySource,r=s.filter(n=>h[n.sourceId]===n.snapshotId);console.log(c.createHash('sha256').update(JSON.stringify(r)).digest('hex'))})\"";
+  hashes.sourceSnapshotSetHash.reproductionCommand = "node -e \"import('./tools/datapack/source-snapshot-policy.mjs').then(({validateLineage})=>{const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),h=validateLineage(s).headsBySource,p=require('./release/product-gates/production-datapack-scope.json'),r=s.filter(n=>p.productionSourceSet.requiredSourceIds.includes(n.sourceId)&&h[n.sourceId]===n.snapshotId);console.log(c.createHash('sha256').update(JSON.stringify(r)).digest('hex'))})\"";
   hashes.sourceInventorySha256.value = spec.sourceInventorySha256;
   hashes.fixturePath.sha256 = sha256(canonicalBytes);
   hashes.sourceSnapshots.note = "기존 release source 중 movement·timetable·network identity는 유지하고, detailed location 3종을 KRIC stationCnvFacl standard로 교체했다. 서울 accessibility는 2026-07-28 full snapshot으로 교체했다.";
   hashes.sourceSnapshots.order = `release snapshot 순서: ${releaseSnapshots.map(({ sourceId }) => sourceId).join(" → ")}`;
-  hashes.sourceSnapshots.committedVerificationCommand = "node -e \"import('./tools/datapack/source-snapshot-policy.mjs').then(({validateLineage})=>{const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),h=validateLineage(s).headsBySource,e=require('./tools/datapack/release/hash-evidence.json');for(const n of s.filter(x=>h[x.sourceId]===x.snapshotId)){const p=e.perSourceEvidence.find(x=>x.snapshotId===n.snapshotId);if(!p||c.createHash('sha256').update(JSON.stringify([n])).digest('hex')!==p.perSourceSnapshotSetHash)throw new Error('source snapshot evidence mismatch: '+n.sourceId)}})\"";
+  hashes.sourceSnapshots.committedVerificationCommand = "node -e \"import('./tools/datapack/source-snapshot-policy.mjs').then(({validateLineage})=>{const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),h=validateLineage(s).headsBySource,e=require('./tools/datapack/release/hash-evidence.json'),p=require('./release/product-gates/production-datapack-scope.json'),r=new Set(p.productionSourceSet.requiredSourceIds);for(const n of s.filter(x=>r.has(x.sourceId)&&h[x.sourceId]===x.snapshotId)){const q=e.perSourceEvidence.find(x=>x.snapshotId===n.snapshotId);if(!q||c.createHash('sha256').update(JSON.stringify([n])).digest('hex')!==q.perSourceSnapshotSetHash)throw new Error('source snapshot evidence mismatch: '+n.sourceId)}})\"";
   hashes.perSourceEvidence = releaseSnapshots.map((snapshot) => ({
     sourceId: snapshot.sourceId,
     snapshotId: snapshot.snapshotId,
@@ -578,6 +600,7 @@ async function syncReleaseEvidence({ check }) {
   if (check) {
     for (const [label, actual, expected] of [
       ["candidate build spec", specBytes, nextSpecBytes],
+      ["mobile source inventory", mobileInventoryBytes, inventoryBytes],
       ["release request", requestBytes, nextRequestBytes],
       ["hash evidence", hashBytes, nextHashBytes],
     ]) if (!actual.equals(expected)) throw new Error(`${label} is stale`);
@@ -585,6 +608,7 @@ async function syncReleaseEvidence({ check }) {
   }
   await Promise.all([
     writeFile(paths.spec, nextSpecBytes),
+    writeFile(paths.mobileInventory, inventoryBytes),
     writeFile(paths.request, nextRequestBytes),
     writeFile(paths.hashes, nextHashBytes),
   ]);

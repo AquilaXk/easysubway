@@ -32,8 +32,8 @@ const LINE_ID = "line-7051a9c2525c";
 const ACCESSIBILITY_FIELDS = Object.freeze([
   "elevator", "escalator", "wheelchair_lift", "status", "verified_at",
 ]);
-// route-map 누적 fixture coverage baseline(실측, Busan accessibility 미포함): supportedCount=19 → +1 = 20.
-const ROUTE_MAP_BASELINE_SUPPORTED_COUNT = 19;
+// route-map 누적 fixture coverage baseline(실측, Busan accessibility 미포함): supportedCount=20 → +1 = 21.
+const ROUTE_MAP_BASELINE_SUPPORTED_COUNT = 20;
 const ACCESSIBILITY_SUPPORTED_COUNT = ROUTE_MAP_BASELINE_SUPPORTED_COUNT + 1;
 
 async function inputs() {
@@ -331,5 +331,9 @@ test("materialized SQLite와 provenance가 대전 accessibility_facilities 1건�
 });
 
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  const value = JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  if (relativePath === "tools/datapack/release/capital-production-reviewed-pack.json") {
+    value.packs[0].routeServiceArtifactEvidence = [];
+  }
+  return value;
 }

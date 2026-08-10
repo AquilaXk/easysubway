@@ -25,7 +25,7 @@ const missingItxEvidence = () => ({
   sourceIssue: 2116,
 });
 
-test("production source pack은 #2116 MISSING identity를 기록하고 ITX data row를 포함하지 않는다", async () => {
+test("production source pack은 #2135 ADMITTED identity를 기록하고 ITX data row는 candidate build 전까지 포함하지 않는다", async () => {
   const production = JSON.parse(await readFile(
     new URL("./release/capital-production-reviewed-pack.json", import.meta.url),
     "utf8",
@@ -33,15 +33,15 @@ test("production source pack은 #2116 MISSING identity를 기록하고 ITX data 
   const pack = production.packs.find(({ id }) => id === "capital");
   assert.deepEqual(pack.routeServiceArtifactEvidence, [{
     serviceClass: "ITX_CHEONGCHUN",
-    timetableArtifactId: "itx-cheongchun-completeness-admission-20260714T083544292Z",
-    timetableArtifactSha256: "347aec507ec951dde65c10a1c4bff9f94454f762d76a5a74064a40662008336c",
+    timetableArtifactId: "itx-cheongchun-source-timetable-20260719230524758",
+    timetableArtifactSha256: "e2894d7ce6decb08fc9fec982394e77151799c34d099b83948481080e56d780e",
     canonicalPackId: "capital",
-    canonicalPackSha256: "580814a58ce8d94b174de1ca8753ef7f350ce806dd793f6a7f43e07e7aa155b9",
-    canonicalPackSqliteSha256: "72b85f941a8cb3a905218287a3e2ff4ce38561397ed5c22d77816576529ffe03",
-    admissionStatus: "MISSING",
-    admissionEligible: false,
-    freshUntil: "2026-07-20T00:00:00.000Z",
-    sourceIssue: 2116,
+    canonicalPackSha256: "7bb4bb68f0642e45377d98b083e93cd8c1c92aaa58dd353f32189e3f325a1562",
+    canonicalPackSqliteSha256: "ed84a649952cd2ccbb238b3a63265f2bd3144497ae8fd36fab5181ad776542fc",
+    admissionStatus: "ADMITTED",
+    admissionEligible: true,
+    freshUntil: "2026-07-27T00:00:00+09:00",
+    sourceIssue: 2135,
   }]);
   assert.equal((pack.transitTrips ?? []).filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN").length, 0);
   assert.equal((pack.networkEdges ?? []).filter(({ serviceClass }) => serviceClass === "ITX_CHEONGCHUN").length, 0);

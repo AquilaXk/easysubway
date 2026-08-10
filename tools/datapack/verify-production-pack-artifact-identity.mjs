@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
-import { createHash, generateKeyPairSync } from "node:crypto";
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { createHash, generateKeyPairSync, randomUUID } from "node:crypto";
+import { lstat, mkdtemp, open, readFile, rename, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -32,6 +32,13 @@ function requiredArg(args, name) {
   const value = args[name];
   if (typeof value !== "string" || value.trim() === "") throw new Error(`--${name} is required`);
   return value;
+}
+
+function optionalBooleanArg(args, name) {
+  const value = args[name];
+  if (value === undefined) return false;
+  if (!["true", "false"].includes(value)) throw new Error(`--${name} must be true or false`);
+  return value === "true";
 }
 
 function assertEqual(actual, expected, label) {
@@ -82,7 +89,13 @@ function networkEdgeCounts(sqlitePath) {
   }
 }
 
-export async function verifyProductionPackArtifactIdentity({ buildSpecPath, assetPath, indexPath, packId }) {
+export async function verifyProductionPackArtifactIdentity({
+  buildSpecPath,
+  assetPath,
+  indexPath,
+  packId,
+  syncIndexFreshness = false,
+}) {
   buildSpecPath = path.resolve(buildSpecPath);
   assetPath = path.resolve(assetPath);
   indexPath = path.resolve(indexPath);
@@ -121,13 +134,45 @@ export async function verifyProductionPackArtifactIdentity({ buildSpecPath, asse
     assertEqual(byteSize, pack.sizeBytes, "asset byteSize");
     assertEqual(sha256(builtGzip), pack.sha256, "built gzip sha256");
 
-    const index = JSON.parse(await readFile(indexPath, "utf8"));
+    const indexStat = await lstat(indexPath);
+    if (!indexStat.isFile() || indexStat.isSymbolicLink()) {
+      throw new Error("index must be a regular non-symlink file");
+    }
+    const indexBytes = await readFile(indexPath);
+    const index = JSON.parse(indexBytes);
     const indexPacks = index.packs?.filter(({ id }) => id === packId) ?? [];
     if (indexPacks.length !== 1) throw new Error(`index must contain exactly one pack: ${packId}`);
     assertEqual(indexPacks[0].asset, path.relative(path.join(root, "apps/mobile"), assetPath).split(path.sep).join("/"), "index asset");
     assertEqual(indexPacks[0].sha256, gzipSha256, "index sha256");
     assertEqual(indexPacks[0].sqliteSha256, sqliteSha256, "index SQLite sha256");
     assertEqual(indexPacks[0].byteSize, byteSize, "index byteSize");
+
+    const freshnessExpiresAt = manifest.expiresAt;
+    if (typeof freshnessExpiresAt !== "string"
+      || !Number.isFinite(Date.parse(freshnessExpiresAt))
+      || new Date(freshnessExpiresAt).toISOString() !== freshnessExpiresAt) {
+      throw new Error("manifest expiresAt must be a canonical UTC timestamp");
+    }
+    if (syncIndexFreshness && index.freshnessExpiresAt !== freshnessExpiresAt) {
+      const nextBytes = Buffer.from(`${JSON.stringify({ ...index, freshnessExpiresAt }, null, 2)}\n`);
+      const tempPath = `${indexPath}.freshness-sync-${process.pid}-${randomUUID()}`;
+      let handle;
+      try {
+        handle = await open(tempPath, "wx", 0o600);
+        await handle.writeFile(nextBytes);
+        await handle.sync();
+        await handle.close();
+        handle = undefined;
+        const currentBytes = await readFile(indexPath);
+        if (!currentBytes.equals(indexBytes)) {
+          throw new Error("index changed during freshness synchronization");
+        }
+        await rename(tempPath, indexPath);
+      } finally {
+        await handle?.close();
+        await rm(tempPath, { force: true });
+      }
+    }
 
     return {
       packId,
@@ -149,6 +194,7 @@ async function main(argv) {
     assetPath: requiredArg(args, "asset"),
     indexPath: requiredArg(args, "index"),
     packId: requiredArg(args, "pack-id"),
+    syncIndexFreshness: optionalBooleanArg(args, "sync-index-freshness"),
   });
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }

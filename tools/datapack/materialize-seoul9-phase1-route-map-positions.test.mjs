@@ -40,9 +40,9 @@ const execFileAsync = promisify(execFile);
 const SOURCE_ID = "kric-seoul-metro-line9-1-route-map-positions";
 const LINE_ID = "line-f0e747248a31";
 const LINE_OPERATOR_ID = "operator-936e454d0bfb";
-// daejeon route_map 누적 fixture coverage baseline(실측): supportedCount=25.
+// daejeon route_map 누적 fixture coverage baseline(실측): supportedCount=26.
 // 이번 FILE admission이 seoul9 phase1 route_map_positions +1을 만든다.
-const DAEJEON_ROUTE_MAP_BASELINE = 25;
+const DAEJEON_ROUTE_MAP_BASELINE = 26;
 const SEOUL9_PHASE1_ROUTE_MAP_SUPPORTED_COUNT = DAEJEON_ROUTE_MAP_BASELINE + 1;
 const SCHEMATIC_X_MIN = 694;
 const SCHEMATIC_X_MAX = 2219;
@@ -335,5 +335,9 @@ test("서울9 phase1 route_map_positions materialize는 metro_map_pack·capital.
 });
 
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  const value = JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  if (relativePath === "tools/datapack/release/capital-production-reviewed-pack.json") {
+    value.packs[0].routeServiceArtifactEvidence = [];
+  }
+  return value;
 }

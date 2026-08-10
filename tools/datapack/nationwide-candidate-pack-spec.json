@@ -958,14 +958,6 @@
   ],
   "lineScopeRedescriptions": [
     {
-      "sourceId": "seoulmetro-cyberstation-route-map",
-      "sourceDomain": "route_map_positions",
-      "lineIds": ["seoul-4"],
-      "requirementKeys": ["capital:seoul-metro:seoul-4:route_map_positions"],
-      "reasonKo": "B0 파일럿 1건. 이 소스는 admission이 완결(admissionEvidence.decision=APPROVED)돼 있고 승계 pack에 seoul-4 route_map_positions 행 2건(derivationKind=OFFICIAL, labelPolygon 포함)이 이미 있다. coverageScope에 lineIds가 있어야 build-datapack.mjs recordCoverageScopes가 (operator, line) 단일 pair line-scoped provenance를 낸다.",
-      "inventorySyncKo": "같은 lineIds를 tools/datapack/source-inventory.json의 같은 소스 coverageScope에도 적어야 한다. 하네스가 두 정본의 lineIds 일치를 fail closed로 확인한다."
-    },
-    {
       "sourceId": "molit-urban-rail-full-route-daegu-line1-membership",
       "sourceDomain": "station_line_membership",
       "lineIds": ["line-5b8d9b05e7e6"],
@@ -1269,7 +1261,14 @@
         "capital:seoul-metro:line-15b3b8a93259:route_map_positions",
         "capital:seoul-metro:line-2b2d9eaa53d0:route_map_positions"
       ],
-      "reasonKo": "B3. 수도권 1~8호선 route_map_position·route_map_label_polygon을 대는 공식 좌표 snapshot 소스다. 8건 중 4호선은 B0 파일럿의 cyberstation 소스와 함께 뒷받침하므로 그 requirement의 근거 소스는 두 개다 — 하네스가 전이를 뒷받침한 소스 집합이 등재분과 정확히 같은지 fail closed로 확인한다. lineIds 순서는 admission 정본이 1호선부터 8호선 순으로 기술한 그대로다.",
+      "nonTransitioningRequirements": [
+        {
+          "requirementKey": "capital:seoul-metro:seoul-4:route_map_positions",
+          "reasonCode": "ALREADY_SUPPORTED_BY_INHERITED_SOURCE",
+          "reasonKo": "승계 pack의 seoulmetro-cyberstation-route-map evidence로 이미 SUPPORTED다. current variant는 그 지원을 대체하지 않고 seoul-metro-route-map-positions 공식 source만 추가해야 한다."
+        }
+      ],
+      "reasonKo": "B3. 수도권 1~8호선 route_map_position·route_map_label_polygon을 대는 공식 좌표 snapshot 소스다. 8건 중 4호선은 inherited cyberstation 근거로 baseline부터 이미 SUPPORTED이며 current official source를 추가한다. 나머지 7건만 MISSING에서 SUPPORTED로 전이한다. lineIds 순서는 admission 정본이 1호선부터 8호선 순으로 기술한 그대로다.",
       "inventorySyncKo": "하네스가 spec lineIds와 tracked source-inventory coverageScope.lineIds의 일치를 fail closed로 확인한다. 이 소스는 이미 8노선 line-scope로 기술돼 있어 재기술은 admission 정본을 그대로 승계한다(inventory 변경 없음)."
     },
     {

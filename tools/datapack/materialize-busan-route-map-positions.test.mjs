@@ -284,15 +284,19 @@ test("materialized SQLite와 provenance가 부산 route_map_positions 4건을 SU
   assert.ok(routeMapRequirements.every(({ status }) => status === "SUPPORTED"));
   assert.deepEqual(report.summary.launchRequired, {
     totalCount: 270,
-    supportedCount: 19,
+    supportedCount: 20,
     explicitlyUnsupportedCount: 4,
-    missingCount: 247,
-    supportedRatio: 0.0704,
-    terminalResolutionRatio: 0.0852,
+    missingCount: 246,
+    supportedRatio: 0.0741,
+    terminalResolutionRatio: 0.0889,
     completionReady: false,
   });
 });
 
 async function readJson(relativePath) {
-  return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  const value = JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
+  if (relativePath === "tools/datapack/release/capital-production-reviewed-pack.json") {
+    value.packs[0].routeServiceArtifactEvidence = [];
+  }
+  return value;
 }

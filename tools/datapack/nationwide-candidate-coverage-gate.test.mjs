@@ -60,7 +60,8 @@ const RESOLUTIONS_PATH =
   "tools/datapack/release/nationwide-public-api-coverage-resolutions-20260725.json";
 const REVIEWED_PACK_PATH = "tools/datapack/release/capital-production-reviewed-pack.json";
 const PILOT_REQUIREMENT_KEY = "capital:seoul-metro:seoul-4:route_map_positions";
-const PILOT_SOURCE_ID = "seoulmetro-cyberstation-route-map";
+const PILOT_SOURCE_ID = "seoul-metro-route-map-positions";
+const INHERITED_PILOT_SOURCE_ID = "seoulmetro-cyberstation-route-map";
 // #2549 B1 대상 9 requirement(대구 3노선 × membership/topology/timetable)와
 // #2580 B2-a 대상 6 requirement(대구 3노선 × route_map_positions/accessibility_facilities).
 const DAEGU_LINE_IDS = ["line-5b8d9b05e7e6", "line-e2938a4cc492", "line-0ffaa95b1b5d"];
@@ -475,7 +476,6 @@ const INCHEON_INCLUSION_BINDINGS = [
 // 이 spec이 전이 대상으로 등재한 requirement 전량. 4호선(B0 파일럿 키)은 수도권 노선도 편입으로 근거
 // 소스가 둘이 되지만 키 자체는 이미 등재돼 있어 여기서 한 번만 센다.
 const ALL_TRANSITIONING_KEYS = [
-  PILOT_REQUIREMENT_KEY,
   ...DAEGU_REQUIREMENT_KEYS,
   ...BUSAN_REQUIREMENT_KEYS,
   ...DAEJEON_REQUIREMENT_KEYS,
@@ -527,9 +527,9 @@ test("candidate evidence는 배포 artifact row count와 transition을 함께 �
   assert.deepEqual(evidence.deployedArtifact, {
     verifierPath: "tools/datapack/verify-production-pack-artifact-identity.mjs",
     packId: "capital",
-    gzipSha256: "f328fbedff014be18a0e8341e0bdbfe9b0dd774fa7e9ae7692aa869e831707b3",
-    sqliteSha256: "a581c5d2a78f765b859e7e7b7d62d3bf0d9b573bcebd246ab4c6f0cd62fddfc5",
-    byteSize: 1463745,
+    gzipSha256: "aa11ed7e760203c9a5a51aa1ccf2db49ebd8ada4c6307afedd4834fd96d69b52",
+    sqliteSha256: "ce092e98e0524ca38b0a2cfdcb977058094a57ef0d848129a699ee2b88a0f602",
+    byteSize: 1463564,
     rowCounts: {
       catalog_metadata: 3,
       data_quality_records: 2,
@@ -575,13 +575,23 @@ test("candidate evidence는 배포 artifact row count와 transition을 함께 �
       strictEligible: 652,
     },
   });
-  assert.deepEqual(evidence.transitions.find((entry) => entry.requirementKey === PILOT_REQUIREMENT_KEY), {
+  assert.equal(evidence.transitions.some((entry) => entry.requirementKey === PILOT_REQUIREMENT_KEY), false);
+  assert.deepEqual(evidence.declaredNonTransitions.entries.find(
+    (entry) => entry.requirementKey === PILOT_REQUIREMENT_KEY,
+  ), {
     requirementKey: PILOT_REQUIREMENT_KEY,
-    before: "MISSING",
+    sourceId: CAPITAL_SEOUL_ROUTE_MAP_SOURCE_ID,
+    sourceDomain: "route_map_positions",
+    reasonCode: "ALREADY_SUPPORTED_BY_INHERITED_SOURCE",
+    reasonKo: "승계 pack의 seoulmetro-cyberstation-route-map evidence로 이미 SUPPORTED다. current variant는 그 지원을 대체하지 않고 seoul-metro-route-map-positions 공식 source만 추가해야 한다.",
+    before: "SUPPORTED",
     after: "SUPPORTED",
-    sourceIds: [CAPITAL_SEOUL_ROUTE_MAP_SOURCE_ID, PILOT_SOURCE_ID],
-    coveredFields: 2,
-    denominator: 2,
+    baselineSourceIds: [INHERITED_PILOT_SOURCE_ID],
+    lineScopedSourceIds: [CAPITAL_SEOUL_ROUTE_MAP_SOURCE_ID, INHERITED_PILOT_SOURCE_ID],
+    supportingRecordCountByField: {
+      route_map_position: 27,
+      route_map_label_polygon: 27,
+    },
   });
 });
 
@@ -600,7 +610,7 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
     ], {
       cwd: root,
       // ponytail: committed fixture replay clock; release workflow keeps actual time.
-      env: { ...process.env, EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-07-30T00:00:00.000Z" },
+      env: { ...process.env, EASYSUBWAY_DATAPACK_BUILD_NOW: "2026-08-09T14:30:00.000Z" },
     });
 
     const regenerated = await readFile(output, "utf8");
@@ -649,7 +659,7 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
   }
 });
 
-test("파일럿 scope는 line-scope 재기술로 MISSING에서 SUPPORTED로 전이한다", async () => {
+test("Seoul-4는 inherited SUPPORTED를 유지하며 current official source를 추가한다", async () => {
   const evidence = await readJson(EVIDENCE_PATH);
 
   // candidate는 root가 되는 단일 pack이어야 게이트가 단독 계약으로 판정한다.
@@ -681,14 +691,15 @@ test("파일럿 scope는 line-scope 재기술로 MISSING에서 SUPPORTED로 전�
   const before = requirementNamed("baseline", PILOT_REQUIREMENT_KEY);
   const after = requirementNamed("lineScoped", PILOT_REQUIREMENT_KEY);
   assert.equal(before.requirementKey, PILOT_REQUIREMENT_KEY);
-  assert.equal(before.status, "MISSING");
-  assert.deepEqual(before.missingFields, ["route_map_position", "route_map_label_polygon"]);
+  assert.equal(before.status, "SUPPORTED");
+  assert.deepEqual(before.sourceIds, [INHERITED_PILOT_SOURCE_ID]);
+  assert.deepEqual(before.missingFields, []);
   assert.equal(after.status, "SUPPORTED");
   assert.equal(after.releaseTier, "LAUNCH_REQUIRED");
   assert.equal(after.coveredFields, 2);
   assert.equal(after.denominator, 2);
   // #2595부터 4호선은 근거 소스가 둘이다 — B0 파일럿의 cyberstation 좌표 2행에 공식 좌표 snapshot이 더해진다.
-  assert.deepEqual(after.sourceIds, [CAPITAL_SEOUL_ROUTE_MAP_SOURCE_ID, PILOT_SOURCE_ID]);
+  assert.deepEqual(after.sourceIds, [CAPITAL_SEOUL_ROUTE_MAP_SOURCE_ID, INHERITED_PILOT_SOURCE_ID]);
   assert.deepEqual(after.missingFields, []);
   // denominator 2는 필수 필드 2개를 뜻하고 데이터 행 2개가 아니다 — 뒷받침 행수를 따로 고정한다.
   // 27행은 cyberstation 2행 + 공식 좌표 편입 25행이며, 필드 수(2)와도 노선의 역 수와도 다른 축이다.
@@ -697,19 +708,12 @@ test("파일럿 scope는 line-scope 재기술로 MISSING에서 SUPPORTED로 전�
     route_map_label_polygon: 27,
   });
   assert.deepEqual(before.supportingRecordCountByField, {
-    route_map_position: 0,
-    route_map_label_polygon: 0,
+    route_map_position: 2,
+    route_map_label_polygon: 2,
   });
   assert.match(evidence.readingGuide.denominatorSemanticsKo, /데이터 행 수가 아니다/);
 
-  assert.deepEqual(evidence.transitions.find((entry) => entry.requirementKey === PILOT_REQUIREMENT_KEY), {
-    requirementKey: PILOT_REQUIREMENT_KEY,
-    before: "MISSING",
-    after: "SUPPORTED",
-    sourceIds: [CAPITAL_SEOUL_ROUTE_MAP_SOURCE_ID, PILOT_SOURCE_ID],
-    coveredFields: 2,
-    denominator: 2,
-  });
+  assert.equal(evidence.transitions.some((entry) => entry.requirementKey === PILOT_REQUIREMENT_KEY), false);
   assert.deepEqual(
     evidence.transitions.map(({ requirementKey }) => requirementKey),
     [...transitioningKeys].sort(),
@@ -1321,10 +1325,12 @@ test("게이트 evidence는 SUPPORTED를 근거 성격별로 나눠 기록하고
     "official-source": 46,
     "owner-authored-canonical": 36,
   });
-  assert.deepEqual(evidence.variants.baseline.supportedByEvidenceModel, {});
+  assert.deepEqual(evidence.variants.baseline.supportedByEvidenceModel, {
+    "owner-authored-canonical": 1,
+  });
 
   // owner-authored-canonical 선언은 판정을 열어 주지 않는다: baseline에서 그 도메인 키는 재기술 전
-  // MISSING이고 분모·차단 임계는 lineScoped와 같다(선언이 아니라 근거가 판정을 낸다).
+  // 인천 키는 MISSING이고 분모·차단 임계는 lineScoped와 같다(선언이 아니라 근거가 판정을 낸다).
   const routeMapKey = `capital:seoul-metro:${INCHEON_LINE7_ID}:route_map_positions`;
   const requirementNamed = (variant) =>
     evidence.variants[variant].pilotRequirements.find((entry) => entry.requirementKey === routeMapKey);
@@ -1360,19 +1366,28 @@ test("인천 13 requirement는 체인 편입으로 전이하고 7호선 구간�
 
   // 선언된 non-transition은 evidence에 그대로 남고, 사유 코드가 요구한 실측 술어도 함께 기록된다.
   // 수치를 따로 못박아 이 축이 조용히 늘면 evidence diff와 이 회귀가 함께 걸리게 한다.
-  assert.equal(evidence.declaredNonTransitions.count, 1);
+  assert.equal(evidence.declaredNonTransitions.count, 2);
   assert.equal(evidence.declaredNonTransitions.entries.length, evidence.declaredNonTransitions.count);
-  assert.deepEqual(evidence.declaredNonTransitions.entries, [{
+  assert.deepEqual(
+    evidence.declaredNonTransitions.entries.map(({ requirementKey }) => requirementKey).sort(),
+    [PILOT_REQUIREMENT_KEY, INCHEON_NON_TRANSITION_KEY].sort(),
+  );
+  const incheonNonTransition = evidence.declaredNonTransitions.entries.find(
+    ({ requirementKey }) => requirementKey === INCHEON_NON_TRANSITION_KEY,
+  );
+  assert.deepEqual(incheonNonTransition, {
     requirementKey: INCHEON_NON_TRANSITION_KEY,
     sourceId: INCHEON_STATION_INFO_SOURCE_ID,
     sourceDomain: "route_graph_topology",
     reasonCode: "NO_SUPPORTING_ROWS_FOR_LINE",
-    reasonKo: evidence.declaredNonTransitions.entries[0].reasonKo,
+    reasonKo: incheonNonTransition.reasonKo,
     before: "MISSING",
     after: "MISSING",
+    baselineSourceIds: [],
+    lineScopedSourceIds: [],
     supportingRecordCountByField: { network_edges: 0, duration_seconds: 0, distance_meters: 0 },
-  }]);
-  assert.match(evidence.declaredNonTransitions.entries[0].reasonKo, /network_edges/);
+  });
+  assert.match(incheonNonTransition.reasonKo, /network_edges/);
   // 선언 키는 전이 목록에 없고 SUPPORTED 집합에도 없다 — 선언이 SUPPORTED 수를 늘리지 못한다.
   assert.equal(
     evidence.transitions.some(({ requirementKey }) => requirementKey === INCHEON_NON_TRANSITION_KEY),
@@ -1411,10 +1426,15 @@ test("candidate spec의 line-scope 재기술은 tracked source inventory와 동�
   const spec = await readJson(SPEC_PATH);
   const inventory = await readJson(INVENTORY_PATH);
   const appInventory = await readJson(APP_INVENTORY_PATH);
-  const [redescription] = spec.lineScopeRedescriptions;
+  const redescription = spec.lineScopeRedescriptions.find(
+    ({ sourceId, sourceDomain }) => sourceId === PILOT_SOURCE_ID && sourceDomain === "route_map_positions",
+  );
   assert.equal(redescription.sourceId, PILOT_SOURCE_ID);
-  assert.deepEqual(redescription.lineIds, ["seoul-4"]);
-  assert.deepEqual(redescription.requirementKeys, [PILOT_REQUIREMENT_KEY]);
+  assert.ok(redescription.lineIds.includes("seoul-4"));
+  assert.ok(redescription.requirementKeys.includes(PILOT_REQUIREMENT_KEY));
+  assert.deepEqual(redescription.nonTransitioningRequirements.map(({ requirementKey }) => requirementKey), [
+    PILOT_REQUIREMENT_KEY,
+  ]);
 
   // 재기술 전건이 admission 정본과 동기여야 한다. #2549는 inventory를 바꾸지 않고 이미 line-scope로
   // 기술된 대구 소스를 그대로 승계하므로, 이 축이 깨지면 재기술이 정본을 앞질렀다는 뜻이다.
@@ -1422,7 +1442,7 @@ test("candidate spec의 line-scope 재기술은 tracked source inventory와 동�
   // 같아야 하므로 열리지 않는 노선도 declare하되, 그 키는 전이 집합에서 명시로 빠진다.
   assert.deepEqual(
     [...new Set(spec.lineScopeRedescriptions.flatMap(({ requirementKeys }) => requirementKeys))].sort(),
-    [...ALL_TRANSITIONING_KEYS, INCHEON_NON_TRANSITION_KEY].sort(),
+    [...ALL_TRANSITIONING_KEYS, PILOT_REQUIREMENT_KEY, INCHEON_NON_TRANSITION_KEY].sort(),
   );
   assert.deepEqual(
     spec.lineScopeRedescriptions.flatMap(
@@ -1430,7 +1450,7 @@ test("candidate spec의 line-scope 재기술은 tracked source inventory와 동�
         ({ requirementKey }) => requirementKey,
       ),
     ),
-    [INCHEON_NON_TRANSITION_KEY],
+    [PILOT_REQUIREMENT_KEY, INCHEON_NON_TRANSITION_KEY],
   );
   for (const entry of spec.lineScopeRedescriptions) {
     const declared = inventory.sources.find(({ id }) => id === entry.sourceId);
@@ -1510,7 +1530,7 @@ test("declared transition seam은 실제 SUPPORTED non-transition을 거부한�
   assert.throws(
     () => assertDeclaredTransitionsMatchVariants(spec, evidence.variants),
     new RegExp(
-      "requirements declared as non-transitioning must not be SUPPORTED after the line-scope redescription: "
+      "requirements declared as NO_SUPPORTING_ROWS_FOR_LINE must not be SUPPORTED: "
         + `capital:incheon-transit:${INCHEON_LINE1_ID}:route_graph_topology`,
     ),
   );
@@ -1563,8 +1583,9 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
     rejectsValidationWith(
       (value) => {
         // requirementKeys까지 함께 넓혀 spec 내부 정합은 맞춘 채로 정본 결속만 어긋나게 한다.
-        value.lineScopeRedescriptions[0].lineIds = ["seoul-4", "seoul-2"];
-        value.lineScopeRedescriptions[0].requirementKeys = [
+        const entry = value.lineScopeRedescriptions.find(({ sourceId }) => sourceId === PILOT_SOURCE_ID);
+        entry.lineIds = ["seoul-4", "seoul-2"];
+        entry.requirementKeys = [
           PILOT_REQUIREMENT_KEY,
           "capital:seoul-metro:seoul-2:route_map_positions",
         ];
@@ -1576,8 +1597,9 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   await context.test("requirementKeys가 덮지 않는 lineIds는 거부된다", () => {
     rejectsValidationWith(
       (value) => {
-        value.lineScopeRedescriptions[0].lineIds = ["seoul-4", "seoul-2"];
-        value.lineScopeRedescriptions[0].requirementKeys = [PILOT_REQUIREMENT_KEY];
+        const entry = value.lineScopeRedescriptions.find(({ sourceId }) => sourceId === PILOT_SOURCE_ID);
+        entry.lineIds = ["seoul-4", "seoul-2"];
+        entry.requirementKeys = [PILOT_REQUIREMENT_KEY];
       },
       /requirementKeys must cover every redescribed line/,
     );
@@ -1586,7 +1608,9 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   await context.test("재기술 도메인을 벗어난 requirementKey는 거부된다", () => {
     rejectsValidationWith(
       (value) => {
-        value.lineScopeRedescriptions[0].requirementKeys = ["capital:seoul-metro:seoul-4:route_graph_topology"];
+        value.lineScopeRedescriptions.find(
+          ({ sourceId }) => sourceId === PILOT_SOURCE_ID,
+        ).requirementKeys = ["capital:seoul-metro:seoul-4:route_graph_topology"];
       },
       /requirementKeys must stay in the redescribed source domain/,
     );
@@ -2534,7 +2558,7 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   await context.test("등재되지 않은 사유 코드는 거부된다", () => {
     rejectsValidationWith(
       (value) => { nonTransitionEntryOf(value).declaration.reasonCode = "OUT_OF_SCOPE"; },
-      /nonTransitioningRequirements\[\]\.reasonCode must be one of NO_SUPPORTING_ROWS_FOR_LINE/,
+      /nonTransitioningRequirements\[\]\.reasonCode must be one of ALREADY_SUPPORTED_BY_INHERITED_SOURCE,NO_SUPPORTING_ROWS_FOR_LINE/,
     );
   });
 
@@ -2799,6 +2823,41 @@ test("사유 술어가 없는 non-transition 코드는 무성 통과하지 않�
   assert.throws(
     () => assertNonTransitionReasons(declarationWith("OWNER_DEFERRED"), lineScoped),
     /non-transition reason code has no harness predicate: OWNER_DEFERRED/,
+  );
+});
+
+test("inherited SUPPORTED requirement의 current official source 추가를 exact 검증한다", () => {
+  const requirementKey = PILOT_REQUIREMENT_KEY;
+  const inheritedSourceId = "seoulmetro-cyberstation-route-map";
+  const officialSourceId = CAPITAL_SEOUL_ROUTE_MAP_SOURCE_ID;
+  const declaration = new Map([[requirementKey, {
+    requirementKey,
+    sourceId: officialSourceId,
+    sourceDomain: "route_map_positions",
+    reasonCode: "ALREADY_SUPPORTED_BY_INHERITED_SOURCE",
+    reasonKo: "승계 근거로 이미 지원되며 current official source를 추가한다.",
+  }]]);
+  const entry = (sourceIds) => ({
+    requirementKey,
+    status: "SUPPORTED",
+    sourceIds,
+    supportingRecordCountByField: { route_map_position: 1, route_map_label_polygon: 1 },
+  });
+  const baseline = { pilotRequirements: [entry([inheritedSourceId])] };
+  const lineScoped = { pilotRequirements: [entry([officialSourceId, inheritedSourceId])] };
+
+  assertNonTransitionReasons(declaration, lineScoped, baseline);
+  assert.throws(
+    () => assertNonTransitionReasons(declaration, lineScoped, {
+      pilotRequirements: [entry([officialSourceId, inheritedSourceId])],
+    }),
+    /baseline must not contain the current official source/,
+  );
+  assert.throws(
+    () => assertNonTransitionReasons(declaration, {
+      pilotRequirements: [entry([inheritedSourceId])],
+    }, baseline),
+    /line-scoped variant must add the current official source/,
   );
 });
 
