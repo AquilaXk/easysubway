@@ -2,6 +2,10 @@ name: Public Sensitivity Owner Receipt
 
 on:
   workflow_call:
+    inputs:
+      observed_at:
+        required: true
+        type: string
     secrets:
       D20_SECRET_SCANNING_ALERTS_READ_TOKEN:
         required: true
@@ -16,6 +20,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     env:
+      OBSERVED_AT: ${{ inputs.observed_at }}
       REPO_CODE: ${{ github.repository == 'AquilaXk/easysubway' && 'hub' || github.repository == 'AquilaXk/easysubway-backend' && 'backend' || github.repository == 'AquilaXk/easysubway-data' && 'data' || github.repository == 'AquilaXk/easysubway-mobile' && 'mobile' || github.repository == 'AquilaXk/easysubway-platform' && 'platform' || 'invalid' }}
     steps:
       - name: Public Sensitivity Owner Receipt / Reject missing secret-alert capability
@@ -47,8 +52,6 @@ jobs:
           set -euo pipefail
           mkdir --parents d20-evidence
           test ! -e d20-evidence/evidence.json
-          OBSERVED_AT="$(date --utc +"%Y-%m-%dT%H:%M:%S.000Z")"
-          printf 'OBSERVED_AT=%s\n' "${OBSERVED_AT}" >> "${GITHUB_ENV}"
           node tools/repo/produce-public-sensitivity-owner-receipt.mjs \
             --repository "${GITHUB_REPOSITORY}" \
             --git-sha "${GITHUB_SHA}" \
