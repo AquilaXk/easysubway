@@ -19,6 +19,7 @@ const EXPECTED_RECORDS = new Map([
   [2798, [2797, "7e1cc3d33d579ead965322fe2fa023409aba8c6b", "CLOSES"]], [2799, [2797, "01ce0b2e4572f65b86ea4f2c91a32c9ff6a2fae1", "CLOSES"]],
   [2801, [2800, "f89c284f76654fef5e32387304edaac64618fce2", "CLOSES"]], [2803, [2802, "b96e8753cb406de6067bbf22a0da158b96b4d898", "CLOSES"]],
   [2806, [2805, "fa2f2602573651af6694e7f56077414b685987b9", "CLOSES"]], [2808, [2807, "3b0076e04df4f6947f33c37c09949ad6b7487238", "CLOSES"]],
+  [2810, [2809, "12a4a4753dbaf733fc436ff645a2f2a1d73b4048", "CLOSES"]], [2813, [2729, "1c7521f0186b365b0a43cdb8fa25b35e06bafdbb", "COORDINATOR_FOLLOWUP"]],
 ]);
 
 export class AuditIncomplete extends Error {
@@ -28,7 +29,7 @@ export class AuditIncomplete extends Error {
 export function validatePlanDocExecutionScope(scope, errors = []) {
   if (scope?.schemaVersion !== 1 || scope?.executionRepository !== REPOSITORY || scope?.planOwner !== "PLAN-DOC") errors.push("scope header mismatch");
   if (JSON.stringify(scope?.forbiddenTargetPathPrefixes) !== JSON.stringify(["apps/mobile/", "backend/", "infra/", "tools/datapack/", "tools/ops/", "tools/release/"])) errors.push("forbidden target prefix mismatch");
-  if (scope?.self?.issueNumber !== 2809 || scope?.self?.planOwner !== "PLAN-DOC") errors.push("self binding mismatch");
+  if (scope?.self?.issueNumber !== 2814 || scope?.self?.planOwner !== "PLAN-DOC") errors.push("self binding mismatch");
   const records = scope?.historical;
   if (!Array.isArray(records) || records.length !== EXPECTED_RECORDS.size) return [...errors, "historical inventory count mismatch"];
   const actual = new Map(records.map((record) => [record?.prNumber, record]));

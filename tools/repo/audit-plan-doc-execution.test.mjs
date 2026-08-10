@@ -25,6 +25,8 @@ const REFRESH_RECORDS = new Map([
   [2803, [2802, "b96e8753cb406de6067bbf22a0da158b96b4d898"]],
   [2806, [2805, "fa2f2602573651af6694e7f56077414b685987b9"]],
   [2808, [2807, "3b0076e04df4f6947f33c37c09949ad6b7487238"]],
+  [2810, [2809, "12a4a4753dbaf733fc436ff645a2f2a1d73b4048"]],
+  [2813, [2729, "1c7521f0186b365b0a43cdb8fa25b35e06bafdbb", "COORDINATOR_FOLLOWUP"]],
 ]);
 
 function matchingLive(scope = SCOPE) {
@@ -51,12 +53,12 @@ function matchingLive(scope = SCOPE) {
 }
 
 test("plan-doc execution audit scope fixes the exact historical inventory and self binding", () => {
-  assert.equal(SCOPE.historical.length, 22);
-  assert.equal(SCOPE.self.issueNumber, 2809);
+  assert.equal(SCOPE.historical.length, 24);
+  assert.equal(SCOPE.self.issueNumber, 2814);
   const byPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
-  for (const [prNumber, [issueNumber, mergeSha]] of REFRESH_RECORDS) {
+  for (const [prNumber, [issueNumber, mergeSha, relation = "CLOSES"]] of REFRESH_RECORDS) {
     assert.deepEqual(byPr.get(prNumber), {
-      issueNumber, prNumber, mergeSha, relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY",
+      issueNumber, prNumber, mergeSha, relation, planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY",
     });
   }
   assert.deepEqual(validatePlanDocExecutionScope(SCOPE), []);
@@ -66,7 +68,7 @@ test("plan-doc execution audit scope fixes the exact historical inventory and se
     (scope) => { scope.historical[0].planOwner = "PLAN-REPO"; },
     (scope) => { scope.executionRepository = "AquilaXk/easysubway-mobile"; },
     (scope) => { scope.historical[1].relation = "COORDINATOR_FOLLOWUP"; },
-    (scope) => { scope.self.issueNumber = 2797; },
+    (scope) => { scope.self.issueNumber = 2809; },
   ]) {
     const invalid = structuredClone(SCOPE);
     mutate(invalid);
