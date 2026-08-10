@@ -36,6 +36,11 @@ import {
   validatePlanDocExecutionAuditReportSchema,
   validateExternalTerminalLocatorAuditScope,
   validateExternalTerminalLocatorAuditReportSchema,
+  validateCleanCheckoutReproducibilityAuditScope,
+  validateCleanCheckoutReproducibilityAuditScopeSchema,
+  validateCleanCheckoutReproducibilityOwnerContractSchema,
+  validateCleanCheckoutReproducibilityOwnerReceiptSchema,
+  validateCleanCheckoutReproducibilityAuditReportSchema,
   validatePostGoBoundaryAuditScope,
   validatePostGoBoundaryAuditReportSchema,
 } from "./check-contracts.mjs";
@@ -190,6 +195,95 @@ test("external terminal locator audit contracts fix the exact pending inventory 
   const unsafeLocator = structuredClone(scope);
   unsafeLocator.slots[0] = { ...unsafeLocator.slots[0], state: "READY", terminalLocator: { kind: "GIT_BLOB", repository: "AquilaXk/easysubway", commitSha: "a".repeat(40), path: "../secret", blobSha: "b".repeat(40) } };
   assert.ok(validateExternalTerminalLocatorAuditScope(unsafeLocator).length > 0);
+});
+
+test("clean checkout reproducibility audit contracts fix the exact five-owner pending inventory and strict evidence schemas", () => {
+  const scope = loadJson("contracts/documentation/clean-checkout-reproducibility-audit-scope.json");
+  const scopeSchema = loadJson("contracts/documentation/clean-checkout-reproducibility-audit-scope.schema.json");
+  const contractSchema = loadJson("contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json");
+  const receiptSchema = loadJson("contracts/documentation/clean-checkout-reproducibility-owner-receipt.schema.json");
+  const reportSchema = loadJson("contracts/documentation/clean-checkout-reproducibility-audit-report.schema.json");
+  assert.equal(validateSchema(scopeSchema, scope).ok, true);
+  assert.deepEqual(validateCleanCheckoutReproducibilityAuditScope(scope), []);
+  assert.deepEqual(validateCleanCheckoutReproducibilityAuditScopeSchema(scopeSchema), []);
+  assert.deepEqual(validateCleanCheckoutReproducibilityOwnerContractSchema(contractSchema), []);
+  assert.deepEqual(validateCleanCheckoutReproducibilityOwnerReceiptSchema(receiptSchema), []);
+  assert.deepEqual(validateCleanCheckoutReproducibilityAuditReportSchema(reportSchema), []);
+
+  const invalidScope = structuredClone(scope); invalidScope.slots[0].ownerIssue = 2816;
+  assert.ok(validateCleanCheckoutReproducibilityAuditScope(invalidScope).length > 0);
+  for (const mutate of [
+    (value) => { value.properties.slots.minItems = 4; },
+    (value) => { value.properties.slots.items.properties.repository.enum.pop(); },
+    (value) => { value.properties.slots.items.properties.contractLocator.oneOf[1].properties.path.pattern = ".+"; },
+    (value) => { value.properties.slots.items.properties.receiptLocator.oneOf[1].properties.workflowPath.pattern = ".+"; },
+    (value) => { value.properties.slots.items.oneOf[0].properties.ownerIssue.type = "integer"; },
+  ]) { const invalid = structuredClone(scopeSchema); mutate(invalid); assert.ok(validateCleanCheckoutReproducibilityAuditScopeSchema(invalid).length > 0); }
+
+  for (const mutate of [
+    (value) => { value.additionalProperties = true; },
+    (value) => { value.properties.repository.enum = ["AquilaXk/easysubway"]; },
+    (value) => { value.properties.variants.maxItems = 17; },
+    (value) => { value.properties.variants.items.properties.phases.minItems = 3; },
+    (value) => { value.properties.variants.items.properties.phases.items.properties.entrypoint.pattern = ".+"; },
+    (value) => { value.properties.variants.items.properties.phases.items.properties.requiredEnvironment.items.pattern = ".+"; },
+    (value) => { value.properties.variants.items.properties.phases.items.properties.timeoutSeconds.maximum = 7200; },
+  ]) { const invalid = structuredClone(contractSchema); mutate(invalid); assert.ok(validateCleanCheckoutReproducibilityOwnerContractSchema(invalid).length > 0); }
+
+  for (const mutate of [
+    (value) => { value.properties.contractSha256.pattern = ".+"; },
+    (value) => { value.properties.cleanCheckout.additionalProperties = true; },
+    (value) => { value.properties.cleanCheckout.properties.initialTrackedDiffCount.minimum = -1; },
+    (value) => { value.properties.variants.items.properties.phases.maxItems = 5; },
+    (value) => { value.properties.variants.items.properties.phases.items.required.pop(); },
+    (value) => { value.properties.variants.items.properties.phases.items.properties.commandSha256.pattern = ".+"; },
+    (value) => { value.properties.variants.items.properties.runnerImage.pattern = ".+"; },
+    (value) => { value.properties.variants.items.properties.phases.items.properties.startedAt.pattern = ".+"; },
+    (value) => { value.properties.variants.items.properties.phases.items.properties.unexpectedProcessCount.type = "number"; },
+  ]) { const invalid = structuredClone(receiptSchema); mutate(invalid); assert.ok(validateCleanCheckoutReproducibilityOwnerReceiptSchema(invalid).length > 0); }
+
+  for (const mutate of [
+    (value) => { delete value.oneOf; },
+    (value) => { value.properties.inputs.additionalProperties = true; },
+    (value) => { value.properties.inputs.properties.stateBeginSha256.pattern = ".+"; },
+    (value) => { value.properties.summary.properties.ready.minimum = -1; },
+    (value) => { value.properties.slots.minItems = 4; },
+    (value) => { value.properties.slots.items.properties.contractLocator.oneOf[1].additionalProperties = true; },
+    (value) => { value.properties.slots.items.properties.receiptLocator.oneOf[1].properties.artifactId.minimum = 0; },
+    (value) => { value.properties.slots.items.properties.currentHead.pattern = ".+"; },
+    (value) => { value.properties.slots.items.oneOf[0].properties.evidenceState.enum = ["VERIFIED"]; },
+    (value) => { value.properties.findings.items.additionalProperties = true; },
+    (value) => { value.oneOf[0].properties.inputs.properties.stateEndSha256.type = ["string", "null"]; },
+  ]) { const invalid = structuredClone(reportSchema); mutate(invalid); assert.ok(validateCleanCheckoutReproducibilityAuditReportSchema(invalid).length > 0); }
+});
+
+test("clean checkout reproducibility contract collection reports malformed or missing scope schema without throwing", () => {
+  const fixture = createExternalWorkspace();
+  try {
+    cpSync("contracts", join(fixture.directory, "contracts"), { recursive: true });
+    const workspace = loadJson(fixture.workspacePath);
+    Object.assign(workspace, {
+      contracts: "contracts",
+      cleanCheckoutReproducibilityAuditScope: "contracts/documentation/clean-checkout-reproducibility-audit-scope.json",
+      cleanCheckoutReproducibilityOwnerContractSchema: "contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json",
+      cleanCheckoutReproducibilityOwnerReceiptSchema: "contracts/documentation/clean-checkout-reproducibility-owner-receipt.schema.json",
+      cleanCheckoutReproducibilityAuditReportSchema: "contracts/documentation/clean-checkout-reproducibility-audit-report.schema.json",
+    });
+    writeFileSync(fixture.workspacePath, JSON.stringify(workspace));
+    const scopeSchemaPath = join(fixture.directory, "contracts/documentation/clean-checkout-reproducibility-audit-scope.schema.json");
+
+    writeFileSync(scopeSchemaPath, "{");
+    let malformedErrors;
+    assert.doesNotThrow(() => { malformedErrors = collectContractErrors(fixture.workspacePath); });
+    assert.ok(malformedErrors.some((error) => error.includes("clean-checkout-reproducibility-audit-scope.schema.json: 유효한 JSON")));
+
+    rmSync(scopeSchemaPath);
+    let missingErrors;
+    assert.doesNotThrow(() => { missingErrors = collectContractErrors(fixture.workspacePath); });
+    assert.ok(missingErrors.some((error) => error.includes("clean-checkout-reproducibility-audit-scope.schema.json 누락")));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
 });
 
 test("post-GO boundary audit contracts bind current blockers and strict report", () => {

@@ -1,0 +1,56 @@
+name: Clean checkout reproducibility audit
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: clean-checkout-reproducibility-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+      actions: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+      - name: Audit current clean-checkout reproducibility evidence
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          EVIDENCE_DIR="audit-evidence"
+          REPORT_PATH="${EVIDENCE_DIR}/clean-checkout-reproducibility-audit-report.json"
+          OBSERVED_AT="$(date --utc +"%Y-%m-%dT%H:%M:%S.000Z")"
+          mkdir --parents -- "${EVIDENCE_DIR}"
+          test ! -e "${REPORT_PATH}"
+          node tools/repo/audit-clean-checkout-reproducibility.mjs \
+            --scope contracts/documentation/clean-checkout-reproducibility-audit-scope.json \
+            --scope-schema contracts/documentation/clean-checkout-reproducibility-audit-scope.schema.json \
+            --owner-contract-schema contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json \
+            --owner-receipt-schema contracts/documentation/clean-checkout-reproducibility-owner-receipt.schema.json \
+            --report-schema contracts/documentation/clean-checkout-reproducibility-audit-report.schema.json \
+            --source-sha "${GITHUB_SHA}" \
+            --observed-at "${OBSERVED_AT}" \
+            --output "${REPORT_PATH}"
+      - name: Upload sanitized audit report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: clean-checkout-reproducibility-audit-${{ github.sha }}
+          path: audit-evidence/clean-checkout-reproducibility-audit-report.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 14
