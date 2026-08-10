@@ -3,11 +3,10 @@
   "$id": "https://easysubway.local/schema/clean-checkout-reproducibility-owner-contract.schema.json",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "repository", "sourceSha", "variants"],
+  "required": ["schemaVersion", "repository", "variants"],
   "properties": {
     "schemaVersion": { "const": 1 },
     "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
-    "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
     "variants": {
       "type": "array",
       "minItems": 1,
