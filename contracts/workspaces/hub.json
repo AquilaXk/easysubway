@@ -18,6 +18,8 @@
   "publicSensitivityAuditReportSchema": "../documentation/public-sensitivity-audit-report.schema.json",
   "planDocExecutionAuditScope": "../documentation/plan-doc-execution-audit-scope.json",
   "planDocExecutionAuditReportSchema": "../documentation/plan-doc-execution-audit-report.schema.json",
+  "externalTerminalLocatorAuditScope": "../documentation/external-terminal-locator-audit-scope.json",
+  "externalTerminalLocatorAuditReportSchema": "../documentation/external-terminal-locator-audit-report.schema.json",
   "postGoBoundaryAuditScope": "../documentation/post-go-boundary-audit-scope.json",
   "postGoBoundaryAuditReportSchema": "../documentation/post-go-boundary-audit-report.schema.json"
 }

@@ -21065,3 +21065,24 @@ test("post-GO boundary audit workflow pins merged SHA, write-once report, and al
   assert.match(workflow, /post-go-boundary-audit-\$\{\{ github\.sha \}\}/);
   assert.doesNotMatch(workflow, /continue-on-error|cache|previous report|git (?:add|commit|push)/i);
 });
+
+test("external terminal locator audit workflow binds main SHA to a write-once sanitized report", () => {
+  const workflow = read(".github/workflows/external-terminal-locator-audit.yml");
+  assert.match(workflow, /^on:\n  push:\n    branches: \[main\]\n    paths:$/m);
+  for (const input of [
+    "contracts/documentation/external-terminal-locator-audit-scope.schema.json",
+    "contracts/documentation/external-terminal-locator-audit-scope.json",
+    "contracts/documentation/external-terminal-locator-audit-report.schema.json",
+    "tools/repo/audit-external-terminal-locators.mjs",
+    "tools/repo/audit-external-terminal-locators.test.mjs",
+    "--source-sha \"${GITHUB_SHA}\"",
+    "--output \"${REPORT_PATH}\"",
+  ]) assert.match(workflow, new RegExp(input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(workflow, /permissions:\n      contents: read\n      issues: read\n      actions: read/);
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /test ! -e "\$\{REPORT_PATH\}"/);
+  assert.match(workflow, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(workflow, /external-terminal-locator-audit-\$\{\{ github\.sha \}\}/);
+  assert.doesNotMatch(workflow, /continue-on-error|cache|previous report|git (?:add|commit|push)/i);
+});

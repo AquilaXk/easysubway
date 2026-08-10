@@ -1,0 +1,10 @@
+{"schemaVersion":1,"slots":[
+{"ownerRepository":"AquilaXk/easysubway","ownerIssue":2764,"accountablePlan":"PLAN-REPO","state":"PENDING","terminalLocator":null},
+{"ownerRepository":"AquilaXk/easysubway","ownerIssue":2767,"accountablePlan":"PLAN-REPO","state":"PENDING","terminalLocator":null},
+{"ownerRepository":"AquilaXk/easysubway-platform","ownerIssue":29,"accountablePlan":"PLAN-REPO","state":"PENDING","terminalLocator":null},
+{"ownerRepository":"AquilaXk/easysubway-platform","ownerIssue":30,"accountablePlan":"PLAN-REPO","state":"PENDING","terminalLocator":null},
+{"ownerRepository":"AquilaXk/easysubway-platform","ownerIssue":31,"accountablePlan":"PLAN-REPO","state":"PENDING","terminalLocator":null},
+{"ownerRepository":"AquilaXk/easysubway-mobile","ownerIssue":84,"accountablePlan":"PLAN-REPO","state":"PENDING","terminalLocator":null},
+{"ownerRepository":"AquilaXk/easysubway","ownerIssue":2765,"accountablePlan":"PLAN-JOURNEY","state":"PENDING","terminalLocator":null},
+{"ownerRepository":"AquilaXk/easysubway-data","ownerIssue":87,"accountablePlan":"PLAN-JOURNEY","state":"PENDING","terminalLocator":null}
+]}
