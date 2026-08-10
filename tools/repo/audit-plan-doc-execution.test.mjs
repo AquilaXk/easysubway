@@ -17,6 +17,15 @@ import {
 const SCOPE = JSON.parse(readFileSync("contracts/documentation/plan-doc-execution-audit-scope.json", "utf8"));
 const SHA = "a".repeat(40);
 const OBSERVED_AT = "2026-08-09T00:00:00.000Z";
+const SELF_PR = 9999;
+const REFRESH_RECORDS = new Map([
+  [2798, [2797, "7e1cc3d33d579ead965322fe2fa023409aba8c6b"]],
+  [2799, [2797, "01ce0b2e4572f65b86ea4f2c91a32c9ff6a2fae1"]],
+  [2801, [2800, "f89c284f76654fef5e32387304edaac64618fce2"]],
+  [2803, [2802, "b96e8753cb406de6067bbf22a0da158b96b4d898"]],
+  [2806, [2805, "fa2f2602573651af6694e7f56077414b685987b9"]],
+  [2808, [2807, "3b0076e04df4f6947f33c37c09949ad6b7487238"]],
+]);
 
 function matchingLive(scope = SCOPE) {
   return {
@@ -30,7 +39,7 @@ function matchingLive(scope = SCOPE) {
     })),
     self: {
       issueNumber: scope.self.issueNumber,
-      prNumber: 2798,
+      prNumber: SELF_PR,
       repository: scope.executionRepository,
       mergeSha: SHA,
       mergedAt: OBSERVED_AT,
@@ -42,6 +51,14 @@ function matchingLive(scope = SCOPE) {
 }
 
 test("plan-doc execution audit scope fixes the exact historical inventory and self binding", () => {
+  assert.equal(SCOPE.historical.length, 22);
+  assert.equal(SCOPE.self.issueNumber, 2809);
+  const byPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
+  for (const [prNumber, [issueNumber, mergeSha]] of REFRESH_RECORDS) {
+    assert.deepEqual(byPr.get(prNumber), {
+      issueNumber, prNumber, mergeSha, relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY",
+    });
+  }
   assert.deepEqual(validatePlanDocExecutionScope(SCOPE), []);
   for (const mutate of [
     (scope) => { scope.historical[0].mergeSha = "b".repeat(40); },
@@ -49,6 +66,7 @@ test("plan-doc execution audit scope fixes the exact historical inventory and se
     (scope) => { scope.historical[0].planOwner = "PLAN-REPO"; },
     (scope) => { scope.executionRepository = "AquilaXk/easysubway-mobile"; },
     (scope) => { scope.historical[1].relation = "COORDINATOR_FOLLOWUP"; },
+    (scope) => { scope.self.issueNumber = 2797; },
   ]) {
     const invalid = structuredClone(SCOPE);
     mutate(invalid);
@@ -86,7 +104,7 @@ test("plan-doc execution audit rejects duplicate PR/SHA and self source to PR to
   scope.historical[2].mergeSha = scope.historical[0].mergeSha;
   const live = matchingLive(scope);
   live.self.mergeSha = "c".repeat(40);
-  live.self.relationText = "Refs #2797";
+  live.self.relationText = `Refs #${SCOPE.self.issueNumber}`;
 
   const codes = auditPlanDocExecution({ scope, sourceSha: SHA, live }).map(({ code }) => code);
   for (const code of ["DUPLICATE_PR", "DUPLICATE_MERGE_SHA", "SELF_SOURCE_SHA_MISMATCH", "SELF_CLOSING_ISSUE_MISMATCH"]) assert.ok(codes.includes(code));
@@ -121,11 +139,11 @@ test("plan-doc execution audit fail closes malformed or partial provider respons
 test("plan-doc execution audit preserves both sides of a rename without treating one PR file as two", async () => {
   const recordByPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
   const provider = async ([, endpoint]) => {
-    if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}/pulls`) return JSON.stringify([{ number: 2798 }]);
+    if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}/pulls`) return JSON.stringify([{ number: SELF_PR }]);
     const prMatch = endpoint.match(/^repos\/AquilaXk\/easysubway\/pulls\/(\d+)$/);
     if (prMatch != null) {
       const prNumber = Number(prMatch[1]);
-      const record = recordByPr.get(prNumber) ?? { issueNumber: 2797, relation: "CLOSES", mergeSha: SHA };
+      const record = recordByPr.get(prNumber) ?? { issueNumber: SCOPE.self.issueNumber, relation: "CLOSES", mergeSha: SHA };
       return JSON.stringify({ number: prNumber, merged: true, merge_commit_sha: record.mergeSha, base: { repo: { full_name: SCOPE.executionRepository } }, changed_files: 1, body: record.relation === "CLOSES" ? `Closes #${record.issueNumber}` : `Refs #${record.issueNumber}`, merged_at: OBSERVED_AT });
     }
     const filesMatch = endpoint.match(/^repos\/AquilaXk\/easysubway\/pulls\/(\d+)\/files\?per_page=100&page=(\d+)$/);
@@ -139,7 +157,7 @@ test("plan-doc execution audit preserves both sides of a rename without treating
   };
 
   const graphql = async (prNumber) => {
-    const record = recordByPr.get(prNumber) ?? { issueNumber: 2797, relation: "CLOSES", mergeSha: SHA };
+    const record = recordByPr.get(prNumber) ?? { issueNumber: SCOPE.self.issueNumber, relation: "CLOSES", mergeSha: SHA };
     return JSON.stringify({ data: { repository: { pullRequest: {
       number: prNumber, merged: true, mergeCommit: { oid: record.mergeSha },
       closingIssuesReferences: { totalCount: record.relation === "CLOSES" ? 1 : 0, pageInfo: { hasNextPage: false }, nodes: record.relation === "CLOSES" ? [{ number: record.issueNumber, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }] : [] },
@@ -154,17 +172,17 @@ test("plan-doc execution audit preserves both sides of a rename without treating
 test("plan-doc execution audit accepts a GitHub-shaped null close event only through an exact GraphQL closing reference", async () => {
   const recordByPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
   const provider = async ([, endpoint]) => {
-    if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}/pulls`) return JSON.stringify([{ number: 2798 }]);
+    if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}/pulls`) return JSON.stringify([{ number: SELF_PR }]);
     const pr = endpoint.match(/^repos\/AquilaXk\/easysubway\/pulls\/(\d+)$/);
     if (pr != null) {
-      const record = recordByPr.get(Number(pr[1])) ?? { issueNumber: 2797, relation: "CLOSES", mergeSha: SHA };
+      const record = recordByPr.get(Number(pr[1])) ?? { issueNumber: SCOPE.self.issueNumber, relation: "CLOSES", mergeSha: SHA };
       return JSON.stringify({ number: Number(pr[1]), merged: true, merge_commit_sha: record.mergeSha, base: { repo: { full_name: SCOPE.executionRepository } }, changed_files: 0, body: record.relation === "CLOSES" ? `Closes #${record.issueNumber}` : `Refs #${record.issueNumber}`, merged_at: OBSERVED_AT });
     }
     if (/\/files\?per_page=100&page=1$/.test(endpoint)) return "[]";
     throw new Error(`unexpected REST request: ${endpoint}`);
   };
   const graphql = async (prNumber) => {
-    const record = recordByPr.get(prNumber) ?? { issueNumber: 2797, relation: "CLOSES", mergeSha: SHA };
+    const record = recordByPr.get(prNumber) ?? { issueNumber: SCOPE.self.issueNumber, relation: "CLOSES", mergeSha: SHA };
     return JSON.stringify({ data: { repository: { pullRequest: {
       number: prNumber, merged: true, mergeCommit: { oid: record.mergeSha },
       closingIssuesReferences: { totalCount: record.relation === "CLOSES" ? 1 : 0, pageInfo: { hasNextPage: false }, nodes: record.relation === "CLOSES" ? [{ number: record.issueNumber, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }] : [] },
