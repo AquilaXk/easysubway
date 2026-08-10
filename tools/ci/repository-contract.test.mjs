@@ -4657,7 +4657,7 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
   assert.match(routeV2GatewayTest, /IP·token limiter와 exact 429 계약/);
   assert.match(routeV2GatewayProbe, /Retry-After: 60/);
   assert.match(ciWorkflow, /tools\/test\/run-route-v2-gateway-integration\.sh/);
-  assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "#1016", "#1020", "#1914"]);
+  assert.deepEqual(abusePenetrationRehearsalGate.buildIdentityPolicy.requiredIssueLinks, ["#1015", "Mobile #8", "#1020", "#1914"]);
   assert.ok(
     abusePenetrationRehearsalGate.productionLikeEvidencePolicy.requiredForClosing.includes(
       "container-hardening-negative-controls",
@@ -8823,7 +8823,7 @@ test("서버 최소화 PR10 QA gate는 최종 인수 증거를 로컬 전용 정
   assert.equal(gate.releaseBlockerScope.androidGooglePlayV1Required, true);
   assert.equal(gate.releaseBlockerScope.iosDeferredOutOfScope, true);
   assert.equal(gate.releaseBlockerScope.iosEvidenceRetainedForHistory, true);
-  assert.match(gate.releaseBlockerScope.completionRuleKo, /Android Google Play v1 release evidence만/);
+  assert.equal(gate.releaseBlockerScope.completionRuleKo, "Android Google Play v1 release evidence만 Mobile #7 release blocker로 본다. 기존 iOS 증거는 참고로 유지하지만 Android 완료를 차단하지 않는다.");
   assert.doesNotMatch(
     JSON.stringify(gate),
     /com\.easysubway\.mobile/,
