@@ -21131,6 +21131,8 @@ test("clean checkout reproducibility owner receipt preserves caller identity and
   assert.match(workflow, /^permissions: \{\}$/m);
   assert.match(workflow, /^  owner-receipt:\n    permissions:\n      contents: read\n    runs-on: ubuntu-24\.04$/m);
   assert.equal((workflow.match(/actions\/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd/g) ?? []).length, 2);
+  assert.equal((workflow.match(/actions\/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1/g) ?? []).length, 1);
+  assert.match(workflow, /python-version: "3\.13\.15"/);
   assert.match(workflow, /repository: \$\{\{ github\.repository \}\}\n          ref: \$\{\{ github\.sha \}\}\n          path: owner-source\n          persist-credentials: false/);
   assert.match(workflow, /repository: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'repository'\)\] \}\}\n          ref: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'sha'\)\] \}\}\n          path: d13-engine\n          persist-credentials: false/);
   assert.match(workflow, /uses: \.\/d13-engine\/\.github\/actions\/clean-checkout-reproducibility-owner-receipt/);
@@ -21157,14 +21159,18 @@ test("clean checkout reproducibility owner receipt preserves caller identity and
   assert.match(action, /--receipt-schema "\$\{GITHUB_ACTION_PATH\}\/\.\.\/\.\.\/\.\.\/contracts\/documentation\/clean-checkout-reproducibility-owner-receipt\.schema\.json"/);
   assert.doesNotMatch(action, /secrets|inherit|cache|continue-on-error|curl|gh api/i);
 
-  assert.match(producer, /spawnProcess\(entrypoint, arguments_, \{/);
+  assert.match(producer, /const executable = linuxSupervisor \? "python3" : entrypoint;/);
+  assert.match(producer, /child = spawnProcess\(executable, spawnArguments, \{/);
   assert.match(producer, /^import \{ execFile, spawn \} from "node:child_process";$/m);
   assert.match(producer, /shell: false/);
   assert.match(producer, /detached: true/);
   assert.match(producer, /stdio: \["ignore", "ignore", "ignore"\]/);
-  assert.match(producer, /snapshotLinuxProcesses/);
-  assert.match(producer, /readFile\(`\/proc\/\$\{pid\}\/status`, "utf8"\)/);
-  assert.match(producer, /readFile\(`\/proc\/\$\{pid\}\/stat`, "utf8"\)/);
+  assert.match(producer, /PR_SET_CHILD_SUBREAPER = 36/);
+  assert.match(producer, /ctypes\.CDLL\(None, use_errno=True\)/);
+  assert.match(producer, /subprocess\.Popen\(/);
+  assert.match(producer, /shell=False/);
+  assert.match(producer, /start_new_session=True/);
+  assert.doesNotMatch(producer, /snapshotLinuxProcesses|PROCESS_SCOPE_ENV/);
   assert.match(producer, /await snapshotEntrypoint\(ownerRoot, prepared\.contract\.entrypoint\)/);
   assert.match(producer, /await snapshotWorkingDirectory\(ownerRoot, prepared\.contract\.workingDirectory\)/);
   assert.match(producer, /open\(outputPath, "wx"\)/);

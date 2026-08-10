@@ -52,7 +52,7 @@ if (process.env.D13_PHASE_LEFTOVER === phase) {
   child.unref();
 }
 if (process.env.D13_PHASE_DETACHED_LEFTOVER === phase) {
-  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { detached: true, env: { PATH: process.env.PATH ?? "" }, stdio: "ignore" });
+  const child = spawn(process.execPath, ["-e", "setInterval(() => {}, 1000)"], { cwd: "/", detached: true, env: { PATH: process.env.PATH ?? "" }, stdio: "ignore" });
   child.unref();
 }
 if (process.env.D13_PHASE_MUTATE_ENTRYPOINT === phase) {
@@ -320,6 +320,8 @@ test("reusable workflow and composite action freeze the dual-checkout single-art
   assert.match(workflow, /^permissions: \{\}$/m);
   assert.match(workflow, /permissions:\n      contents: read/);
   assert.match(workflow, /runs-on: ubuntu-24\.04/);
+  assert.match(workflow, /actions\/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1/);
+  assert.match(workflow, /python-version: "3\.13\.15"/);
   assert.match(workflow, /repository: \$\{\{ github\.repository \}\}\n          ref: \$\{\{ github\.sha \}\}\n          path: owner-source\n          persist-credentials: false/);
   assert.match(workflow, /repository: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'repository'\)\] \}\}\n          ref: \$\{\{ fromJSON\(toJSON\(job\)\)\[format\('workflow_\{0\}', 'sha'\)\] \}\}\n          path: d13-engine\n          persist-credentials: false/);
   assert.match(workflow, /uses: \.\/d13-engine\/\.github\/actions\/clean-checkout-reproducibility-owner-receipt/);
@@ -335,9 +337,12 @@ test("reusable workflow and composite action freeze the dual-checkout single-art
   assert.match(workflow, /retention-days: 14/);
   assert.doesNotMatch(workflow, /secrets:|secrets\.|inherit|actions\/cache|continue-on-error|previous|fallback|git (?:add|commit|push)/i);
   const producer = await readFile(producerPath, "utf8");
-  assert.match(producer, /snapshotLinuxProcesses/);
-  assert.match(producer, /readFile\(`\/proc\/\$\{pid\}\/status`, "utf8"\)/);
-  assert.match(producer, /readFile\(`\/proc\/\$\{pid\}\/stat`, "utf8"\)/);
+  assert.match(producer, /PR_SET_CHILD_SUBREAPER = 36/);
+  assert.match(producer, /ctypes\.CDLL\(None, use_errno=True\)/);
+  assert.match(producer, /subprocess\.Popen\(/);
+  assert.match(producer, /shell=False/);
+  assert.match(producer, /start_new_session=True/);
+  assert.doesNotMatch(producer, /snapshotLinuxProcesses|PROCESS_SCOPE_ENV/);
   assert.match(producer, /await snapshotEntrypoint\(ownerRoot, prepared\.contract\.entrypoint\)/);
   assert.match(producer, /await snapshotWorkingDirectory\(ownerRoot, prepared\.contract\.workingDirectory\)/);
 });

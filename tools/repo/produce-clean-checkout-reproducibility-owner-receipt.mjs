@@ -7,7 +7,6 @@ import {
   open,
   readFile,
   realpath,
-  readdir,
   unlink,
 } from "node:fs/promises";
 import path from "node:path";
@@ -36,6 +35,143 @@ const CODE = /^[A-Z][A-Z0-9_]*$/;
 const INPUT_LIMIT = 2 * 1024 * 1024;
 const GIT_OUTPUT_LIMIT = 2 * 1024 * 1024;
 const TERMINATION_GRACE_MS = 250;
+const LINUX_SUPERVISOR_WATCHDOG_MS = 5_000;
+const LINUX_SUPERVISOR_EXIT = Object.freeze({
+  PHASE_NONZERO: 10,
+  PHASE_TIMEOUT: 11,
+  PHASE_PROCESS_LEAK: 12,
+  PHASE_CLEANUP_FAILED: 13,
+  PROCESS_ISOLATION_UNAVAILABLE: 14,
+});
+const LINUX_SUBREAPER_SCRIPT = String.raw`
+import ctypes
+import os
+import signal
+import subprocess
+import sys
+import time
+
+PR_SET_CHILD_SUBREAPER = 36
+GRACE_SECONDS = 0.25
+EXIT_PHASE_NONZERO = 10
+EXIT_PHASE_TIMEOUT = 11
+EXIT_PHASE_PROCESS_LEAK = 12
+EXIT_PHASE_CLEANUP_FAILED = 13
+EXIT_PROCESS_ISOLATION_UNAVAILABLE = 14
+
+def finish(code):
+    os._exit(code)
+
+def direct_children():
+    try:
+        with open(f"/proc/self/task/{os.getpid()}/children", "r", encoding="ascii") as stream:
+            value = stream.read().strip()
+    except OSError:
+        finish(EXIT_PROCESS_ISOLATION_UNAVAILABLE)
+    if not value:
+        return []
+    try:
+        return [int(item) for item in value.split()]
+    except ValueError:
+        finish(EXIT_PROCESS_ISOLATION_UNAVAILABLE)
+
+def reap_available():
+    while True:
+        try:
+            waited, _ = os.waitpid(-1, os.WNOHANG)
+        except ChildProcessError:
+            return
+        if waited == 0:
+            return
+
+def signal_children(sig):
+    for pid in direct_children():
+        try:
+            os.kill(pid, sig)
+        except ProcessLookupError:
+            pass
+        except OSError:
+            finish(EXIT_PHASE_CLEANUP_FAILED)
+
+def drain_children(sig, seconds):
+    deadline = time.monotonic() + seconds
+    while True:
+        reap_available()
+        if not direct_children():
+            return True
+        signal_children(sig)
+        if time.monotonic() >= deadline:
+            return False
+        time.sleep(0.01)
+
+def cleanup_orphans():
+    reap_available()
+    if not direct_children():
+        return False
+    if not drain_children(signal.SIGTERM, GRACE_SECONDS):
+        if not drain_children(signal.SIGKILL, GRACE_SECONDS):
+            finish(EXIT_PHASE_CLEANUP_FAILED)
+    return True
+
+def signal_group(pid, sig):
+    try:
+        os.killpg(pid, sig)
+    except ProcessLookupError:
+        pass
+    except OSError:
+        finish(EXIT_PHASE_CLEANUP_FAILED)
+
+try:
+    timeout_seconds = int(sys.argv[1])
+    entrypoint = sys.argv[2]
+    working_directory = sys.argv[3]
+    arguments = sys.argv[4:]
+except (IndexError, ValueError):
+    finish(EXIT_PROCESS_ISOLATION_UNAVAILABLE)
+
+libc = ctypes.CDLL(None, use_errno=True)
+if libc.prctl(PR_SET_CHILD_SUBREAPER, 1, 0, 0, 0) != 0:
+    finish(EXIT_PROCESS_ISOLATION_UNAVAILABLE)
+
+try:
+    child = subprocess.Popen(
+        [entrypoint, *arguments],
+        cwd=working_directory,
+        env=os.environ.copy(),
+        stdin=subprocess.DEVNULL,
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
+        close_fds=True,
+        shell=False,
+        start_new_session=True,
+    )
+except (OSError, ValueError):
+    finish(EXIT_PROCESS_ISOLATION_UNAVAILABLE)
+
+timed_out = False
+try:
+    return_code = child.wait(timeout=timeout_seconds)
+except subprocess.TimeoutExpired:
+    timed_out = True
+    signal_group(child.pid, signal.SIGTERM)
+    try:
+        return_code = child.wait(timeout=GRACE_SECONDS)
+    except subprocess.TimeoutExpired:
+        signal_group(child.pid, signal.SIGKILL)
+        try:
+            return_code = child.wait(timeout=GRACE_SECONDS)
+        except subprocess.TimeoutExpired:
+            finish(EXIT_PHASE_CLEANUP_FAILED)
+
+had_orphans = cleanup_orphans()
+if timed_out:
+    finish(EXIT_PHASE_TIMEOUT)
+if had_orphans:
+    finish(EXIT_PHASE_PROCESS_LEAK)
+if return_code != 0:
+    finish(EXIT_PHASE_NONZERO)
+finish(0)
+`;
 
 export class OwnerReceiptFailure extends Error {
   constructor(code) {
@@ -194,76 +330,30 @@ function signalProcessGroup(pid, signal) {
 
 const delay = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds));
 
-async function snapshotLinuxProcesses() {
-  if (process.platform !== "linux") return null;
-  let entries;
-  try { entries = await readdir("/proc", { withFileTypes: true }); } catch { failure("PROCESS_ISOLATION_UNAVAILABLE"); }
-  const currentUid = process.getuid();
-  const snapshot = new Map();
-  for (const entry of entries) {
-    if (!entry.isDirectory() || !/^[1-9][0-9]*$/.test(entry.name)) continue;
-    const pid = Number(entry.name);
-    if (!Number.isSafeInteger(pid)) continue;
-    try {
-      const [status, stat] = await Promise.all([
-        readFile(`/proc/${pid}/status`, "utf8"),
-        readFile(`/proc/${pid}/stat`, "utf8"),
-      ]);
-      const uid = Number(/^Uid:\s+([0-9]+)/m.exec(status)?.[1]);
-      if (uid !== currentUid) continue;
-      const close = stat.lastIndexOf(")");
-      const startTime = close === -1 ? null : stat.slice(close + 2).trim().split(/\s+/)[19];
-      if (!/^[0-9]+$/.test(startTime ?? "")) failure("PROCESS_ISOLATION_UNAVAILABLE");
-      snapshot.set(pid, startTime);
-    } catch (error) {
-      if (error instanceof OwnerReceiptFailure) throw error;
-      if (!["ENOENT", "EACCES", "EPERM"].includes(error?.code)) failure("PROCESS_ISOLATION_UNAVAILABLE");
-    }
-  }
-  return snapshot;
-}
-
-function unexpectedProcesses(baseline, current) {
-  if (baseline == null || current == null) return [];
-  return [...current].filter(([pid, startTime]) => pid !== process.pid && baseline.get(pid) !== startTime);
-}
-
-function signalProcesses(processes, signal) {
-  for (const [pid] of processes) {
-    try { process.kill(pid, signal); } catch (error) {
-      if (error?.code !== "ESRCH") return false;
-    }
-  }
-  return true;
-}
-
-async function cleanProcessScope(pid, baseline, snapshotProcesses) {
+async function cleanProcessGroup(pid) {
   const groupExists = processGroupExists(pid);
-  let unexpected = unexpectedProcesses(baseline, await snapshotProcesses());
-  const unexpectedProcessCount = Math.max(groupExists ? 1 : 0, unexpected.length);
-  if (unexpectedProcessCount === 0) return 0;
+  if (!groupExists) return 0;
   if (groupExists) signalProcessGroup(pid, "SIGTERM");
-  signalProcesses(unexpected, "SIGTERM");
   await delay(TERMINATION_GRACE_MS);
-  unexpected = unexpectedProcesses(baseline, await snapshotProcesses());
   if (processGroupExists(pid)) signalProcessGroup(pid, "SIGKILL");
-  signalProcesses(unexpected, "SIGKILL");
-  if (processGroupExists(pid) || unexpected.length !== 0) {
-    await delay(TERMINATION_GRACE_MS);
-  }
-  if (processGroupExists(pid) || unexpectedProcesses(baseline, await snapshotProcesses()).length !== 0) failure("PHASE_CLEANUP_FAILED");
-  return unexpectedProcessCount;
+  if (processGroupExists(pid)) await delay(TERMINATION_GRACE_MS);
+  if (processGroupExists(pid)) failure("PHASE_CLEANUP_FAILED");
+  return 1;
 }
 
-export async function executeOwnerPhase({ entrypoint, arguments_, workingDirectory, timeoutSeconds, environment, now = () => new Date(), spawnProcess = spawn, snapshotProcesses = snapshotLinuxProcesses }) {
-  const processBaseline = await snapshotProcesses();
+export async function executeOwnerPhase({ entrypoint, arguments_, workingDirectory, timeoutSeconds, environment, now = () => new Date(), spawnProcess = spawn, platform = process.platform }) {
+  const linuxSupervisor = platform === "linux";
+  const executable = linuxSupervisor ? "python3" : entrypoint;
+  const spawnArguments = linuxSupervisor
+    ? ["-c", LINUX_SUBREAPER_SCRIPT, String(timeoutSeconds), entrypoint, workingDirectory, ...arguments_]
+    : arguments_;
   const startedAt = timestamp(now);
   const execution = await new Promise((resolve, reject) => {
     let timedOut = false;
     let forceTimer;
     let child;
     try {
-      child = spawnProcess(entrypoint, arguments_, {
+      child = spawnProcess(executable, spawnArguments, {
         cwd: workingDirectory,
         env: environment,
         shell: false,
@@ -275,7 +365,7 @@ export async function executeOwnerPhase({ entrypoint, arguments_, workingDirecto
       timedOut = true;
       signalProcessGroup(child.pid, "SIGTERM");
       forceTimer = setTimeout(() => signalProcessGroup(child.pid, "SIGKILL"), TERMINATION_GRACE_MS);
-    }, timeoutSeconds * 1_000);
+    }, timeoutSeconds * 1_000 + (linuxSupervisor ? LINUX_SUPERVISOR_WATCHDOG_MS : 0));
     child.once("error", () => {
       clearTimeout(timeoutTimer);
       clearTimeout(forceTimer);
@@ -285,13 +375,28 @@ export async function executeOwnerPhase({ entrypoint, arguments_, workingDirecto
       clearTimeout(timeoutTimer);
       clearTimeout(forceTimer);
       try {
-        const unexpectedProcessCount = await cleanProcessScope(child.pid, processBaseline, snapshotProcesses);
+        if (linuxSupervisor) {
+          if (timedOut || code === LINUX_SUPERVISOR_EXIT.PHASE_CLEANUP_FAILED) failure("PHASE_CLEANUP_FAILED");
+          if (code === LINUX_SUPERVISOR_EXIT.PROCESS_ISOLATION_UNAVAILABLE) failure("PROCESS_ISOLATION_UNAVAILABLE");
+          if (![0, LINUX_SUPERVISOR_EXIT.PHASE_NONZERO, LINUX_SUPERVISOR_EXIT.PHASE_TIMEOUT, LINUX_SUPERVISOR_EXIT.PHASE_PROCESS_LEAK].includes(code)) failure("PHASE_START_FAILED");
+          resolve({
+            exitCode: code === LINUX_SUPERVISOR_EXIT.PHASE_NONZERO ? 1 : 0,
+            timedOut: code === LINUX_SUPERVISOR_EXIT.PHASE_TIMEOUT,
+            unexpectedProcessCount: code === LINUX_SUPERVISOR_EXIT.PHASE_PROCESS_LEAK ? 1 : 0,
+          });
+          return;
+        }
+        const unexpectedProcessCount = await cleanProcessGroup(child.pid);
         resolve({
           exitCode: Number.isInteger(code) ? code : -1,
           timedOut,
           unexpectedProcessCount,
         });
-      } catch { reject(new OwnerReceiptFailure("PHASE_PROCESS_LEAK")); }
+      } catch (error) {
+        reject(error instanceof OwnerReceiptFailure
+          ? error
+          : new OwnerReceiptFailure("PHASE_PROCESS_LEAK"));
+      }
     });
   });
   const completedAt = timestamp(now);
