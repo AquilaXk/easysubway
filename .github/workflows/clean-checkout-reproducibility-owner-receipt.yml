@@ -28,6 +28,7 @@ jobs:
         id: d13-engine-identity
         shell: bash
         env:
+          # Dynamic lookup tolerates actionlint's older job schema; the guard below fails closed when the provider omits either field.
           D13_ENGINE_REPOSITORY: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'repository')] }}
           D13_ENGINE_SHA: ${{ fromJSON(toJSON(job))[format('workflow_{0}', 'sha')] }}
         run: |
