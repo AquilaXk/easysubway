@@ -34,6 +34,8 @@ import {
   validatePublicSensitivityAuditReportSchema,
   validatePlanDocExecutionAuditScope,
   validatePlanDocExecutionAuditReportSchema,
+  validateExternalTerminalLocatorAuditScope,
+  validateExternalTerminalLocatorAuditReportSchema,
   validatePostGoBoundaryAuditScope,
   validatePostGoBoundaryAuditReportSchema,
 } from "./check-contracts.mjs";
@@ -125,6 +127,56 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
     mutate(mutated);
     assert.ok(validatePlanDocExecutionAuditReportSchema(mutated).length > 0, name);
   }
+});
+
+test("external terminal locator audit contracts fix the exact pending inventory and strict report", () => {
+  const scope = loadJson("contracts/documentation/external-terminal-locator-audit-scope.json");
+  const scopeSchema = loadJson("contracts/documentation/external-terminal-locator-audit-scope.schema.json");
+  const reportSchema = loadJson("contracts/documentation/external-terminal-locator-audit-report.schema.json");
+  assert.equal(validateSchema(scopeSchema, scope).ok, true);
+  assert.deepEqual(validateExternalTerminalLocatorAuditScope(scope), []);
+  assert.deepEqual(validateExternalTerminalLocatorAuditReportSchema(reportSchema), []);
+  const invalid = structuredClone(scope); invalid.slots[0].ownerIssue = 1;
+  assert.ok(validateExternalTerminalLocatorAuditScope(invalid).length > 0);
+  const weakened = structuredClone(reportSchema); delete weakened.oneOf;
+  assert.ok(validateExternalTerminalLocatorAuditReportSchema(weakened).length > 0);
+  const weakenedNested = structuredClone(reportSchema); weakenedNested.properties.slots.items.properties.terminalLocator.oneOf[1].properties.path.pattern = ".+";
+  assert.ok(validateExternalTerminalLocatorAuditReportSchema(weakenedNested).length > 0);
+  const weakenedOci = structuredClone(reportSchema); weakenedOci.properties.slots.items.properties.terminalLocator.oneOf[2].properties.repositoryPath.pattern = ".+";
+  assert.ok(validateExternalTerminalLocatorAuditReportSchema(weakenedOci).length > 0);
+  const weakenedComplete = structuredClone(reportSchema); weakenedComplete.oneOf[0].properties.inputs.properties.stateBeginSha256.type = ["string", "null"];
+  assert.ok(validateExternalTerminalLocatorAuditReportSchema(weakenedComplete).length > 0);
+  const weakenedTimestamp = structuredClone(reportSchema); weakenedTimestamp.properties.slots.items.properties.terminalLocator.oneOf[3].properties.createdAt.pattern = ".+";
+  assert.ok(validateExternalTerminalLocatorAuditReportSchema(weakenedTimestamp).length > 0);
+  const weakenedWorkflowPath = structuredClone(reportSchema); weakenedWorkflowPath.properties.slots.items.properties.terminalLocator.oneOf[3].properties.workflowPath.pattern = ".+";
+  assert.ok(validateExternalTerminalLocatorAuditReportSchema(weakenedWorkflowPath).length > 0);
+  for (const mutate of [
+    (value) => { value.properties.slots.items.properties.terminalLocator.oneOf[1].properties.kind.const = "OCI_DIGEST"; },
+    (value) => { value.properties.slots.items.properties.terminalLocator.oneOf[1].required.pop(); },
+    (value) => { value.properties.slots.items.properties.terminalLocator.oneOf[2].additionalProperties = true; },
+    (value) => { value.properties.slots.items.properties.terminalLocator.oneOf[2].properties.digest.pattern = ".+"; },
+    (value) => { value.properties.slots.items.properties.terminalLocator.oneOf[3].properties.artifactId.minimum = 0; },
+    (value) => { value.properties.slots.items.additionalProperties = true; },
+    (value) => { value.properties.slots.items.properties.ownerRepository.enum = ["AquilaXk/easysubway"]; },
+    (value) => { value.properties.inputs.additionalProperties = true; },
+    (value) => { value.properties.inputs.required.pop(); },
+    (value) => { value.properties.inputs.properties.sourceSha.pattern = ".+"; },
+    (value) => { value.properties.inputs.properties.stateBeginSha256.pattern = ".+"; },
+    (value) => { value.properties.summary.type = "array"; },
+    (value) => { value.properties.summary.additionalProperties = true; },
+    (value) => { value.properties.summary.required.pop(); },
+    (value) => { value.properties.summary.properties.ready.minimum = -1; },
+    (value) => { value.properties.slots.type = "object"; },
+    (value) => { value.properties.slots.items.type = "array"; },
+  ]) { const invalid = structuredClone(reportSchema); mutate(invalid); assert.ok(validateExternalTerminalLocatorAuditReportSchema(invalid).length > 0); }
+  const validActions = structuredClone(scope);
+  validActions.slots[0] = { ...validActions.slots[0], state: "READY", terminalLocator: { kind: "ACTIONS_ARTIFACT", repository: "AquilaXk/easysubway", runId: 1, artifactId: 1, artifactName: "receipt", archiveDigest: `sha256:${"a".repeat(64)}`, workflowPath: ".github/workflows/audit.yml", headSha: "b".repeat(40), createdAt: "2026-08-10T00:00:00Z", expiresAt: "2026-08-11T00:00:00Z" } };
+  assert.equal(validateSchema(scopeSchema, validActions).ok, true);
+  const unsafeWorkflow = structuredClone(validActions); unsafeWorkflow.slots[0].terminalLocator.workflowPath = ".github/workflows/../audit.yml";
+  assert.equal(validateSchema(scopeSchema, unsafeWorkflow).ok, false);
+  const unsafeLocator = structuredClone(scope);
+  unsafeLocator.slots[0] = { ...unsafeLocator.slots[0], state: "READY", terminalLocator: { kind: "GIT_BLOB", repository: "AquilaXk/easysubway", commitSha: "a".repeat(40), path: "../secret", blobSha: "b".repeat(40) } };
+  assert.ok(validateExternalTerminalLocatorAuditScope(unsafeLocator).length > 0);
 });
 
 test("post-GO boundary audit contracts bind current blockers and strict report", () => {

@@ -7,6 +7,7 @@ import { basename, dirname, isAbsolute, join, relative, resolve, win32 } from "n
 import { validateSourceGovernancePolicy } from "../datapack/source-governance-policy.mjs";
 import { validateAmendments, validateLedger } from "../repo/issue-migration-ledger.mjs";
 import { validatePlanDocExecutionScope as validatePlanDocExecutionAuditInventory } from "../repo/audit-plan-doc-execution.mjs";
+import { validateExternalTerminalLocatorScope as validateExternalTerminalLocatorAuditInventory } from "../repo/audit-external-terminal-locators.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isDeepStrictEqual } from "node:util";
@@ -91,6 +92,8 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     publicSensitivityAuditReportSchema: workspace.publicSensitivityAuditReportSchema == null ? null : resolveWorkspacePath(workspace.publicSensitivityAuditReportSchema),
     planDocExecutionAuditScope: workspace.planDocExecutionAuditScope == null ? null : resolveWorkspacePath(workspace.planDocExecutionAuditScope),
     planDocExecutionAuditReportSchema: workspace.planDocExecutionAuditReportSchema == null ? null : resolveWorkspacePath(workspace.planDocExecutionAuditReportSchema),
+    externalTerminalLocatorAuditScope: workspace.externalTerminalLocatorAuditScope == null ? null : resolveWorkspacePath(workspace.externalTerminalLocatorAuditScope),
+    externalTerminalLocatorAuditReportSchema: workspace.externalTerminalLocatorAuditReportSchema == null ? null : resolveWorkspacePath(workspace.externalTerminalLocatorAuditReportSchema),
     postGoBoundaryAuditScope: workspace.postGoBoundaryAuditScope == null ? null : resolveWorkspacePath(workspace.postGoBoundaryAuditScope),
     postGoBoundaryAuditReportSchema: workspace.postGoBoundaryAuditReportSchema == null ? null : resolveWorkspacePath(workspace.postGoBoundaryAuditReportSchema),
   };
@@ -207,6 +210,16 @@ export function collectContractErrors(
       if (scopeValid) validatePostGoBoundaryAuditScope(loadJson(workspace.postGoBoundaryAuditScope), errors, workspace.postGoBoundaryAuditScope);
       if (!existsSync(workspace.postGoBoundaryAuditReportSchema)) errors.push(`${workspace.postGoBoundaryAuditReportSchema} 누락`);
       else { try { validatePostGoBoundaryAuditReportSchema(loadJson(workspace.postGoBoundaryAuditReportSchema), errors, workspace.postGoBoundaryAuditReportSchema); } catch { errors.push(`${workspace.postGoBoundaryAuditReportSchema}: 유효한 JSON이 필요하다`); } }
+    }
+  }
+  const externalTerminalEntries = [workspace.externalTerminalLocatorAuditScope, workspace.externalTerminalLocatorAuditReportSchema];
+  if (externalTerminalEntries.some((entry) => entry != null)) {
+    if (externalTerminalEntries.some((entry) => entry == null)) errors.push("external terminal locator audit workspace entries는 함께 필요하다");
+    else {
+      const scopeValid = validateJson(contract("documentation/external-terminal-locator-audit-scope.schema.json"), workspace.externalTerminalLocatorAuditScope, errors);
+      if (scopeValid) validateExternalTerminalLocatorAuditScope(loadJson(workspace.externalTerminalLocatorAuditScope), errors, workspace.externalTerminalLocatorAuditScope);
+      if (!existsSync(workspace.externalTerminalLocatorAuditReportSchema)) errors.push(`${workspace.externalTerminalLocatorAuditReportSchema} 누락`);
+      else { try { validateExternalTerminalLocatorAuditReportSchema(loadJson(workspace.externalTerminalLocatorAuditReportSchema), errors, workspace.externalTerminalLocatorAuditReportSchema); } catch { errors.push(`${workspace.externalTerminalLocatorAuditReportSchema}: 유효한 JSON이 필요하다`); } }
     }
   }
   let currentArchitectureDecisions = [];
@@ -852,6 +865,37 @@ export function validatePlanDocExecutionAuditReportSchema(schema, errors = [], p
   if (JSON.stringify(record?.required) !== JSON.stringify(["kind", "issueNumber", "prNumber", "repository", "mergeSha", "changedFiles"]) || JSON.stringify(finding?.required) !== JSON.stringify(["code", "identity"]) || JSON.stringify(incomplete?.required) !== JSON.stringify(["stage", "code", "affectedIdentity"])) errors.push(`${path}: records/findings/incomplete exact required lists가 필요하다`);
   const parity = schema?.oneOf;
   if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: incomplete fail-closed parity가 필요하다`);
+  return errors;
+}
+
+export function validateExternalTerminalLocatorAuditScope(scope, errors = [], path = "external-terminal-locator-audit-scope") {
+  errors.push(...validateExternalTerminalLocatorAuditInventory(scope).map((error) => `${path}: ${error}`));
+  return errors;
+}
+function strictExternalTerminalLocator(locator) {
+  const [nil, git, oci, artifact] = locator?.oneOf ?? [];
+  const exact = (value, required) => value?.type === "object" && value?.additionalProperties === false && JSON.stringify(value?.required) === JSON.stringify(required);
+  return nil?.type === "null"
+    && exact(git, ["kind", "repository", "commitSha", "path", "blobSha"])
+    && git?.properties?.kind?.const === "GIT_BLOB" && JSON.stringify(git?.properties?.repository?.enum) === JSON.stringify(["AquilaXk/easysubway", "AquilaXk/easysubway-platform", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-data"]) && git?.properties?.commitSha?.pattern === "^[0-9a-f]{40}$" && git?.properties?.path?.pattern === "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$" && git?.properties?.blobSha?.pattern === "^[0-9a-f]{40}$"
+    && exact(oci, ["kind", "registry", "repositoryPath", "digest"])
+    && oci?.properties?.kind?.const === "OCI_DIGEST" && oci?.properties?.registry?.const === "ghcr.io" && oci?.properties?.repositoryPath?.pattern === "^[a-z0-9][a-z0-9._-]*(?:/[a-z0-9][a-z0-9._-]*)*$" && oci?.properties?.digest?.pattern === "^sha256:[0-9a-f]{64}$"
+    && exact(artifact, ["kind", "repository", "runId", "artifactId", "artifactName", "archiveDigest", "workflowPath", "headSha", "createdAt", "expiresAt"])
+    && artifact?.properties?.kind?.const === "ACTIONS_ARTIFACT" && JSON.stringify(artifact?.properties?.repository?.enum) === JSON.stringify(["AquilaXk/easysubway", "AquilaXk/easysubway-platform", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-data"]) && artifact?.properties?.runId?.type === "integer" && artifact?.properties?.runId?.minimum === 1 && artifact?.properties?.artifactId?.type === "integer" && artifact?.properties?.artifactId?.minimum === 1 && artifact?.properties?.artifactName?.type === "string" && artifact?.properties?.artifactName?.minLength === 1 && artifact?.properties?.archiveDigest?.pattern === "^sha256:[0-9a-f]{64}$" && artifact?.properties?.workflowPath?.pattern === "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])\\.github/workflows/[A-Za-z0-9][A-Za-z0-9._/-]*\\.ya?ml$" && artifact?.properties?.headSha?.pattern === "^[0-9a-f]{40}$" && artifact?.properties?.createdAt?.pattern === "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$" && artifact?.properties?.expiresAt?.pattern === "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$";
+}
+export function validateExternalTerminalLocatorAuditReportSchema(schema, errors = [], path = "external-terminal-locator-audit-report.schema") {
+  const p = schema?.properties;
+  const strictObject = (value, required) => value?.type === "object" && value?.additionalProperties === false && JSON.stringify(value?.required) === JSON.stringify(required);
+  if (schema?.type !== "object" || schema?.additionalProperties !== false || JSON.stringify(schema?.required) !== JSON.stringify(["schemaVersion", "status", "observedAt", "inputs", "summary", "slots", "findings", "incomplete"])) errors.push(`${path}: strict report schema가 필요하다`);
+  if (p?.schemaVersion?.const !== 1 || JSON.stringify(p?.status?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"]) || JSON.stringify(p?.inputs?.required) !== JSON.stringify(["sourceSha", "scopeSha256", "stateBeginSha256", "stateEndSha256"]) || p?.inputs?.properties?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || p?.inputs?.properties?.scopeSha256?.pattern !== "^[0-9a-f]{64}$" || !["stateBeginSha256", "stateEndSha256"].every((key) => JSON.stringify(p?.inputs?.properties?.[key]?.type) === JSON.stringify(["string", "null"]) && p.inputs.properties[key]?.pattern === "^[0-9a-f]{64}$")) errors.push(`${path}: source/status contract가 필요하다`);
+  const slot = p?.slots?.items; const locator = slot?.properties?.terminalLocator;
+  if (p?.slots?.minItems !== 8 || p?.slots?.maxItems !== 8 || JSON.stringify(p?.summary?.required) !== JSON.stringify(["pending", "ready", "findings", "incomplete"]) || JSON.stringify(slot?.required) !== JSON.stringify(["ownerRepository", "ownerIssue", "accountablePlan", "state", "terminalLocator", "issueState"]) || JSON.stringify(slot?.properties?.issueState?.enum) !== JSON.stringify(["OPEN", "CLOSED", "UNAVAILABLE"]) || !Array.isArray(locator?.oneOf) || locator.oneOf.length !== 4 || locator.oneOf[0]?.type !== "null" || locator.oneOf[1]?.properties?.path?.pattern !== "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$" || locator.oneOf[2]?.properties?.repositoryPath?.pattern !== "^[a-z0-9][a-z0-9._-]*(?:/[a-z0-9][a-z0-9._-]*)*$" || locator.oneOf[3]?.properties?.workflowPath?.pattern !== "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])\\.github/workflows/[A-Za-z0-9][A-Za-z0-9._/-]*\\.ya?ml$" || locator.oneOf[3]?.properties?.createdAt?.pattern !== "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$" || locator.oneOf[3]?.properties?.expiresAt?.pattern !== "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$" || p?.findings?.uniqueItems !== true || p?.incomplete?.uniqueItems !== true || p?.findings?.items?.additionalProperties !== false || p?.incomplete?.items?.additionalProperties !== false) errors.push(`${path}: exact slot and sanitized result contract가 필요하다`);
+  const parity = schema?.oneOf;
+  const inputs = p?.inputs; const summary = p?.summary;
+  if (!strictObject(inputs, ["sourceSha", "scopeSha256", "stateBeginSha256", "stateEndSha256"]) || inputs?.properties?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || inputs?.properties?.scopeSha256?.pattern !== "^[0-9a-f]{64}$" || !["stateBeginSha256", "stateEndSha256"].every((key) => JSON.stringify(inputs?.properties?.[key]?.type) === JSON.stringify(["string", "null"]) && inputs?.properties?.[key]?.pattern === "^[0-9a-f]{64}$") || !strictObject(summary, ["pending", "ready", "findings", "incomplete"]) || !["pending", "ready", "findings", "incomplete"].every((key) => summary?.properties?.[key]?.type === "integer" && summary?.properties?.[key]?.minimum === 0)) errors.push(`${path}: strict inputs/summary schema가 필요하다`);
+  if (p?.slots?.type !== "array" || p?.slots?.minItems !== 8 || p?.slots?.maxItems !== 8 || slot?.type !== "object" || slot?.additionalProperties !== false || !Array.isArray(slot?.required)) errors.push(`${path}: strict eight-slot array schema가 필요하다`);
+  if (slot?.additionalProperties !== false || JSON.stringify(slot?.properties?.ownerRepository?.enum) !== JSON.stringify(["AquilaXk/easysubway", "AquilaXk/easysubway-platform", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-data"]) || slot?.properties?.ownerIssue?.type !== "integer" || slot?.properties?.ownerIssue?.minimum !== 1 || JSON.stringify(slot?.properties?.accountablePlan?.enum) !== JSON.stringify(["PLAN-REPO", "PLAN-JOURNEY"]) || JSON.stringify(slot?.properties?.state?.enum) !== JSON.stringify(["PENDING", "READY"]) || !strictExternalTerminalLocator(locator)) errors.push(`${path}: exact eight-slot locator schema가 필요하다`);
+  if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.inputs?.properties?.stateBeginSha256?.type !== "string" || parity[0]?.properties?.inputs?.properties?.stateEndSha256?.type !== "string" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: incomplete fail-closed parity가 필요하다`);
   return errors;
 }
 
