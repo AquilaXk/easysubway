@@ -7,6 +7,10 @@ const read = (file) => readFile(new URL(`../../.github/workflows/${file}`, impor
 test("owner receipt workflow pins the reusable two-artifact protocol and separate alert secret", async () => {
   const text = await read("public-sensitivity-owner-receipt.yml");
   assert.match(text, /workflow_call:/);
+  assert.match(text, /workflow_call:\s*\n\s*inputs:\s*\n\s*observed_at:\s*\n\s*required: true\s*\n\s*type: string\s*\n\s*secrets:/);
+  assert.match(text, /OBSERVED_AT: \$\{\{ inputs\.observed_at \}\}/);
+  assert.doesNotMatch(text, /\bdate\s/);
+  assert.doesNotMatch(text, /GITHUB_ENV/);
   assert.doesNotMatch(text, /secrets:\s*inherit/);
   assert.match(text, /permissions:\s*\n\s*contents: read\s*\n\s*actions: read/);
   assert.match(text, /D20_SECRET_SCANNING_ALERTS_READ_TOKEN:/);
