@@ -150,6 +150,25 @@ test("external terminal locator audit contracts fix the exact pending inventory 
   assert.ok(validateExternalTerminalLocatorAuditReportSchema(weakenedTimestamp).length > 0);
   const weakenedWorkflowPath = structuredClone(reportSchema); weakenedWorkflowPath.properties.slots.items.properties.terminalLocator.oneOf[3].properties.workflowPath.pattern = ".+";
   assert.ok(validateExternalTerminalLocatorAuditReportSchema(weakenedWorkflowPath).length > 0);
+  for (const mutate of [
+    (value) => { value.properties.slots.items.properties.terminalLocator.oneOf[1].properties.kind.const = "OCI_DIGEST"; },
+    (value) => { value.properties.slots.items.properties.terminalLocator.oneOf[1].required.pop(); },
+    (value) => { value.properties.slots.items.properties.terminalLocator.oneOf[2].additionalProperties = true; },
+    (value) => { value.properties.slots.items.properties.terminalLocator.oneOf[2].properties.digest.pattern = ".+"; },
+    (value) => { value.properties.slots.items.properties.terminalLocator.oneOf[3].properties.artifactId.minimum = 0; },
+    (value) => { value.properties.slots.items.additionalProperties = true; },
+    (value) => { value.properties.slots.items.properties.ownerRepository.enum = ["AquilaXk/easysubway"]; },
+    (value) => { value.properties.inputs.additionalProperties = true; },
+    (value) => { value.properties.inputs.required.pop(); },
+    (value) => { value.properties.inputs.properties.sourceSha.pattern = ".+"; },
+    (value) => { value.properties.inputs.properties.stateBeginSha256.pattern = ".+"; },
+    (value) => { value.properties.summary.type = "array"; },
+    (value) => { value.properties.summary.additionalProperties = true; },
+    (value) => { value.properties.summary.required.pop(); },
+    (value) => { value.properties.summary.properties.ready.minimum = -1; },
+    (value) => { value.properties.slots.type = "object"; },
+    (value) => { value.properties.slots.items.type = "array"; },
+  ]) { const invalid = structuredClone(reportSchema); mutate(invalid); assert.ok(validateExternalTerminalLocatorAuditReportSchema(invalid).length > 0); }
   const validActions = structuredClone(scope);
   validActions.slots[0] = { ...validActions.slots[0], state: "READY", terminalLocator: { kind: "ACTIONS_ARTIFACT", repository: "AquilaXk/easysubway", runId: 1, artifactId: 1, artifactName: "receipt", archiveDigest: `sha256:${"a".repeat(64)}`, workflowPath: ".github/workflows/audit.yml", headSha: "b".repeat(40), createdAt: "2026-08-10T00:00:00Z", expiresAt: "2026-08-11T00:00:00Z" } };
   assert.equal(validateSchema(scopeSchema, validActions).ok, true);

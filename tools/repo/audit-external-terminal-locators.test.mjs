@@ -41,16 +41,16 @@ test("external terminal locator audit completes the exact eight pending slots", 
 test("external terminal locator audit verifies exact Git blob, OCI digest, and Actions archive identities", async () => {
   const slot = (terminalLocator) => ({ ...SCOPE.slots[0], state: "READY", terminalLocator });
   const git = slot({ kind: "GIT_BLOB", repository: "AquilaXk/easysubway", commitSha: "b".repeat(40), path: "contracts/x.json", blobSha: "c".repeat(40) });
-  await verifyReadyLocator({ slot: git, ghGet: async (endpoint) => endpoint === "repos/AquilaXk/easysubway/contents/contracts/x.json?ref=" + "b".repeat(40) ? { sha: "c".repeat(40) } : null });
+  assert.deepEqual(await verifyReadyLocator({ slot: git, ghGet: async (endpoint) => endpoint === "repos/AquilaXk/easysubway/contents/contracts/x.json?ref=" + "b".repeat(40) ? { sha: "c".repeat(40) } : null }), { identity: "AquilaXk/easysubway#2764", ok: true });
 
   const oci = slot({ kind: "OCI_DIGEST", registry: "ghcr.io", repositoryPath: "aquilaxk/example", digest: "sha256:" + "d".repeat(64) });
-  await verifyReadyLocator({ slot: oci, fetchImpl: async (url, init) => ({ status: url === "https://ghcr.io/v2/aquilaxk/example/manifests/sha256:" + "d".repeat(64) && init.method === "HEAD" && /application\/vnd\.oci\.image\.manifest\.v1\+json/.test(init.headers.Accept) ? 200 : 404, headers: new Headers({ "Docker-Content-Digest": "sha256:" + "d".repeat(64) }) }) });
+  assert.deepEqual(await verifyReadyLocator({ slot: oci, fetchImpl: async (url, init) => ({ status: url === "https://ghcr.io/v2/aquilaxk/example/manifests/sha256:" + "d".repeat(64) && init.method === "HEAD" && /application\/vnd\.oci\.image\.manifest\.v1\+json/.test(init.headers.Accept) ? 200 : 404, headers: new Headers({ "Docker-Content-Digest": "sha256:" + "d".repeat(64) }) }) }), { identity: "AquilaXk/easysubway#2764", ok: true });
 
   const archive = new TextEncoder().encode("artifact");
   const digest = "sha256:" + (await import("node:crypto")).createHash("sha256").update(archive).digest("hex");
   const actions = slot({ kind: "ACTIONS_ARTIFACT", repository: "AquilaXk/easysubway", runId: 7, artifactId: 8, artifactName: "terminal", archiveDigest: digest, workflowPath: ".github/workflows/audit.yml", headSha: "e".repeat(40), createdAt: "2026-08-10T00:00:00Z", expiresAt: "2026-08-11T00:00:00Z" });
   const actionsGhGet = async (endpoint) => endpoint.endsWith("runs/7") ? { conclusion: "success", path: ".github/workflows/audit.yml", head_sha: "e".repeat(40) } : { id: 8, name: "terminal", expired: false, created_at: "2026-08-10T00:00:00Z", expires_at: "2026-08-11T00:00:00Z", digest, workflow_run: { id: 7, head_sha: "e".repeat(40) } };
-  await verifyReadyLocator({ slot: actions, now: "2026-08-10T12:00:00.000Z", ghGet: actionsGhGet, downloadArtifact: async () => archive });
+  assert.deepEqual(await verifyReadyLocator({ slot: actions, now: "2026-08-10T12:00:00.000Z", ghGet: actionsGhGet, downloadArtifact: async () => archive }), { identity: "AquilaXk/easysubway#2764", ok: true });
   assert.deepEqual(await verifyReadyLocator({ slot: actions, now: "2026-08-10T12:00:00.000Z", ghGet: async (endpoint) => endpoint.endsWith("runs/7") ? actionsGhGet(endpoint) : { ...(await actionsGhGet(endpoint)), workflow_run: { id: 9, head_sha: "e".repeat(40) } }, downloadArtifact: async () => archive }), { identity: "AquilaXk/easysubway#2764", ok: false, code: "ACTIONS_ARTIFACT_MISMATCH" });
 });
 
@@ -105,9 +105,21 @@ test("external terminal locator audit classifies direct and authenticated OCI 40
   } }), { identity: "AquilaXk/easysubway#2764", ok: false, code: "OCI_DIGEST_MISMATCH" });
 });
 
-test("external terminal locator audit normalizes lowercase GitHub issue states", async () => {
-  const issues = await collectLiveIssues(SCOPE, async ([, endpoint]) => JSON.stringify({ number: Number(endpoint.split("/").at(-1)), repository_url: `https://api.github.com/repos/${endpoint.split("/").slice(1, 3).join("/")}`, state: "open" }));
+test("external terminal locator audit treats missing or malformed OCI content digests as provider failures", async () => {
+  const slot = { ...SCOPE.slots[0], state: "READY", terminalLocator: { kind: "OCI_DIGEST", registry: "ghcr.io", repositoryPath: "aquilaxk/example", digest: "sha256:" + "d".repeat(64) } };
+  for (const header of [null, "sha256:not-a-digest"]) {
+    await assert.rejects(
+      () => verifyReadyLocator({ slot, fetchImpl: async () => ({ status: 200, headers: new Headers(header == null ? {} : { "Docker-Content-Digest": header }) }) }),
+      (error) => error instanceof AuditIncomplete && error.code === "PROVIDER_MALFORMED",
+    );
+  }
+});
+
+test("external terminal locator audit uses anonymous public issue reads and normalizes lowercase states", async () => {
+  const args = [];
+  const issues = await collectLiveIssues(SCOPE, async (actual) => { args.push(actual); const endpoint = actual.at(-1); return JSON.stringify({ number: Number(endpoint.split("/").at(-1)), repository_url: `https://api.github.com/repos/${endpoint.split("/").slice(1, 3).join("/")}`, state: "open" }); });
   assert.ok(issues.every((issue) => issue.state === "OPEN"));
+  assert.deepEqual(args, SCOPE.slots.map((slot) => ["api", "-H", "Authorization:", `repos/${slot.ownerRepository}/issues/${slot.ownerIssue}`]));
 });
 
 test("external terminal locator audit rejects state and fixed mapping drift", () => {
@@ -210,6 +222,21 @@ test("external terminal locator audit CLI writes an exact fallback report for ma
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
 
+test("external terminal locator audit classifies unreadable or malformed schema inputs by stage", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "external-terminal-locator-schema-stage-"));
+  const argv = (name) => ["--scope", "scope", "--scope-schema", "scope-schema", "--report-schema", "report-schema", "--source-sha", "a".repeat(40), "--observed-at", "2026-08-10T00:00:00.000Z", "--output", join(directory, name)];
+  const scope = JSON.stringify(SCOPE); const scopeSchema = readFileSync("contracts/documentation/external-terminal-locator-audit-scope.schema.json", "utf8"); const reportSchema = readFileSync("contracts/documentation/external-terminal-locator-audit-report.schema.json", "utf8");
+  try {
+    for (const [name, read, expected] of [
+      ["missing-scope-schema.json", async (path) => { if (path === "scope-schema") throw new Error("missing"); return ({ scope, "report-schema": reportSchema })[path]; }, ["scope", "SCOPE_INVALID"]],
+      ["invalid-report-schema.json", async (path) => ({ scope, "scope-schema": scopeSchema, "report-schema": "{" })[path], ["schema", "REPORT_SCHEMA_INVALID"]],
+    ]) {
+      const result = await runAuditCli({ argv: argv(name), read, collectIssues: async () => { throw new Error("must not collect"); } });
+      assert.deepEqual([result.exitCode, result.report.incomplete[0].stage, result.report.incomplete[0].code], [2, expected[0], expected[1]]);
+    }
+  } finally { rmSync(directory, { recursive: true, force: true }); }
+});
+
 test("external terminal locator audit fallback preserves a validated READY scope", async () => {
   const directory = mkdtempSync(join(tmpdir(), "external-terminal-locator-ready-fallback-"));
   const output = join(directory, "report.json");
@@ -227,10 +254,13 @@ test("external terminal locator audit fallback preserves a validated READY scope
 });
 
 test("external terminal locator audit rejects nested locator path/time/repository and contract weakening", () => {
+  const actions = { kind: "ACTIONS_ARTIFACT", repository: "AquilaXk/easysubway", runId: 1, artifactId: 1, artifactName: "a", archiveDigest: "sha256:" + "a".repeat(64), workflowPath: ".github/workflows/audit.yml", headSha: "a".repeat(40), createdAt: "2026-08-10T00:00:00.000Z", expiresAt: "2026-08-11T00:00:00.000Z" };
   for (const mutate of [
     (scope) => { scope.slots[0] = { ...scope.slots[0], state: "READY", terminalLocator: { kind: "GIT_BLOB", repository: "AquilaXk/other", commitSha: "a".repeat(40), path: "../secret", blobSha: "b".repeat(40) } }; },
     (scope) => { scope.slots[0] = { ...scope.slots[0], state: "READY", terminalLocator: { kind: "OCI_DIGEST", registry: "ghcr.io", repositoryPath: "aquilaxk/../other", digest: "sha256:" + "a".repeat(64) } }; },
-    (scope) => { scope.slots[0] = { ...scope.slots[0], state: "READY", terminalLocator: { kind: "ACTIONS_ARTIFACT", repository: "AquilaXk/easysubway", runId: 1, artifactId: 1, artifactName: "a", archiveDigest: "sha256:" + "a".repeat(64), workflowPath: ".github/workflows/../audit.yml", headSha: "a".repeat(40), createdAt: "2026-08-10T00:00:00.000+00:00", expiresAt: "2026-08-09T00:00:00.000Z" } }; },
+    (scope) => { scope.slots[0] = { ...scope.slots[0], state: "READY", terminalLocator: { ...actions, workflowPath: ".github/workflows/../audit.yml" } }; },
+    (scope) => { scope.slots[0] = { ...scope.slots[0], state: "READY", terminalLocator: { ...actions, createdAt: "2026-08-10T00:00:00.000+00:00" } }; },
+    (scope) => { scope.slots[0] = { ...scope.slots[0], state: "READY", terminalLocator: { ...actions, expiresAt: "2026-08-09T00:00:00.000Z" } }; },
   ]) { const invalid = structuredClone(SCOPE); mutate(invalid); assert.notDeepEqual(validateExternalTerminalLocatorScope(invalid), []); }
 });
 
@@ -254,4 +284,10 @@ test("external terminal locator audit gh boundary rejects dot-segment content pa
   let executed = false;
   await assert.rejects(() => gh(["api", `repos/AquilaXk/easysubway/contents/contracts/../secret?ref=${"a".repeat(40)}`], async () => { executed = true; return { stdout: "{}" }; }), /allowlist/);
   assert.equal(executed, false);
+});
+
+test("external terminal locator audit gh boundary permits only anonymous public issue reads", async () => {
+  const execute = async (_binary, args) => ({ stdout: JSON.stringify({ endpoint: args.at(-1) }) });
+  assert.equal(await gh(["api", "-H", "Authorization:", "repos/AquilaXk/easysubway-platform/issues/29"], execute), JSON.stringify({ endpoint: "repos/AquilaXk/easysubway-platform/issues/29" }));
+  await assert.rejects(() => gh(["api", "-H", "Authorization:", `repos/AquilaXk/easysubway/contents/contracts/x.json?ref=${"a".repeat(40)}`], execute), /allowlist/);
 });

@@ -106,7 +106,7 @@ export async function collectLiveIssues(scope, runGh = gh) {
   const issues = [];
   for (const slot of scope.slots) {
     const identity = key(slot); let issue;
-    try { issue = parseProviderJson(await runGh(["api", `repos/${slot.ownerRepository}/issues/${slot.ownerIssue}`]), identity); } catch (error) { providerFailure(error, identity); }
+    try { issue = parseProviderJson(await runGh(["api", "-H", "Authorization:", `repos/${slot.ownerRepository}/issues/${slot.ownerIssue}`]), identity); } catch (error) { providerFailure(error, identity); }
     if (issue?.number !== slot.ownerIssue || issue?.repository_url !== `https://api.github.com/repos/${slot.ownerRepository}` || !["open", "closed"].includes(issue?.state)) throw new AuditIncomplete("PROVIDER_MALFORMED", identity);
     issues.push({ repository: slot.ownerRepository, number: slot.ownerIssue, state: issue.state.toUpperCase() });
   }
@@ -143,7 +143,9 @@ export async function verifyReadyLocator({ slot, ghGet, fetchImpl = fetch, downl
     }
     if (response.status === 404) return { identity, ok: false, code: "OCI_DIGEST_MISMATCH" };
     if (response.status !== 200) throw new AuditIncomplete(`OCI_HTTP_${response.status}`, identity);
-    return response.headers.get("Docker-Content-Digest") === locator.digest ? { identity, ok: true } : { identity, ok: false, code: "OCI_DIGEST_MISMATCH" };
+    const contentDigest = response.headers.get("Docker-Content-Digest");
+    if (typeof contentDigest !== "string" || !DIGEST.test(contentDigest)) throw new AuditIncomplete("PROVIDER_MALFORMED", identity);
+    return contentDigest === locator.digest ? { identity, ok: true } : { identity, ok: false, code: "OCI_DIGEST_MISMATCH" };
   }
   if (locator?.kind === "ACTIONS_ARTIFACT") {
     let run; let artifact;
@@ -194,7 +196,8 @@ export async function collectLive(scope, { sourceSha, runGh = gh, fetchImpl = fe
 }
 
 export async function gh(args, execute = execFileAsync) {
-  const endpoint = args?.[1];
+  const anonymousIssueRead = args?.length === 4 && args[0] === "api" && args[1] === "-H" && args[2] === "Authorization:";
+  const endpoint = anonymousIssueRead ? args[3] : args?.[1];
   const contentPath = "(?:[A-Za-z0-9][A-Za-z0-9._/-]*)";
   const repo = "AquilaXk/easysubway(?:-(?:platform|mobile|data))?";
   const allowed = new RegExp(`^repos/${repo}(?:$|/issues/[1-9]\\d*$|/contents/${contentPath}\\?ref=[0-9a-f]{40}$|/actions/runs/[1-9]\\d*$|/actions/artifacts/[1-9]\\d*$|/git/ref/heads/main$)`);
@@ -203,7 +206,8 @@ export async function gh(args, execute = execFileAsync) {
     const refStart = endpoint.indexOf("?ref=", contentStart);
     if (refStart < 0 || !safePath(endpoint.slice(contentStart + "/contents/".length, refStart))) throw new Error("gh read-only allowlist violation");
   }
-  if (args?.[0] !== "api" || !allowed.test(endpoint)) throw new Error("gh read-only allowlist violation");
+  const publicIssue = new RegExp(`^repos/${repo}/issues/[1-9]\\d*$`);
+  if (args?.[0] !== "api" || !allowed.test(endpoint) || (anonymousIssueRead && !publicIssue.test(endpoint)) || (!anonymousIssueRead && args?.length !== 2)) throw new Error("gh read-only allowlist violation");
   try { return (await execute("gh", args, { encoding: "utf8", timeout: 30_000, killSignal: "SIGTERM", maxBuffer: 1024 * 1024 })).stdout; } catch (error) {
     if (/(?:^|\D)HTTP 404(?:\D|$)/.test(String(error?.stderr ?? ""))) throw Object.assign(new Error("gh API returned HTTP 404"), { status: 404 });
     throw error;
@@ -259,9 +263,11 @@ function reportSchemaIsStrict(schema) {
 export async function runAuditCli({ argv, collectIssues = collectLive, read = readFile, openFile = open } = {}) {
   let args; let scopeText = ""; let scope = null; let report = null; let exitCode = 2;
   try {
-    args = parseArguments(argv); scopeText = await read(args.scopePath, "utf8"); const parsedScope = JSON.parse(scopeText);
-    const [scopeSchemaText, reportSchemaText] = await Promise.all([read(args.scopeSchemaPath, "utf8"), read(args.reportSchemaPath, "utf8")]);
-    const scopeSchema = JSON.parse(scopeSchemaText); const reportSchema = JSON.parse(reportSchemaText);
+    args = parseArguments(argv);
+    try { scopeText = await read(args.scopePath, "utf8"); } catch { throw new AuditIncomplete("SCOPE_INVALID", "scope"); }
+    let parsedScope; try { parsedScope = JSON.parse(scopeText); } catch { throw new AuditIncomplete("SCOPE_INVALID", "scope"); }
+    let scopeSchema; try { scopeSchema = JSON.parse(await read(args.scopeSchemaPath, "utf8")); } catch { throw new AuditIncomplete("SCOPE_INVALID", "scope"); }
+    let reportSchema; try { reportSchema = JSON.parse(await read(args.reportSchemaPath, "utf8")); } catch { throw new AuditIncomplete("REPORT_SCHEMA_INVALID", "report"); }
     if (!validateSchema(scopeSchema, parsedScope).ok || validateExternalTerminalLocatorScope(parsedScope).length !== 0) throw new AuditIncomplete("SCOPE_INVALID", "scope");
     scope = parsedScope;
     if (!reportSchemaIsStrict(reportSchema)) throw new AuditIncomplete("REPORT_SCHEMA_INVALID", "report");

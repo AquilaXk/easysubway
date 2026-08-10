@@ -21083,6 +21083,8 @@ test("external terminal locator audit workflow binds main SHA to a write-once sa
   assert.match(workflow, /persist-credentials: false/);
   assert.match(workflow, /test ! -e "\$\{REPORT_PATH\}"/);
   assert.match(workflow, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.match(workflow, /retention-days: 14/);
   assert.match(workflow, /external-terminal-locator-audit-\$\{\{ github\.sha \}\}/);
   assert.doesNotMatch(workflow, /continue-on-error|cache|previous report|git (?:add|commit|push)/i);
 });
