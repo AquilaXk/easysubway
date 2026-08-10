@@ -139,7 +139,7 @@ export function validateOwnerReceipt(receipt, errors = []) {
   return errors;
 }
 
-function commandSha256(item) {
+export function commandSha256(item) {
   return digest(Buffer.from(stableJson({ entrypoint: item.entrypoint, arguments: item.arguments, workingDirectory: item.workingDirectory })));
 }
 
