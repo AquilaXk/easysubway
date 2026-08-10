@@ -107,21 +107,23 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
   const scope = loadJson("contracts/documentation/plan-doc-execution-audit-scope.json");
   const scopeSchema = loadJson("contracts/documentation/plan-doc-execution-audit-scope.schema.json");
   const reportSchema = loadJson("contracts/documentation/plan-doc-execution-audit-report.schema.json");
-  assert.equal(scope.historical.length, 22);
-  assert.equal(scope.self.issueNumber, 2809);
-  assert.equal(scopeSchema.properties.historical.minItems, 22);
-  assert.equal(scopeSchema.properties.historical.maxItems, 22);
-  assert.equal(scopeSchema.properties.self.properties.issueNumber.const, 2809);
+  assert.equal(scope.historical.length, 24);
+  assert.equal(scope.self.issueNumber, 2814);
+  assert.equal(scopeSchema.properties.historical.minItems, 24);
+  assert.equal(scopeSchema.properties.historical.maxItems, 24);
+  assert.equal(scopeSchema.properties.self.properties.issueNumber.const, 2814);
   const recordsByPr = new Map(scope.historical.map((record) => [record.prNumber, record]));
-  for (const [prNumber, issueNumber] of [[2798, 2797], [2799, 2797], [2801, 2800], [2803, 2802], [2806, 2805], [2808, 2807]]) {
+  for (const [prNumber, issueNumber] of [[2798, 2797], [2799, 2797], [2801, 2800], [2803, 2802], [2806, 2805], [2808, 2807], [2810, 2809], [2813, 2729]]) {
     assert.equal(recordsByPr.get(prNumber)?.issueNumber, issueNumber);
   }
+  assert.equal(recordsByPr.get(2810)?.relation, "CLOSES");
+  assert.equal(recordsByPr.get(2813)?.relation, "COORDINATOR_FOLLOWUP");
   assert.equal(validateSchema(scopeSchema, scope).ok, true);
   assert.deepEqual(validatePlanDocExecutionAuditScope(scope), []);
   assert.deepEqual(validatePlanDocExecutionAuditReportSchema(reportSchema), []);
   const invalid = structuredClone(scope); invalid.historical[0].mergeSha = "a".repeat(40);
   assert.ok(validatePlanDocExecutionAuditScope(invalid).length > 0);
-  const invalidSelf = structuredClone(scope); invalidSelf.self.issueNumber = 2797;
+  const invalidSelf = structuredClone(scope); invalidSelf.self.issueNumber = 2809;
   assert.ok(validatePlanDocExecutionAuditScope(invalidSelf).length > 0);
   const weakened = structuredClone(reportSchema); delete weakened.oneOf;
   assert.ok(validatePlanDocExecutionAuditReportSchema(weakened).length > 0);
