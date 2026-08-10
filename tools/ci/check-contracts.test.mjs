@@ -112,17 +112,19 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
   const scope = loadJson("contracts/documentation/plan-doc-execution-audit-scope.json");
   const scopeSchema = loadJson("contracts/documentation/plan-doc-execution-audit-scope.schema.json");
   const reportSchema = loadJson("contracts/documentation/plan-doc-execution-audit-report.schema.json");
-  assert.equal(scope.historical.length, 24);
-  assert.equal(scope.self.issueNumber, 2814);
-  assert.equal(scopeSchema.properties.historical.minItems, 24);
-  assert.equal(scopeSchema.properties.historical.maxItems, 24);
-  assert.equal(scopeSchema.properties.self.properties.issueNumber.const, 2814);
+  assert.equal(scope.historical.length, 26);
+  assert.equal(scope.self.issueNumber, 2818);
+  assert.equal(scopeSchema.properties.historical.minItems, 26);
+  assert.equal(scopeSchema.properties.historical.maxItems, 26);
+  assert.equal(scopeSchema.properties.self.properties.issueNumber.const, 2818);
   const recordsByPr = new Map(scope.historical.map((record) => [record.prNumber, record]));
-  for (const [prNumber, issueNumber] of [[2798, 2797], [2799, 2797], [2801, 2800], [2803, 2802], [2806, 2805], [2808, 2807], [2810, 2809], [2813, 2729]]) {
+  for (const [prNumber, issueNumber] of [[2798, 2797], [2799, 2797], [2801, 2800], [2803, 2802], [2806, 2805], [2808, 2807], [2810, 2809], [2813, 2729], [2815, 2814], [2817, 2816]]) {
     assert.equal(recordsByPr.get(prNumber)?.issueNumber, issueNumber);
   }
   assert.equal(recordsByPr.get(2810)?.relation, "CLOSES");
   assert.equal(recordsByPr.get(2813)?.relation, "COORDINATOR_FOLLOWUP");
+  assert.equal(recordsByPr.get(2815)?.relation, "CLOSES");
+  assert.equal(recordsByPr.get(2817)?.relation, "CLOSES");
   assert.equal(validateSchema(scopeSchema, scope).ok, true);
   assert.deepEqual(validatePlanDocExecutionAuditScope(scope), []);
   assert.deepEqual(validatePlanDocExecutionAuditReportSchema(reportSchema), []);
