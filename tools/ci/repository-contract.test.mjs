@@ -21053,6 +21053,40 @@ test("plan-doc execution audit workflow binds merged source SHA to a write-once 
   assert.doesNotMatch(workflow, /continue-on-error|uses:\s*actions\/cache@|git (?:add|commit|push)/i);
 });
 
+test("Documentation Inventory Audit workflow binds main SHA to the exact five-fragment report", () => {
+  const workflow = read(".github/workflows/documentation-inventory-audit.yml");
+  assert.match(workflow, /^name: Documentation Inventory Audit$/m);
+  assert.match(workflow, /^on:\n  push:\n    branches: \[main\]$/m);
+  assert.doesNotMatch(workflow, /^\s+paths:/m);
+  assert.match(workflow, /^permissions: \{\}$/m);
+  assert.match(workflow, /^concurrency:\n  group: documentation-inventory-audit-\$\{\{ github\.ref \}\}\n  cancel-in-progress: false$/m);
+  assert.match(workflow, /permissions:\n      contents: read/);
+  assert.match(workflow, /actions\/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd/);
+  assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /persist-credentials: false/);
+  assert.match(workflow, /actions\/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e/);
+  assert.match(workflow, /node-version: "24"/);
+  assert.match(workflow, /set -euo pipefail/);
+  assert.match(workflow, /rm --recursive --force -- "\$\{EVIDENCE_DIR\}"\n          mkdir --parents -- "\$\{EVIDENCE_DIR\}"\n          test ! -e "\$\{REPORT_PATH\}"/);
+  for (const input of [
+    "tools/repo/audit-documentation-inventory.mjs",
+    "--scope contracts/documentation/documentation-inventory-audit-scope.json",
+    "--scope-schema contracts/documentation/documentation-inventory-audit-scope.schema.json",
+    "--report-schema contracts/documentation/documentation-inventory-audit-report.schema.json",
+    "--source-sha \"${GITHUB_SHA}\"",
+    "--observed-at \"${OBSERVED_AT}\"",
+    "--output \"${REPORT_PATH}\"",
+  ]) assert.match(workflow, new RegExp(input.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")));
+  assert.match(workflow, /if: \$\{\{ always\(\) \}\}/);
+  assert.match(workflow, /actions\/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02/);
+  assert.match(workflow, /name: documentation-inventory-audit-\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /path: audit-evidence\/documentation-inventory-audit-report\.json/);
+  assert.match(workflow, /if-no-files-found: error/);
+  assert.match(workflow, /include-hidden-files: false/);
+  assert.match(workflow, /retention-days: 14/);
+  assert.doesNotMatch(workflow, /secrets:|secrets\.|inherit|continue-on-error|actions\/cache|previous report|git (?:add|commit|push)/i);
+});
+
 test("post-GO boundary audit workflow pins merged SHA, write-once report, and always upload", () => {
   const workflow = read(".github/workflows/post-go-boundary-audit.yml");
   assert.match(workflow, /^on:\n  push:\n    branches: \[main\]/m);

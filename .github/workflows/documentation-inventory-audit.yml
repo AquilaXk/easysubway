@@ -1,0 +1,54 @@
+name: Documentation Inventory Audit
+
+on:
+  push:
+    branches: [main]
+
+permissions: {}
+
+concurrency:
+  group: documentation-inventory-audit-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+      - name: Audit current five-fragment documentation inventory
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          EVIDENCE_DIR="audit-evidence"
+          REPORT_PATH="${EVIDENCE_DIR}/documentation-inventory-audit-report.json"
+          OBSERVED_AT="$(date --utc +"%Y-%m-%dT%H:%M:%S.000Z")"
+          rm --recursive --force -- "${EVIDENCE_DIR}"
+          mkdir --parents -- "${EVIDENCE_DIR}"
+          test ! -e "${REPORT_PATH}"
+          node tools/repo/audit-documentation-inventory.mjs \
+            --scope contracts/documentation/documentation-inventory-audit-scope.json \
+            --scope-schema contracts/documentation/documentation-inventory-audit-scope.schema.json \
+            --report-schema contracts/documentation/documentation-inventory-audit-report.schema.json \
+            --source-sha "${GITHUB_SHA}" \
+            --observed-at "${OBSERVED_AT}" \
+            --output "${REPORT_PATH}"
+      - name: Upload sanitized documentation inventory audit
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: documentation-inventory-audit-${{ github.sha }}
+          path: audit-evidence/documentation-inventory-audit-report.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 14
