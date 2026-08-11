@@ -328,6 +328,21 @@ function validateImmutableEngineCheckoutBoundary(workflow) {
   assert.doesNotMatch(checkoutBlock, /fromJSON\(toJSON\(job\)\)|github\.(?:repository|sha)/);
 }
 
+function validateOwnerSourceCheckoutBoundary(workflow) {
+  const checkoutBlocks = workflow.match(/      - name: Checkout caller source\n[\s\S]*?(?=\n      - name:)/g) ?? [];
+  assert.equal(checkoutBlocks.length, 1);
+  assert.equal(checkoutBlocks[0], `      - name: Checkout caller source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          repository: \${{ github.repository }}
+          ref: \${{ github.sha }}
+          path: owner-source
+          persist-credentials: false
+          fetch-depth: 0
+`);
+  assert.equal((workflow.match(/^\s+fetch-depth:/gm) ?? []).length, 1);
+}
+
 test("reusable workflow and composite action freeze the dual-checkout single-artifact boundary", async () => {
   const action = await readFile(path.join(root, ".github/actions/clean-checkout-reproducibility-owner-receipt/action.yml"), "utf8");
   const workflow = await readFile(path.join(root, ".github/workflows/clean-checkout-reproducibility-owner-receipt.yml"), "utf8");
@@ -345,7 +360,7 @@ test("reusable workflow and composite action freeze the dual-checkout single-art
   assert.match(workflow, /runs-on: ubuntu-24\.04/);
   assert.match(workflow, /actions\/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1/);
   assert.match(workflow, /python-version: "3\.13\.15"/);
-  assert.match(workflow, /repository: \$\{\{ github\.repository \}\}\n          ref: \$\{\{ github\.sha \}\}\n          path: owner-source\n          persist-credentials: false/);
+  validateOwnerSourceCheckoutBoundary(workflow);
   validateImmutableEngineCheckoutBoundary(workflow);
   assert.match(workflow, /uses: \.\/d13-engine\/\.github\/actions\/clean-checkout-reproducibility-owner-receipt/);
   assert.match(workflow, /contract-path: \$\{\{ inputs\.contract_path \}\}/);
@@ -382,5 +397,21 @@ test("reusable workflow rejects unvalidated or weak D13 engine identities", asyn
   ];
   for (const mutation of mutations) {
     assert.throws(() => validateImmutableEngineCheckoutBoundary(mutation));
+  }
+});
+
+test("reusable workflow rejects shallow or misplaced owner-source history", async () => {
+  const workflow = await readFile(path.join(root, ".github/workflows/clean-checkout-reproducibility-owner-receipt.yml"), "utf8");
+  validateOwnerSourceCheckoutBoundary(workflow);
+  const mutations = [
+    workflow.replace("          fetch-depth: 0\n", ""),
+    workflow.replace("fetch-depth: 0", "fetch-depth: 1"),
+    workflow.replace("fetch-depth: 0", 'fetch-depth: "0"'),
+    workflow
+      .replace("          fetch-depth: 0\n", "")
+      .replace("          path: d13-engine\n", "          path: d13-engine\n          fetch-depth: 0\n"),
+  ];
+  for (const mutation of mutations) {
+    assert.throws(() => validateOwnerSourceCheckoutBoundary(mutation));
   }
 });
