@@ -8,6 +8,7 @@ import {
   AuditIncomplete,
   auditDocumentationInventory,
   collectLive,
+  gh,
   runAuditCli,
   validateDocumentationInventoryAuditReport,
   validateDocumentationInventoryAuditScope,
@@ -111,6 +112,10 @@ test("documentation inventory audit validates exact scope and preserves missing 
     mutate(invalid);
     assert.notDeepEqual(validateDocumentationInventoryAuditScope(invalid), []);
   }
+  const malformed = structuredClone(SCOPE);
+  malformed.repositories[0] = null;
+  assert.doesNotThrow(() => validateDocumentationInventoryAuditScope(malformed));
+  assert.notDeepEqual(validateDocumentationInventoryAuditScope(malformed), []);
   const repositories = REPOSITORIES.map((repository) => ({ repository, headSha: SHA, state: "PENDING", fragmentStatus: "MISSING", fragmentBlobSha: null, fragment: null, resourceCount: 0, activeResourceCount: 0 }));
   const report = auditDocumentationInventory({ scope: SCOPE, sourceSha: SHA, observedAt: "2026-08-11T00:00:00.000Z", repositories, stateBeginSha256: WATERMARK, stateEndSha256: WATERMARK });
   assert.deepEqual([report.status, report.summary.pending, report.summary.ready, report.summary.findings, report.summary.incomplete], ["COMPLETE", 5, 0, 0, 0]);
@@ -172,6 +177,15 @@ test("documentation inventory audit rejects state drift and writes schema-valid 
     assert.equal(result.exitCode, 2);
     assert.equal(validateSchema(JSON.parse(reportSchema), report).ok, true);
     assert.deepEqual([report.status, report.summary.pending, report.summary.ready, report.summary.incomplete], ["AUDIT_INCOMPLETE", 5, 0, 1]);
+    const malformedScope = structuredClone(SCOPE);
+    malformedScope.repositories[0] = null;
+    const malformedOutput = join(directory, "malformed-scope.json");
+    const malformedArgv = [...argv.slice(0, -1), malformedOutput];
+    const malformedResult = await runAuditCli({ argv: malformedArgv, read: async (path) => ({ scope: JSON.stringify(malformedScope), "scope-schema": scopeSchema, "report-schema": reportSchema })[path], collect: async () => { throw new Error("must not collect"); } });
+    const malformedReport = JSON.parse(readFileSync(malformedOutput, "utf8"));
+    assert.equal(malformedResult.exitCode, 2);
+    assert.equal(validateSchema(JSON.parse(reportSchema), malformedReport).ok, true);
+    assert.deepEqual([malformedReport.status, malformedReport.summary.incomplete], ["AUDIT_INCOMPLETE", 1]);
     writeFileSync(join(directory, "existing.json"), "existing\n");
     const existingArgv = [...argv.slice(0, -1), join(directory, "existing.json")];
     assert.equal((await runAuditCli({ argv: existingArgv, read: async (path) => ({ scope: JSON.stringify(SCOPE), "scope-schema": scopeSchema, "report-schema": reportSchema })[path], collect: async () => ({ repositories: pending, stateBeginSha256: WATERMARK, stateEndSha256: WATERMARK }) })).exitCode, 2);
@@ -179,4 +193,22 @@ test("documentation inventory audit rejects state drift and writes schema-valid 
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test("documentation inventory audit retries transient structured GitHub responses and preserves structured 404", async () => {
+  const endpoint = `repos/AquilaXk/easysubway/contents/${PATH}?ref=${SHA}`;
+  const response = (status, body) => `HTTP/2.0 ${status}\nContent-Type: application/json\n\n${JSON.stringify(body)}`;
+  const delays = [];
+  let attempts = 0;
+  const execute = async () => {
+    attempts += 1;
+    if (attempts < 3) throw Object.assign(new Error("transient"), { stdout: response("500 Internal Server Error", { message: "unavailable" }), stderr: "provider unavailable" });
+    return { stdout: response("200 OK", { type: "file" }), stderr: "" };
+  };
+  assert.equal(JSON.parse(await gh(["api", endpoint], execute, async (delay) => delays.push(delay))).type, "file");
+  assert.deepEqual([attempts, delays], [3, [250, 500]]);
+  await assert.rejects(
+    () => gh(["api", endpoint], async () => { throw Object.assign(new Error("missing"), { stdout: response("404 Not Found", { message: "Not Found" }), stderr: "localized stderr" }); }),
+    (error) => error?.status === 404,
+  );
 });

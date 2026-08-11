@@ -40,11 +40,11 @@ const fallbackScope = () => ({ schemaVersion: 1, repositories: EXPECTED_REPOSITO
 
 export function validateDocumentationInventoryAuditScope(scope, errors = []) {
   if (scope?.schemaVersion !== 1 || !Array.isArray(scope.repositories) || !Array.isArray(scope.dods)) return [...errors, "scope shape mismatch"];
-  const repositories = scope.repositories.map(({ repository }) => repository);
+  const repositories = scope.repositories.map((entry) => entry != null && typeof entry === "object" && !Array.isArray(entry) ? entry.repository : null);
   if (JSON.stringify(repositories) !== JSON.stringify(EXPECTED_REPOSITORIES)) errors.push("repository inventory mismatch");
   if (JSON.stringify(scope.dods) !== JSON.stringify(EXPECTED_DODS)) errors.push("DoD inventory mismatch");
   for (const entry of scope.repositories) {
-    if (!exactKeys(entry, ["repository", "defaultBranch", "fragmentPath", "requiredStatus"]) || entry.defaultBranch !== "main" || entry.fragmentPath !== FRAGMENT_PATH || !safePath(entry.fragmentPath) || entry.requiredStatus !== "ACTIVE") errors.push(`repository contract mismatch:${entry?.repository ?? "unknown"}`);
+    if (entry == null || typeof entry !== "object" || Array.isArray(entry) || !exactKeys(entry, ["repository", "defaultBranch", "fragmentPath", "requiredStatus"]) || entry.defaultBranch !== "main" || entry.fragmentPath !== FRAGMENT_PATH || !safePath(entry.fragmentPath) || entry.requiredStatus !== "ACTIVE") errors.push(`repository contract mismatch:${entry?.repository ?? "unknown"}`);
   }
   return errors;
 }
@@ -214,7 +214,19 @@ export async function collectContent(repository, path, sha, runGh = gh) {
   return providerJson(await runGh(["api", `repos/${repository}/contents/${path}?ref=${sha}`]), `${repository}:${path}`);
 }
 
-export async function gh(args, execute = execFileAsync) {
+function includedGitHubResponse(stdout) {
+  const text = String(stdout ?? "");
+  const status = Number(/^HTTP\/\S+ ([0-9]{3})(?: [^\r\n]*)?$/m.exec(text)?.[1]);
+  const crlfBoundary = text.indexOf("\r\n\r\n");
+  const lfBoundary = text.indexOf("\n\n");
+  const boundary = crlfBoundary >= 0 && (lfBoundary < 0 || crlfBoundary <= lfBoundary) ? crlfBoundary : lfBoundary;
+  const separatorLength = boundary === crlfBoundary ? 4 : 2;
+  return { status: Number.isInteger(status) ? status : null, body: boundary >= 0 ? text.slice(boundary + separatorLength) : "" };
+}
+
+const wait = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
+
+export async function gh(args, execute = execFileAsync, pause = wait) {
   const endpoint = args?.[1];
   const repositories = "AquilaXk/easysubway(?:-(?:backend|data|mobile|platform))?";
   const allowed = new RegExp(`^repos/${repositories}(?:/git/ref/heads/main|/contents/[A-Za-z0-9][A-Za-z0-9._/-]*\\?ref=[0-9a-f]{40})$`);
@@ -224,11 +236,22 @@ export async function gh(args, execute = execFileAsync) {
     const refIndex = endpoint.indexOf("?ref=", contentIndex);
     if (refIndex < 0 || !safePath(endpoint.slice(contentIndex + "/contents/".length, refIndex))) throw new Error("gh read-only allowlist violation");
   }
-  try { return (await execute("gh", args, { encoding: "utf8", timeout: 30_000, killSignal: "SIGTERM", maxBuffer: 8 * 1024 * 1024 })).stdout; }
-  catch (error) {
-    if (/(?:^|\D)HTTP 404(?:\D|$)/.test(String(error?.stderr ?? ""))) throw Object.assign(new Error("not found"), { status: 404 });
-    throw error;
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    try {
+      const result = await execute("gh", ["api", "--include", endpoint], { encoding: "utf8", timeout: 30_000, killSignal: "SIGTERM", maxBuffer: 8 * 1024 * 1024 });
+      const response = includedGitHubResponse(result.stdout);
+      if (response.status != null && response.status >= 200 && response.status < 300) return response.body;
+      throw Object.assign(new Error("GitHub API response invalid"), { status: response.status, stdout: result.stdout, stderr: result.stderr });
+    } catch (error) {
+      const response = includedGitHubResponse(error?.stdout);
+      const status = Number.isInteger(error?.status) ? error.status : response.status;
+      if (status === 404) throw Object.assign(new Error("not found"), { status });
+      const transient = status == null || status === 429 || status >= 500;
+      if (!transient || attempt === 2) throw error;
+      await pause(250 * (2 ** attempt));
+    }
   }
+  throw new Error("GitHub API retry exhausted");
 }
 
 function parseArguments(argv) {
