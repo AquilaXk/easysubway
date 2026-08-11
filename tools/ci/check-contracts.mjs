@@ -9,6 +9,7 @@ import { validateAmendments, validateLedger } from "../repo/issue-migration-ledg
 import { validatePlanDocExecutionScope as validatePlanDocExecutionAuditInventory } from "../repo/audit-plan-doc-execution.mjs";
 import { validateExternalTerminalLocatorScope as validateExternalTerminalLocatorAuditInventory } from "../repo/audit-external-terminal-locators.mjs";
 import { validateCleanCheckoutReproducibilityScope as validateCleanCheckoutReproducibilityAuditInventory } from "../repo/audit-clean-checkout-reproducibility.mjs";
+import { validateDocumentationInventoryAuditScope as validateDocumentationInventoryAuditInventory } from "../repo/audit-documentation-inventory.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isDeepStrictEqual } from "node:util";
@@ -101,6 +102,8 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
     cleanCheckoutReproducibilityOwnerContractSchema: workspace.cleanCheckoutReproducibilityOwnerContractSchema == null ? null : resolveWorkspacePath(workspace.cleanCheckoutReproducibilityOwnerContractSchema),
     cleanCheckoutReproducibilityOwnerReceiptSchema: workspace.cleanCheckoutReproducibilityOwnerReceiptSchema == null ? null : resolveWorkspacePath(workspace.cleanCheckoutReproducibilityOwnerReceiptSchema),
     cleanCheckoutReproducibilityAuditReportSchema: workspace.cleanCheckoutReproducibilityAuditReportSchema == null ? null : resolveWorkspacePath(workspace.cleanCheckoutReproducibilityAuditReportSchema),
+    documentationInventoryAuditScope: workspace.documentationInventoryAuditScope == null ? null : resolveWorkspacePath(workspace.documentationInventoryAuditScope),
+    documentationInventoryAuditReportSchema: workspace.documentationInventoryAuditReportSchema == null ? null : resolveWorkspacePath(workspace.documentationInventoryAuditReportSchema),
   };
 }
 
@@ -250,6 +253,16 @@ export function collectContractErrors(
           } catch { errors.push(`${path}: 유효한 JSON이 필요하다`); }
         }
       }
+    }
+  }
+  const documentationInventoryAuditEntries = [workspace.documentationInventoryAuditScope, workspace.documentationInventoryAuditReportSchema];
+  if (documentationInventoryAuditEntries.some((entry) => entry != null)) {
+    if (documentationInventoryAuditEntries.some((entry) => entry == null)) errors.push("documentation inventory audit workspace entries는 함께 필요하다");
+    else {
+      const scopeValid = validateJson(contract("documentation/documentation-inventory-audit-scope.schema.json"), workspace.documentationInventoryAuditScope, errors);
+      if (scopeValid) errors.push(...validateDocumentationInventoryAuditInventory(loadJson(workspace.documentationInventoryAuditScope)).map((error) => `${workspace.documentationInventoryAuditScope}: ${error}`));
+      if (!existsSync(workspace.documentationInventoryAuditReportSchema)) errors.push(`${workspace.documentationInventoryAuditReportSchema} 누락`);
+      else { try { validateDocumentationInventoryAuditReportSchema(loadJson(workspace.documentationInventoryAuditReportSchema), errors, workspace.documentationInventoryAuditReportSchema); } catch { errors.push(`${workspace.documentationInventoryAuditReportSchema}: 유효한 JSON이 필요하다`); } }
     }
   }
   let currentArchitectureDecisions = [];
@@ -895,6 +908,27 @@ export function validatePlanDocExecutionAuditReportSchema(schema, errors = [], p
   if (JSON.stringify(record?.required) !== JSON.stringify(["kind", "issueNumber", "prNumber", "repository", "mergeSha", "changedFiles"]) || JSON.stringify(finding?.required) !== JSON.stringify(["code", "identity"]) || JSON.stringify(incomplete?.required) !== JSON.stringify(["stage", "code", "affectedIdentity"])) errors.push(`${path}: records/findings/incomplete exact required lists가 필요하다`);
   const parity = schema?.oneOf;
   if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: incomplete fail-closed parity가 필요하다`);
+  return errors;
+}
+
+export function validateDocumentationInventoryAuditReportSchema(schema, errors = [], path = "documentation-inventory-audit-report.schema") {
+  const repositories = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
+  const dods = ["D01", "D02", "D03", "D04", "D05"];
+  const p = schema?.properties;
+  const strictObject = (value, required) => value?.type === "object" && value?.additionalProperties === false && JSON.stringify(value?.required) === JSON.stringify(required);
+  const inputRequired = ["sourceSha", "scopeSha256", "stateBeginSha256", "stateEndSha256"];
+  const summaryRequired = ["pending", "ready", "activeResources", "findings", "incomplete"];
+  const repositoryRequired = ["repository", "headSha", "state", "fragmentStatus", "fragmentBlobSha", "resourceCount", "activeResourceCount"];
+  if (!strictObject(schema, ["schemaVersion", "status", "observedAt", "inputs", "summary", "repositories", "dods", "findings", "incomplete"]) || p?.schemaVersion?.const !== 1 || JSON.stringify(p?.status?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"])) errors.push(`${path}: strict report root가 필요하다`);
+  if (!strictObject(p?.inputs, inputRequired) || p?.inputs?.properties?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || p?.inputs?.properties?.scopeSha256?.pattern !== "^[0-9a-f]{64}$" || !["stateBeginSha256", "stateEndSha256"].every((key) => JSON.stringify(p?.inputs?.properties?.[key]?.type) === JSON.stringify(["string", "null"]) && p.inputs.properties[key]?.pattern === "^[0-9a-f]{64}$")) errors.push(`${path}: immutable input watermark schema가 필요하다`);
+  if (!strictObject(p?.summary, summaryRequired) || !summaryRequired.every((key) => p?.summary?.properties?.[key]?.type === "integer" && p.summary.properties[key]?.minimum === 0)) errors.push(`${path}: strict summary schema가 필요하다`);
+  const repository = p?.repositories?.items;
+  if (p?.repositories?.type !== "array" || p?.repositories?.minItems !== 5 || p?.repositories?.maxItems !== 5 || p?.repositories?.uniqueItems !== true || !strictObject(repository, repositoryRequired) || JSON.stringify(repository?.properties?.repository?.enum) !== JSON.stringify(repositories) || JSON.stringify(repository?.properties?.state?.enum) !== JSON.stringify(["PENDING", "READY", "UNAVAILABLE"]) || !["resourceCount", "activeResourceCount"].every((key) => repository?.properties?.[key]?.type === "integer" && repository.properties[key]?.minimum === 0)) errors.push(`${path}: strict five-repository result schema가 필요하다`);
+  const dod = p?.dods?.items;
+  if (p?.dods?.minItems !== 5 || p?.dods?.maxItems !== 5 || p?.dods?.uniqueItems !== true || !strictObject(dod, ["id", "status", "findings"]) || JSON.stringify(dod?.properties?.id?.enum) !== JSON.stringify(dods) || JSON.stringify(dod?.properties?.status?.enum) !== JSON.stringify(["PENDING", "PROVEN", "CONTRADICTED", "INCOMPLETE"])) errors.push(`${path}: strict D01-D05 result schema가 필요하다`);
+  if (p?.findings?.uniqueItems !== true || !strictObject(p?.findings?.items, ["dod", "code", "identity"]) || p?.incomplete?.uniqueItems !== true || !strictObject(p?.incomplete?.items, ["stage", "code", "affectedIdentity"])) errors.push(`${path}: strict finding/incomplete schema가 필요하다`);
+  const parity = schema?.oneOf;
+  if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.inputs?.properties?.stateBeginSha256?.type !== "string" || parity[0]?.properties?.inputs?.properties?.stateEndSha256?.type !== "string" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: fail-closed status parity가 필요하다`);
   return errors;
 }
 

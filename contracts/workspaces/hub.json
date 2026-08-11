@@ -25,5 +25,7 @@
   "cleanCheckoutReproducibilityAuditScope": "../documentation/clean-checkout-reproducibility-audit-scope.json",
   "cleanCheckoutReproducibilityOwnerContractSchema": "../documentation/clean-checkout-reproducibility-owner-contract.schema.json",
   "cleanCheckoutReproducibilityOwnerReceiptSchema": "../documentation/clean-checkout-reproducibility-owner-receipt.schema.json",
-  "cleanCheckoutReproducibilityAuditReportSchema": "../documentation/clean-checkout-reproducibility-audit-report.schema.json"
+  "cleanCheckoutReproducibilityAuditReportSchema": "../documentation/clean-checkout-reproducibility-audit-report.schema.json",
+  "documentationInventoryAuditScope": "../documentation/documentation-inventory-audit-scope.json",
+  "documentationInventoryAuditReportSchema": "../documentation/documentation-inventory-audit-report.schema.json"
 }

@@ -34,6 +34,7 @@ import {
   validatePublicSensitivityAuditReportSchema,
   validatePlanDocExecutionAuditScope,
   validatePlanDocExecutionAuditReportSchema,
+  validateDocumentationInventoryAuditReportSchema,
   validateExternalTerminalLocatorAuditScope,
   validateExternalTerminalLocatorAuditReportSchema,
   validateCleanCheckoutReproducibilityAuditScope,
@@ -45,6 +46,32 @@ import {
   validatePostGoBoundaryAuditReportSchema,
 } from "./check-contracts.mjs";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
+import { validateDocumentationInventoryAuditScope } from "../repo/audit-documentation-inventory.mjs";
+
+test("documentation inventory audit contracts bind the exact five repositories and D01-D05", () => {
+  const scope = loadJson("contracts/documentation/documentation-inventory-audit-scope.json");
+  const scopeSchema = loadJson("contracts/documentation/documentation-inventory-audit-scope.schema.json");
+  const reportSchema = loadJson("contracts/documentation/documentation-inventory-audit-report.schema.json");
+  const workspace = loadWorkspace();
+  assert.equal(workspace.documentationInventoryAuditScope, "contracts/documentation/documentation-inventory-audit-scope.json");
+  assert.equal(workspace.documentationInventoryAuditReportSchema, "contracts/documentation/documentation-inventory-audit-report.schema.json");
+  assert.equal(validateSchema(scopeSchema, scope).ok, true);
+  assert.deepEqual(validateDocumentationInventoryAuditScope(scope), []);
+  assert.deepEqual(validateDocumentationInventoryAuditReportSchema(reportSchema), []);
+  for (const mutate of [
+    (value) => value.repositories.reverse(),
+    (value) => { value.repositories[0].fragmentPath = "../fragment.json"; },
+    (value) => value.dods.pop(),
+  ]) { const invalid = structuredClone(scope); mutate(invalid); assert.ok(validateDocumentationInventoryAuditScope(invalid).length > 0); }
+  for (const mutate of [
+    (value) => { value.properties.status.enum = ["COMPLETE"]; },
+    (value) => { value.properties.summary.required.pop(); },
+    (value) => { value.properties.repositories.maxItems = 6; },
+    (value) => { value.properties.repositories.items.required.pop(); },
+    (value) => { value.properties.dods.items.properties.id.enum.pop(); },
+    (value) => { value.oneOf[0].properties.incomplete.maxItems = 1; },
+  ]) { const invalid = structuredClone(reportSchema); mutate(invalid); assert.ok(validateDocumentationInventoryAuditReportSchema(invalid).length > 0); }
+});
 
 test("reference audit scope requires the exact five-repository inventory", () => {
   const errors = [];
