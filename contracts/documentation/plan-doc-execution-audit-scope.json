@@ -30,6 +30,7 @@
     { "issueNumber": 2729, "prNumber": 2813, "mergeSha": "1c7521f0186b365b0a43cdb8fa25b35e06bafdbb", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
     { "issueNumber": 2814, "prNumber": 2815, "mergeSha": "dc256a4e0f0759f572cdfb00233e6699840642e6", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
     { "issueNumber": 2816, "prNumber": 2817, "mergeSha": "4f94f3fd794f61bd06c9b8f0cbfb6b7ec713da9c", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2818, "prNumber": 2819, "mergeSha": "bb54c453e1b38386c17bc02b6fce77dab8a060c6", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
     { "issueNumber": 2821, "prNumber": 2822, "mergeSha": "b89f4ddd50e98b2cff5a2a4cee0e0245a59a383a", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
     { "issueNumber": 2820, "prNumber": 2824, "mergeSha": "c84a23f981516640a530ab3119152c239597b6c6", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
     { "issueNumber": 2825, "prNumber": 2826, "mergeSha": "2f26c9028f74ce46ef934bc4938dd42fcd966441", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },

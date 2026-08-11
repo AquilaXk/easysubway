@@ -878,7 +878,7 @@ export function validatePlanDocExecutionAuditScope(scope, errors = [], path = "p
   if (scope?.schemaVersion !== 1 || scope?.executionRepository !== "AquilaXk/easysubway" || scope?.planOwner !== "PLAN-DOC" || scope?.self?.issueNumber !== 2831 || scope?.self?.planOwner !== "PLAN-DOC") errors.push(`${path}: exact PLAN-DOC self binding이 필요하다`);
   if (JSON.stringify(scope?.forbiddenTargetPathPrefixes) !== JSON.stringify(["apps/mobile/", "backend/", "infra/", "tools/datapack/", "tools/ops/", "tools/release/"])) errors.push(`${path}: target path deny inventory는 exact여야 한다`);
   const records = scope?.historical;
-  if (!Array.isArray(records) || records.length !== 31 || new Set(records.map(({ prNumber }) => prNumber)).size !== 31 || new Set(records.map(({ mergeSha }) => mergeSha)).size !== 31 || records.some((record) => record?.planOwner !== "PLAN-DOC" || record?.changedPathClass !== "HUB_GOVERNANCE_ONLY")) errors.push(`${path}: exact historical PLAN-DOC inventory가 필요하다`);
+  if (!Array.isArray(records) || records.length !== 32 || new Set(records.map(({ prNumber }) => prNumber)).size !== 32 || new Set(records.map(({ mergeSha }) => mergeSha)).size !== 32 || records.some((record) => record?.planOwner !== "PLAN-DOC" || record?.changedPathClass !== "HUB_GOVERNANCE_ONLY")) errors.push(`${path}: exact historical PLAN-DOC inventory가 필요하다`);
   errors.push(...validatePlanDocExecutionAuditInventory(scope).map((error) => `${path}: ${error}`));
   return errors;
 }
