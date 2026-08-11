@@ -29,7 +29,12 @@
     { "issueNumber": 2809, "prNumber": 2810, "mergeSha": "12a4a4753dbaf733fc436ff645a2f2a1d73b4048", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
     { "issueNumber": 2729, "prNumber": 2813, "mergeSha": "1c7521f0186b365b0a43cdb8fa25b35e06bafdbb", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
     { "issueNumber": 2814, "prNumber": 2815, "mergeSha": "dc256a4e0f0759f572cdfb00233e6699840642e6", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2816, "prNumber": 2817, "mergeSha": "4f94f3fd794f61bd06c9b8f0cbfb6b7ec713da9c", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" }
+    { "issueNumber": 2816, "prNumber": 2817, "mergeSha": "4f94f3fd794f61bd06c9b8f0cbfb6b7ec713da9c", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2821, "prNumber": 2822, "mergeSha": "b89f4ddd50e98b2cff5a2a4cee0e0245a59a383a", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2820, "prNumber": 2824, "mergeSha": "c84a23f981516640a530ab3119152c239597b6c6", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2825, "prNumber": 2826, "mergeSha": "2f26c9028f74ce46ef934bc4938dd42fcd966441", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2827, "prNumber": 2828, "mergeSha": "4475e6d9da634e28cda4179b738d4f9f440f06a7", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
+    { "issueNumber": 2829, "prNumber": 2830, "mergeSha": "aed1c9ab7e9e45c913f3817f17276865934c9bbc", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" }
   ],
-  "self": { "issueNumber": 2818, "planOwner": "PLAN-DOC" }
+  "self": { "issueNumber": 2831, "planOwner": "PLAN-DOC" }
 }
