@@ -1782,12 +1782,15 @@ test("short PR 템플릿은 B/C등급 5개 섹션과 리뷰 게이트를 유지�
   }
   assert.match(template, /이슈 없음\(C등급\)/);
   assert.match(template, /full\.md를 사용/);
+  assert.match(template, /A등급\(API, schema, data, security, deployment, artifact, release, CI workflow·계약 테스트·release gate 변경\)/);
   assert.match(template, /실행한 명령과 결과/);
   assert.match(template, /DB migration 없음/);
   assert.match(template, /CI workflow·계약 테스트·release gate JSON 변경 없음/);
   assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
   assert.match(template, /CodeRabbit status check만으로는 리뷰 완료로 보지 않는다/);
   assert.match(template, /폴백 리뷰를 단일 PR review로 게시했다/);
+  assert.doesNotMatch(template, /Not run — reason: None/);
+  assert.match(template, /Rerun owner \/ condition/);
 });
 
 test("기본 PR 템플릿은 등급 안내와 최소 섹션을 포함한다", () => {
@@ -1797,12 +1800,23 @@ test("기본 PR 템플릿은 등급 안내와 최소 섹션을 포함한다", ()
   assert.match(template, /B\/C등급/);
   assert.match(template, /PULL_REQUEST_TEMPLATE\/full\.md/);
   assert.match(template, /PULL_REQUEST_TEMPLATE\/short\.md/);
-  assert.match(template, /gh CLI는 template 쿼리를 지원하지 않으므로/);
+  assert.match(template, /A등급\(API, schema, data, security, deployment, artifact, release, CI workflow·계약 테스트·release gate 변경\)/);
+  assert.match(template, /gh pr create --template \.github\/PULL_REQUEST_TEMPLATE\/full\.md/);
+  assert.match(template, /gh pr create --template \.github\/PULL_REQUEST_TEMPLATE\/short\.md/);
   assert.match(template, /리뷰·automerge 게이트는 등급과 무관하게 모든 PR 공통/);
   for (const heading of ["## 관련 이슈", "## 작업 내용", "## 검증", "## 영향", "## 체크리스트"]) {
     assert.ok(template.includes(heading), `default template must include ${heading}`);
   }
+  assert.match(template, /CodeRabbit 리뷰를 확인했다/);
   assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
+  assert.match(template, /CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다/);
+});
+
+test("작업 이슈 템플릿은 일반 작업 prefix와 기존 분류 label을 유지한다", () => {
+  const template = read(".github/ISSUE_TEMPLATE/feature_request.yml");
+
+  assert.match(template, /^title: "\[Task\] "$/m);
+  assert.match(template, /^labels:\s*\n\s+- enhancement$/m);
 });
 
 test("PR template documentation impact proposal은 default full short에서 같은 판정 필드를 유지한다", () => {

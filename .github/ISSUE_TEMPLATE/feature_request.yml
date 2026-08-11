@@ -1,100 +1,114 @@
-name: "기능"
-description: "쉬운 지하철 사용자 가치나 기능을 추가합니다."
-labels: ["enhancement"]
+name: "작업 / 개선"
+description: "기능, 개선, 리팩터링, 자동화 작업을 등록합니다."
+title: "[Task] "
+labels:
+  - enhancement
 body:
   - type: markdown
     attributes:
       value: |
-        제목은 `[Feat] 한국어 작업 요약` 형식으로 작성합니다.
-        본문은 한국어 중심으로 작성하고 API, CI, Android, iOS처럼 현업 공통 용어만 영어를 유지합니다.
-        실제 개발자가 바로 판단할 수 있게 목표, 사용자 또는 운영 영향, 실행할 검증을 구체적으로 적습니다.
-        상위 이슈는 하위 이슈와 완료 조건을 함께 적고, 하위 이슈 완료 전에는 닫지 않습니다.
-        PR 본문 양식과 GitHub PR Review 증거 확인을 완료 조건에 포함합니다.
-
-  - type: input
-    id: goal
-    attributes:
-      label: 목표
-      description: 이 작업으로 만들고 싶은 결과를 한 문장으로 적어 주세요.
-      placeholder: 예) 사용자가 계단 없는 역 경로를 검색할 수 있다.
-    validations:
-      required: true
+        하나의 이슈는 하나의 accountable 결과를 소유합니다.
+        상위 이슈는 조정과 완료 판정만 담당하고, 하위 이슈의 구현·검증 절차를 복제하지 않습니다.
+        과거 실행 로그는 댓글이나 연결된 계획서에 남기고 본문에는 현재 계약만 유지합니다.
+        기존 issue·branch·worktree·PR 소유권은 보존하며, 첫 의미 있는 변경 뒤 Draft PR을 열어 실제 diff를 기준으로 협업합니다.
 
   - type: dropdown
-    id: platform
+    id: task_type
     attributes:
-      label: 대상 플랫폼
+      label: Task Type
       options:
-        - Android / iOS 공통
-        - Android
-        - iOS
-        - API 연동
-        - 데이터 / 배치
-        - 관리자
-        - 빌드 / CI / 배포
+        - Feature
+        - Improvement
+        - Refactor
+        - Build / CI
+        - Documentation
+        - Operations
+        - Investigation
     validations:
       required: true
 
   - type: input
     id: domain
     attributes:
-      label: 영역
-      description: 관련 화면, 도메인, API 경로를 적어 주세요.
-      placeholder: 예) onboarding, station-search, routing, GET /api/...
+      label: Domain
+      description: 관련 저장소, 컴포넌트, 화면, API, workflow 또는 운영 영역을 적습니다.
+      placeholder: 예) Hub release coordination, Journey V3, documentation audit
     validations:
       required: true
 
   - type: textarea
-    id: background
+    id: description
     attributes:
-      label: 배경
-      description: 왜 필요한지, 사용자 또는 운영 영향이 무엇인지 설명해 주세요.
-    validations:
-      required: true
-
-  - type: textarea
-    id: acceptance
-    attributes:
-      label: 완료 조건
-      description: 완료로 볼 기준을 체크리스트로 적어 주세요.
+      label: Description
+      description: 현재 문제, 실제 영향, 이번 작업이 만들 결과를 간결하게 적습니다.
       placeholder: |
-        - [ ] 핵심 사용자 흐름이 기대한 방식으로 동작하는가?
-        - [ ] Android/iOS 영향 범위를 확인했는가?
-        - [ ] API/화면 계약이 정리되었는가?
-        - [ ] 필요한 테스트와 검증을 수행했는가?
+        Current:
+        - ...
+
+        Impact:
+        - ...
+
+        Outcome:
+        - ...
     validations:
       required: true
 
   - type: textarea
-    id: out_of_scope
+    id: done_when
     attributes:
-      label: 제외 범위
-      description: 이번 작업에서 의도적으로 제외할 범위를 설명해 주세요.
-      placeholder: 예) 푸시 알림, 결제, 운영기관 관리자 기능은 이번 범위에서 제외
-
-  - type: textarea
-    id: evidence
-    attributes:
-      label: 필요 증거
-      description: PR에서 확인해야 할 증거 유형을 적어 주세요. UI/접근성은 스크린샷, 녹화, UI tree, 스크린리더 확인 결과 중 하나가 필요합니다.
+      label: Done When
+      description: 구현 과정이 아니라 완료 후 관찰 가능한 결과를 체크리스트로 적습니다.
       placeholder: |
-        - [ ] Android 스크린샷 또는 녹화
-        - [ ] iOS 스크린샷 또는 녹화
-        - [ ] 접근성 확인 결과 또는 UI tree
-        - [ ] 명령 실행 결과, 로그, workflow 링크
-        - [ ] 증거가 필요 없는 경우 사유:
+        - [ ] 핵심 결과가 동작한다.
+        - [ ] 대표 실패 경로가 명시적으로 실패한다.
+        - [ ] 필요한 후속 owner가 소비할 handoff 또는 receipt가 남는다.
     validations:
       required: true
 
   - type: textarea
-    id: todo
+    id: execution_contract
     attributes:
-      label: 작업 목록
-      description: 구현 순서와 실행할 검증을 체크리스트로 적어 주세요.
+      label: Execution Contract
+      description: 이번 이슈의 포함·제외 범위, owner, 실제 dependency와 실패 동작을 적습니다.
       placeholder: |
-        - [ ] 요구사항과 제외 범위를 정리한다.
-        - [ ] 화면/API 계약을 확정한다.
-        - [ ] 구현 후 필요한 검증을 수행한다.
-        - [ ] PR 본문에 검증 결과를 남긴다.
+        Included:
+        - ...
+
+        Excluded:
+        - ...
+
+        Owner / dependency:
+        - Accountable plan or owner:
+        - Related active issue / PR:
+        - Blocked by actual output only:
+
+        Failure behavior:
+        - 실패 시 상태 변경 없이 명시적으로 종료한다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification_delivery
+    attributes:
+      label: Verification & Delivery
+      description: 변경 위험에 필요한 최소 검증과 전달 방식을 적습니다. 해당 없는 검증은 사유와 함께 생략합니다.
+      placeholder: |
+        Focused verification:
+        - ...
+
+        Required CI:
+        - repository required checks
+
+        Manual / runtime:
+        - Not required — reason: ...
+
+        Not run:
+        - Check:
+        - Reason:
+        - Rerun owner / condition:
+
+        Delivery:
+        - 첫 의미 있는 변경 뒤 Draft PR
+        - merge/closure 전 필요한 evidence:
     validations:
       required: true

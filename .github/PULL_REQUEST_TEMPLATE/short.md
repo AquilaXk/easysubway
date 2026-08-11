@@ -1,12 +1,11 @@
-<!-- B/C등급(일반 코드 변경·낮은 위험 maintenance) 전용. A등급(제품/운영 위험, CI/계약 테스트/release gate 변경)은 full.md를 사용합니다. -->
+<!-- B/C등급(일반 코드 변경·낮은 위험 maintenance) 전용. A등급(API, schema, data, security, deployment, artifact, release, CI workflow·계약 테스트·release gate 변경)은 full.md를 사용합니다. -->
 
-## 관련 이슈
+## 관련 이슈 / Related issue
 
 <!-- umbrella `Refs #N` 또는 `이슈 없음(C등급)` 명기. 빈 칸 금지. -->
-
 Refs #
 
-## 작업 내용
+## 작업 내용 / Change
 
 -
 
@@ -17,21 +16,25 @@ Refs #
 - documentationFamily:
 - lifecycle/evidence 영향:
 
-## 검증
+## 검증 / Verification
 
 - 실행한 명령과 결과:
+- Not run — reason: <미실행 사유를 필수로 작성>
+- Rerun owner / condition: <재실행 담당자와 조건>
 
-## 영향
+## 영향 / Risk
 
-- [ ] 제품/운영 위험 없음 (route/accessibility/mobile UX/backend API/auth/security 아님)
+- [ ] 제품/운영 위험 없음
 - [ ] DB migration 없음
 - [ ] 배포 영향 없음
 - [ ] route/realtime/datapack contract 영향 없음
-- [ ] CI workflow·계약 테스트·release gate JSON 변경 없음 (있으면 full.md로 전환)
+- [ ] CI workflow·계약 테스트·release gate JSON 변경 없음
+- Rollback: Revert this PR
 
-## 체크리스트
+## 체크리스트 / Checklist
 
-- [ ] 이 PR은 B/C등급 작업이며 full template이 필요 없다.
-- [ ] CI 결과를 확인했다.
+- [ ] 이 PR은 B/C등급 작업이며 full.md를 사용할 필요가 없다.
+- [ ] 이슈 범위와 실제 diff가 일치하며 관련 없는 변경을 포함하지 않았다.
+- [ ] 실행한 명령과 결과 또는 미실행 사유를 기록했다.
 - [ ] GitHub PR Review 객체가 있는지 확인했다. CodeRabbit status check만으로는 리뷰 완료로 보지 않는다.
 - [ ] CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 폴백 리뷰를 단일 PR review로 게시했다.

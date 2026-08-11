@@ -1,14 +1,33 @@
-## 관련 이슈
+<!-- A등급: API, schema, data, security, deployment, artifact, release, CI workflow·계약 테스트·release gate 변경. -->
 
-close #
+## 관련 이슈 / Related issue
 
-## 작업 배경
+Closes #
+
+## 작업 배경 / Summary
+
+- Problem:
+- Outcome:
+
+## 작업 내용 / Changes
 
 -
 
-## 작업 내용
+## Scope
+
+### Included
 
 -
+
+### Excluded
+
+-
+
+### Ownership / dependencies
+
+- Accountable owner or plan:
+- Required predecessor output:
+- Concurrent work overlap: None
 
 ## Documentation impact
 
@@ -17,17 +36,21 @@ close #
 - documentationFamily:
 - lifecycle/evidence 영향:
 
-## 검증
+## 검증 / Verification
+
+| Check | Result / Evidence |
+| --- | --- |
+| Focused RED → GREEN | |
+| Affected integration | |
+| Required CI | |
+| Manual / production-like | Not required — reason: |
+| Security / privacy / accessibility | Not applicable — reason: |
 
 - 실행한 명령과 결과:
 
 ## 검증 증거
 
 UI, 접근성, 수동 QA, 배포 확인이 필요한 항목은 증거 첨부, 링크, 또는 로컬 evidence 경로를 적습니다. 증거가 필요 없는 항목은 사유를 적습니다.
-
-| 항목 | 플랫폼 | 확인 방법 | 증거 | 결과 |
-| --- | --- | --- | --- | --- |
-|  |  |  |  |  |
 
 ## Version impact
 
@@ -54,25 +77,41 @@ UI, 접근성, 수동 QA, 배포 확인이 필요한 항목은 증거 첨부, �
 
 ### Version decision
 
-- mobile versionName:
-- mobile versionCode:
+- mobile versionName / versionCode:
 - datapack version:
-- route contract:
-- realtime contract:
+- route / realtime contract:
 - backend identity:
 
-## 리뷰어 메모
+## Not run
+
+- Check: None
+- Reason:
+- Rerun owner / condition:
+
+## 리뷰어 메모 / Review focus
 
 - 리뷰어가 먼저 봐야 할 지점:
 
-## 리스크
+## 리스크 / Risk
 
--
+- Level: High
+- Main risk:
+- Failure behavior:
+- State mutation on failure:
+- Fallback or degraded-success path introduced: No
 
-## 체크리스트
+## Rollout / Recovery
+
+- Rollout or activation:
+- Monitoring / success signal:
+- Rollback or recovery:
+- Data / config compatibility after rollback:
+
+## 체크리스트 / Checklist
 
 - [ ] PR 본문은 이 템플릿 섹션을 삭제하지 않고 모두 채웠다.
-- [ ] CI 결과를 확인했다.
+- [ ] 이슈 범위와 실제 diff가 일치하며 관련 없는 변경을 포함하지 않았다.
+- [ ] 위험에 필요한 검증과 미실행 사유를 기록했다.
 - [ ] CodeRabbit 리뷰를 확인했다.
 - [ ] GitHub PR Review 객체가 있는지 확인했다. CodeRabbit status check만으로는 리뷰 완료로 보지 않는다.
 - [ ] CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다.
