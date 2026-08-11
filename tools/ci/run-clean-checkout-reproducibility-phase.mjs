@@ -26,13 +26,12 @@ export function runHubReproducibilityPhase(arguments_, {
   if (arguments_[0] === "setup") {
     if (arguments_.length !== 3 || arguments_[1] !== NODE_MAJOR) fail("D13_HUB_PHASE_INVALID");
     if (arguments_[2] !== TOOLCHAIN_DIGEST) fail("D13_HUB_TOOLCHAIN_MISMATCH");
-    if (nodeVersion.split(".", 1)[0] !== NODE_MAJOR) fail("D13_HUB_NODE_MISMATCH");
-    const bytes = lockBytes ?? readToolchainLock(repositoryRoot);
-    if (createHash("sha256").update(bytes).digest("hex") !== TOOLCHAIN_DIGEST) fail("D13_HUB_TOOLCHAIN_MISMATCH");
+    verifyToolchain({ nodeVersion, repositoryRoot, lockBytes });
     return 0;
   }
 
   if (arguments_.length !== 1 || !COMMANDS.has(arguments_[0])) fail("D13_HUB_PHASE_INVALID");
+  verifyToolchain({ nodeVersion, repositoryRoot, lockBytes });
   const result = spawnProcess(process.execPath, COMMANDS.get(arguments_[0]), {
     cwd: repositoryRoot,
     env: process.env,
@@ -42,6 +41,14 @@ export function runHubReproducibilityPhase(arguments_, {
   if (result?.error) fail("D13_HUB_PHASE_START_FAILED");
   if (result?.status !== 0) fail("D13_HUB_PHASE_NONZERO");
   return 0;
+}
+
+function verifyToolchain({ nodeVersion, repositoryRoot, lockBytes }) {
+  if (nodeVersion.split(".", 1)[0] !== NODE_MAJOR) fail("D13_HUB_NODE_MISMATCH");
+  const bytes = lockBytes ?? readToolchainLock(repositoryRoot);
+  if (createHash("sha256").update(bytes).digest("hex") !== TOOLCHAIN_DIGEST) {
+    fail("D13_HUB_TOOLCHAIN_MISMATCH");
+  }
 }
 
 function readToolchainLock(repositoryRoot) {

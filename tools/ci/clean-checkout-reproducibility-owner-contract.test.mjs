@@ -114,6 +114,11 @@ test("phase entrypoint maps only the four approved commands and fails closed", a
   }
   assert.throws(() => runHubReproducibilityPhase(["setup", "24", "0".repeat(64)], base), /D13_HUB_TOOLCHAIN_MISMATCH/);
   assert.throws(() => runHubReproducibilityPhase(["setup", "24", TOOLCHAIN_DIGEST], { ...base, nodeVersion: "23.0.0" }), /D13_HUB_NODE_MISMATCH/);
+  for (const command of ["build", "test", "debug"]) {
+    assert.throws(() => runHubReproducibilityPhase([command], { ...base, nodeVersion: "23.0.0" }), /D13_HUB_NODE_MISMATCH/);
+    assert.throws(() => runHubReproducibilityPhase([command], { ...base, lockBytes: Buffer.from("mismatch") }), /D13_HUB_TOOLCHAIN_MISMATCH/);
+  }
+  assert.equal(calls.length, 3);
   assert.throws(() => runHubReproducibilityPhase(["build"], { ...base, spawnProcess: () => ({ status: 1 }) }), /D13_HUB_PHASE_NONZERO/);
   assert.throws(() => runHubReproducibilityPhase(["build"], { ...base, spawnProcess: () => ({ error: new Error("raw") }) }), /D13_HUB_PHASE_START_FAILED/);
 });
