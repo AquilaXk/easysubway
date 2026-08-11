@@ -1,0 +1,94 @@
+name: Release Track
+description: 동일 RC의 admission·E2E·audit·final decision 또는 post-go 관측을 관리합니다.
+title: '[Release] '
+body:
+- type: markdown
+  attributes:
+    value: 'Release Track은 target repository 구현을 소유하지 않습니다.
+
+      각 target PBI의 immutable receipt를 소비하고 동일 RC의 판정·관측만 수행합니다.
+
+      기존 release 이슈 번호와 현재 작업 계획서 경계를 합치거나 재번호화하지 않습니다.'
+- type: dropdown
+  id: phase
+  attributes:
+    label: 단계
+    options:
+    - Candidate admission
+    - System RC E2E
+    - Product verdict
+    - Security verdict
+    - Independent audit
+    - Operations readiness
+    - Final GO / NO-GO
+    - Post-Go observation
+  validations:
+    required: true
+- type: textarea
+  id: outcome
+  attributes:
+    label: 판정·관측 목표
+  validations:
+    required: true
+- type: textarea
+  id: candidate
+  attributes:
+    label: 동일 RC identity
+    description: 필요한 manifest·component·artifact·deployment identity를 링크합니다. issue prose는 identity가 아닙니다.
+  validations:
+    required: true
+- type: textarea
+  id: receipts
+  attributes:
+    label: 입력 receipt
+    description: 직접 재실행하지 않고 소비할 target/system terminal receipt를 적습니다.
+    placeholder: '- Data:
+
+      - Backend:
+
+      - Mobile:
+
+      - Platform:
+
+      - System:'
+  validations:
+    required: true
+- type: textarea
+  id: owned_execution
+  attributes:
+    label: 이 단계가 직접 수행하는 것
+    description: 대표 시나리오·spot audit·판정처럼 이 단계만의 실행을 적습니다.
+  validations:
+    required: true
+- type: textarea
+  id: dependencies
+  attributes:
+    label: Blocked by / Blocks
+  validations:
+    required: true
+- type: textarea
+  id: completion
+  attributes:
+    label: 완료 조건
+  validations:
+    required: true
+- type: textarea
+  id: non_scope
+  attributes:
+    label: 제외 범위
+    description: Target 구현, child full suite 재실행, cross-RC 합성 등 하지 않을 일을 적습니다.
+  validations:
+    required: true
+- type: checkboxes
+  id: policy
+  attributes:
+    label: Release Track 원칙
+    options:
+    - label: 모든 입력과 결과는 하나의 exact same-RC identity에 결속합니다.
+      required: true
+    - label: Target repository 구현·수정·full suite를 이 이슈에서 재수행하지 않습니다.
+      required: true
+    - label: 상위 단계는 하위 immutable receipt를 소비하고 동일 검증을 반복하지 않습니다.
+      required: true
+    - label: 외부 대기·달력 경과·CI queue를 active work로 계산하지 않습니다.
+      required: true
