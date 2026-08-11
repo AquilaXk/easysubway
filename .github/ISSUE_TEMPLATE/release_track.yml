@@ -1,94 +1,111 @@
-name: Release Track
-description: 동일 RC의 admission·E2E·audit·final decision 또는 post-go 관측을 관리합니다.
-title: '[Release] '
+name: "Release / Audit"
+description: "동일 릴리스 후보의 admission, E2E, audit, readiness 또는 최종 판정을 관리합니다."
+title: "[Release] "
 body:
-- type: markdown
-  attributes:
-    value: 'Release Track은 target repository 구현을 소유하지 않습니다.
+  - type: markdown
+    attributes:
+      value: |
+        이 이슈는 target 저장소 구현을 대신하지 않습니다.
+        각 owner가 만든 현재 릴리스의 immutable output을 소비하고, 이 단계가 소유한 최소 통합 검증과 판정만 수행합니다.
+        하위 CI·Review를 반복하거나 서로 다른 RC의 증거를 합성하지 않습니다.
 
-      각 target PBI의 immutable receipt를 소비하고 동일 RC의 판정·관측만 수행합니다.
-
-      기존 release 이슈 번호와 현재 작업 계획서 경계를 합치거나 재번호화하지 않습니다.'
-- type: dropdown
-  id: phase
-  attributes:
-    label: 단계
-    options:
-    - Candidate admission
-    - System RC E2E
-    - Product verdict
-    - Security verdict
-    - Independent audit
-    - Operations readiness
-    - Final GO / NO-GO
-    - Post-Go observation
-  validations:
-    required: true
-- type: textarea
-  id: outcome
-  attributes:
-    label: 판정·관측 목표
-  validations:
-    required: true
-- type: textarea
-  id: candidate
-  attributes:
-    label: 동일 RC identity
-    description: 필요한 manifest·component·artifact·deployment identity를 링크합니다. issue prose는 identity가 아닙니다.
-  validations:
-    required: true
-- type: textarea
-  id: receipts
-  attributes:
-    label: 입력 receipt
-    description: 직접 재실행하지 않고 소비할 target/system terminal receipt를 적습니다.
-    placeholder: '- Data:
-
-      - Backend:
-
-      - Mobile:
-
-      - Platform:
-
-      - System:'
-  validations:
-    required: true
-- type: textarea
-  id: owned_execution
-  attributes:
-    label: 이 단계가 직접 수행하는 것
-    description: 대표 시나리오·spot audit·판정처럼 이 단계만의 실행을 적습니다.
-  validations:
-    required: true
-- type: textarea
-  id: dependencies
-  attributes:
-    label: Blocked by / Blocks
-  validations:
-    required: true
-- type: textarea
-  id: completion
-  attributes:
-    label: 완료 조건
-  validations:
-    required: true
-- type: textarea
-  id: non_scope
-  attributes:
-    label: 제외 범위
-    description: Target 구현, child full suite 재실행, cross-RC 합성 등 하지 않을 일을 적습니다.
-  validations:
-    required: true
-- type: checkboxes
-  id: policy
-  attributes:
-    label: Release Track 원칙
-    options:
-    - label: 모든 입력과 결과는 하나의 exact same-RC identity에 결속합니다.
+  - type: dropdown
+    id: task_type
+    attributes:
+      label: Task Type
+      options:
+        - Candidate admission
+        - Integrated E2E
+        - Independent audit
+        - Operations readiness
+        - GO / NO-GO decision
+        - Post-release observation
+    validations:
       required: true
-    - label: Target repository 구현·수정·full suite를 이 이슈에서 재수행하지 않습니다.
+
+  - type: input
+    id: domain
+    attributes:
+      label: Domain
+      description: 릴리스, 감사, 운영 또는 제품 판정 영역을 적습니다.
+      placeholder: 예) Journey V3 same-RC release
+    validations:
       required: true
-    - label: 상위 단계는 하위 immutable receipt를 소비하고 동일 검증을 반복하지 않습니다.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: 현재 판정 상태, 남은 실제 입력, 이번 단계의 결과를 적습니다.
+      placeholder: |
+        Current:
+        - ...
+
+        Required inputs:
+        - ...
+
+        Outcome:
+        - ...
+    validations:
       required: true
-    - label: 외부 대기·달력 경과·CI queue를 active work로 계산하지 않습니다.
+
+  - type: textarea
+    id: done_when
+    attributes:
+      label: Done When
+      description: 이 단계의 terminal 결과와 후속 전달 조건을 체크리스트로 적습니다.
+      placeholder: |
+        - [ ] 모든 필수 current-RC 입력이 존재하고 identity가 일치한다.
+        - [ ] 이 단계가 소유한 통합 검증 또는 audit가 완료된다.
+        - [ ] PASS / FAIL / INCOMPLETE 판정과 후속 owner가 명확하다.
+    validations:
+      required: true
+
+  - type: textarea
+    id: execution_contract
+    attributes:
+      label: Execution Contract
+      description: 동일 RC identity, 입력 owner, 직접 수행할 범위, 제외 범위와 실패 동작을 적습니다.
+      placeholder: |
+        Current release identity:
+        - system / component manifest:
+        - Data:
+        - Backend:
+        - Mobile:
+        - Platform:
+
+        Included:
+        - ...
+
+        Excluded:
+        - target implementation
+        - child full suite or review repetition
+        - cross-RC evidence composition
+
+        Failure behavior:
+        - 입력 누락·불일치 시 상태 변경 없이 FAIL 또는 INCOMPLETE
+    validations:
+      required: true
+
+  - type: textarea
+    id: verification_delivery
+    attributes:
+      label: Verification & Delivery
+      description: 소비할 terminal evidence, 이 단계만의 검증, 결과 기록과 후속 전달 방식을 적습니다.
+      placeholder: |
+        Consumed evidence:
+        - ...
+
+        Owned verification:
+        - ...
+
+        Not repeated:
+        - child focused test / full CI / code review
+
+        Result artifact / comment:
+        - ...
+
+        Decision or next owner:
+        - ...
+    validations:
       required: true
