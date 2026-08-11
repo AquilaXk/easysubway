@@ -1,16 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "System release manifest v2",
+  "title": "System release manifest v3",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "productReleaseId", "phase", "decision", "generatedAt", "issueRefs", "contracts", "mobile", "backend", "data", "platform"],
+  "required": ["schemaVersion", "productReleaseId", "phase", "decision", "generatedAt", "issueRefs", "hub", "contracts", "mobile", "backend", "data", "platform"],
   "properties": {
-    "schemaVersion": { "const": 2 },
+    "schemaVersion": { "const": 3 },
     "productReleaseId": { "type": "string", "minLength": 1 },
     "phase": { "type": "string", "enum": ["CANDIDATE", "FINAL"] },
     "decision": { "type": "string", "enum": ["GO", "NO_GO"] },
     "generatedAt": { "type": "string", "format": "date-time" },
     "issueRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^AquilaXk/(easysubway|easysubway-data|easysubway-platform|easysubway-backend|easysubway-mobile)#[1-9][0-9]*$" } },
+    "hub": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "gitSha"],
+      "properties": {
+        "repository": { "const": "AquilaXk/easysubway" },
+        "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    },
     "contracts": { "type": "object", "additionalProperties": false, "required": ["version", "sha256"], "properties": { "version": { "type": "string", "minLength": 1 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } },
     "mobile": { "type": "object" }, "backend": { "type": "object" }, "data": { "type": "object" }, "platform": { "type": "object" }
   }

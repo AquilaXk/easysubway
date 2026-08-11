@@ -6053,7 +6053,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(corruptManifest.readiness.blockers.some((blocker) => blocker.id === "missing_aabPayloadSha256"));
 });
 
-test("[system-release-generator] FINAL은 component manifest에서 검증된 system release v2를 별도로 생성한다", async () => {
+test("[system-release-generator] FINAL은 Hub와 네 target SHA를 결속한 system release v3를 별도로 생성한다", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-system-release-"));
   const candidatePath = path.join(tempDir, "candidate.json");
   const outputPath = path.join(tempDir, "legacy-final.json");
@@ -6138,7 +6138,8 @@ test("[system-release-generator] FINAL은 component manifest에서 검증된 sys
     const legacy = JSON.parse(await readFile(outputPath, "utf8"));
     const system = JSON.parse(await readFile(systemOutputPath, "utf8"));
     assert.equal(Object.hasOwn(system, "gitSha"), false);
-    assert.equal(system.schemaVersion, 2);
+    assert.equal(system.schemaVersion, 3);
+    assert.deepEqual(system.hub, { repository: "AquilaXk/easysubway", gitSha: currentGitSha });
     assert.equal(system.phase, "FINAL");
     assert.equal(system.decision, "NO_GO");
     assert.deepEqual(system.issueRefs, issueRefs);
