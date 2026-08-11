@@ -6,7 +6,7 @@ import test from "node:test";
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { validateOwnerContract } from "../repo/audit-clean-checkout-reproducibility.mjs";
 
-const ENGINE_SHA = "c84a23f981516640a530ab3119152c239597b6c6";
+const ENGINE_SHA = "4475e6d9da634e28cda4179b738d4f9f440f06a7";
 const TOOLCHAIN_DIGEST = "2bafa62df07a90cbc8501e2cc9c7f7abdcbb99069462893ab7f0c2ce02b31ac1";
 const ENTRYPOINT = "tools/ci/run-clean-checkout-reproducibility-phase.mjs";
 const CONTRACT_PATH = "contracts/documentation/clean-checkout-reproducibility-owner-contract.json";

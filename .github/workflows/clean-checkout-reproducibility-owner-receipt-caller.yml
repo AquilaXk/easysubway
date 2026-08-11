@@ -9,6 +9,6 @@ jobs:
   owner-receipt:
     permissions:
       contents: read
-    uses: AquilaXk/easysubway/.github/workflows/clean-checkout-reproducibility-owner-receipt.yml@c84a23f981516640a530ab3119152c239597b6c6
+    uses: AquilaXk/easysubway/.github/workflows/clean-checkout-reproducibility-owner-receipt.yml@4475e6d9da634e28cda4179b738d4f9f440f06a7
     with:
       contract_path: contracts/documentation/clean-checkout-reproducibility-owner-contract.json
