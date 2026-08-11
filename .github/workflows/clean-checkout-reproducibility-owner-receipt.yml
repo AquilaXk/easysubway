@@ -23,6 +23,7 @@ jobs:
           ref: ${{ github.sha }}
           path: owner-source
           persist-credentials: false
+          fetch-depth: 0
 
       - name: Validate immutable D13 engine identity
         id: d13-engine-identity
