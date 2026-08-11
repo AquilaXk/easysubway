@@ -78,6 +78,7 @@ test("system release manifest v3 rejects every locked identity violation", () =>
   const cases = [
     ["legacy v2", (manifest) => { manifest.schemaVersion = 2; }],
     ["missing Hub identity", (manifest) => { delete manifest.hub; }],
+    ["missing Hub SHA", (manifest) => { delete manifest.hub.gitSha; }],
     ["wrong Hub repository", (manifest) => { manifest.hub.repository = "AquilaXk/easysubway-backend"; }],
     ["uppercase Hub SHA", (manifest) => { manifest.hub.gitSha = gitSha.toUpperCase(); }],
     ["short Hub SHA", (manifest) => { manifest.hub.gitSha = "b".repeat(39); }],
