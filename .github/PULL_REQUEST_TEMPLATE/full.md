@@ -1,79 +1,61 @@
-## 관련 이슈
+<!--
+API/schema/DB migration/deploy/security/privacy/artifact/release처럼 실패 비용이 큰 PBI에 사용합니다.
+상세 설계는 Tech Spec/ADR에 두고 PR에는 실제 diff, 검증, 위험과 rollout만 기록합니다.
+-->
 
-close #
+## 관련 작업
 
-## 작업 배경
+- Epic:
+- PBI / Sub-task:
+- `Closes` 또는 `Refs`:
+- Tech Spec / ADR:
+
+## 목적·범위
+
+- 해결할 문제:
+- 포함:
+- 제외:
+- accountable owner / plan:
+
+## 변경 내용
 
 -
-
-## 작업 내용
-
--
-
-## Documentation impact
-
-- 영향 resource ID 또는 `NONE`:
-- resourceClass:
-- documentationFamily:
-- lifecycle/evidence 영향:
 
 ## 검증
 
-- 실행한 명령과 결과:
+- Focused RED → GREEN:
+- Affected integration:
+- Required CI:
+- Manual / device / production-like 확인: `NONE`
 
-## 검증 증거
+## 실패·호환·rollout
 
-UI, 접근성, 수동 QA, 배포 확인이 필요한 항목은 증거 첨부, 링크, 또는 로컬 evidence 경로를 적습니다. 증거가 필요 없는 항목은 사유를 적습니다.
+- 실패 시 상태 변화:
+- 호환성 / migration:
+- rollout / activation:
+- rollback:
+- fallback 또는 이전 결과를 current success로 사용하는 경로: `없음`
 
-| 항목 | 플랫폼 | 확인 방법 | 증거 | 결과 |
-| --- | --- | --- | --- | --- |
-|  |  |  |  |  |
+## 필요한 증거
 
-## Version impact
+<!-- 실제 변경에 필요한 항목만 남깁니다. -->
+- CI / test:
+- UI / accessibility / device: `NONE`
+- artifact / deploy / operations: `NONE`
 
-- [ ] no version change
-- [ ] mobile patch
-- [ ] mobile minor
-- [ ] mobile major
-- [ ] backend deploy only
-- [ ] datapack release only
-- [ ] route/realtime contract change
-- [ ] DB migration change
+## Documentation impact
 
-## Route commercialization gate impact
+- 영향 resource 또는 `NONE`:
+- canonical owner:
+- lifecycle/evidence 영향:
 
-- [ ] route-commercialization-gate.json 영향 없음
-- [ ] route ETA accuracy, realtime coverage, accessibility regression, route v2 contract report를 갱신했다.
-- [ ] 상용 경로/ETA claim을 추가하거나 변경하지 않는다.
-
-## Route release readiness tracker impact
-
-- [ ] route-release-readiness-tracker.json 영향 없음
-- [ ] #1414 하위 release blocker issue 또는 production evidence 완료 조건을 갱신했다.
-- [ ] 실시간/교통약자 길찾기 출시 준비 완료 claim을 추가하거나 변경하지 않는다.
-
-### Version decision
-
-- mobile versionName:
-- mobile versionCode:
-- datapack version:
-- route contract:
-- realtime contract:
-- backend identity:
-
-## 리뷰어 메모
-
-- 리뷰어가 먼저 봐야 할 지점:
-
-## 리스크
+## 리뷰 포인트
 
 -
 
-## 체크리스트
+## 확인
 
-- [ ] PR 본문은 이 템플릿 섹션을 삭제하지 않고 모두 채웠다.
-- [ ] CI 결과를 확인했다.
-- [ ] CodeRabbit 리뷰를 확인했다.
-- [ ] GitHub PR Review 객체가 있는지 확인했다. CodeRabbit status check만으로는 리뷰 완료로 보지 않는다.
-- [ ] CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다.
-- [ ] 배포 영향이 있는 경우 CD 상태를 확인했다.
+- [ ] 하나의 PBI/Sub-task와 한 accountable owner의 변경입니다.
+- [ ] 다른 작업자의 issue·branch·worktree·PR 경계를 변경하지 않았습니다.
+- [ ] 검증은 risk-based focused matrix이며 동일 full suite를 여러 계층에서 반복하지 않습니다.
+- [ ] required CI와 repository Review 정책을 PR gate에서 확인합니다.
