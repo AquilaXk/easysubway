@@ -1,6 +1,8 @@
 name: "작업 / 개선"
 description: "기능, 개선, 리팩터링, 자동화 작업을 등록합니다."
-title: ""
+title: "[Task] "
+labels:
+  - enhancement
 body:
   - type: markdown
     attributes:

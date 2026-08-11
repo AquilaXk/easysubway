@@ -1,4 +1,4 @@
-<!-- B/C등급(일반 코드 변경·낮은 위험 maintenance) 전용. A등급 또는 CI workflow·계약 테스트·release gate 변경은 full.md를 사용합니다. -->
+<!-- B/C등급(일반 코드 변경·낮은 위험 maintenance) 전용. A등급(API, schema, data, security, deployment, artifact, release, CI workflow·계약 테스트·release gate 변경)은 full.md를 사용합니다. -->
 
 ## 관련 이슈 / Related issue
 
@@ -19,7 +19,8 @@ Refs #
 ## 검증 / Verification
 
 - 실행한 명령과 결과:
-- Not run — reason: None
+- Not run — reason: <미실행 사유를 필수로 작성>
+- Rerun owner / condition: <재실행 담당자와 조건>
 
 ## 영향 / Risk
 
