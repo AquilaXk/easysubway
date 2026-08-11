@@ -12,12 +12,13 @@ const issue = (repository, number) => `AquilaXk/${repository}#${number}`;
 
 function validManifest() {
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     productReleaseId: "easysubway-2026.07.30.1",
     phase: "FINAL",
     decision: "GO",
     generatedAt: "2026-07-30T00:00:00Z",
     issueRefs: [issue("easysubway", 2693)],
+    hub: { repository: "AquilaXk/easysubway", gitSha },
     contracts: { version: "1.2.3", sha256: sha },
     mobile: {
       schemaVersion: 1, component: "mobile", repository: "AquilaXk/easysubway-mobile", gitSha,
@@ -48,11 +49,11 @@ const schemas = {
   issueRefSchema: JSON.parse(readFileSync("contracts/release/issue-ref.schema.json", "utf8")),
 };
 
-test("system release manifest v2 validates the locked release identity", () => {
+test("system release manifest v3 validates the locked five-repository release identity", () => {
   assert.deepEqual(validateSystemReleaseManifest({ manifest: validManifest(), ...schemas }), []);
 });
 
-test("system release manifest v2 rejects invalid contracts SemVer", () => {
+test("system release manifest v3 rejects invalid contracts SemVer", () => {
   const manifest = validManifest();
   manifest.contracts.version = `1.2.3-${"a.".repeat(150)}a`;
   assert.ok(validateSystemReleaseManifest({ manifest, ...schemas }).includes("system: contracts version must be SemVer"));
@@ -73,8 +74,15 @@ test("system release decision requires legacy GO and every GO transition conditi
   }
 });
 
-test("system release manifest v2 rejects every locked identity violation", () => {
+test("system release manifest v3 rejects every locked identity violation", () => {
   const cases = [
+    ["legacy v2", (manifest) => { manifest.schemaVersion = 2; }],
+    ["missing Hub identity", (manifest) => { delete manifest.hub; }],
+    ["missing Hub SHA", (manifest) => { delete manifest.hub.gitSha; }],
+    ["wrong Hub repository", (manifest) => { manifest.hub.repository = "AquilaXk/easysubway-backend"; }],
+    ["uppercase Hub SHA", (manifest) => { manifest.hub.gitSha = gitSha.toUpperCase(); }],
+    ["short Hub SHA", (manifest) => { manifest.hub.gitSha = "b".repeat(39); }],
+    ["extra Hub identity field", (manifest) => { manifest.hub.ref = "main"; }],
     ["top-level gitSha", (manifest) => { manifest.gitSha = gitSha; }],
     ["bare issue number", (manifest) => { manifest.issueRefs = [2693]; }],
     ["uppercase hash", (manifest) => { manifest.contracts.sha256 = sha.toUpperCase(); }],
@@ -95,7 +103,7 @@ test("system release manifest v2 rejects every locked identity violation", () =>
   }
 });
 
-test("system release manifest v2 rejects unsafe identity integers", () => {
+test("system release manifest v3 rejects unsafe identity integers", () => {
   for (const [mutate, expected] of [
     [(manifest) => { manifest.mobile.artifactIdentity.versionCode = Number.MAX_SAFE_INTEGER + 1; }, "mobile: versionCode must be a safe integer"],
     [(manifest) => { manifest.data.artifactIdentity.releaseSequence = Number.MAX_SAFE_INTEGER + 1; }, "data: releaseSequence must be a safe integer"],

@@ -7,6 +7,7 @@ import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
 import { isSemVer } from "./lib/semver.mjs";
 
 const slots = ["mobile", "backend", "data", "platform"];
+const canonicalHubRepository = "AquilaXk/easysubway";
 const canonicalRepositories = Object.fromEntries(slots.map((slot) => [slot, `AquilaXk/easysubway-${slot}`]));
 const allowedRepositories = Object.fromEntries(slots.map((slot) => [slot, new Set(["AquilaXk/easysubway", canonicalRepositories[slot]])]));
 
@@ -31,6 +32,7 @@ export function validateSystemReleaseManifest({ manifest, componentSchema, syste
       errors.push(...validateSchema(issueRefSchema, issueRef).errors.map(() => "system: invalid issue ref"));
     }
   }
+  if (manifest.hub?.repository !== canonicalHubRepository) errors.push("hub: repository must be canonical");
   if (!isSemVer(manifest.contracts?.version)) errors.push("system: contracts version must be SemVer");
 
   const components = slots.map((slot) => manifest[slot]).filter(Boolean);

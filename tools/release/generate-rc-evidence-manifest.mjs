@@ -452,12 +452,16 @@ function buildSystemReleaseManifest(legacyManifest, inputs) {
     for (const issueRef of component.issueRefs ?? []) if (!issueRefs.includes(issueRef)) issueRefs.push(issueRef);
   }
   const base = {
-    schemaVersion: 2,
+    schemaVersion: 3,
     productReleaseId: inputs.productReleaseId,
     phase: "FINAL",
     decision: "NO_GO",
     generatedAt,
     issueRefs,
+    hub: {
+      repository: "AquilaXk/easysubway",
+      gitSha: legacyManifest.releaseCandidateIdentity.gitSha,
+    },
     contracts: inputs.contracts,
     ...inputs.components,
   };
