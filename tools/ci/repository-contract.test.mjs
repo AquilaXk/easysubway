@@ -3380,7 +3380,13 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
   assert.match(mobileJob, /flutter build apk --config-only/);
   assert.match(mobileJob, /android\/gradlew -p android :app:processReleaseMainManifest --no-daemon/);
   assert.match(mobileJob, /for attempt in 1 2 3; do/);
-  assert.match(mobileJob, /gradle_status="\$\{PIPESTATUS\[0\]\}"/);
+  assert.match(mobileJob, /pipeline_status=\("\$\{PIPESTATUS\[@\]\}"\)/);
+  assert.match(mobileJob, /gradle_status="\$\{pipeline_status\[0\]\}"/);
+  assert.match(mobileJob, /tee_status="\$\{pipeline_status\[1\]\}"/);
+  assert.match(
+    mobileJob,
+    /if \[\[ "\$\{tee_status\}" -ne 0 \]\]; then[\s\S]*exit "\$\{tee_status\}"/,
+  );
   assert.match(mobileJob, /if \[\[ "\$\{gradle_status\}" -eq 0 \]\]; then[\s\S]*break/);
   assert.match(
     mobileJob,

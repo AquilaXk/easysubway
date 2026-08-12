@@ -729,7 +729,28 @@ jobs:
           set -euo pipefail
           flutter pub get
           flutter build apk --config-only
-          android/gradlew -p android :app:processReleaseMainManifest --no-daemon
+          gradle_log="${RUNNER_TEMP}/easysubway-mobile-gradle-wrapper.log"
+          for attempt in 1 2 3; do
+            set +e
+            android/gradlew -p android :app:processReleaseMainManifest --no-daemon 2>&1 | tee "${gradle_log}"
+            pipeline_status=("${PIPESTATUS[@]}")
+            set -e
+            gradle_status="${pipeline_status[0]}"
+            tee_status="${pipeline_status[1]}"
+
+            if [[ "${tee_status}" -ne 0 ]]; then
+              exit "${tee_status}"
+            fi
+            if [[ "${gradle_status}" -eq 0 ]]; then
+              break
+            fi
+            if [[ "${attempt}" -eq 3 ]] || ! grep -Fq "Unexpected end of file from server" "${gradle_log}"; then
+              exit "${gradle_status}"
+            fi
+
+            echo "Transient Gradle wrapper EOF; retrying bounded attempt $((attempt + 1))/3." >&2
+            sleep "$((attempt * 5))"
+          done
 
       - name: Mobile App CI / Run mobile contracts
         if: ${{ needs.changes.outputs.mobile == 'true' && steps.scaffold.outputs.present == 'true' }}
