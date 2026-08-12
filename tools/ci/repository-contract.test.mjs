@@ -3379,6 +3379,18 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
   assert.match(mobileJob, /flutter pub get/);
   assert.match(mobileJob, /flutter build apk --config-only/);
   assert.match(mobileJob, /android\/gradlew -p android :app:processReleaseMainManifest --no-daemon/);
+  assert.match(mobileJob, /for attempt in 1 2 3; do/);
+  assert.match(mobileJob, /gradle_status="\$\{PIPESTATUS\[0\]\}"/);
+  assert.match(mobileJob, /if \[\[ "\$\{gradle_status\}" -eq 0 \]\]; then[\s\S]*break/);
+  assert.match(
+    mobileJob,
+    /if \[\[ "\$\{attempt\}" -eq 3 \]\] \|\| ! grep -Fq "Unexpected end of file from server" "\$\{gradle_log\}"; then[\s\S]*exit "\$\{gradle_status\}"/,
+  );
+  assert.match(mobileJob, /sleep "\$\(\(attempt \* 5\)\)"/);
+  assert.doesNotMatch(
+    mobileJob,
+    /android\/gradlew -p android :app:processReleaseMainManifest --no-daemon\s*\|\|\s*true/,
+  );
   assert.match(mobileJob, /Mobile App CI \/ Run mobile contracts/);
   assert.match(mobileJob, /EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST: "true"/);
   assert.match(
