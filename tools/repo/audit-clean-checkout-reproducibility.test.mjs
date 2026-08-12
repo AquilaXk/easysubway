@@ -10,10 +10,12 @@ import {
   AuditIncomplete,
   auditCleanCheckoutReproducibility,
   collectArtifactCatalog,
+  collectCurrentHeadWorkflowRuns,
   collectLive,
   evaluateReadyEvidence,
   readSingleReceiptZip,
   runAuditCli,
+  selectCurrentHeadWorkflowRun,
   stableJson,
   validateCleanCheckoutReproducibilityReport,
   validateCleanCheckoutReproducibilityScope,
@@ -35,13 +37,12 @@ const OBSERVED_AT = "2026-08-10T00:05:00.000Z";
 const WATERMARK = "d".repeat(64);
 
 const SCOPE = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   slots: REPOSITORIES.map((repository) => ({
     repository,
     state: "PENDING",
     ownerIssue: null,
-    contractLocator: null,
-    receiptLocator: null,
+    evidenceSource: null,
   })),
 };
 
@@ -106,16 +107,27 @@ const readySlot = (repository = REPOSITORIES[0]) => ({
   repository,
   state: "READY",
   ownerIssue: 123,
+  evidenceSource: {
+    contractPath: "contracts/reproducibility.json",
+    workflowPath: ".github/workflows/reproducibility.yml",
+    artifactNamePrefix: "clean-checkout-reproducibility-",
+  },
+});
+
+const verifiedEvidence = (contract = ownerContract(), receipt = ownerReceipt(contract)) => ({
+  repository: contract.repository,
+  currentHead: SOURCE_SHA,
+  issueState: "CLOSED",
   contractLocator: {
     kind: "GIT_BLOB",
-    repository,
+    repository: contract.repository,
     commitSha: SOURCE_SHA,
     path: "contracts/reproducibility.json",
     blobSha: "f".repeat(40),
   },
   receiptLocator: {
     kind: "ACTIONS_ARTIFACT",
-    repository,
+    repository: contract.repository,
     runId: 456,
     artifactId: 789,
     artifactName: `clean-checkout-reproducibility-${SOURCE_SHA}`,
@@ -125,12 +137,6 @@ const readySlot = (repository = REPOSITORIES[0]) => ({
     createdAt: "2026-08-10T00:00:00Z",
     expiresAt: "2026-08-24T00:00:00Z",
   },
-});
-
-const verifiedEvidence = (contract = ownerContract(), receipt = ownerReceipt(contract)) => ({
-  repository: contract.repository,
-  currentHead: SOURCE_SHA,
-  issueState: "CLOSED",
   contract,
   contractText: JSON.stringify(contract),
   contractEntry: { path: "contracts/reproducibility.json", mode: "100644", type: "blob" },
@@ -139,6 +145,7 @@ const verifiedEvidence = (contract = ownerContract(), receipt = ownerReceipt(con
   receipt,
   receiptArchiveDigest: ARCHIVE_DIGEST,
   run: {
+    id: 456,
     conclusion: "success",
     path: ".github/workflows/reproducibility.yml",
     headSha: SOURCE_SHA,
@@ -182,6 +189,11 @@ test("clean checkout reproducibility audit accepts exact PENDING and owner contr
   const invalidScope = structuredClone(SCOPE);
   invalidScope.slots[0].ownerIssue = 123;
   assert.notDeepEqual(validateCleanCheckoutReproducibilityScope(invalidScope), []);
+  const ready = structuredClone(SCOPE);
+  ready.slots[0] = readySlot();
+  assert.deepEqual(validateCleanCheckoutReproducibilityScope(ready), []);
+  ready.slots[0].evidenceSource.artifactNamePrefix = "../receipt-";
+  assert.notDeepEqual(validateCleanCheckoutReproducibilityScope(ready), []);
 });
 
 test("clean checkout reproducibility audit rejects phase, token, environment and DEBUG weakening", () => {
@@ -213,6 +225,7 @@ test("clean checkout reproducibility audit verifies one READY evidence path and 
     [(evidence) => { evidence.artifactCatalog = []; }, "ACTIONS_ARTIFACT_CATALOG_MISMATCH"],
     [(evidence) => { evidence.entrypoints[0].mode = "100644"; }, "ENTRYPOINT_NOT_EXECUTABLE"],
     [(evidence) => { evidence.run.conclusion = "failure"; }, "ACTIONS_RUN_MISMATCH"],
+    [(evidence) => { evidence.run.id = 457; }, "ACTIONS_RUN_MISMATCH"],
     [(evidence) => { evidence.contractSha256 = "9".repeat(64); }, "CONTRACT_RECEIPT_DIGEST_MISMATCH"],
     [(evidence) => { evidence.receipt.observedAt = "2026-08-10T00:20:00.000Z"; }, "RECEIPT_TIME_MISMATCH"],
     [(evidence) => { evidence.receipt.variants[0].phases[0].commandSha256 = "9".repeat(64); }, "CONTRACT_RECEIPT_PHASE_MISMATCH"],
@@ -240,17 +253,75 @@ test("clean checkout reproducibility audit emits a complete five-PENDING report 
 });
 
 test("clean checkout reproducibility audit accepts an exact five-READY provider-shaped result", () => {
-  const scope = { schemaVersion: 1, slots: REPOSITORIES.map((repository) => readySlot(repository)) };
+  const scope = { schemaVersion: 2, slots: REPOSITORIES.map((repository) => readySlot(repository)) };
   const records = scope.slots.map((slot) => {
     const contract = ownerContract(slot.repository);
     const evidence = verifiedEvidence(contract, ownerReceipt(contract));
     const findings = evaluateReadyEvidence({ slot, evidence, now: "2026-08-10T12:00:00.000Z" });
     assert.deepEqual(findings, []);
-    return { repository: slot.repository, currentHead: SOURCE_SHA, issueState: "CLOSED", evidenceState: "VERIFIED", findings };
+    return { repository: slot.repository, currentHead: SOURCE_SHA, issueState: "CLOSED", evidenceState: "VERIFIED", findings, contractLocator: evidence.contractLocator, receiptLocator: evidence.receiptLocator };
   });
   const report = auditCleanCheckoutReproducibility({ scope, sourceSha: SOURCE_SHA, observedAt: OBSERVED_AT, records, stateBeginSha256: WATERMARK, stateEndSha256: WATERMARK, scopeText: JSON.stringify(scope) });
   assert.deepEqual([report.status, report.summary.pending, report.summary.ready, report.summary.findings], ["COMPLETE", 0, 5, 0]);
   assert.deepEqual(validateCleanCheckoutReproducibilityReport(report), []);
+  const missingEvidenceSource = structuredClone(report);
+  missingEvidenceSource.slots[0].evidenceSource = null;
+  assert.notDeepEqual(validateCleanCheckoutReproducibilityReport(missingEvidenceSource), []);
+});
+
+test("clean checkout reproducibility audit reports a missing current-head receipt without a circular locator", () => {
+  const scope = structuredClone(SCOPE);
+  scope.slots[0] = readySlot();
+  const evidence = verifiedEvidence();
+  const records = REPOSITORIES.map((repository, index) => index === 0 ? {
+    repository,
+    currentHead: SOURCE_SHA,
+    issueState: "CLOSED",
+    evidenceState: "FINDING",
+    contractLocator: evidence.contractLocator,
+    receiptLocator: null,
+    findings: [{ code: "CURRENT_HEAD_RECEIPT_MISSING", repository }],
+  } : { repository, currentHead: SOURCE_SHA, issueState: null, evidenceState: "PENDING", findings: [] });
+  const report = auditCleanCheckoutReproducibility({ scope, sourceSha: SOURCE_SHA, observedAt: OBSERVED_AT, records, stateBeginSha256: WATERMARK, stateEndSha256: WATERMARK, scopeText: JSON.stringify(scope) });
+  const schema = JSON.parse(readFileSync("contracts/documentation/clean-checkout-reproducibility-audit-report.schema.json", "utf8"));
+  assert.equal(validateSchema(schema, report).ok, true);
+  assert.deepEqual(validateCleanCheckoutReproducibilityReport(report), []);
+  assert.deepEqual([report.summary.ready, report.summary.findings, report.slots[0].receiptLocator, report.slots[0].evidenceState], [1, 1, null, "FINDING"]);
+});
+
+test("clean checkout reproducibility audit discovers only exact current-head successful workflow runs", async () => {
+  const workflowPath = readySlot().evidenceSource.workflowPath;
+  const rawRun = (id) => ({
+    id,
+    head_sha: SOURCE_SHA,
+    path: workflowPath,
+    event: "workflow_dispatch",
+    status: "completed",
+    conclusion: "success",
+    run_started_at: "2026-08-10T00:00:00Z",
+    updated_at: "2026-08-10T00:10:00Z",
+  });
+  const endpoints = [];
+  const runs = await collectCurrentHeadWorkflowRuns(REPOSITORIES[0], {
+    branch: "main",
+    workflowPath,
+    headSha: SOURCE_SHA,
+  }, async ({ endpoint }) => {
+    endpoints.push(endpoint);
+    return { total_count: 1, workflow_runs: [rawRun(456)] };
+  });
+  assert.deepEqual(runs.map(({ id }) => id), [456]);
+  assert.match(endpoints[0], /actions\/workflows\/reproducibility\.yml\/runs\?branch=main&event=workflow_dispatch&status=success&head_sha=a{40}&per_page=100&page=1$/);
+  assert.equal(selectCurrentHeadWorkflowRun([], REPOSITORIES[0]), null);
+  assert.throws(() => selectCurrentHeadWorkflowRun([runs[0], { ...runs[0], id: 457 }], REPOSITORIES[0]), (error) => error instanceof AuditIncomplete && error.code === "WORKFLOW_RUN_AMBIGUOUS");
+  await assert.rejects(
+    () => collectCurrentHeadWorkflowRuns(REPOSITORIES[0], { branch: "main", workflowPath, headSha: SOURCE_SHA }, async () => ({ total_count: 2, workflow_runs: [rawRun(456)] })),
+    (error) => error instanceof AuditIncomplete && error.code === "WORKFLOW_RUN_CATALOG_COUNT_MISMATCH",
+  );
+  await assert.rejects(
+    () => collectCurrentHeadWorkflowRuns(REPOSITORIES[0], { branch: "main", workflowPath, headSha: SOURCE_SHA }, async () => ({ total_count: 1, workflow_runs: [{ ...rawRun(456), event: "push" }] })),
+    (error) => error instanceof AuditIncomplete && error.code === "WORKFLOW_RUN_IDENTITY_MISMATCH",
+  );
 });
 
 test("clean checkout reproducibility audit freezes bounded artifact catalog pagination", async () => {

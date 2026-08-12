@@ -244,6 +244,8 @@ test("clean checkout reproducibility audit contracts fix the exact five-owner pe
   assert.deepEqual(validateCleanCheckoutReproducibilityOwnerContractSchema(contractSchema), []);
   assert.deepEqual(validateCleanCheckoutReproducibilityOwnerReceiptSchema(receiptSchema), []);
   assert.deepEqual(validateCleanCheckoutReproducibilityAuditReportSchema(reportSchema), []);
+  assert.equal(scope.schemaVersion, 2);
+  assert.equal(reportSchema.properties.schemaVersion.const, 2);
 
   const invalidScope = structuredClone(scope); invalidScope.slots[0].ownerIssue = 2816;
   assert.ok(validateCleanCheckoutReproducibilityAuditScope(invalidScope).length > 0);
@@ -252,8 +254,13 @@ test("clean checkout reproducibility audit contracts fix the exact five-owner pe
   for (const mutate of [
     (value) => { value.properties.slots.minItems = 4; },
     (value) => { value.properties.slots.items.properties.repository.enum.pop(); },
-    (value) => { value.properties.slots.items.properties.contractLocator.oneOf[1].properties.path.pattern = ".+"; },
-    (value) => { value.properties.slots.items.properties.receiptLocator.oneOf[1].properties.workflowPath.pattern = ".+"; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.contractPath.pattern = ".+"; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.workflowPath.pattern = ".+"; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.artifactNamePrefix.pattern = ".+"; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.contractPath.type = ["string", "null"]; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.workflowPath.type = ["string", "null"]; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.artifactNamePrefix.type = ["string", "null"]; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf.push({}); },
     (value) => { value.properties.slots.items.oneOf[0].properties.ownerIssue.type = "integer"; },
   ]) { const invalid = structuredClone(scopeSchema); mutate(invalid); assert.ok(validateCleanCheckoutReproducibilityAuditScopeSchema(invalid).length > 0); }
 
@@ -286,6 +293,7 @@ test("clean checkout reproducibility audit contracts fix the exact five-owner pe
     (value) => { value.properties.inputs.properties.stateBeginSha256.pattern = ".+"; },
     (value) => { value.properties.summary.properties.ready.minimum = -1; },
     (value) => { value.properties.slots.minItems = 4; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].additionalProperties = true; },
     (value) => { value.properties.slots.items.properties.contractLocator.oneOf[1].additionalProperties = true; },
     (value) => { value.properties.slots.items.properties.receiptLocator.oneOf[1].properties.artifactId.minimum = 0; },
     (value) => { value.properties.slots.items.properties.currentHead.pattern = ".+"; },

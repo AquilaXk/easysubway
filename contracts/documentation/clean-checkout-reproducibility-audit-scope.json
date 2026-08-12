@@ -1,10 +1,10 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "slots": [
-    { "repository": "AquilaXk/easysubway", "state": "PENDING", "ownerIssue": null, "contractLocator": null, "receiptLocator": null },
-    { "repository": "AquilaXk/easysubway-backend", "state": "PENDING", "ownerIssue": null, "contractLocator": null, "receiptLocator": null },
-    { "repository": "AquilaXk/easysubway-data", "state": "PENDING", "ownerIssue": null, "contractLocator": null, "receiptLocator": null },
-    { "repository": "AquilaXk/easysubway-mobile", "state": "PENDING", "ownerIssue": null, "contractLocator": null, "receiptLocator": null },
-    { "repository": "AquilaXk/easysubway-platform", "state": "PENDING", "ownerIssue": null, "contractLocator": null, "receiptLocator": null }
+    { "repository": "AquilaXk/easysubway", "state": "PENDING", "ownerIssue": null, "evidenceSource": null },
+    { "repository": "AquilaXk/easysubway-backend", "state": "PENDING", "ownerIssue": null, "evidenceSource": null },
+    { "repository": "AquilaXk/easysubway-data", "state": "PENDING", "ownerIssue": null, "evidenceSource": null },
+    { "repository": "AquilaXk/easysubway-mobile", "state": "PENDING", "ownerIssue": null, "evidenceSource": null },
+    { "repository": "AquilaXk/easysubway-platform", "state": "PENDING", "ownerIssue": null, "evidenceSource": null }
   ]
 }
