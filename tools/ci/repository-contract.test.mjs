@@ -3405,6 +3405,29 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
   );
 });
 
+test("Android 변경 CI는 native asset header 단절만 bounded retry한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const androidJob = jobBlock(workflow, "android", "notify-slack-ci-failure");
+
+  assert.match(androidJob, /Android CI \/ Build Flutter Android debug APK/);
+  assert.match(androidJob, /for attempt in 1 2 3; do/);
+  assert.match(androidJob, /flutter build apk --debug 2>&1 \| tee "\$\{android_log\}"/);
+  assert.match(androidJob, /pipeline_status=\("\$\{PIPESTATUS\[@\]\}"\)/);
+  assert.match(androidJob, /build_status="\$\{pipeline_status\[0\]\}"/);
+  assert.match(androidJob, /tee_status="\$\{pipeline_status\[1\]\}"/);
+  assert.match(
+    androidJob,
+    /if \[\[ "\$\{tee_status\}" -ne 0 \]\]; then[\s\S]*exit "\$\{tee_status\}"/,
+  );
+  assert.match(androidJob, /if \[\[ "\$\{build_status\}" -eq 0 \]\]; then[\s\S]*break/);
+  assert.match(
+    androidJob,
+    /if \[\[ "\$\{attempt\}" -eq 3 \]\] \|\| ! grep -Fq "Connection closed before full header was received" "\$\{android_log\}"; then[\s\S]*exit "\$\{build_status\}"/,
+  );
+  assert.match(androidJob, /sleep "\$\(\(attempt \* 5\)\)"/);
+  assert.doesNotMatch(androidJob, /flutter build apk --debug\s*\|\|\s*true/);
+});
+
 test("OSV 의존성 취약점 게이트는 PR 의존성 취약점을 차단한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const dependencyScanJob = jobBlock(workflow, "dependency-vulnerability-scan", "pr-title");
