@@ -3435,7 +3435,7 @@ test("Android native asset cache는 sqlite3 3.3.4 content hash identity를 고�
   assert.match(pubspec, /^  sqlite3: 3\.3\.4$/m);
   assert.match(
     lockfile,
-    /  sqlite3:\n    dependency: "direct main"\n    description:\n      name: sqlite3\n      sha256: "[a-f0-9]{64}"\n      url: "https:\/\/pub\.dev"\n    source: hosted\n    version: "3\.3\.4"/,
+    /  sqlite3:\n    dependency: "direct main"\n    description:\n      name: sqlite3\n      sha256: "752d9d746052359a2022f588bb979f2e7c4e0f9e4b6a1c3121f7626a1574974b"\n      url: "https:\/\/pub\.dev"\n    source: hosted\n    version: "3\.3\.4"/,
   );
   assert.doesNotMatch(pubspec, /sqlite3_flutter_libs/);
 });
