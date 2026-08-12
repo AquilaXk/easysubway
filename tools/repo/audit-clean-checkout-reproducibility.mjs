@@ -179,7 +179,7 @@ export function evaluateReadyEvidence({ slot, evidence, now = new Date().toISOSt
   if (receipt?.contractSha256 !== evidence?.contractSha256) add("CONTRACT_RECEIPT_DIGEST_MISMATCH");
   if (receipt?.cleanCheckout?.repository !== repository || receipt?.cleanCheckout?.sourceSha !== evidence?.currentHead || receipt?.cleanCheckout?.initialTrackedDiffCount !== 0 || receipt?.cleanCheckout?.initialUntrackedCount !== 0) add("CLEAN_CHECKOUT_DIRTY");
   const run = evidence?.run; const artifact = evidence?.artifact;
-  if (run?.conclusion !== "success" || run?.path !== slot.evidenceSource?.workflowPath || run?.headSha !== evidence?.currentHead) add("ACTIONS_RUN_MISMATCH");
+  if (run?.id !== receiptLocator?.runId || run?.conclusion !== "success" || run?.path !== slot.evidenceSource?.workflowPath || run?.headSha !== evidence?.currentHead) add("ACTIONS_RUN_MISMATCH");
   const artifactCreatedAt = providerUtc(artifact?.createdAt) ? new Date(artifact.createdAt).toISOString() : null;
   const artifactExpiresAt = providerUtc(artifact?.expiresAt) ? new Date(artifact.expiresAt).toISOString() : null;
   const locatorCreatedAt = providerUtc(receiptLocator?.createdAt) ? new Date(receiptLocator.createdAt).toISOString() : null;
@@ -257,6 +257,7 @@ export function validateCleanCheckoutReproducibilityReport(report, errors = []) 
     const contractValid = slot.contractLocator === null || validContractLocator(slot.contractLocator, slot.repository);
     const receiptValid = slot.receiptLocator === null || validReceiptLocator(slot.receiptLocator, slot.repository);
     if (!contractValid || !receiptValid || slot.evidenceState === "VERIFIED" && (slot.contractLocator === null || slot.receiptLocator === null)) { errors.push("ready locator mismatch"); continue; }
+    if (slot.evidenceSource === null) { errors.push("ready evidence source mismatch"); continue; }
     if (slot.contractLocator !== null && (slot.contractLocator.commitSha !== slot.currentHead || slot.contractLocator.path !== slot.evidenceSource.contractPath)) errors.push("ready contract locator mismatch");
     if (slot.receiptLocator !== null && (slot.receiptLocator.headSha !== slot.currentHead || slot.receiptLocator.workflowPath !== slot.evidenceSource.workflowPath || slot.receiptLocator.artifactName !== `${slot.evidenceSource.artifactNamePrefix}${slot.currentHead}`)) errors.push("ready receipt locator mismatch");
   }

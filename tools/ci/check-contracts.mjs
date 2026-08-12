@@ -992,11 +992,12 @@ function strictReproducibilityArtifactLocator(schema) {
 }
 
 function strictReproducibilityEvidenceSource(schema) {
+  if (!Array.isArray(schema?.oneOf) || schema.oneOf.length !== 2) return false;
   const [nil, source] = schema?.oneOf ?? [];
   return nil?.type === "null" && strictSchemaObject(source, ["contractPath", "workflowPath", "artifactNamePrefix"])
-    && source?.properties?.contractPath?.pattern === REPRODUCIBILITY_PATH_PATTERN
-    && source?.properties?.workflowPath?.pattern === REPRODUCIBILITY_WORKFLOW_PATTERN
-    && source?.properties?.artifactNamePrefix?.pattern === REPRODUCIBILITY_ARTIFACT_PREFIX_PATTERN;
+    && source?.properties?.contractPath?.type === "string" && source?.properties?.contractPath?.pattern === REPRODUCIBILITY_PATH_PATTERN
+    && source?.properties?.workflowPath?.type === "string" && source?.properties?.workflowPath?.pattern === REPRODUCIBILITY_WORKFLOW_PATTERN
+    && source?.properties?.artifactNamePrefix?.type === "string" && source?.properties?.artifactNamePrefix?.pattern === REPRODUCIBILITY_ARTIFACT_PREFIX_PATTERN;
 }
 
 export function validateCleanCheckoutReproducibilityAuditScope(scope, errors = [], path = "clean-checkout-reproducibility-audit-scope") {

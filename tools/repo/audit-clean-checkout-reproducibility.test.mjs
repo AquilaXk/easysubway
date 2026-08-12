@@ -145,6 +145,7 @@ const verifiedEvidence = (contract = ownerContract(), receipt = ownerReceipt(con
   receipt,
   receiptArchiveDigest: ARCHIVE_DIGEST,
   run: {
+    id: 456,
     conclusion: "success",
     path: ".github/workflows/reproducibility.yml",
     headSha: SOURCE_SHA,
@@ -224,6 +225,7 @@ test("clean checkout reproducibility audit verifies one READY evidence path and 
     [(evidence) => { evidence.artifactCatalog = []; }, "ACTIONS_ARTIFACT_CATALOG_MISMATCH"],
     [(evidence) => { evidence.entrypoints[0].mode = "100644"; }, "ENTRYPOINT_NOT_EXECUTABLE"],
     [(evidence) => { evidence.run.conclusion = "failure"; }, "ACTIONS_RUN_MISMATCH"],
+    [(evidence) => { evidence.run.id = 457; }, "ACTIONS_RUN_MISMATCH"],
     [(evidence) => { evidence.contractSha256 = "9".repeat(64); }, "CONTRACT_RECEIPT_DIGEST_MISMATCH"],
     [(evidence) => { evidence.receipt.observedAt = "2026-08-10T00:20:00.000Z"; }, "RECEIPT_TIME_MISMATCH"],
     [(evidence) => { evidence.receipt.variants[0].phases[0].commandSha256 = "9".repeat(64); }, "CONTRACT_RECEIPT_PHASE_MISMATCH"],
@@ -262,6 +264,9 @@ test("clean checkout reproducibility audit accepts an exact five-READY provider-
   const report = auditCleanCheckoutReproducibility({ scope, sourceSha: SOURCE_SHA, observedAt: OBSERVED_AT, records, stateBeginSha256: WATERMARK, stateEndSha256: WATERMARK, scopeText: JSON.stringify(scope) });
   assert.deepEqual([report.status, report.summary.pending, report.summary.ready, report.summary.findings], ["COMPLETE", 0, 5, 0]);
   assert.deepEqual(validateCleanCheckoutReproducibilityReport(report), []);
+  const missingEvidenceSource = structuredClone(report);
+  missingEvidenceSource.slots[0].evidenceSource = null;
+  assert.notDeepEqual(validateCleanCheckoutReproducibilityReport(missingEvidenceSource), []);
 });
 
 test("clean checkout reproducibility audit reports a missing current-head receipt without a circular locator", () => {

@@ -257,6 +257,10 @@ test("clean checkout reproducibility audit contracts fix the exact five-owner pe
     (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.contractPath.pattern = ".+"; },
     (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.workflowPath.pattern = ".+"; },
     (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.artifactNamePrefix.pattern = ".+"; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.contractPath.type = ["string", "null"]; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.workflowPath.type = ["string", "null"]; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf[1].properties.artifactNamePrefix.type = ["string", "null"]; },
+    (value) => { value.properties.slots.items.properties.evidenceSource.oneOf.push({}); },
     (value) => { value.properties.slots.items.oneOf[0].properties.ownerIssue.type = "integer"; },
   ]) { const invalid = structuredClone(scopeSchema); mutate(invalid); assert.ok(validateCleanCheckoutReproducibilityAuditScopeSchema(invalid).length > 0); }
 
