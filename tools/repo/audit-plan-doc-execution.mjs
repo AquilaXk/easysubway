@@ -25,6 +25,9 @@ const EXPECTED_RECORDS = new Map([
   [2822, [2821, "b89f4ddd50e98b2cff5a2a4cee0e0245a59a383a", "CLOSES"]], [2824, [2820, "c84a23f981516640a530ab3119152c239597b6c6", "CLOSES"]],
   [2826, [2825, "2f26c9028f74ce46ef934bc4938dd42fcd966441", "CLOSES"]], [2828, [2827, "4475e6d9da634e28cda4179b738d4f9f440f06a7", "CLOSES"]],
   [2830, [2829, "aed1c9ab7e9e45c913f3817f17276865934c9bbc", "CLOSES"]],
+  [2832, [2831, "f5ef5ef4e35dd8401150f7e35a1512f634baed33", "CLOSES"]], [2834, [2833, "47b62ab816280d7584ef589b10161563f76c9cd6", "CLOSES"]],
+  [2842, [2841, "57ead1fd88e5a6b05a2a5d76099e5a3070b712d1", "CLOSES"]], [2844, [2843, "ebb4044cb04d3a7fa6cb0ea9e4da8e3acfac8a86", "CLOSES"]],
+  [2846, [2845, "51b99da63b9c2a09226f522b240716adeb24f14c", "CLOSES"]], [2848, [2847, "e5af7fec4dd7dcf27f3676abc2a650a2536a204b", "CLOSES"]],
 ]);
 
 export class AuditIncomplete extends Error {
@@ -34,7 +37,7 @@ export class AuditIncomplete extends Error {
 export function validatePlanDocExecutionScope(scope, errors = []) {
   if (scope?.schemaVersion !== 1 || scope?.executionRepository !== REPOSITORY || scope?.planOwner !== "PLAN-DOC") errors.push("scope header mismatch");
   if (JSON.stringify(scope?.forbiddenTargetPathPrefixes) !== JSON.stringify(["apps/mobile/", "backend/", "infra/", "tools/datapack/", "tools/ops/", "tools/release/"])) errors.push("forbidden target prefix mismatch");
-  if (scope?.self?.issueNumber !== 2831 || scope?.self?.planOwner !== "PLAN-DOC") errors.push("self binding mismatch");
+  if (scope?.self?.issueNumber !== 2849 || scope?.self?.planOwner !== "PLAN-DOC") errors.push("self binding mismatch");
   const records = scope?.historical;
   if (!Array.isArray(records) || records.length !== EXPECTED_RECORDS.size) return [...errors, "historical inventory count mismatch"];
   const actual = new Map(records.map((record) => [record?.prNumber, record]));
