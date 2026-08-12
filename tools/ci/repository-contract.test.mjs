@@ -3379,12 +3379,65 @@ test("모바일 변경 CI는 모바일 계약 테스트를 실행한다", () => 
   assert.match(mobileJob, /flutter pub get/);
   assert.match(mobileJob, /flutter build apk --config-only/);
   assert.match(mobileJob, /android\/gradlew -p android :app:processReleaseMainManifest --no-daemon/);
+  assert.match(mobileJob, /for attempt in 1 2 3; do/);
+  assert.match(mobileJob, /pipeline_status=\("\$\{PIPESTATUS\[@\]\}"\)/);
+  assert.match(mobileJob, /gradle_status="\$\{pipeline_status\[0\]\}"/);
+  assert.match(mobileJob, /tee_status="\$\{pipeline_status\[1\]\}"/);
+  assert.match(
+    mobileJob,
+    /if \[\[ "\$\{tee_status\}" -ne 0 \]\]; then[\s\S]*exit "\$\{tee_status\}"/,
+  );
+  assert.match(mobileJob, /if \[\[ "\$\{gradle_status\}" -eq 0 \]\]; then[\s\S]*break/);
+  assert.match(
+    mobileJob,
+    /if \[\[ "\$\{attempt\}" -eq 3 \]\] \|\| ! grep -Fq "Unexpected end of file from server" "\$\{gradle_log\}"; then[\s\S]*exit "\$\{gradle_status\}"/,
+  );
+  assert.match(mobileJob, /sleep "\$\(\(attempt \* 5\)\)"/);
+  assert.doesNotMatch(
+    mobileJob,
+    /android\/gradlew -p android :app:processReleaseMainManifest --no-daemon\s*\|\|\s*true/,
+  );
   assert.match(mobileJob, /Mobile App CI \/ Run mobile contracts/);
   assert.match(mobileJob, /EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST: "true"/);
   assert.match(
     mobileJob,
     /node --test --test-name-pattern "모바일 generic catch\|모바일 접근성 출시 QA\|릴리즈 보안 기준선\|모바일 스토어 심사 정보 기준선\|모바일 스토어 개인정보 인벤토리\|Android 릴리즈 권한\|iOS 앱은 개인정보 매니페스트\|Android 런처 아이콘" tools\/ci\/repository-contract\.test\.mjs/,
   );
+});
+
+test("Android 변경 CI는 native asset header 단절만 bounded retry한다", () => {
+  const workflow = read(".github/workflows/ci.yml");
+  const androidJob = jobBlock(workflow, "android", "notify-slack-ci-failure");
+
+  assert.match(androidJob, /Android CI \/ Build Flutter Android debug APK/);
+  assert.match(androidJob, /for attempt in 1 2 3; do/);
+  assert.match(androidJob, /flutter build apk --debug 2>&1 \| tee "\$\{android_log\}"/);
+  assert.match(androidJob, /pipeline_status=\("\$\{PIPESTATUS\[@\]\}"\)/);
+  assert.match(androidJob, /build_status="\$\{pipeline_status\[0\]\}"/);
+  assert.match(androidJob, /tee_status="\$\{pipeline_status\[1\]\}"/);
+  assert.match(
+    androidJob,
+    /if \[\[ "\$\{tee_status\}" -ne 0 \]\]; then[\s\S]*exit "\$\{tee_status\}"/,
+  );
+  assert.match(androidJob, /if \[\[ "\$\{build_status\}" -eq 0 \]\]; then[\s\S]*break/);
+  assert.match(
+    androidJob,
+    /if \[\[ "\$\{attempt\}" -eq 3 \]\] \|\| ! grep -Fq "Connection closed before full header was received" "\$\{android_log\}"; then[\s\S]*exit "\$\{build_status\}"/,
+  );
+  assert.match(androidJob, /sleep "\$\(\(attempt \* 5\)\)"/);
+  assert.doesNotMatch(androidJob, /flutter build apk --debug\s*\|\|\s*true/);
+});
+
+test("Android native asset cache는 sqlite3 3.3.4 content hash identity를 고정한다", () => {
+  const pubspec = read("apps/mobile/pubspec.yaml");
+  const lockfile = read("apps/mobile/pubspec.lock");
+
+  assert.match(pubspec, /^  sqlite3: 3\.3\.4$/m);
+  assert.match(
+    lockfile,
+    /  sqlite3:\n    dependency: "direct main"\n    description:\n      name: sqlite3\n      sha256: "752d9d746052359a2022f588bb979f2e7c4e0f9e4b6a1c3121f7626a1574974b"\n      url: "https:\/\/pub\.dev"\n    source: hosted\n    version: "3\.3\.4"/,
+  );
+  assert.doesNotMatch(pubspec, /sqlite3_flutter_libs/);
 });
 
 test("OSV 의존성 취약점 게이트는 PR 의존성 취약점을 차단한다", () => {
