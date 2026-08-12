@@ -1,7 +1,16 @@
 {
   "schemaVersion": 2,
   "slots": [
-    { "repository": "AquilaXk/easysubway", "state": "PENDING", "ownerIssue": null, "evidenceSource": null },
+    {
+      "repository": "AquilaXk/easysubway",
+      "state": "READY",
+      "ownerIssue": 2843,
+      "evidenceSource": {
+        "contractPath": "contracts/documentation/clean-checkout-reproducibility-owner-contract.json",
+        "workflowPath": ".github/workflows/clean-checkout-reproducibility-owner-receipt-caller.yml",
+        "artifactNamePrefix": "clean-checkout-reproducibility-owner-receipt-"
+      }
+    },
     { "repository": "AquilaXk/easysubway-backend", "state": "PENDING", "ownerIssue": null, "evidenceSource": null },
     { "repository": "AquilaXk/easysubway-data", "state": "PENDING", "ownerIssue": null, "evidenceSource": null },
     { "repository": "AquilaXk/easysubway-mobile", "state": "PENDING", "ownerIssue": null, "evidenceSource": null },
