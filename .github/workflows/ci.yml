@@ -837,7 +837,28 @@ jobs:
         run: |
           set -euo pipefail
           flutter pub get
-          flutter build apk --debug
+          android_log="${RUNNER_TEMP}/easysubway-android-build.log"
+          for attempt in 1 2 3; do
+            set +e
+            flutter build apk --debug 2>&1 | tee "${android_log}"
+            pipeline_status=("${PIPESTATUS[@]}")
+            set -e
+            build_status="${pipeline_status[0]}"
+            tee_status="${pipeline_status[1]}"
+
+            if [[ "${tee_status}" -ne 0 ]]; then
+              exit "${tee_status}"
+            fi
+            if [[ "${build_status}" -eq 0 ]]; then
+              break
+            fi
+            if [[ "${attempt}" -eq 3 ]] || ! grep -Fq "Connection closed before full header was received" "${android_log}"; then
+              exit "${build_status}"
+            fi
+
+            echo "Transient Android native asset header close; retrying bounded attempt $((attempt + 1))/3." >&2
+            sleep "$((attempt * 5))"
+          done
 
   notify-slack-ci-failure:
     name: Slack / CI failure
