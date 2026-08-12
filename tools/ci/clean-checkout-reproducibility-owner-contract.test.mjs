@@ -52,11 +52,9 @@ test("Hub owner contract pins the exact four reproducibility phases and current 
   ]);
   const contract = JSON.parse(contractText);
   const schema = JSON.parse(schemaText);
-  const liteSchema = structuredClone(schema);
-  delete liteSchema.properties.variants.items.properties.phases.items.properties.timeoutSeconds.maximum;
 
   assert.deepEqual(contract, expectedContract);
-  assert.equal(validateSchema(liteSchema, contract).ok, true);
+  assert.equal(validateSchema(schema, contract).ok, true);
   assert.deepEqual(validateOwnerContract(contract), []);
   assert.equal(createHash("sha256").update(lockBytes).digest("hex"), TOOLCHAIN_DIGEST);
   assert.notEqual(entrypointStat.mode & 0o111, 0);

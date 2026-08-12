@@ -53,6 +53,19 @@ test("minLength는 Unicode code point 기준으로 문자열 길이를 검증한
   assert.throws(() => validateSchema({ type: "array", minLength: 1 }, []), /type: string/);
 });
 
+test("minimum과 maximum은 유한한 inclusive numeric bound를 검증한다", () => {
+  const schema = { type: "integer", minimum: 1, maximum: 3 };
+
+  assert.equal(validateSchema(schema, 1).ok, true);
+  assert.equal(validateSchema(schema, 3).ok, true);
+  assert.equal(validateSchema(schema, 0).ok, false);
+  assert.equal(validateSchema(schema, 4).ok, false);
+  assert.throws(() => validateSchema({ type: "integer", maximum: "3" }, 2), /유한한 숫자/);
+  assert.throws(() => validateSchema({ type: "number", minimum: Number.NaN }, 2), /유한한 숫자/);
+  assert.throws(() => validateSchema({ type: "number", maximum: Number.POSITIVE_INFINITY }, 2), /유한한 숫자/);
+  assert.throws(() => validateSchema({ type: "integer", minimum: 4, maximum: 3 }, 3), /minimum.*maximum/);
+});
+
 test("중첩 객체 오류 경로를 점 표기로 보고한다", () => {
   const schema = {
     type: "object",
