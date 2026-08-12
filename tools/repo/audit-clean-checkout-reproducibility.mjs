@@ -501,16 +501,31 @@ export function readSingleReceiptZip(bytes) {
     const centralSize = bytes.readUInt32LE(eocd + 12); const centralOffset = bytes.readUInt32LE(eocd + 16);
     if (centralOffset + centralSize !== eocd || centralSize < 46 || bytes.readUInt32LE(centralOffset) !== 0x02014b50) throw new Error();
     const flags = bytes.readUInt16LE(centralOffset + 8); const method = bytes.readUInt16LE(centralOffset + 10); const crc = bytes.readUInt32LE(centralOffset + 16); const compressed = bytes.readUInt32LE(centralOffset + 20); const size = bytes.readUInt32LE(centralOffset + 24); const nameLength = bytes.readUInt16LE(centralOffset + 28); const extraLength = bytes.readUInt16LE(centralOffset + 30); const commentLength = bytes.readUInt16LE(centralOffset + 32); const external = bytes.readUInt32LE(centralOffset + 38); const localOffset = bytes.readUInt32LE(centralOffset + 42);
-    if ((flags & ~0x0800) !== 0 || ![0, 8].includes(method) || compressed > ARCHIVE_LIMIT || size > OUTPUT_LIMIT || centralOffset + 46 + nameLength + extraLength + commentLength !== eocd || Math.floor(external / 65_536) >> 12 === 0xa || localOffset + 30 > centralOffset || bytes.readUInt32LE(localOffset) !== 0x04034b50) throw new Error();
+    const usesDataDescriptor = (flags & 0x0008) !== 0;
+    if ((flags & ~0x0808) !== 0 || ![0, 8].includes(method) || compressed > ARCHIVE_LIMIT || size > OUTPUT_LIMIT || centralOffset + 46 + nameLength + extraLength + commentLength !== eocd || Math.floor(external / 65_536) >> 12 === 0xa || localOffset + 30 > centralOffset || bytes.readUInt32LE(localOffset) !== 0x04034b50) throw new Error("unsupported receipt ZIP entry");
     const centralName = bytes.subarray(centralOffset + 46, centralOffset + 46 + nameLength); const name = new TextDecoder("utf-8", { fatal: true }).decode(centralName);
     const localNameLength = bytes.readUInt16LE(localOffset + 26); const localExtraLength = bytes.readUInt16LE(localOffset + 28); const localName = bytes.subarray(localOffset + 30, localOffset + 30 + localNameLength);
-    if (name !== RECEIPT_NAME || !localName.equals(centralName) || bytes.readUInt16LE(localOffset + 6) !== flags || bytes.readUInt16LE(localOffset + 8) !== method || bytes.readUInt32LE(localOffset + 14) !== crc || bytes.readUInt32LE(localOffset + 18) !== compressed || bytes.readUInt32LE(localOffset + 22) !== size) throw new Error();
+    if (name !== RECEIPT_NAME || !localName.equals(centralName) || bytes.readUInt16LE(localOffset + 6) !== flags || bytes.readUInt16LE(localOffset + 8) !== method || !validLocalReceiptIdentity(bytes, localOffset, usesDataDescriptor, crc, compressed, size)) throw new Error("receipt ZIP local header mismatch");
     const dataOffset = localOffset + 30 + localNameLength + localExtraLength; const data = bytes.subarray(dataOffset, dataOffset + compressed);
-    if (data.length !== compressed || dataOffset + compressed !== centralOffset) throw new Error();
+    const descriptorOffset = dataOffset + compressed;
+    if (data.length !== compressed || !validReceiptDescriptorIdentity(bytes, descriptorOffset, centralOffset, usesDataDescriptor, crc, compressed, size)) throw new Error("receipt ZIP descriptor mismatch");
     const decoded = method === 0 ? data : inflateRawSync(data, { maxOutputLength: OUTPUT_LIMIT });
     if (decoded.length !== size || crc32(decoded) !== crc) throw new Error();
     return new TextDecoder("utf-8", { fatal: true }).decode(decoded);
   } catch { throw new Error("RECEIPT_ARCHIVE_INVALID"); }
+}
+
+function validLocalReceiptIdentity(bytes, localOffset, usesDataDescriptor, crc, compressed, size) {
+  const localCrc = bytes.readUInt32LE(localOffset + 14); const localCompressed = bytes.readUInt32LE(localOffset + 18); const localSize = bytes.readUInt32LE(localOffset + 22);
+  return usesDataDescriptor
+    ? localCrc === 0 && localCompressed === 0 && localSize === 0
+    : localCrc === crc && localCompressed === compressed && localSize === size;
+}
+
+function validReceiptDescriptorIdentity(bytes, descriptorOffset, centralOffset, usesDataDescriptor, crc, compressed, size) {
+  return usesDataDescriptor
+    ? descriptorOffset + 16 === centralOffset && bytes.readUInt32LE(descriptorOffset) === 0x08074b50 && bytes.readUInt32LE(descriptorOffset + 4) === crc && bytes.readUInt32LE(descriptorOffset + 8) === compressed && bytes.readUInt32LE(descriptorOffset + 12) === size
+    : descriptorOffset === centralOffset;
 }
 
 function crc32(bytes) {

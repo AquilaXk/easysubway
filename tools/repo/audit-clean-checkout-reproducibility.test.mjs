@@ -4,6 +4,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
+import { deflateRawSync } from "node:zlib";
 
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
 import {
@@ -364,6 +365,26 @@ test("clean checkout reproducibility audit detects source and normalized snapsho
 test("clean checkout reproducibility audit decodes one exact receipt JSON ZIP entry", () => {
   const receipt = ownerReceipt();
   assert.deepEqual(JSON.parse(readSingleReceiptZip(zip("clean-checkout-reproducibility-owner-receipt.json", JSON.stringify(receipt)))), receipt);
+  const descriptorZip = zip("clean-checkout-reproducibility-owner-receipt.json", JSON.stringify(receipt), { dataDescriptor: true });
+  assert.deepEqual(JSON.parse(readSingleReceiptZip(descriptorZip)), receipt);
+  const centralOffset = descriptorZip.readUInt32LE(descriptorZip.length - 6);
+  const descriptorOffset = centralOffset - 16;
+  for (const mutate of [
+    (bytes) => bytes.writeUInt32LE(0, descriptorOffset),
+    (bytes) => bytes.writeUInt32LE((bytes.readUInt32LE(descriptorOffset + 4) + 1) >>> 0, descriptorOffset + 4),
+    (bytes) => bytes.writeUInt32LE(bytes.readUInt32LE(descriptorOffset + 8) + 1, descriptorOffset + 8),
+    (bytes) => {
+      bytes.writeUInt16LE(bytes.readUInt16LE(6) | 1, 6);
+      bytes.writeUInt16LE(bytes.readUInt16LE(centralOffset + 8) | 1, centralOffset + 8);
+    },
+  ]) {
+    const invalid = Buffer.from(descriptorZip);
+    mutate(invalid);
+    assert.throws(() => readSingleReceiptZip(invalid), /RECEIPT_ARCHIVE_INVALID/);
+  }
+  const trailing = Buffer.concat([descriptorZip.subarray(0, centralOffset), Buffer.from([0]), descriptorZip.subarray(centralOffset)]);
+  trailing.writeUInt32LE(centralOffset + 1, trailing.length - 6);
+  assert.throws(() => readSingleReceiptZip(trailing), /RECEIPT_ARCHIVE_INVALID/);
   assert.throws(() => readSingleReceiptZip(zip("other.json", JSON.stringify(receipt))), /RECEIPT_ARCHIVE_INVALID/);
 });
 
@@ -413,20 +434,27 @@ test("clean checkout reproducibility audit CLI writes schema-valid exit 0, 1 and
   }
 });
 
-function zip(name, text) {
+function zip(name, text, { dataDescriptor = false } = {}) {
   const nameBytes = Buffer.from(name);
   const data = Buffer.from(text);
+  const payload = dataDescriptor ? deflateRawSync(data) : data;
   const crc = crc32(data);
+  const flags = 0x0800 | (dataDescriptor ? 0x0008 : 0);
+  const method = dataDescriptor ? 8 : 0;
   const local = Buffer.alloc(30);
-  local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(0x0800, 6); local.writeUInt16LE(0, 8);
-  local.writeUInt32LE(crc, 14); local.writeUInt32LE(data.length, 18); local.writeUInt32LE(data.length, 22); local.writeUInt16LE(nameBytes.length, 26);
+  local.writeUInt32LE(0x04034b50, 0); local.writeUInt16LE(20, 4); local.writeUInt16LE(flags, 6); local.writeUInt16LE(method, 8);
+  local.writeUInt32LE(dataDescriptor ? 0 : crc, 14); local.writeUInt32LE(dataDescriptor ? 0 : payload.length, 18); local.writeUInt32LE(dataDescriptor ? 0 : data.length, 22); local.writeUInt16LE(nameBytes.length, 26);
+  const descriptor = dataDescriptor ? Buffer.alloc(16) : Buffer.alloc(0);
+  if (dataDescriptor) {
+    descriptor.writeUInt32LE(0x08074b50, 0); descriptor.writeUInt32LE(crc, 4); descriptor.writeUInt32LE(payload.length, 8); descriptor.writeUInt32LE(data.length, 12);
+  }
   const central = Buffer.alloc(46);
-  central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(0x0800, 8); central.writeUInt16LE(0, 10);
-  central.writeUInt32LE(crc, 16); central.writeUInt32LE(data.length, 20); central.writeUInt32LE(data.length, 24); central.writeUInt16LE(nameBytes.length, 28); central.writeUInt32LE(0o100644 * 65_536, 38);
-  const centralOffset = local.length + nameBytes.length + data.length;
+  central.writeUInt32LE(0x02014b50, 0); central.writeUInt16LE(20, 4); central.writeUInt16LE(20, 6); central.writeUInt16LE(flags, 8); central.writeUInt16LE(method, 10);
+  central.writeUInt32LE(crc, 16); central.writeUInt32LE(payload.length, 20); central.writeUInt32LE(data.length, 24); central.writeUInt16LE(nameBytes.length, 28); central.writeUInt32LE(0o100644 * 65_536, 38);
+  const centralOffset = local.length + nameBytes.length + payload.length + descriptor.length;
   const eocd = Buffer.alloc(22);
   eocd.writeUInt32LE(0x06054b50, 0); eocd.writeUInt16LE(1, 8); eocd.writeUInt16LE(1, 10); eocd.writeUInt32LE(central.length + nameBytes.length, 12); eocd.writeUInt32LE(centralOffset, 16);
-  return Buffer.concat([local, nameBytes, data, central, nameBytes, eocd]);
+  return Buffer.concat([local, nameBytes, payload, descriptor, central, nameBytes, eocd]);
 }
 
 function crc32(bytes) {
