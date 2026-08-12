@@ -365,7 +365,26 @@ test("clean checkout reproducibility audit detects source and normalized snapsho
 test("clean checkout reproducibility audit decodes one exact receipt JSON ZIP entry", () => {
   const receipt = ownerReceipt();
   assert.deepEqual(JSON.parse(readSingleReceiptZip(zip("clean-checkout-reproducibility-owner-receipt.json", JSON.stringify(receipt)))), receipt);
-  assert.deepEqual(JSON.parse(readSingleReceiptZip(zip("clean-checkout-reproducibility-owner-receipt.json", JSON.stringify(receipt), { dataDescriptor: true }))), receipt);
+  const descriptorZip = zip("clean-checkout-reproducibility-owner-receipt.json", JSON.stringify(receipt), { dataDescriptor: true });
+  assert.deepEqual(JSON.parse(readSingleReceiptZip(descriptorZip)), receipt);
+  const centralOffset = descriptorZip.readUInt32LE(descriptorZip.length - 6);
+  const descriptorOffset = centralOffset - 16;
+  for (const mutate of [
+    (bytes) => bytes.writeUInt32LE(0, descriptorOffset),
+    (bytes) => bytes.writeUInt32LE((bytes.readUInt32LE(descriptorOffset + 4) + 1) >>> 0, descriptorOffset + 4),
+    (bytes) => bytes.writeUInt32LE(bytes.readUInt32LE(descriptorOffset + 8) + 1, descriptorOffset + 8),
+    (bytes) => {
+      bytes.writeUInt16LE(bytes.readUInt16LE(6) | 1, 6);
+      bytes.writeUInt16LE(bytes.readUInt16LE(centralOffset + 8) | 1, centralOffset + 8);
+    },
+  ]) {
+    const invalid = Buffer.from(descriptorZip);
+    mutate(invalid);
+    assert.throws(() => readSingleReceiptZip(invalid), /RECEIPT_ARCHIVE_INVALID/);
+  }
+  const trailing = Buffer.concat([descriptorZip.subarray(0, centralOffset), Buffer.from([0]), descriptorZip.subarray(centralOffset)]);
+  trailing.writeUInt32LE(centralOffset + 1, trailing.length - 6);
+  assert.throws(() => readSingleReceiptZip(trailing), /RECEIPT_ARCHIVE_INVALID/);
   assert.throws(() => readSingleReceiptZip(zip("other.json", JSON.stringify(receipt))), /RECEIPT_ARCHIVE_INVALID/);
 });
 
