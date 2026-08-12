@@ -3428,6 +3428,18 @@ test("Android 변경 CI는 native asset header 단절만 bounded retry한다", (
   assert.doesNotMatch(androidJob, /flutter build apk --debug\s*\|\|\s*true/);
 });
 
+test("Android native asset cache는 sqlite3 3.3.4 content hash identity를 고정한다", () => {
+  const pubspec = read("apps/mobile/pubspec.yaml");
+  const lockfile = read("apps/mobile/pubspec.lock");
+
+  assert.match(pubspec, /^  sqlite3: 3\.3\.4$/m);
+  assert.match(
+    lockfile,
+    /  sqlite3:\n    dependency: "direct main"\n    description:\n      name: sqlite3\n      sha256: "[a-f0-9]{64}"\n      url: "https:\/\/pub\.dev"\n    source: hosted\n    version: "3\.3\.4"/,
+  );
+  assert.doesNotMatch(pubspec, /sqlite3_flutter_libs/);
+});
+
 test("OSV 의존성 취약점 게이트는 PR 의존성 취약점을 차단한다", () => {
   const workflow = read(".github/workflows/ci.yml");
   const dependencyScanJob = jobBlock(workflow, "dependency-vulnerability-scan", "pr-title");
