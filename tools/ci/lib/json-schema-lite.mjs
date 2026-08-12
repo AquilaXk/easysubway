@@ -10,6 +10,7 @@ const SUPPORTED = new Set([
   "format",
   "items",
   "maxItems",
+  "maximum",
   "minItems",
   "minLength",
   "minimum",
@@ -66,6 +67,7 @@ function assertSupported(schema, path) {
 
 function validateScalar(schema, value, path, errors) {
   validateMinLengthKeyword(schema, path);
+  validateNumericBoundsKeywords(schema, path);
   if (schema.const !== undefined && value !== schema.const) {
     errors.push(`${path}: const ${JSON.stringify(schema.const)} 불일치`);
     return true;
@@ -82,7 +84,22 @@ function validateScalar(schema, value, path, errors) {
   if (typeof value === "number" && schema.minimum !== undefined && value < schema.minimum) {
     errors.push(`${path}: minimum ${schema.minimum} 미만`);
   }
+  if (typeof value === "number" && schema.maximum !== undefined && value > schema.maximum) {
+    errors.push(`${path}: maximum ${schema.maximum} 초과`);
+  }
   return false;
+}
+
+function validateNumericBoundsKeywords(schema, path) {
+  for (const keyword of ["minimum", "maximum"]) {
+    if (schema[keyword] !== undefined
+      && (typeof schema[keyword] !== "number" || !Number.isFinite(schema[keyword]))) {
+      throw new Error(`json-schema-lite: ${keyword}은 유한한 숫자여야 합니다 (${path})`);
+    }
+  }
+  if (schema.minimum !== undefined && schema.maximum !== undefined && schema.minimum > schema.maximum) {
+    throw new Error(`json-schema-lite: minimum은 maximum 이하여야 합니다 (${path})`);
+  }
 }
 
 function validateMinLengthKeyword(schema, path) {
