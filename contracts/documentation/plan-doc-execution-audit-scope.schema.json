@@ -10,7 +10,7 @@
     "planOwner": { "const": "PLAN-DOC" },
     "forbiddenTargetPathPrefixes": { "type": "array", "minItems": 6, "maxItems": 6, "uniqueItems": true, "items": { "enum": ["apps/mobile/", "backend/", "infra/", "tools/datapack/", "tools/ops/", "tools/release/"] } },
     "historical": {
-      "type": "array", "minItems": 32, "maxItems": 32,
+      "type": "array", "minItems": 38, "maxItems": 38,
       "items": {
         "type": "object", "additionalProperties": false,
         "required": ["issueNumber", "prNumber", "mergeSha", "relation", "planOwner", "changedPathClass"],
@@ -27,7 +27,7 @@
     "self": {
       "type": "object", "additionalProperties": false,
       "required": ["issueNumber", "planOwner"],
-      "properties": { "issueNumber": { "const": 2831 }, "planOwner": { "const": "PLAN-DOC" } }
+      "properties": { "issueNumber": { "const": 2849 }, "planOwner": { "const": "PLAN-DOC" } }
     }
   }
 }
