@@ -232,7 +232,7 @@ test("external terminal locator audit contracts fix the exact pending inventory 
   assert.ok(validateExternalTerminalLocatorAuditScope(unsafeLocator).length > 0);
 });
 
-test("clean checkout reproducibility audit contracts fix the exact five-owner pending inventory and strict evidence schemas", () => {
+test("clean checkout reproducibility audit contracts fix the exact Hub READY and four-owner pending inventory", () => {
   const scope = loadJson("contracts/documentation/clean-checkout-reproducibility-audit-scope.json");
   const scopeSchema = loadJson("contracts/documentation/clean-checkout-reproducibility-audit-scope.schema.json");
   const contractSchema = loadJson("contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json");
@@ -246,8 +246,26 @@ test("clean checkout reproducibility audit contracts fix the exact five-owner pe
   assert.deepEqual(validateCleanCheckoutReproducibilityAuditReportSchema(reportSchema), []);
   assert.equal(scope.schemaVersion, 2);
   assert.equal(reportSchema.properties.schemaVersion.const, 2);
+  assert.deepEqual(scope.slots, [
+    {
+      repository: "AquilaXk/easysubway",
+      state: "READY",
+      ownerIssue: 2843,
+      evidenceSource: {
+        contractPath: "contracts/documentation/clean-checkout-reproducibility-owner-contract.json",
+        workflowPath: ".github/workflows/clean-checkout-reproducibility-owner-receipt-caller.yml",
+        artifactNamePrefix: "clean-checkout-reproducibility-owner-receipt-",
+      },
+    },
+    ...[
+      "AquilaXk/easysubway-backend",
+      "AquilaXk/easysubway-data",
+      "AquilaXk/easysubway-mobile",
+      "AquilaXk/easysubway-platform",
+    ].map((repository) => ({ repository, state: "PENDING", ownerIssue: null, evidenceSource: null })),
+  ]);
 
-  const invalidScope = structuredClone(scope); invalidScope.slots[0].ownerIssue = 2816;
+  const invalidScope = structuredClone(scope); invalidScope.slots[0].evidenceSource = null;
   assert.ok(validateCleanCheckoutReproducibilityAuditScope(invalidScope).length > 0);
   assert.deepEqual(contractSchema.required, ["schemaVersion", "repository", "variants"]);
   assert.equal(Object.hasOwn(contractSchema.properties, "sourceSha"), false);

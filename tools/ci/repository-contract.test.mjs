@@ -21140,11 +21140,15 @@ test("external terminal locator audit workflow binds main SHA to a write-once sa
 
 test("clean checkout reproducibility audit workflow binds main SHA to a write-once sanitized report", () => {
   const workflow = read(".github/workflows/clean-checkout-reproducibility-audit.yml");
-  assert.match(workflow, /^on:\n  push:\n    branches: \[main\]$/m);
+  assert.match(workflow, /^on:\n  push:\n    branches: \[main\]\n  workflow_dispatch:\s*$/m);
   assert.doesNotMatch(workflow, /^\s+paths:/m);
+  assert.doesNotMatch(workflow, /^\s{4}inputs:/m);
+  assert.doesNotMatch(workflow, /^\s{2}(pull_request|schedule):/m);
   assert.match(workflow, /^permissions: \{\}$/m);
   assert.match(workflow, /^concurrency:\n  group: clean-checkout-reproducibility-audit-\$\{\{ github\.ref \}\}\n  cancel-in-progress: false$/m);
   assert.match(workflow, /permissions:\n      contents: read\n      issues: read\n      actions: read/);
+  assert.match(workflow, /DEFAULT_BRANCH: \$\{\{ github\.event\.repository\.default_branch \}\}/);
+  assert.match(workflow, /if \[\[ "\$\{GITHUB_REF\}" != "refs\/heads\/\$\{DEFAULT_BRANCH\}" \]\]; then[\s\S]*?clean checkout reproducibility audit must run from the default branch[\s\S]*?exit 1/);
   assert.match(workflow, /ref: \$\{\{ github\.sha \}\}/);
   assert.match(workflow, /persist-credentials: false/);
   assert.match(workflow, /set -euo pipefail/);
