@@ -5,7 +5,7 @@
   "additionalProperties": false,
   "required": ["schemaVersion", "status", "observedAt", "inputs", "summary", "slots", "findings", "incomplete"],
   "properties": {
-    "schemaVersion": { "const": 1 },
+    "schemaVersion": { "const": 2 },
     "status": { "enum": ["COMPLETE", "AUDIT_INCOMPLETE"] },
     "observedAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{3}Z$", "format": "date-time" },
     "inputs": {
@@ -37,12 +37,22 @@
       "items": {
         "type": "object",
         "additionalProperties": false,
-        "required": ["repository", "state", "currentHead", "ownerIssue", "contractLocator", "receiptLocator", "evidenceState"],
+        "required": ["repository", "state", "currentHead", "ownerIssue", "evidenceSource", "contractLocator", "receiptLocator", "evidenceState"],
         "properties": {
           "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
           "state": { "enum": ["PENDING", "READY"] },
           "currentHead": { "type": ["string", "null"], "pattern": "^[0-9a-f]{40}$" },
           "ownerIssue": { "type": ["integer", "null"], "minimum": 1 },
+          "evidenceSource": {
+            "oneOf": [
+              { "type": "null" },
+              { "type": "object", "additionalProperties": false, "required": ["contractPath", "workflowPath", "artifactNamePrefix"], "properties": {
+                "contractPath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$" },
+                "workflowPath": { "type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9][A-Za-z0-9._-]*\\.ya?ml$" },
+                "artifactNamePrefix": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,86}-$" }
+              } }
+            ]
+          },
           "contractLocator": {
             "oneOf": [
               { "type": "null" },
@@ -65,7 +75,7 @@
                 "artifactId": { "type": "integer", "minimum": 1 },
                 "artifactName": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
                 "archiveDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
-                "workflowPath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])\\.github/workflows/[A-Za-z0-9][A-Za-z0-9._/-]*\\.ya?ml$" },
+                "workflowPath": { "type": "string", "pattern": "^\\.github/workflows/[A-Za-z0-9][A-Za-z0-9._-]*\\.ya?ml$" },
                 "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
                 "createdAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$", "format": "date-time" },
                 "expiresAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$", "format": "date-time" }
@@ -78,6 +88,7 @@
           { "type": "object", "properties": {
             "state": { "const": "PENDING" },
             "ownerIssue": { "type": "null" },
+            "evidenceSource": { "type": "null" },
             "contractLocator": { "type": "null" },
             "receiptLocator": { "type": "null" },
             "evidenceState": { "enum": ["PENDING", "UNAVAILABLE"] }
@@ -85,9 +96,16 @@
           { "type": "object", "properties": {
             "state": { "const": "READY" },
             "ownerIssue": { "type": "integer", "minimum": 1 },
+            "evidenceSource": { "type": "object" },
             "contractLocator": { "type": "object" },
             "receiptLocator": { "type": "object" },
-            "evidenceState": { "enum": ["VERIFIED", "FINDING", "UNAVAILABLE"] }
+            "evidenceState": { "const": "VERIFIED" }
+          } },
+          { "type": "object", "properties": {
+            "state": { "const": "READY" },
+            "ownerIssue": { "type": "integer", "minimum": 1 },
+            "evidenceSource": { "type": "object" },
+            "evidenceState": { "enum": ["FINDING", "UNAVAILABLE"] }
           } }
         ]
       }

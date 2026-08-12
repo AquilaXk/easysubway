@@ -31,12 +31,16 @@ const ENVIRONMENT_NAME = /^[A-Z][A-Z0-9_]{0,127}$/;
 const VARIANT_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/;
 const RUNNER_IMAGE = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const ARTIFACT_NAME = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
-const WORKFLOW_PATH = /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*[?#])\.github\/workflows\/[A-Za-z0-9][A-Za-z0-9._/-]*\.ya?ml$/;
+const ARTIFACT_NAME_PREFIX = /^[A-Za-z0-9][A-Za-z0-9._-]{0,86}-$/;
+const WORKFLOW_PATH = /^\.github\/workflows\/[A-Za-z0-9][A-Za-z0-9._-]*\.ya?ml$/;
+const DEFAULT_BRANCH = /^[A-Za-z0-9._-]{1,255}$/;
 const CODE = /^[A-Z][A-Z0-9_]*$/;
 const OUTPUT_LIMIT = 2 * 1024 * 1024;
 const ARCHIVE_LIMIT = 16 * 1024 * 1024;
 const ARTIFACT_PAGE_SIZE = 100;
 const ARTIFACT_LIMIT = 1_000;
+const WORKFLOW_RUN_PAGE_SIZE = 100;
+const WORKFLOW_RUN_LIMIT = 1_000;
 const RECEIPT_NAME = "clean-checkout-reproducibility-owner-receipt.json";
 const execFileAsync = promisify(execFile);
 
@@ -81,17 +85,24 @@ function validReceiptLocator(locator, repository) {
     && providerUtc(locator.createdAt) && providerUtc(locator.expiresAt) && Date.parse(locator.createdAt) < Date.parse(locator.expiresAt);
 }
 
+function validEvidenceSource(source) {
+  return exactKeys(source, ["contractPath", "workflowPath", "artifactNamePrefix"])
+    && SAFE_PATH.test(source.contractPath) && WORKFLOW_PATH.test(source.workflowPath)
+    && ARTIFACT_NAME_PREFIX.test(source.artifactNamePrefix)
+    && source.artifactNamePrefix.length + 40 <= 128;
+}
+
 export function validateCleanCheckoutReproducibilityScope(scope, errors = []) {
-  if (!exactKeys(scope, ["schemaVersion", "slots"]) || scope.schemaVersion !== 1 || !Array.isArray(scope.slots) || scope.slots.length !== REPOSITORIES.length) return [...errors, "slot inventory mismatch"];
+  if (!exactKeys(scope, ["schemaVersion", "slots"]) || scope.schemaVersion !== 2 || !Array.isArray(scope.slots) || scope.slots.length !== REPOSITORIES.length) return [...errors, "slot inventory mismatch"];
   const repositories = scope.slots.map((slot) => slot?.repository);
   if (JSON.stringify(repositories) !== JSON.stringify(REPOSITORIES) || !unique(repositories)) errors.push("repository inventory mismatch");
   for (const slot of scope.slots) {
     const repository = slot?.repository ?? "unknown";
-    if (!exactKeys(slot, ["repository", "state", "ownerIssue", "contractLocator", "receiptLocator"]) || !REPOSITORY_SET.has(repository)) { errors.push(`slot shape mismatch:${repository}`); continue; }
+    if (!exactKeys(slot, ["repository", "state", "ownerIssue", "evidenceSource"]) || !REPOSITORY_SET.has(repository)) { errors.push(`slot shape mismatch:${repository}`); continue; }
     if (slot.state === "PENDING") {
-      if (slot.ownerIssue !== null || slot.contractLocator !== null || slot.receiptLocator !== null) errors.push(`pending slot mismatch:${repository}`);
+      if (slot.ownerIssue !== null || slot.evidenceSource !== null) errors.push(`pending slot mismatch:${repository}`);
     } else if (slot.state === "READY") {
-      if (!validInteger(slot.ownerIssue, 1) || !validContractLocator(slot.contractLocator, repository) || !validReceiptLocator(slot.receiptLocator, repository)) errors.push(`ready slot mismatch:${repository}`);
+      if (!validInteger(slot.ownerIssue, 1) || !validEvidenceSource(slot.evidenceSource)) errors.push(`ready slot mismatch:${repository}`);
     } else errors.push(`slot state mismatch:${repository}`);
   }
   return errors;
@@ -151,11 +162,16 @@ export function evaluateReadyEvidence({ slot, evidence, now = new Date().toISOSt
   const repository = slot.repository;
   const findings = [];
   const add = (code) => { if (!findings.some((item) => item.code === code)) findings.push(finding(code, repository)); };
+  for (const item of evidence?.discoveryFindings ?? []) add(item.code);
+  const contractLocator = evidence?.contractLocator;
+  const receiptLocator = evidence?.receiptLocator;
   if (evidence?.issueState !== "CLOSED") add("OWNER_ISSUE_NOT_TERMINAL");
-  if (!SHA.test(evidence?.currentHead ?? "") || evidence.currentHead !== slot.contractLocator.commitSha || evidence.currentHead !== slot.receiptLocator.headSha) add("CURRENT_HEAD_MISMATCH");
-  if (slot.contractLocator.repository !== repository || slot.receiptLocator.repository !== repository) add("OWNER_REPOSITORY_MISMATCH");
-  if (evidence?.contractBlobSha !== slot.contractLocator.blobSha) add("CONTRACT_BLOB_MISMATCH");
-  if (evidence?.receiptArchiveDigest !== slot.receiptLocator.archiveDigest) add("RECEIPT_ARCHIVE_DIGEST_MISMATCH");
+  if (!validContractLocator(contractLocator, repository) || !validReceiptLocator(receiptLocator, repository)) add("EVIDENCE_LOCATOR_INVALID");
+  if (!SHA.test(evidence?.currentHead ?? "") || evidence.currentHead !== contractLocator?.commitSha || evidence.currentHead !== receiptLocator?.headSha) add("CURRENT_HEAD_MISMATCH");
+  if (contractLocator?.repository !== repository || receiptLocator?.repository !== repository) add("OWNER_REPOSITORY_MISMATCH");
+  if (contractLocator?.path !== slot.evidenceSource?.contractPath || receiptLocator?.workflowPath !== slot.evidenceSource?.workflowPath || receiptLocator?.artifactName !== `${slot.evidenceSource?.artifactNamePrefix ?? ""}${evidence?.currentHead ?? ""}`) add("EVIDENCE_SOURCE_MISMATCH");
+  if (evidence?.contractBlobSha !== contractLocator?.blobSha) add("CONTRACT_BLOB_MISMATCH");
+  if (evidence?.receiptArchiveDigest !== receiptLocator?.archiveDigest) add("RECEIPT_ARCHIVE_DIGEST_MISMATCH");
   if (validateOwnerContract(evidence?.contract).length) add("OWNER_CONTRACT_INVALID");
   if (validateOwnerReceipt(evidence?.receipt).length) add("OWNER_RECEIPT_INVALID");
   const contract = evidence?.contract; const receipt = evidence?.receipt;
@@ -163,11 +179,13 @@ export function evaluateReadyEvidence({ slot, evidence, now = new Date().toISOSt
   if (receipt?.contractSha256 !== evidence?.contractSha256) add("CONTRACT_RECEIPT_DIGEST_MISMATCH");
   if (receipt?.cleanCheckout?.repository !== repository || receipt?.cleanCheckout?.sourceSha !== evidence?.currentHead || receipt?.cleanCheckout?.initialTrackedDiffCount !== 0 || receipt?.cleanCheckout?.initialUntrackedCount !== 0) add("CLEAN_CHECKOUT_DIRTY");
   const run = evidence?.run; const artifact = evidence?.artifact;
-  if (run?.conclusion !== "success" || run?.path !== slot.receiptLocator.workflowPath || run?.headSha !== evidence?.currentHead) add("ACTIONS_RUN_MISMATCH");
+  if (run?.conclusion !== "success" || run?.path !== slot.evidenceSource?.workflowPath || run?.headSha !== evidence?.currentHead) add("ACTIONS_RUN_MISMATCH");
   const artifactCreatedAt = providerUtc(artifact?.createdAt) ? new Date(artifact.createdAt).toISOString() : null;
   const artifactExpiresAt = providerUtc(artifact?.expiresAt) ? new Date(artifact.expiresAt).toISOString() : null;
-  if (artifact?.id !== slot.receiptLocator.artifactId || artifact?.name !== slot.receiptLocator.artifactName || artifact?.digest !== slot.receiptLocator.archiveDigest || artifact?.runId !== slot.receiptLocator.runId || artifact?.headSha !== evidence?.currentHead || artifact?.expired !== false || Date.parse(artifactExpiresAt ?? "") <= Date.parse(now) || artifactCreatedAt !== new Date(slot.receiptLocator.createdAt).toISOString() || artifactExpiresAt !== new Date(slot.receiptLocator.expiresAt).toISOString()) add("ACTIONS_ARTIFACT_MISMATCH");
-  const catalogMatches = (evidence?.artifactCatalog ?? []).filter(({ id }) => id === slot.receiptLocator.artifactId);
+  const locatorCreatedAt = providerUtc(receiptLocator?.createdAt) ? new Date(receiptLocator.createdAt).toISOString() : null;
+  const locatorExpiresAt = providerUtc(receiptLocator?.expiresAt) ? new Date(receiptLocator.expiresAt).toISOString() : null;
+  if (artifact?.id !== receiptLocator?.artifactId || artifact?.name !== receiptLocator?.artifactName || artifact?.digest !== receiptLocator?.archiveDigest || artifact?.runId !== receiptLocator?.runId || artifact?.headSha !== evidence?.currentHead || artifact?.expired !== false || Date.parse(artifactExpiresAt ?? "") <= Date.parse(now) || artifactCreatedAt !== locatorCreatedAt || artifactExpiresAt !== locatorExpiresAt) add("ACTIONS_ARTIFACT_MISMATCH");
+  const catalogMatches = (evidence?.artifactCatalog ?? []).filter(({ id }) => id === receiptLocator?.artifactId);
   if (catalogMatches.length !== 1 || stableJson(catalogMatches[0]) !== stableJson(artifact)) add("ACTIONS_ARTIFACT_CATALOG_MISMATCH");
   if (!canonicalUtc(receipt?.observedAt) || Date.parse(receipt.observedAt) < Date.parse(run?.startedAt ?? "") || Date.parse(receipt.observedAt) > Date.parse(run?.completedAt ?? "")) add("RECEIPT_TIME_MISMATCH");
   const entrypoints = new Map((evidence?.entrypoints ?? []).map((entry) => [entry.path, entry]));
@@ -202,14 +220,15 @@ export function auditCleanCheckoutReproducibility({ scope, sourceSha, observedAt
       state: slot.state,
       currentHead: SHA.test(record.currentHead ?? "") ? record.currentHead : null,
       ownerIssue: slot.ownerIssue,
-      contractLocator: slot.contractLocator,
-      receiptLocator: slot.receiptLocator,
+      evidenceSource: slot.evidenceSource,
+      contractLocator: record.contractLocator ?? null,
+      receiptLocator: record.receiptLocator ?? null,
       evidenceState: slot.state === "PENDING" ? "PENDING" : (recordFindings.length ? "FINDING" : "VERIFIED"),
     };
   });
   const pending = slots.filter(({ state }) => state === "PENDING").length;
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: "COMPLETE",
     observedAt,
     inputs: { sourceSha, scopeSha256: digest(Buffer.from(scopeText)), stateBeginSha256, stateEndSha256 },
@@ -222,14 +241,25 @@ export function auditCleanCheckoutReproducibility({ scope, sourceSha, observedAt
 
 export function validateCleanCheckoutReproducibilityReport(report, errors = []) {
   const top = ["schemaVersion", "status", "observedAt", "inputs", "summary", "slots", "findings", "incomplete"];
-  if (!exactKeys(report, top) || report.schemaVersion !== 1 || !["COMPLETE", "AUDIT_INCOMPLETE"].includes(report.status) || !canonicalUtc(report.observedAt) || !Array.isArray(report.slots) || report.slots.length !== REPOSITORIES.length || JSON.stringify(report.slots.map(({ repository }) => repository)) !== JSON.stringify(REPOSITORIES) || !Array.isArray(report.findings) || !Array.isArray(report.incomplete)) return [...errors, "report shape mismatch"];
+  if (!exactKeys(report, top) || report.schemaVersion !== 2 || !["COMPLETE", "AUDIT_INCOMPLETE"].includes(report.status) || !canonicalUtc(report.observedAt) || !Array.isArray(report.slots) || report.slots.length !== REPOSITORIES.length || JSON.stringify(report.slots.map(({ repository }) => repository)) !== JSON.stringify(REPOSITORIES) || !Array.isArray(report.findings) || !Array.isArray(report.incomplete)) return [...errors, "report shape mismatch"];
   if (!exactKeys(report.inputs, ["sourceSha", "scopeSha256", "stateBeginSha256", "stateEndSha256"]) || !SHA.test(report.inputs.sourceSha ?? "") || !SHA256.test(report.inputs.scopeSha256 ?? "")) errors.push("report inputs mismatch");
   if (!exactKeys(report.summary, ["pending", "ready", "findings", "incomplete"]) || !Object.values(report.summary).every((value) => validInteger(value))) errors.push("report summary mismatch");
   const pending = report.slots.filter(({ state }) => state === "PENDING").length;
   if (report.summary.pending !== pending || report.summary.ready !== REPOSITORIES.length - pending || report.summary.findings !== report.findings.length || report.summary.incomplete !== report.incomplete.length) errors.push("report count parity mismatch");
-  if (report.slots.some((slot) => !exactKeys(slot, ["repository", "state", "currentHead", "ownerIssue", "contractLocator", "receiptLocator", "evidenceState"]) || !["PENDING", "READY"].includes(slot.state) || !["PENDING", "VERIFIED", "FINDING", "UNAVAILABLE"].includes(slot.evidenceState))) errors.push("report slot mismatch");
-  const reportScope = { schemaVersion: 1, slots: report.slots.map(({ repository, state, ownerIssue, contractLocator, receiptLocator }) => ({ repository, state, ownerIssue, contractLocator, receiptLocator })) };
+  if (report.slots.some((slot) => !exactKeys(slot, ["repository", "state", "currentHead", "ownerIssue", "evidenceSource", "contractLocator", "receiptLocator", "evidenceState"]) || !["PENDING", "READY"].includes(slot.state) || !["PENDING", "VERIFIED", "FINDING", "UNAVAILABLE"].includes(slot.evidenceState))) errors.push("report slot mismatch");
+  const reportScope = { schemaVersion: 2, slots: report.slots.map(({ repository, state, ownerIssue, evidenceSource }) => ({ repository, state, ownerIssue, evidenceSource })) };
   if (validateCleanCheckoutReproducibilityScope(reportScope).length || report.slots.some((slot) => slot.state === "PENDING" ? !["PENDING", "UNAVAILABLE"].includes(slot.evidenceState) : !["VERIFIED", "FINDING", "UNAVAILABLE"].includes(slot.evidenceState))) errors.push("report slot state parity mismatch");
+  for (const slot of report.slots) {
+    if (slot.state === "PENDING") {
+      if (slot.contractLocator !== null || slot.receiptLocator !== null) errors.push("pending locator mismatch");
+      continue;
+    }
+    const contractValid = slot.contractLocator === null || validContractLocator(slot.contractLocator, slot.repository);
+    const receiptValid = slot.receiptLocator === null || validReceiptLocator(slot.receiptLocator, slot.repository);
+    if (!contractValid || !receiptValid || slot.evidenceState === "VERIFIED" && (slot.contractLocator === null || slot.receiptLocator === null)) { errors.push("ready locator mismatch"); continue; }
+    if (slot.contractLocator !== null && (slot.contractLocator.commitSha !== slot.currentHead || slot.contractLocator.path !== slot.evidenceSource.contractPath)) errors.push("ready contract locator mismatch");
+    if (slot.receiptLocator !== null && (slot.receiptLocator.headSha !== slot.currentHead || slot.receiptLocator.workflowPath !== slot.evidenceSource.workflowPath || slot.receiptLocator.artifactName !== `${slot.evidenceSource.artifactNamePrefix}${slot.currentHead}`)) errors.push("ready receipt locator mismatch");
+  }
   if (report.findings.some((item) => !exactKeys(item, ["code", "repository"]) || !CODE.test(item.code ?? "") || !REPOSITORY_SET.has(item.repository)) || !unique(report.findings.map((item) => `${item.code}\0${item.repository}`))) errors.push("report findings mismatch");
   if (report.incomplete.some((item) => !exactKeys(item, ["stage", "code", "affectedIdentity"]) || !/^[a-z][a-z0-9-]*$/.test(item.stage ?? "") || !CODE.test(item.code ?? "") || !/^[A-Za-z0-9:._/-]+$/.test(item.affectedIdentity ?? "")) || !unique(report.incomplete.map((item) => `${item.stage}\0${item.code}\0${item.affectedIdentity}`))) errors.push("report incomplete mismatch");
   if (report.status === "COMPLETE") {
@@ -264,24 +294,31 @@ export async function collectLive(scope, { sourceSha, collectSnapshot = null, ru
 async function collectLiveSnapshot(scope, { runGh, now, ownerContractSchema, ownerReceiptSchema }) {
   const records = [];
   for (const slot of scope.slots) {
-    const currentHead = await collectRepositoryHead(slot.repository, runGh);
+    const { currentHead, defaultBranch } = await collectRepositoryHead(slot.repository, runGh);
     if (slot.state === "PENDING") {
-      records.push({ repository: slot.repository, currentHead, issueState: null, evidenceState: "PENDING", findings: [] });
+      records.push({ repository: slot.repository, currentHead, issueState: null, evidenceState: "PENDING", contractLocator: null, receiptLocator: null, findings: [] });
       continue;
     }
-    const evidence = await collectReadyEvidence(slot, { currentHead, runGh, ownerContractSchema, ownerReceiptSchema });
-    const findings = evaluateReadyEvidence({ slot, evidence, now });
+    const evidence = await collectReadyEvidence(slot, { currentHead, defaultBranch, runGh, now, ownerContractSchema, ownerReceiptSchema });
+    const findings = evidence.discoveryFindings?.length
+      ? evidence.discoveryFindings.slice().sort(compareFinding)
+      : evaluateReadyEvidence({ slot, evidence, now });
     records.push({
       repository: slot.repository,
       currentHead,
       issueState: evidence.issueState,
       evidenceState: findings.length ? "FINDING" : "VERIFIED",
+      contractLocator: evidence.contractLocator ?? null,
+      receiptLocator: evidence.receiptLocator ?? null,
       findings,
       snapshotIdentity: {
         issueState: evidence.issueState,
+        contractLocator: evidence.contractLocator ?? null,
+        receiptLocator: evidence.receiptLocator ?? null,
         contractBlobSha: evidence.contractBlobSha,
         contractSha256: evidence.contractSha256,
         receiptArchiveDigest: evidence.receiptArchiveDigest,
+        run: evidence.run,
         artifact: evidence.artifact,
         artifactCatalog: evidence.artifactCatalog,
       },
@@ -294,60 +331,124 @@ async function collectRepositoryHead(repository, runGh) {
   let metadata; let ref;
   try {
     metadata = await runGh({ endpoint: `repos/${repository}` });
-    if (!/^[A-Za-z0-9._-]{1,255}$/.test(metadata?.default_branch ?? "")) throw new Error();
+    if (!DEFAULT_BRANCH.test(metadata?.default_branch ?? "")) throw new Error();
     ref = await runGh({ endpoint: `repos/${repository}/git/ref/heads/${metadata.default_branch}` });
   } catch (error) { providerFailure(error, "heads", repository); }
   if (ref?.ref !== `refs/heads/${metadata.default_branch}` || !SHA.test(ref?.object?.sha ?? "")) throw new AuditIncomplete("PROVIDER_MALFORMED", repository);
-  return ref.object.sha;
+  return { currentHead: ref.object.sha, defaultBranch: metadata.default_branch };
 }
 
-async function collectReadyEvidence(slot, { currentHead, runGh, ownerContractSchema, ownerReceiptSchema }) {
+async function collectReadyEvidence(slot, { currentHead, defaultBranch, runGh, now, ownerContractSchema, ownerReceiptSchema }) {
   const repository = slot.repository;
-  let issue; let contractResponse; let tree; let run; let artifact; let artifactCatalog; let archive;
+  const { contractPath, workflowPath, artifactNamePrefix } = slot.evidenceSource;
+  let issue; let contractResponse; let tree; let workflowRuns;
   try {
-    [issue, contractResponse, tree, run, artifact, artifactCatalog] = await Promise.all([
+    [issue, contractResponse, tree, workflowRuns] = await Promise.all([
       runGh({ endpoint: `repos/${repository}/issues/${slot.ownerIssue}` }),
-      runGh({ endpoint: `repos/${repository}/contents/${slot.contractLocator.path}?ref=${slot.contractLocator.commitSha}` }),
-      runGh({ endpoint: `repos/${repository}/git/trees/${slot.contractLocator.commitSha}?recursive=1` }),
-      runGh({ endpoint: `repos/${repository}/actions/runs/${slot.receiptLocator.runId}` }),
-      runGh({ endpoint: `repos/${repository}/actions/artifacts/${slot.receiptLocator.artifactId}` }),
-      collectArtifactCatalog(repository, slot.receiptLocator.runId, runGh),
+      runGh({ endpoint: `repos/${repository}/contents/${contractPath}?ref=${currentHead}` }),
+      runGh({ endpoint: `repos/${repository}/git/trees/${currentHead}?recursive=1` }),
+      collectCurrentHeadWorkflowRuns(repository, { branch: defaultBranch, workflowPath, headSha: currentHead }, runGh),
     ]);
-    archive = await runGh({ endpoint: `repos/${repository}/actions/artifacts/${slot.receiptLocator.artifactId}/zip`, binary: true });
   } catch (error) { providerFailure(error, "ready", repository); }
   if (issue?.number !== slot.ownerIssue || issue?.repository_url !== `https://api.github.com/repos/${repository}` || !["open", "closed"].includes(issue?.state)) throw new AuditIncomplete("PROVIDER_MALFORMED", repository);
   if (contractResponse?.type !== "file" || contractResponse?.encoding !== "base64" || !SHA.test(contractResponse?.sha ?? "") || typeof contractResponse?.content !== "string") throw new AuditIncomplete("PROVIDER_MALFORMED", repository);
-  let contractText; let contract; let receiptText; let receipt;
+  let contractText; let contract;
   try {
     contractText = Buffer.from(contractResponse.content.replace(/\s/g, ""), "base64").toString("utf8");
     contract = JSON.parse(contractText);
-    receiptText = readSingleReceiptZip(archive);
-    receipt = JSON.parse(receiptText);
   } catch { throw new AuditIncomplete("OWNER_EVIDENCE_DECODE_INVALID", repository); }
   if (ownerContractSchema == null || ownerReceiptSchema == null || !validateSchema(ownerContractSchema, contract).ok || validateOwnerContract(contract).length) throw new AuditIncomplete("OWNER_CONTRACT_INVALID", repository);
-  if (!validateSchema(ownerReceiptSchema, receipt).ok || validateOwnerReceipt(receipt).length) throw new AuditIncomplete("OWNER_RECEIPT_INVALID", repository);
   if (tree?.truncated !== false || !Array.isArray(tree?.tree)) throw new AuditIncomplete("PROVIDER_MALFORMED", repository);
   const paths = new Map(tree.tree.map((entry) => [entry?.path, { path: entry?.path, mode: entry?.mode, type: entry?.type }]));
-  const contractEntry = paths.get(slot.contractLocator.path) ?? { path: slot.contractLocator.path, mode: null, type: null };
+  const contractEntry = paths.get(contractPath) ?? { path: contractPath, mode: null, type: null };
   const entrypoints = [...new Set(contract.variants.flatMap(({ phases }) => phases.map(({ entrypoint }) => entrypoint)))].map((path) => paths.get(path) ?? { path, mode: null, type: null });
-  if (!Buffer.isBuffer(archive)) throw new AuditIncomplete("PROVIDER_MALFORMED", repository);
-  const normalizedRun = normalizeRun(run, repository); const normalizedArtifact = normalizeArtifact(artifact, repository);
-  return {
+  const contractLocator = { kind: "GIT_BLOB", repository, commitSha: currentHead, path: contractPath, blobSha: contractResponse.sha };
+  const baseEvidence = {
     repository,
     currentHead,
     issueState: issue.state.toUpperCase(),
+    contractLocator,
+    receiptLocator: null,
     contract,
     contractText,
     contractBlobSha: contractResponse.sha,
     contractEntry,
     contractSha256: digest(Buffer.from(contractText)),
-    receipt,
-    receiptArchiveDigest: `sha256:${digest(archive)}`,
-    run: normalizedRun,
-    artifact: normalizedArtifact,
-    artifactCatalog,
+    artifactCatalog: [],
     entrypoints,
   };
+  const run = selectCurrentHeadWorkflowRun(workflowRuns, repository);
+  if (run === null) return { ...baseEvidence, discoveryFindings: [finding("CURRENT_HEAD_RECEIPT_MISSING", repository)] };
+  let artifactCatalog;
+  try { artifactCatalog = await collectArtifactCatalog(repository, run.id, runGh); } catch (error) { providerFailure(error, "artifacts", repository); }
+  const liveArtifacts = artifactCatalog.filter((artifact) => artifact.expired === false && Date.parse(artifact.expiresAt) > Date.parse(now));
+  const expectedArtifactName = `${artifactNamePrefix}${currentHead}`;
+  if (liveArtifacts.length === 0 || liveArtifacts.length === 1 && liveArtifacts[0].name !== expectedArtifactName) {
+    return { ...baseEvidence, run, artifactCatalog, discoveryFindings: [finding("CURRENT_HEAD_RECEIPT_ARTIFACT_MISSING", repository)] };
+  }
+  if (liveArtifacts.length !== 1) throw new AuditIncomplete("ARTIFACT_IDENTITY_AMBIGUOUS", repository);
+  const artifact = liveArtifacts[0];
+  let archive;
+  try { archive = await runGh({ endpoint: `repos/${repository}/actions/artifacts/${artifact.id}/zip`, binary: true }); } catch (error) { providerFailure(error, "artifact-download", repository); }
+  if (!Buffer.isBuffer(archive)) throw new AuditIncomplete("PROVIDER_MALFORMED", repository);
+  let receipt;
+  try { receipt = JSON.parse(readSingleReceiptZip(archive)); } catch { throw new AuditIncomplete("OWNER_EVIDENCE_DECODE_INVALID", repository); }
+  if (!validateSchema(ownerReceiptSchema, receipt).ok || validateOwnerReceipt(receipt).length) throw new AuditIncomplete("OWNER_RECEIPT_INVALID", repository);
+  const receiptLocator = {
+    kind: "ACTIONS_ARTIFACT",
+    repository,
+    runId: run.id,
+    artifactId: artifact.id,
+    artifactName: artifact.name,
+    archiveDigest: artifact.digest,
+    workflowPath,
+    headSha: currentHead,
+    createdAt: artifact.createdAt,
+    expiresAt: artifact.expiresAt,
+  };
+  return {
+    ...baseEvidence,
+    contractLocator,
+    receiptLocator,
+    receipt,
+    receiptArchiveDigest: `sha256:${digest(archive)}`,
+    run,
+    artifact,
+    artifactCatalog,
+  };
+}
+
+export async function collectCurrentHeadWorkflowRuns(repository, { branch, workflowPath, headSha }, runGh = gh) {
+  if (!REPOSITORY_SET.has(repository) || !DEFAULT_BRANCH.test(branch ?? "") || !WORKFLOW_PATH.test(workflowPath ?? "") || !SHA.test(headSha ?? "")) throw new AuditIncomplete("WORKFLOW_RUN_CATALOG_IDENTITY_INVALID", repository);
+  const workflowFile = workflowPath.slice(".github/workflows/".length);
+  const records = [];
+  const ids = new Set();
+  let totalCount = null;
+  for (let page = 1; page <= WORKFLOW_RUN_LIMIT / WORKFLOW_RUN_PAGE_SIZE + 1; page += 1) {
+    const endpoint = `repos/${repository}/actions/workflows/${workflowFile}/runs?branch=${branch}&event=workflow_dispatch&status=success&head_sha=${headSha}&per_page=${WORKFLOW_RUN_PAGE_SIZE}&page=${page}`;
+    const response = await runGh({ endpoint });
+    if (!validInteger(response?.total_count) || response.total_count > WORKFLOW_RUN_LIMIT || !Array.isArray(response?.workflow_runs) || response.workflow_runs.length > WORKFLOW_RUN_PAGE_SIZE) throw new AuditIncomplete("WORKFLOW_RUN_CATALOG_MALFORMED", repository);
+    if (totalCount == null) totalCount = response.total_count;
+    else if (response.total_count !== totalCount) throw new AuditIncomplete("WORKFLOW_RUN_CATALOG_COUNT_DRIFT", repository);
+    for (const candidate of response.workflow_runs) {
+      const normalized = normalizeRun(candidate, repository, { workflowPath, headSha });
+      if (ids.has(normalized.id)) throw new AuditIncomplete("WORKFLOW_RUN_CATALOG_DUPLICATE", repository);
+      ids.add(normalized.id);
+      records.push(normalized);
+    }
+    if (response.workflow_runs.length < WORKFLOW_RUN_PAGE_SIZE) {
+      if (records.length !== totalCount) throw new AuditIncomplete("WORKFLOW_RUN_CATALOG_COUNT_MISMATCH", repository);
+      return records.sort((left, right) => left.id - right.id);
+    }
+  }
+  throw new AuditIncomplete("WORKFLOW_RUN_CATALOG_PAGE_LIMIT", repository);
+}
+
+export function selectCurrentHeadWorkflowRun(runs, repository) {
+  if (!REPOSITORY_SET.has(repository) || !Array.isArray(runs)) throw new AuditIncomplete("WORKFLOW_RUN_CATALOG_IDENTITY_INVALID", repository);
+  if (runs.length === 0) return null;
+  if (runs.length !== 1) throw new AuditIncomplete("WORKFLOW_RUN_AMBIGUOUS", repository);
+  return runs[0];
 }
 
 export async function collectArtifactCatalog(repository, runId, runGh = gh) {
@@ -374,9 +475,9 @@ export async function collectArtifactCatalog(repository, runId, runGh = gh) {
   throw new AuditIncomplete("ARTIFACT_CATALOG_PAGE_LIMIT", repository);
 }
 
-function normalizeRun(run, repository) {
-  if (typeof run?.conclusion !== "string" || typeof run?.path !== "string" || typeof run?.head_sha !== "string" || !providerUtc(run?.run_started_at) || !providerUtc(run?.updated_at)) throw new AuditIncomplete("PROVIDER_MALFORMED", repository);
-  return { conclusion: run.conclusion, path: run.path, headSha: run.head_sha, startedAt: new Date(run.run_started_at).toISOString(), completedAt: new Date(run.updated_at).toISOString() };
+function normalizeRun(run, repository, { workflowPath, headSha }) {
+  if (!validInteger(run?.id, 1) || run?.event !== "workflow_dispatch" || run?.status !== "completed" || run?.conclusion !== "success" || run?.path !== workflowPath || run?.head_sha !== headSha || !providerUtc(run?.run_started_at) || !providerUtc(run?.updated_at) || Date.parse(run.run_started_at) > Date.parse(run.updated_at)) throw new AuditIncomplete("WORKFLOW_RUN_IDENTITY_MISMATCH", repository);
+  return { id: run.id, conclusion: run.conclusion, path: run.path, headSha: run.head_sha, startedAt: new Date(run.run_started_at).toISOString(), completedAt: new Date(run.updated_at).toISOString() };
 }
 
 function normalizeArtifact(artifact, repository) {
@@ -420,7 +521,8 @@ function crc32(bytes) {
 function allowedEndpoint(endpoint, binary) {
   const repository = "AquilaXk/easysubway(?:-(?:backend|data|mobile|platform))?";
   const path = "[A-Za-z0-9][A-Za-z0-9._/-]*";
-  const common = new RegExp(`^repos/${repository}(?:$|/git/ref/heads/[A-Za-z0-9._-]{1,255}$|/issues/[1-9]\\d*$|/contents/${path}\\?ref=[0-9a-f]{40}$|/git/trees/[0-9a-f]{40}\\?recursive=1$|/actions/runs/[1-9]\\d*$|/actions/runs/[1-9]\\d*/artifacts\\?per_page=100&page=[1-9]\\d*$|/actions/artifacts/[1-9]\\d*(?:/zip)?$)`);
+  const workflowRuns = "/actions/workflows/[A-Za-z0-9][A-Za-z0-9._-]*\\.ya?ml/runs\\?branch=[A-Za-z0-9._-]{1,255}&event=workflow_dispatch&status=success&head_sha=[0-9a-f]{40}&per_page=100&page=[1-9]\\d*";
+  const common = new RegExp(`^repos/${repository}(?:$|/git/ref/heads/[A-Za-z0-9._-]{1,255}$|/issues/[1-9]\\d*$|/contents/${path}\\?ref=[0-9a-f]{40}$|/git/trees/[0-9a-f]{40}\\?recursive=1$|${workflowRuns}$|/actions/runs/[1-9]\\d*/artifacts\\?per_page=100&page=[1-9]\\d*$|/actions/artifacts/[1-9]\\d*(?:/zip)?$)`);
   if (!common.test(endpoint) || endpoint.includes("..")) return false;
   return binary ? /\/actions\/artifacts\/[1-9]\d*\/zip$/.test(endpoint) : !endpoint.endsWith("/zip");
 }
@@ -435,14 +537,14 @@ export async function gh({ endpoint, binary = false }, execute = execFileAsync) 
 }
 
 function fallbackScope() {
-  return { schemaVersion: 1, slots: REPOSITORIES.map((repository) => ({ repository, state: "PENDING", ownerIssue: null, contractLocator: null, receiptLocator: null })) };
+  return { schemaVersion: 2, slots: REPOSITORIES.map((repository) => ({ repository, state: "PENDING", ownerIssue: null, evidenceSource: null })) };
 }
 
 function incompleteReport({ scope, sourceSha, observedAt, scopeText, code, identity, stage = "audit", inputs = {} }) {
-  const slots = scope.slots.map((slot) => ({ repository: slot.repository, state: slot.state, currentHead: null, ownerIssue: slot.ownerIssue, contractLocator: slot.contractLocator, receiptLocator: slot.receiptLocator, evidenceState: "UNAVAILABLE" }));
+  const slots = scope.slots.map((slot) => ({ repository: slot.repository, state: slot.state, currentHead: null, ownerIssue: slot.ownerIssue, evidenceSource: slot.evidenceSource, contractLocator: null, receiptLocator: null, evidenceState: "UNAVAILABLE" }));
   const pending = slots.filter(({ state }) => state === "PENDING").length;
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: "AUDIT_INCOMPLETE",
     observedAt,
     inputs: { sourceSha, scopeSha256: digest(Buffer.from(scopeText)), stateBeginSha256: inputs.stateBeginSha256 ?? null, stateEndSha256: inputs.stateEndSha256 ?? null },
