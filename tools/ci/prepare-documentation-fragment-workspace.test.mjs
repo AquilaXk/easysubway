@@ -54,6 +54,10 @@ function createRepository(directory) {
 function writeInputs(directory, outerSha, mutate = () => {}) {
   const catalog = JSON.parse(readFileSync("contracts/documentation/documentation-system-catalog.json", "utf8"));
   const scope = JSON.parse(readFileSync("contracts/documentation/documentation-inventory-audit-scope.json", "utf8"));
+  for (const entry of catalog.repositories) {
+    entry.status = "PROPOSED";
+    entry.fragment = null;
+  }
   const mobile = catalog.repositories.find(({ repository }) => repository === MOBILE);
   mobile.status = "ACTIVE";
   mobile.fragment = {
