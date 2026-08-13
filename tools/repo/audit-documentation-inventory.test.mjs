@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -29,6 +30,7 @@ const SCOPE = {
   dods: ["D01", "D02", "D03", "D04", "D05"],
 };
 const SHA = "a".repeat(40);
+const SOURCE_SHA = "e".repeat(40);
 const WATERMARK = "b".repeat(64);
 
 function record(repository, overrides = {}) {
@@ -86,7 +88,7 @@ function fragment(repository, resources = [record(repository)], overrides = {}) 
     $schema: "./documentation-fragment.schema.json",
     schemaVersion: 1,
     repository,
-    gitSha: SHA,
+    sourceSha: SHA,
     status: "ACTIVE",
     lastVerifiedAt: "2026-08-11T00:00:00.000Z",
     verificationEvidence: ["evidence:fixture"],
@@ -145,17 +147,99 @@ test("documentation inventory audit proves D01-D05 only for five exact ACTIVE fr
   ]);
 });
 
-test("documentation inventory audit verifies tracked fragment blobs and rejects malformed or cross-head input", async () => {
+test("documentation inventory audit verifies tracked fragment blobs and rejects malformed input", async () => {
   const candidate = fragment(REPOSITORIES[0]);
   const readContent = async (_repository, path, _sha) => path === PATH
     ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(candidate)).toString("base64") }
     : { type: "file", sha: "c".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") };
   const verified = await verifyFragment(SCOPE.repositories[0], SHA, { readContent });
   assert.deepEqual([verified.state, verified.fragmentStatus, verified.resourceCount, verified.activeResourceCount], ["READY", "ACTIVE", 1, 1]);
-  await assert.rejects(() => verifyFragment(SCOPE.repositories[0], "b".repeat(40), { readContent }), (error) => error instanceof AuditIncomplete && error.code === "FRAGMENT_HEAD_MISMATCH");
   await assert.rejects(() => verifyFragment(SCOPE.repositories[0], SHA, { readContent: async () => ({ type: "file", sha: "d".repeat(40), encoding: "base64", content: "%%%" }) }), (error) => error instanceof AuditIncomplete && error.code === "FRAGMENT_DECODE_INVALID");
   const missing = await verifyFragment(SCOPE.repositories[0], SHA, { readContent: async () => { throw Object.assign(new Error("missing"), { status: 404 }); } });
   assert.deepEqual([missing.state, missing.fragmentStatus, missing.fragmentBlobSha], ["PENDING", "MISSING", null]);
+});
+
+test("documentation inventory audit accepts source-bound resources without self-head identity", async () => {
+  const canonicalIdentity = `git:${SOURCE_SHA}:contracts/easysubway.json:${"c".repeat(40)}`;
+  const candidate = fragment(REPOSITORIES[0], [record(REPOSITORIES[0], {
+    canonicalIdentity,
+    lastVerifiedIdentity: canonicalIdentity,
+  })]);
+  candidate.sourceSha = SOURCE_SHA;
+  const readContent = async (_repository, path, sha) => path === PATH
+    ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(candidate)).toString("base64") }
+    : [SOURCE_SHA, SHA].includes(sha)
+      ? { type: "file", sha: "c".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") }
+      : Promise.reject(Object.assign(new Error("missing"), { status: 404 }));
+  const verified = await verifyFragment(SCOPE.repositories[0], SHA, { readContent });
+  assert.deepEqual(
+    [verified.state, verified.fragmentStatus, verified.resourceCount, verified.verificationFindings],
+    ["READY", "ACTIVE", 1, []],
+  );
+
+  const payload = Buffer.from("{}");
+  const payloadSha256 = createHash("sha256").update(payload).digest("hex");
+  const sha256Identity = `git:${SOURCE_SHA}:contracts/easysubway.json:${payloadSha256}`;
+  const sha256Candidate = fragment(REPOSITORIES[0], [record(REPOSITORIES[0], {
+    canonicalIdentity: sha256Identity,
+    lastVerifiedIdentity: sha256Identity,
+  })], { sourceSha: SOURCE_SHA });
+  const sha256Verified = await verifyFragment(SCOPE.repositories[0], SHA, {
+    readContent: async (_repository, path) => path === PATH
+      ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(sha256Candidate)).toString("base64") }
+      : { type: "file", sha: "c".repeat(40), encoding: "base64", content: payload.toString("base64") },
+  });
+  assert.deepEqual(
+    [sha256Verified.state, sha256Verified.fragmentStatus, sha256Verified.resourceCount, sha256Verified.verificationFindings],
+    ["READY", "ACTIVE", 1, []],
+  );
+
+  const currentMismatch = await verifyFragment(SCOPE.repositories[0], SHA, {
+    readContent: async (_repository, path, sha) => path === PATH
+      ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(candidate)).toString("base64") }
+      : { type: "file", sha: sha === SOURCE_SHA ? "c".repeat(40) : "f".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") },
+  });
+  assert.deepEqual(currentMismatch.verificationFindings, [{
+    dod: "D01",
+    code: "TRACKED_RESOURCE_CURRENT_BLOB_MISMATCH",
+    identity: candidate.resources[0].resource,
+  }]);
+
+  const currentMissing = await verifyFragment(SCOPE.repositories[0], SHA, {
+    readContent: async (_repository, path, sha) => {
+      if (path === PATH) return { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(candidate)).toString("base64") };
+      if (sha === SOURCE_SHA) return { type: "file", sha: "c".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") };
+      throw Object.assign(new Error("missing"), { status: 404 });
+    },
+  });
+  assert.deepEqual(currentMissing.verificationFindings, [{
+    dod: "D01",
+    code: "TRACKED_RESOURCE_CURRENT_MISSING",
+    identity: candidate.resources[0].resource,
+  }]);
+
+  await assert.rejects(
+    () => verifyFragment(SCOPE.repositories[0], SHA, {
+      readContent: async (_repository, path, sha) => {
+        if (path === PATH) return { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(candidate)).toString("base64") };
+        if (sha === SOURCE_SHA) throw Object.assign(new Error("missing"), { status: 404 });
+        return { type: "file", sha: "c".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") };
+      },
+    }),
+    (error) => error instanceof AuditIncomplete && error.code === "TRACKED_RESOURCE_SOURCE_MISSING",
+  );
+
+  const legacy = structuredClone(candidate);
+  legacy.gitSha = legacy.sourceSha;
+  delete legacy.sourceSha;
+  await assert.rejects(
+    () => verifyFragment(SCOPE.repositories[0], SHA, {
+      readContent: async (_repository, path) => path === PATH
+        ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(legacy)).toString("base64") }
+        : { type: "file", sha: "c".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") },
+    }),
+    (error) => error instanceof AuditIncomplete && error.code === "FRAGMENT_SCHEMA_INVALID",
+  );
 });
 
 test("documentation inventory audit rejects state drift and writes schema-valid fallback without overwriting", async () => {

@@ -532,7 +532,7 @@ function createDocumentationCatalogWorkspace({ activeIndexes = null } = {}) {
       const resourceIdentity = index === 0 ? resourceBlob : resourceDigest;
       const fragment = {
         $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
-        repository: entry.repository, gitSha: innerSha, status: "ACTIVE",
+        repository: entry.repository, sourceSha: innerSha, status: "ACTIVE",
         lastVerifiedAt: "2026-08-05T00:00:00.000Z", verificationEvidence: ["evidence:fixture"],
         resources: [documentationCatalogRecord(entry.repository, innerSha, resourceIdentity)],
       };
@@ -612,7 +612,7 @@ function rewriteDocumentationFragmentInnerCommit(fragment, innerSha, resourcePat
   record.resource = `${fragment.repository}:${resourcePath}`;
   record.canonicalIdentity = `git:${innerSha}:${resourcePath}:${identity}`;
   record.lastVerifiedIdentity = record.canonicalIdentity;
-  fragment.gitSha = innerSha;
+  fragment.sourceSha = innerSha;
 }
 
 function documentationExternalRecord(record, resource) {
@@ -645,6 +645,59 @@ test("documentation catalog resolves exact outer and inner Git blobs", () => {
     assert.ok(collectContractErrors(fixture.workspacePath, {
       documentationFragmentWorkspacePath: fixture.fragmentWorkspacePath,
     }).some((error) => error.includes("mapping")));
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog accepts a source commit distinct from the outer fragment commit", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    const catalog = loadJson(fixture.catalogPath);
+    assert.notEqual(fragment.sourceSha, catalog.repositories[0].fragment.gitSha);
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog rejects current resource drift after source binding", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    writeFileSync(join(root, "docs/resource.txt"), "drifted-resource\n");
+    fixtureGit(["add", "docs/resource.txt"], { cwd: root, stdio: "ignore" });
+    fixtureGit(["commit", "-m", "drift resource"], { cwd: root, stdio: "ignore" });
+    const catalog = loadJson(fixture.catalogPath);
+    catalog.repositories[0].fragment.gitSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    catalog.repositories[0].fragment.blobSha = fixtureGit(["rev-parse", "HEAD:docs/fragment.json"], { cwd: root, encoding: "utf8" }).trim();
+    writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    assertDocumentationCatalogFailure(fixture, "TRACKED resource current blob identity가 일치하지 않는다");
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation catalog rejects SHA-256 current resource drift after source binding", () => {
+  const fixture = createDocumentationCatalogWorkspace({ activeIndexes: [1] });
+  try {
+    const [{ repository, root }] = fixture.repositories;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    assert.equal(fragment.resources[0].canonicalIdentity.split(":").at(-1).length, 64);
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+
+    writeFileSync(join(root, "docs/resource.txt"), "drifted-sha256-resource\n");
+    fixtureGit(["add", "docs/resource.txt"], { cwd: root, stdio: "ignore" });
+    fixtureGit(["commit", "-m", "drift SHA-256 resource"], { cwd: root, stdio: "ignore" });
+    const catalog = loadJson(fixture.catalogPath);
+    const entry = catalog.repositories.find((candidate) => candidate.repository === repository);
+    assert.ok(entry?.fragment);
+    entry.fragment.gitSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    entry.fragment.blobSha = createHash("sha256").update(readFileSync(join(root, "docs/fragment.json"))).digest("hex");
+    writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    assertDocumentationCatalogFailure(fixture, "TRACKED resource current blob identity가 일치하지 않는다");
   } finally {
     rmSync(fixture.directory, { recursive: true, force: true });
   }
@@ -705,14 +758,15 @@ test("documentation catalog limits the resource union across ACTIVE fragments", 
       });
       if (repositoryIndex === 0) {
         fragment.resources[0] = documentationCatalogRecord(
-          fragment.repository, fragment.gitSha, "0".repeat(40), "docs/missing.txt",
+          fragment.repository, fragment.sourceSha, "0".repeat(40), "docs/missing.txt",
         );
       }
       commitDocumentationCatalogFragment(fixture, repositoryIndex, JSON.stringify(fragment));
     }
     const errors = documentationCatalogErrors(fixture);
     assert.ok(errors.some((error) => error.includes("resources는 전체 256개 이하여야 한다")), errors.join("\n"));
-    assert.ok(errors.every((error) => !error.includes("TRACKED resource blob identity")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes("TRACKED resource source blob identity")), errors.join("\n"));
+    assert.ok(errors.every((error) => !error.includes("TRACKED resource current blob identity")), errors.join("\n"));
     assert.ok(errors.every((error) => !error.includes("ACTIVE fragment relation")), errors.join("\n"));
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
 });
@@ -964,14 +1018,14 @@ test("documentation catalog rejects fragment header and TRACKED identity drift",
       fragment.resources[0].canonicalIdentity = fragment.resources[0].canonicalIdentity.replace(/:[0-9a-f]{40}$/, `:${"0".repeat(40)}`);
       fragment.resources[0].lastVerifiedIdentity = fragment.resources[0].canonicalIdentity;
       commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
-    }, "TRACKED resource blob identity"],
+    }, "TRACKED resource source blob identity"],
     ["TRACKED resource SHA-256", (fixture) => {
       const root = fixture.repositories[1].root;
       const fragment = loadJson(join(root, "docs/fragment.json"));
       fragment.resources[0].canonicalIdentity = fragment.resources[0].canonicalIdentity.replace(/:[0-9a-f]{64}$/, `:${"0".repeat(64)}`);
       fragment.resources[0].lastVerifiedIdentity = fragment.resources[0].canonicalIdentity;
       commitDocumentationCatalogFragment(fixture, 1, JSON.stringify(fragment));
-    }, "TRACKED resource blob identity"],
+    }, "TRACKED resource source blob identity"],
   ];
   for (const [, mutate, expected] of cases) {
     const fixture = createDocumentationCatalogWorkspace();
@@ -1027,7 +1081,7 @@ test("documentation catalog enforces the explicit 64 MiB blob limit", () => {
     fixtureGit(["commit", "-m", "aggregate digest payload"], { cwd: root, stdio: "ignore" });
     const innerSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
     const fragment = loadJson(join(root, "docs/fragment.json"));
-    fragment.gitSha = innerSha;
+    fragment.sourceSha = innerSha;
     fragment.resources = [
       documentationCatalogRecord(fragment.repository, innerSha, largeDigest),
       documentationCatalogRecord(
@@ -1184,9 +1238,9 @@ test("documentation catalog rejects missing and symlink TRACKED resources", () =
   try {
     const root = missing.repositories[0].root;
     const fragment = loadJson(join(root, "docs/fragment.json"));
-    rewriteDocumentationFragmentInnerCommit(fragment, fragment.gitSha, "docs/missing.txt", "0".repeat(40));
+    rewriteDocumentationFragmentInnerCommit(fragment, fragment.sourceSha, "docs/missing.txt", "0".repeat(40));
     commitDocumentationCatalogFragment(missing, 0, JSON.stringify(fragment));
-    assertDocumentationCatalogFailure(missing, "TRACKED resource blob identity");
+    assertDocumentationCatalogFailure(missing, "TRACKED resource source blob identity");
   } finally { rmSync(missing.directory, { recursive: true, force: true }); }
 
   const symlink = createSingleDocumentationCatalogWorkspace();
@@ -1200,7 +1254,7 @@ test("documentation catalog rejects missing and symlink TRACKED resources", () =
     const fragment = loadJson(join(root, "docs/fragment.json"));
     rewriteDocumentationFragmentInnerCommit(fragment, innerSha);
     commitDocumentationCatalogFragment(symlink, 0, JSON.stringify(fragment));
-    assertDocumentationCatalogFailure(symlink, "TRACKED resource blob identity");
+    assertDocumentationCatalogFailure(symlink, "TRACKED resource source blob identity");
   } finally { rmSync(symlink.directory, { recursive: true, force: true }); }
 });
 
@@ -2038,7 +2092,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     $schema: "./documentation-fragment.schema.json",
     schemaVersion: 1,
     repository: "AquilaXk/easysubway",
-    gitSha: "a".repeat(40),
+    sourceSha: "a".repeat(40),
     status: "ACTIVE",
     lastVerifiedAt: "2026-08-05T00:00:00.000Z",
     verificationEvidence: [],
@@ -2051,7 +2105,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     $schema: "./documentation-fragment.schema.json",
     schemaVersion: 1,
     repository: "AquilaXk/easysubway",
-    gitSha: "a".repeat(40),
+    sourceSha: "a".repeat(40),
     status: "ACTIVE",
     lastVerifiedAt: null,
     verificationEvidence: ["evidence:fixture"],
@@ -2093,7 +2147,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     $schema: "./documentation-fragment.schema.json",
     schemaVersion: 1,
     repository: "AquilaXk/easysubway",
-    gitSha: "a".repeat(40),
+    sourceSha: "a".repeat(40),
     status: "PROPOSED",
     lastVerifiedAt: null,
     verificationEvidence: [],
@@ -2122,7 +2176,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     $schema: "./documentation-fragment.schema.json",
     schemaVersion: 1,
     repository: "AquilaXk/easysubway",
-    gitSha: "a".repeat(40),
+    sourceSha: "a".repeat(40),
     status: "PROPOSED",
     lastVerifiedAt: null,
     verificationEvidence: [],
@@ -2139,7 +2193,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   const trackedIdentityErrors = [];
   validateDocumentationFragment({
     $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
-    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [trackedRecord],
   }, fragmentSchema, resourceSchema, trackedIdentityErrors);
   assert.ok(trackedIdentityErrors.some((error) => error.includes("tracked fragment identity mismatch")));
@@ -2151,7 +2205,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   const unsupportedTrackedErrors = [];
   validateDocumentationFragment({
     $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
-    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [unsupportedTrackedIdentity],
   }, fragmentSchema, resourceSchema, unsupportedTrackedErrors);
   assert.ok(unsupportedTrackedErrors.some((error) => error.includes("invalid tracked identity")));
@@ -2165,7 +2219,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     const lifecycleErrors = [];
     validateDocumentationFragment({
       $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
-      repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+      repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
       lastVerifiedAt: null, verificationEvidence: [], resources: [record],
     }, fragmentSchema, resourceSchema, lifecycleErrors);
     assert.ok(lifecycleErrors.some((error) => error.includes("fragment lifecycle contradiction")));
@@ -2182,7 +2236,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   const reciprocalErrors = [];
   validateDocumentationFragment({
     $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
-    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [predecessor, successor],
   }, fragmentSchema, resourceSchema, reciprocalErrors);
   assert.ok(reciprocalErrors.some((error) => error.includes("fragment relation contradiction")));
@@ -2198,7 +2252,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   const cycleErrors = [];
   validateDocumentationFragment({
     $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
-    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [cycleA, cycleB],
   }, fragmentSchema, resourceSchema, cycleErrors);
   assert.ok(cycleErrors.some((error) => error.includes("fragment supersession cycle")));
@@ -2212,7 +2266,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   const duplicateCanonicalErrors = [];
   validateDocumentationFragment({
     $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
-    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA, duplicateCanonicalB],
   }, fragmentSchema, resourceSchema, duplicateCanonicalErrors);
   assert.ok(duplicateCanonicalErrors.some((error) => error.includes("fragment duplicate group contradiction")));
@@ -2226,7 +2280,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     const duplicateMemberErrors = [];
     validateDocumentationFragment({
       $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
-      repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+      repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
       lastVerifiedAt: null, verificationEvidence: [], resources: [record],
     }, fragmentSchema, resourceSchema, duplicateMemberErrors);
     assert.ok(duplicateMemberErrors.some((error) => error.includes("fragment duplicate group contradiction")));
@@ -2235,7 +2289,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   const unresolvedDuplicateErrors = [];
   validateDocumentationFragment({
     $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
-    repository: "AquilaXk/easysubway", gitSha: "a".repeat(40), status: "PROPOSED",
+    repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA],
   }, fragmentSchema, resourceSchema, unresolvedDuplicateErrors);
   assert.deepEqual(unresolvedDuplicateErrors, []);

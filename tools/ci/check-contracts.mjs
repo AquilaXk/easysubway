@@ -1450,32 +1450,50 @@ function resolveActiveDocumentationFragments(catalog, workspacePath, errors, sch
       fragmentErrors.push("catalog fragment header 불일치");
     }
     try {
-      if (documentationGit(root, ["cat-file", "-t", fragment.gitSha], "utf8").trim() !== "commit") {
+      if (documentationGit(root, ["cat-file", "-t", fragment.sourceSha], "utf8").trim() !== "commit") {
         fragmentErrors.push("inner commit relation 불일치");
       } else {
-        documentationGit(root, ["merge-base", "--is-ancestor", fragment.gitSha, entry.fragment.gitSha]);
+        documentationGit(root, ["merge-base", "--is-ancestor", fragment.sourceSha, entry.fragment.gitSha]);
       }
     } catch { fragmentErrors.push("inner commit relation 불일치"); }
     const trackedRecords = fragment.resources.filter(({ sourceSurface }) => sourceSurface === "TRACKED");
     for (const record of trackedRecords) {
       const identity = /^git:([0-9a-f]{40}):([^:]+):([0-9a-f]{40}|[0-9a-f]{64})$/.exec(record.canonicalIdentity);
-      const blob = identity != null && identity[1] === fragment.gitSha
-        ? resolveDocumentationBlob(root, fragment.gitSha, identity[2], { readBytes: false }) : null;
-      if (blob?.tooLarge) {
+      const sourceBlob = identity != null && identity[1] === fragment.sourceSha
+        ? resolveDocumentationBlob(root, fragment.sourceSha, identity[2], { readBytes: false }) : null;
+      const currentBlob = identity != null
+        ? resolveDocumentationBlob(root, entry.fragment.gitSha, identity[2], { readBytes: false }) : null;
+      if (sourceBlob?.tooLarge || currentBlob?.tooLarge) {
         fragmentErrors.push("TRACKED resource blob은 64 MiB 이하여야 한다");
         continue;
       }
-      let actual = blob?.oid ?? null;
-      if (blob != null && identity[3].length === 64) {
-        if (trackedDigestBytes + blob.byteLength > BigInt(DOCUMENTATION_GIT_MAX_BUFFER)) {
+      let sourceActual = sourceBlob?.oid ?? null;
+      if (sourceBlob != null && identity[3].length === 64) {
+        if (trackedDigestBytes + sourceBlob.byteLength > BigInt(DOCUMENTATION_GIT_MAX_BUFFER)) {
           fragmentErrors.push("TRACKED resource SHA-256 payload 합계는 64 MiB 이하여야 한다");
           break;
         }
-        trackedDigestBytes += blob.byteLength;
-        try { actual = createHash("sha256").update(documentationGit(root, ["cat-file", "blob", blob.oid])).digest("hex"); }
-        catch { actual = null; }
+        trackedDigestBytes += sourceBlob.byteLength;
+        try { sourceActual = createHash("sha256").update(documentationGit(root, ["cat-file", "blob", sourceBlob.oid])).digest("hex"); }
+        catch { sourceActual = null; }
       }
-      if (actual !== identity?.[3]) fragmentErrors.push("TRACKED resource blob identity가 일치하지 않는다");
+      if (sourceActual !== identity?.[3]) {
+        fragmentErrors.push("TRACKED resource source blob identity가 일치하지 않는다");
+        continue;
+      }
+      let currentActual = currentBlob?.oid ?? null;
+      if (currentBlob != null && identity[3].length === 64) {
+        if (currentBlob.oid === sourceBlob?.oid) currentActual = sourceActual;
+        else if (trackedDigestBytes + currentBlob.byteLength > BigInt(DOCUMENTATION_GIT_MAX_BUFFER)) {
+          fragmentErrors.push("TRACKED resource SHA-256 payload 합계는 64 MiB 이하여야 한다");
+          break;
+        } else {
+          trackedDigestBytes += currentBlob.byteLength;
+          try { currentActual = createHash("sha256").update(documentationGit(root, ["cat-file", "blob", currentBlob.oid])).digest("hex"); }
+          catch { currentActual = null; }
+        }
+      }
+      if (currentActual !== identity?.[3]) fragmentErrors.push("TRACKED resource current blob identity가 일치하지 않는다");
     }
     if (fragmentErrors.length > 0) {
       failed = true;
@@ -1517,7 +1535,7 @@ export function validateDocumentationFragment(fragment, fragmentSchema, resource
     try {
       validateDocumentationRecord(record, {
         ownerRepository: fragment.repository,
-        gitSha: fragment.gitSha,
+        gitSha: fragment.sourceSha,
         tracked: record.sourceSurface === "TRACKED",
       });
       if (record.sourceSurface === "TRACKED") {
