@@ -2075,7 +2075,7 @@ test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => 
   assert.ok(adr.confirmation.some(({ method }) => method.endsWith("--current-only --local-contracts-only")));
 });
 
-test("documentation catalog는 terminal Backend와 Mobile locator를 ACTIVE로 소비하고 fragment lifecycle을 fail closed한다", () => {
+test("documentation catalog는 terminal Hub, Backend와 Mobile locator를 ACTIVE로 소비하고 fragment lifecycle을 fail closed한다", () => {
   const resourceSchema = loadJson("contracts/documentation/documentation-resource.schema.json");
   const fragmentSchema = loadJson("contracts/documentation/documentation-fragment.schema.json");
   const catalogSchema = loadJson("contracts/documentation/documentation-system-catalog.schema.json");
@@ -2092,6 +2092,22 @@ test("documentation catalog는 terminal Backend와 Mobile locator를 ACTIVE로 �
     "AquilaXk/easysubway-platform",
   ]);
   assert.equal(catalog.status, "PROPOSED");
+  const hub = catalog.repositories.find(({ repository }) => repository === "AquilaXk/easysubway");
+  assert.deepEqual(hub, {
+    repository: "AquilaXk/easysubway",
+    status: "ACTIVE",
+    fragment: {
+      gitSha: "71d03cbb20cca0a1b358c921febe9ca646ad06b3",
+      path: "contracts/documentation/documentation-fragment.json",
+      blobSha: "317d93550975428f8e72c5ead516e3e101c74172",
+      lastVerifiedAt: "2026-08-13T13:32:18.000Z",
+      verificationEvidence: [
+        "https://github.com/AquilaXk/easysubway/issues/2748",
+        "https://github.com/AquilaXk/easysubway/issues/2861",
+        "https://github.com/AquilaXk/easysubway/issues/2863",
+      ],
+    },
+  });
   const backend = catalog.repositories.find(({ repository }) => repository === "AquilaXk/easysubway-backend");
   assert.deepEqual(backend, {
     repository: "AquilaXk/easysubway-backend",
@@ -2124,8 +2140,8 @@ test("documentation catalog는 terminal Backend와 Mobile locator를 ACTIVE로 �
       ],
     },
   });
-  assert.deepEqual(catalog.repositories.filter(({ repository }) => ![backend.repository, mobile.repository].includes(repository))
-    .map(({ status, fragment }) => ({ status, fragment })), Array(3).fill({ status: "PROPOSED", fragment: null }));
+  assert.deepEqual(catalog.repositories.filter(({ repository }) => ![hub.repository, backend.repository, mobile.repository].includes(repository))
+    .map(({ status, fragment }) => ({ status, fragment })), Array(2).fill({ status: "PROPOSED", fragment: null }));
   const unresolvedErrors = [];
   validateDocumentationSystemCatalog(catalog, catalogSchema, unresolvedErrors);
   assert.ok(unresolvedErrors.some((error) => error.includes("ACTIVE fragment resolution contract")));
@@ -2134,7 +2150,7 @@ test("documentation catalog는 terminal Backend와 Mobile locator를 ACTIVE로 �
     [(value) => value.repositories.pop(), /minItems 5/],
     [(value) => value.repositories.push(structuredClone(value.repositories[0])), /maxItems 5/],
     [(value) => { value.repositories[0].repository = "AquilaXk/unknown"; }, /enum/],
-    [(value) => { value.repositories[0].status = "ACTIVE"; }, /ACTIVE fragment가 필요하다/],
+    [(value) => { value.repositories[0].status = "ACTIVE"; value.repositories[0].fragment = null; }, /ACTIVE fragment가 필요하다/],
     [(value) => { value.repositories[0].resources = []; }, /resources/],
   ]) {
     const invalid = structuredClone(catalog);
