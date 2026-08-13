@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import test from "node:test";
@@ -90,7 +90,7 @@ test("documentation fragment workspace preparer creates one exact ACTIVE mapping
 
     assert.deepEqual(result, {
       schemaVersion: 1,
-      repositories: [{ repository: MOBILE, root: resolve(rootDirectory, "easysubway-mobile") }],
+      repositories: [{ repository: MOBILE, root: resolve(realpathSync(rootDirectory), "easysubway-mobile") }],
     });
     assert.deepEqual(JSON.parse(readFileSync(outputPath, "utf8")), result);
     assert.equal(git(result.repositories[0].root, ["rev-parse", "--verify", `${repository.outerSha}^{commit}`]), repository.outerSha);

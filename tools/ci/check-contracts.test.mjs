@@ -1301,7 +1301,10 @@ test("documentation catalog CLI accepts compatibility modes and rejects malforme
   });
   const proposed = createExternalWorkspace();
   try {
-    assert.doesNotThrow(() => run(["--workspace", proposed.workspacePath, "--current-only"]));
+    assert.throws(() => run(["--workspace", proposed.workspacePath, "--current-only"]), /workspace가 필요하다/);
+    assert.doesNotThrow(() => run([
+      "--workspace", proposed.workspacePath, "--current-only", "--local-contracts-only",
+    ]));
   } finally { rmSync(proposed.directory, { recursive: true, force: true }); }
 
   const fixture = createSingleDocumentationCatalogWorkspace();
@@ -1341,6 +1344,7 @@ test("documentation catalog CLI accepts compatibility modes and rejects malforme
       [...valid, "--documentation-fragment-workspace", fixture.fragmentWorkspacePath],
       [...valid, "--local-contracts-only"],
       ["--workspace", fixture.workspacePath, "--base-ref", "a".repeat(40), "--local-contracts-only"],
+      ["--workspace", fixture.workspacePath, "--current-only", "--documentation-fragment-workspace", "--local-contracts-only"],
       [...valid, "extra"],
     ]) assert.throws(() => run(args), /사용법/);
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }

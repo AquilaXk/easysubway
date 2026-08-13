@@ -14,7 +14,20 @@
     { "repository": "AquilaXk/easysubway", "status": "PROPOSED", "fragment": null },
     { "repository": "AquilaXk/easysubway-backend", "status": "PROPOSED", "fragment": null },
     { "repository": "AquilaXk/easysubway-data", "status": "PROPOSED", "fragment": null },
-    { "repository": "AquilaXk/easysubway-mobile", "status": "PROPOSED", "fragment": null },
+    {
+      "repository": "AquilaXk/easysubway-mobile",
+      "status": "ACTIVE",
+      "fragment": {
+        "gitSha": "397a475a988c65fb31600142d5c79f26e46a03f5",
+        "path": "contracts/documentation/documentation-fragment.json",
+        "blobSha": "37aa755bf7959737dc68a10ff346f16b5bc1954b",
+        "lastVerifiedAt": "2026-08-13T07:33:23.000Z",
+        "verificationEvidence": [
+          "https://github.com/AquilaXk/easysubway-mobile/issues/225",
+          "https://github.com/AquilaXk/easysubway/pull/2854"
+        ]
+      }
+    },
     { "repository": "AquilaXk/easysubway-platform", "status": "PROPOSED", "fragment": null }
   ]
 }

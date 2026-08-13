@@ -11,7 +11,7 @@ const TOOLCHAIN_LOCK_PATH = "tools/qa/package-lock.json";
 const TOOLCHAIN_DIGEST = "2bafa62df07a90cbc8501e2cc9c7f7abdcbb99069462893ab7f0c2ce02b31ac1";
 
 const COMMANDS = new Map([
-  ["build", ["tools/ci/check-contracts.mjs", "--workspace", "contracts/workspaces/hub.json", "--current-only"]],
+  ["build", ["tools/ci/check-contracts.mjs", "--workspace", "contracts/workspaces/hub.json", "--current-only", "--local-contracts-only"]],
   ["test", ["--test", "tools/repo/audit-clean-checkout-reproducibility.test.mjs", "tools/repo/produce-clean-checkout-reproducibility-owner-receipt.test.mjs"]],
   ["debug", ["tools/ci/api-catalog.mjs", "list"]],
 ]);
