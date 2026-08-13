@@ -680,6 +680,29 @@ test("documentation catalog rejects current resource drift after source binding"
   }
 });
 
+test("documentation catalog rejects SHA-256 current resource drift after source binding", () => {
+  const fixture = createDocumentationCatalogWorkspace({ activeIndexes: [1] });
+  try {
+    const [{ repository, root }] = fixture.repositories;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    assert.equal(fragment.resources[0].canonicalIdentity.split(":").at(-1).length, 64);
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+
+    writeFileSync(join(root, "docs/resource.txt"), "drifted-sha256-resource\n");
+    fixtureGit(["add", "docs/resource.txt"], { cwd: root, stdio: "ignore" });
+    fixtureGit(["commit", "-m", "drift SHA-256 resource"], { cwd: root, stdio: "ignore" });
+    const catalog = loadJson(fixture.catalogPath);
+    const entry = catalog.repositories.find((candidate) => candidate.repository === repository);
+    assert.ok(entry?.fragment);
+    entry.fragment.gitSha = fixtureGit(["rev-parse", "HEAD"], { cwd: root, encoding: "utf8" }).trim();
+    entry.fragment.blobSha = createHash("sha256").update(readFileSync(join(root, "docs/fragment.json"))).digest("hex");
+    writeFileSync(fixture.catalogPath, JSON.stringify(catalog));
+    assertDocumentationCatalogFailure(fixture, "TRACKED resource current blob identity가 일치하지 않는다");
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
 test("documentation catalog rejects schema-invalid fragment blobs without throwing", () => {
   const fixture = createDocumentationCatalogWorkspace();
   try {

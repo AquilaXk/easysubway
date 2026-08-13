@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -173,6 +174,23 @@ test("documentation inventory audit accepts source-bound resources without self-
   const verified = await verifyFragment(SCOPE.repositories[0], SHA, { readContent });
   assert.deepEqual(
     [verified.state, verified.fragmentStatus, verified.resourceCount, verified.verificationFindings],
+    ["READY", "ACTIVE", 1, []],
+  );
+
+  const payload = Buffer.from("{}");
+  const payloadSha256 = createHash("sha256").update(payload).digest("hex");
+  const sha256Identity = `git:${SOURCE_SHA}:contracts/easysubway.json:${payloadSha256}`;
+  const sha256Candidate = fragment(REPOSITORIES[0], [record(REPOSITORIES[0], {
+    canonicalIdentity: sha256Identity,
+    lastVerifiedIdentity: sha256Identity,
+  })], { sourceSha: SOURCE_SHA });
+  const sha256Verified = await verifyFragment(SCOPE.repositories[0], SHA, {
+    readContent: async (_repository, path) => path === PATH
+      ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(sha256Candidate)).toString("base64") }
+      : { type: "file", sha: "c".repeat(40), encoding: "base64", content: payload.toString("base64") },
+  });
+  assert.deepEqual(
+    [sha256Verified.state, sha256Verified.fragmentStatus, sha256Verified.resourceCount, sha256Verified.verificationFindings],
     ["READY", "ACTIVE", 1, []],
   );
 
