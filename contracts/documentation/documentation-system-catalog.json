@@ -11,7 +11,21 @@
     "gaps": ["gap:kubernetes:platform-deployment-contract"]
   },
   "repositories": [
-    { "repository": "AquilaXk/easysubway", "status": "PROPOSED", "fragment": null },
+    {
+      "repository": "AquilaXk/easysubway",
+      "status": "ACTIVE",
+      "fragment": {
+        "gitSha": "71d03cbb20cca0a1b358c921febe9ca646ad06b3",
+        "path": "contracts/documentation/documentation-fragment.json",
+        "blobSha": "317d93550975428f8e72c5ead516e3e101c74172",
+        "lastVerifiedAt": "2026-08-13T13:32:18.000Z",
+        "verificationEvidence": [
+          "https://github.com/AquilaXk/easysubway/issues/2748",
+          "https://github.com/AquilaXk/easysubway/issues/2861",
+          "https://github.com/AquilaXk/easysubway/issues/2863"
+        ]
+      }
+    },
     {
       "repository": "AquilaXk/easysubway-backend",
       "status": "ACTIVE",
