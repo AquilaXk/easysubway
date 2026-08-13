@@ -2075,7 +2075,7 @@ test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => 
   assert.ok(adr.confirmation.some(({ method }) => method.endsWith("--current-only --local-contracts-only")));
 });
 
-test("documentation catalog는 terminal Mobile locator만 ACTIVE로 소비하고 fragment lifecycle을 fail closed한다", () => {
+test("documentation catalog는 terminal Backend와 Mobile locator를 ACTIVE로 소비하고 fragment lifecycle을 fail closed한다", () => {
   const resourceSchema = loadJson("contracts/documentation/documentation-resource.schema.json");
   const fragmentSchema = loadJson("contracts/documentation/documentation-fragment.schema.json");
   const catalogSchema = loadJson("contracts/documentation/documentation-system-catalog.schema.json");
@@ -2092,6 +2092,23 @@ test("documentation catalog는 terminal Mobile locator만 ACTIVE로 소비하고
     "AquilaXk/easysubway-platform",
   ]);
   assert.equal(catalog.status, "PROPOSED");
+  const backend = catalog.repositories.find(({ repository }) => repository === "AquilaXk/easysubway-backend");
+  assert.deepEqual(backend, {
+    repository: "AquilaXk/easysubway-backend",
+    status: "ACTIVE",
+    fragment: {
+      gitSha: "e506d2c8718ad6af681e9389fba780673e1f24d2",
+      path: "contracts/documentation/documentation-fragment.json",
+      blobSha: "1c27d17a4acef8f6c4bed168e8a1e20c2d04b992",
+      lastVerifiedAt: "2026-08-13T11:24:30.000Z",
+      verificationEvidence: [
+        "https://github.com/AquilaXk/easysubway-backend/issues/247",
+        "https://github.com/AquilaXk/easysubway-backend/pull/250",
+        "https://github.com/AquilaXk/easysubway/pull/2854",
+        "https://github.com/AquilaXk/easysubway/pull/2856",
+      ],
+    },
+  });
   const mobile = catalog.repositories.find(({ repository }) => repository === "AquilaXk/easysubway-mobile");
   assert.deepEqual(mobile, {
     repository: "AquilaXk/easysubway-mobile",
@@ -2107,8 +2124,8 @@ test("documentation catalog는 terminal Mobile locator만 ACTIVE로 소비하고
       ],
     },
   });
-  assert.deepEqual(catalog.repositories.filter(({ repository }) => repository !== mobile.repository)
-    .map(({ status, fragment }) => ({ status, fragment })), Array(4).fill({ status: "PROPOSED", fragment: null }));
+  assert.deepEqual(catalog.repositories.filter(({ repository }) => ![backend.repository, mobile.repository].includes(repository))
+    .map(({ status, fragment }) => ({ status, fragment })), Array(3).fill({ status: "PROPOSED", fragment: null }));
   const unresolvedErrors = [];
   validateDocumentationSystemCatalog(catalog, catalogSchema, unresolvedErrors);
   assert.ok(unresolvedErrors.some((error) => error.includes("ACTIVE fragment resolution contract")));
