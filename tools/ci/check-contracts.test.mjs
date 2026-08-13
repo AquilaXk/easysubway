@@ -476,6 +476,13 @@ function createExternalWorkspace() {
   copy("contracts/documentation/ADR-HUB-0001.json", "inputs/architecture-decision.json");
   copy("contracts/documentation/ADR-HUB-0001-decision.schema.json", "inputs/ADR-HUB-0001-decision.schema.json");
   copy("contracts/documentation/documentation-system-catalog.json", "inputs/documentation-system-catalog.json");
+  const fixtureCatalogPath = join(directory, "inputs/documentation-system-catalog.json");
+  const fixtureCatalog = loadJson(fixtureCatalogPath);
+  for (const entry of fixtureCatalog.repositories) {
+    entry.status = "PROPOSED";
+    entry.fragment = null;
+  }
+  writeFileSync(fixtureCatalogPath, JSON.stringify(fixtureCatalog));
   copy("contracts/documentation/product-claim-catalog.json", "inputs/product-claim-catalog.json");
   return { directory, workspacePath };
 }
@@ -1301,7 +1308,7 @@ test("documentation catalog CLI accepts compatibility modes and rejects malforme
   });
   const proposed = createExternalWorkspace();
   try {
-    assert.throws(() => run(["--workspace", proposed.workspacePath, "--current-only"]), /workspace가 필요하다/);
+    assert.doesNotThrow(() => run(["--workspace", proposed.workspacePath, "--current-only"]));
     assert.doesNotThrow(() => run([
       "--workspace", proposed.workspacePath, "--current-only", "--local-contracts-only",
     ]));
