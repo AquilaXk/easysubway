@@ -48,6 +48,9 @@ import {
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { validateDocumentationInventoryAuditScope } from "../repo/audit-documentation-inventory.mjs";
 
+const DOCUMENTATION_FRAGMENT_SCHEMA_URI =
+  `https://raw.githubusercontent.com/AquilaXk/easysubway/${"a".repeat(40)}/contracts/documentation/documentation-fragment.schema.json`;
+
 test("documentation inventory audit contracts bind the exact five repositories and D01-D05", () => {
   const scope = loadJson("contracts/documentation/documentation-inventory-audit-scope.json");
   const scopeSchema = loadJson("contracts/documentation/documentation-inventory-audit-scope.schema.json");
@@ -2293,6 +2296,29 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA],
   }, fragmentSchema, resourceSchema, unresolvedDuplicateErrors);
   assert.deepEqual(unresolvedDuplicateErrors, []);
+});
+
+test("documentation catalog fragment schema requires an immutable canonical Hub URI", () => {
+  const schema = loadJson("contracts/documentation/documentation-fragment.schema.json");
+  const fragment = {
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI,
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway-mobile",
+    sourceSha: "b".repeat(40),
+    status: "PROPOSED",
+    lastVerifiedAt: null,
+    verificationEvidence: [],
+    resources: [],
+  };
+  const outcomes = [
+    fragment.$schema,
+    "./documentation-fragment.schema.json",
+    "https://raw.githubusercontent.com/AquilaXk/easysubway/main/contracts/documentation/documentation-fragment.schema.json",
+    `https://raw.githubusercontent.com/AquilaXk/easysubway-mobile/${"a".repeat(40)}/contracts/documentation/documentation-fragment.schema.json`,
+    `https://raw.githubusercontent.com/AquilaXk/easysubway/${"a".repeat(40)}/contracts/documentation/documentation-resource.schema.json`,
+    `${fragment.$schema}?download=1`,
+  ].map(($schema) => validateSchema(schema, { ...fragment, $schema }).ok);
+  assert.deepEqual(outcomes, [true, false, false, false, false, false]);
 });
 
 test("문서 거버넌스 계약은 successor의 자체 decision schema와 안전한 schema path만 허용한다", () => {
