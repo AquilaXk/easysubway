@@ -87,7 +87,7 @@ function fragment(repository, resources = [record(repository)], overrides = {}) 
     $schema: "./documentation-fragment.schema.json",
     schemaVersion: 1,
     repository,
-    gitSha: SHA,
+    sourceSha: SHA,
     status: "ACTIVE",
     lastVerifiedAt: "2026-08-11T00:00:00.000Z",
     verificationEvidence: ["evidence:fixture"],
@@ -146,14 +146,13 @@ test("documentation inventory audit proves D01-D05 only for five exact ACTIVE fr
   ]);
 });
 
-test("documentation inventory audit verifies tracked fragment blobs and rejects malformed or cross-head input", async () => {
+test("documentation inventory audit verifies tracked fragment blobs and rejects malformed input", async () => {
   const candidate = fragment(REPOSITORIES[0]);
   const readContent = async (_repository, path, _sha) => path === PATH
     ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(candidate)).toString("base64") }
     : { type: "file", sha: "c".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") };
   const verified = await verifyFragment(SCOPE.repositories[0], SHA, { readContent });
   assert.deepEqual([verified.state, verified.fragmentStatus, verified.resourceCount, verified.activeResourceCount], ["READY", "ACTIVE", 1, 1]);
-  await assert.rejects(() => verifyFragment(SCOPE.repositories[0], "b".repeat(40), { readContent }), (error) => error instanceof AuditIncomplete && error.code === "FRAGMENT_HEAD_MISMATCH");
   await assert.rejects(() => verifyFragment(SCOPE.repositories[0], SHA, { readContent: async () => ({ type: "file", sha: "d".repeat(40), encoding: "base64", content: "%%%" }) }), (error) => error instanceof AuditIncomplete && error.code === "FRAGMENT_DECODE_INVALID");
   const missing = await verifyFragment(SCOPE.repositories[0], SHA, { readContent: async () => { throw Object.assign(new Error("missing"), { status: 404 }); } });
   assert.deepEqual([missing.state, missing.fragmentStatus, missing.fragmentBlobSha], ["PENDING", "MISSING", null]);
@@ -166,7 +165,6 @@ test("documentation inventory audit accepts source-bound resources without self-
     lastVerifiedIdentity: canonicalIdentity,
   })]);
   candidate.sourceSha = SOURCE_SHA;
-  delete candidate.gitSha;
   const readContent = async (_repository, path, sha) => path === PATH
     ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(candidate)).toString("base64") }
     : [SOURCE_SHA, SHA].includes(sha)

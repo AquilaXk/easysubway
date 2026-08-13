@@ -62,22 +62,44 @@ function parseJson(bytes, identity) {
   try { return JSON.parse(bytes.toString("utf8")); } catch { throw new AuditIncomplete("FRAGMENT_JSON_INVALID", identity, "fragment"); }
 }
 
-function validateFragment(fragment, entry, headSha) {
+function validateFragment(fragment, entry) {
   const errors = validateSchema(FRAGMENT_SCHEMA, fragment).errors;
   if (errors.length !== 0) throw new AuditIncomplete("FRAGMENT_SCHEMA_INVALID", entry.repository, "fragment");
-  if (fragment.repository !== entry.repository || fragment.gitSha !== headSha) throw new AuditIncomplete("FRAGMENT_HEAD_MISMATCH", entry.repository, "fragment");
+  if (fragment.repository !== entry.repository) throw new AuditIncomplete("FRAGMENT_REPOSITORY_MISMATCH", entry.repository, "fragment");
   if (fragment.status === "ACTIVE" && (fragment.verificationEvidence.length === 0 || !canonicalUtc(fragment.lastVerifiedAt))) throw new AuditIncomplete("FRAGMENT_SEMANTIC_INVALID", entry.repository, "fragment");
   const resourceIds = fragment.resources.map(({ resource }) => resource);
   if (resourceIds.some((resource) => typeof resource !== "string") || JSON.stringify(resourceIds) !== JSON.stringify([...new Set(resourceIds)].sort(codepointCompare))) throw new AuditIncomplete("FRAGMENT_SEMANTIC_INVALID", entry.repository, "fragment");
   for (const record of fragment.resources) {
     if (!validateSchema(RESOURCE_SCHEMA, record).ok) throw new AuditIncomplete("RESOURCE_SCHEMA_INVALID", entry.repository, "fragment");
-    try { validateDocumentationRecord(record, { ownerRepository: entry.repository, gitSha: headSha, tracked: record.sourceSurface === "TRACKED" }); }
+    try {
+      validateDocumentationRecord(record, { ownerRepository: entry.repository, gitSha: fragment.sourceSha, tracked: record.sourceSurface === "TRACKED" });
+      if (record.sourceSurface === "TRACKED") {
+        const identity = trackedIdentity(record);
+        const prefix = `${entry.repository}:`;
+        if (!record.resource.startsWith(prefix) || identity?.[2] !== record.resource.slice(prefix.length)) throw new Error("tracked fragment identity mismatch");
+      }
+    }
     catch { throw new AuditIncomplete("RESOURCE_SEMANTIC_INVALID", entry.repository, "fragment"); }
   }
 }
 
 function trackedIdentity(record) {
   return /^git:([0-9a-f]{40}):([^:]+):([0-9a-f]{40}|[0-9a-f]{64})$/.exec(record.canonicalIdentity);
+}
+
+async function readTrackedResource(entry, path, sha, identity, { readContent, missingCode, allowMissing }) {
+  let tracked;
+  try { tracked = await readContent(entry.repository, path, sha); }
+  catch (error) {
+    if (error?.status === 404) {
+      if (allowMissing) return null;
+      throw new AuditIncomplete(missingCode, identity, "fragment");
+    }
+    throw error instanceof AuditIncomplete ? error : new AuditIncomplete("PROVIDER_UNAVAILABLE", identity);
+  }
+  if (tracked?.type !== "file" || !SHA.test(tracked?.sha) || tracked?.encoding !== "base64") throw new AuditIncomplete("RESOURCE_PROVIDER_MALFORMED", identity, "fragment");
+  const bytes = decodeBase64(tracked.content, identity);
+  return { blobSha: tracked.sha, sha256: sha256(bytes) };
 }
 
 export async function verifyFragment(entry, headSha, { readContent = collectContent } = {}) {
@@ -89,22 +111,33 @@ export async function verifyFragment(entry, headSha, { readContent = collectCont
   }
   if (content?.type !== "file" || !SHA.test(content?.sha) || content?.encoding !== "base64") throw new AuditIncomplete("FRAGMENT_PROVIDER_MALFORMED", entry.repository, "fragment");
   const fragment = parseJson(decodeBase64(content.content, entry.repository), entry.repository);
-  validateFragment(fragment, entry, headSha);
+  validateFragment(fragment, entry);
   if (fragment.status !== entry.requiredStatus) return { repository: entry.repository, headSha, state: "PENDING", fragmentStatus: fragment.status, fragmentBlobSha: content.sha, fragment: null, resourceCount: 0, activeResourceCount: 0, verificationFindings: [] };
   const verificationFindings = [];
   for (const record of fragment.resources.filter(({ sourceSurface }) => sourceSurface === "TRACKED")) {
     const identity = trackedIdentity(record);
-    if (identity == null || identity[1] !== headSha) throw new AuditIncomplete("RESOURCE_IDENTITY_INVALID", record.resource, "fragment");
-    let tracked;
-    try { tracked = await readContent(entry.repository, identity[2], headSha); }
-    catch (error) {
-      if (error?.status === 404) { verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_MISSING", identity: record.resource }); continue; }
-      throw error instanceof AuditIncomplete ? error : new AuditIncomplete("PROVIDER_UNAVAILABLE", record.resource);
+    if (identity == null || identity[1] !== fragment.sourceSha) throw new AuditIncomplete("RESOURCE_IDENTITY_INVALID", record.resource, "fragment");
+    const source = await readTrackedResource(entry, identity[2], fragment.sourceSha, record.resource, {
+      readContent,
+      missingCode: "TRACKED_RESOURCE_SOURCE_MISSING",
+      allowMissing: false,
+    });
+    const sourceActual = identity[3].length === 40 ? source.blobSha : source.sha256;
+    if (sourceActual !== identity[3]) {
+      verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_SOURCE_BLOB_MISMATCH", identity: record.resource });
+      continue;
     }
-    if (tracked?.type !== "file" || !SHA.test(tracked?.sha) || tracked?.encoding !== "base64") throw new AuditIncomplete("RESOURCE_PROVIDER_MALFORMED", record.resource, "fragment");
-    const bytes = decodeBase64(tracked.content, record.resource);
-    const actual = identity[3].length === 40 ? tracked.sha : sha256(bytes);
-    if (actual !== identity[3]) verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_BLOB_MISMATCH", identity: record.resource });
+    const current = fragment.sourceSha === headSha ? source : await readTrackedResource(entry, identity[2], headSha, record.resource, {
+      readContent,
+      missingCode: "TRACKED_RESOURCE_CURRENT_MISSING",
+      allowMissing: true,
+    });
+    if (current == null) {
+      verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_CURRENT_MISSING", identity: record.resource });
+      continue;
+    }
+    const currentActual = identity[3].length === 40 ? current.blobSha : current.sha256;
+    if (currentActual !== identity[3]) verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_CURRENT_BLOB_MISMATCH", identity: record.resource });
   }
   return { repository: entry.repository, headSha, state: "READY", fragmentStatus: "ACTIVE", fragmentBlobSha: content.sha, fragment, resourceCount: fragment.resources.length, activeResourceCount: fragment.resources.filter(({ status }) => status === "ACTIVE").length, verificationFindings };
 }
