@@ -32,6 +32,8 @@ const SCOPE = {
 const SHA = "a".repeat(40);
 const SOURCE_SHA = "e".repeat(40);
 const WATERMARK = "b".repeat(64);
+const DOCUMENTATION_FRAGMENT_SCHEMA_URI =
+  `https://raw.githubusercontent.com/AquilaXk/easysubway/${"a".repeat(40)}/contracts/documentation/documentation-fragment.schema.json`;
 
 function record(repository, overrides = {}) {
   const path = `contracts/${repository.split("/").at(-1)}.json`;
@@ -85,7 +87,7 @@ function record(repository, overrides = {}) {
 
 function fragment(repository, resources = [record(repository)], overrides = {}) {
   return {
-    $schema: "./documentation-fragment.schema.json",
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI,
     schemaVersion: 1,
     repository,
     sourceSha: SHA,
