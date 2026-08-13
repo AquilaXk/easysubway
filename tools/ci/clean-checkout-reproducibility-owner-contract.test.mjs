@@ -98,7 +98,7 @@ test("phase entrypoint maps only the four approved commands and fails closed", a
   assert.equal(runHubReproducibilityPhase(["test"], base), 0);
   assert.equal(runHubReproducibilityPhase(["debug"], base), 0);
   assert.deepEqual(calls.map(({ arguments_ }) => arguments_), [
-    ["tools/ci/check-contracts.mjs", "--workspace", "contracts/workspaces/hub.json", "--current-only"],
+    ["tools/ci/check-contracts.mjs", "--workspace", "contracts/workspaces/hub.json", "--current-only", "--local-contracts-only"],
     ["--test", "tools/repo/audit-clean-checkout-reproducibility.test.mjs", "tools/repo/produce-clean-checkout-reproducibility-owner-receipt.test.mjs"],
     ["tools/ci/api-catalog.mjs", "list"],
   ]);
