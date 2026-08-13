@@ -476,6 +476,13 @@ function createExternalWorkspace() {
   copy("contracts/documentation/ADR-HUB-0001.json", "inputs/architecture-decision.json");
   copy("contracts/documentation/ADR-HUB-0001-decision.schema.json", "inputs/ADR-HUB-0001-decision.schema.json");
   copy("contracts/documentation/documentation-system-catalog.json", "inputs/documentation-system-catalog.json");
+  const fixtureCatalogPath = join(directory, "inputs/documentation-system-catalog.json");
+  const fixtureCatalog = loadJson(fixtureCatalogPath);
+  for (const entry of fixtureCatalog.repositories) {
+    entry.status = "PROPOSED";
+    entry.fragment = null;
+  }
+  writeFileSync(fixtureCatalogPath, JSON.stringify(fixtureCatalog));
   copy("contracts/documentation/product-claim-catalog.json", "inputs/product-claim-catalog.json");
   return { directory, workspacePath };
 }
@@ -1302,12 +1309,18 @@ test("documentation catalog CLI accepts compatibility modes and rejects malforme
   const proposed = createExternalWorkspace();
   try {
     assert.doesNotThrow(() => run(["--workspace", proposed.workspacePath, "--current-only"]));
+    assert.doesNotThrow(() => run([
+      "--workspace", proposed.workspacePath, "--current-only", "--local-contracts-only",
+    ]));
   } finally { rmSync(proposed.directory, { recursive: true, force: true }); }
 
   const fixture = createSingleDocumentationCatalogWorkspace();
   try {
     const valid = ["--workspace", fixture.workspacePath, "--current-only", "--documentation-fragment-workspace", fixture.fragmentWorkspacePath];
     assert.doesNotThrow(() => run(valid));
+    assert.doesNotThrow(() => run([
+      "--workspace", fixture.workspacePath, "--current-only", "--local-contracts-only",
+    ]));
     const clone = mkdtempSync(join(tmpdir(), "documentation-catalog-cli-"));
     try {
       const copied = join(clone, "fixture");
@@ -1336,6 +1349,9 @@ test("documentation catalog CLI accepts compatibility modes and rejects malforme
       valid.slice(0, -1),
       ["--workspace", fixture.workspacePath, "--documentation-fragment-workspace", fixture.fragmentWorkspacePath, "--current-only"],
       [...valid, "--documentation-fragment-workspace", fixture.fragmentWorkspacePath],
+      [...valid, "--local-contracts-only"],
+      ["--workspace", fixture.workspacePath, "--base-ref", "a".repeat(40), "--local-contracts-only"],
+      ["--workspace", fixture.workspacePath, "--current-only", "--documentation-fragment-workspace", "--local-contracts-only"],
       [...valid, "extra"],
     ]) assert.throws(() => run(args), /사용법/);
   } finally { rmSync(fixture.directory, { recursive: true, force: true }); }
@@ -2056,17 +2072,17 @@ test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => 
     errors,
   ), true);
   assert.deepEqual(errors, []);
-  assert.ok(adr.confirmation.some(({ method }) => method.endsWith("--current-only")));
+  assert.ok(adr.confirmation.some(({ method }) => method.endsWith("--current-only --local-contracts-only")));
 });
 
-test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifecycle을 fail closed한다", () => {
+test("documentation catalog는 terminal Mobile locator만 ACTIVE로 소비하고 fragment lifecycle을 fail closed한다", () => {
   const resourceSchema = loadJson("contracts/documentation/documentation-resource.schema.json");
   const fragmentSchema = loadJson("contracts/documentation/documentation-fragment.schema.json");
   const catalogSchema = loadJson("contracts/documentation/documentation-system-catalog.schema.json");
   const catalog = loadJson("contracts/documentation/documentation-system-catalog.json");
   const errors = [];
 
-  validateDocumentationSystemCatalog(catalog, catalogSchema, errors);
+  validateDocumentationSystemCatalog(catalog, catalogSchema, errors, { requireActiveResolution: false });
   assert.deepEqual(errors, []);
   assert.deepEqual(catalog.repositories.map(({ repository }) => repository), [
     "AquilaXk/easysubway",
@@ -2075,6 +2091,27 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     "AquilaXk/easysubway-mobile",
     "AquilaXk/easysubway-platform",
   ]);
+  assert.equal(catalog.status, "PROPOSED");
+  const mobile = catalog.repositories.find(({ repository }) => repository === "AquilaXk/easysubway-mobile");
+  assert.deepEqual(mobile, {
+    repository: "AquilaXk/easysubway-mobile",
+    status: "ACTIVE",
+    fragment: {
+      gitSha: "397a475a988c65fb31600142d5c79f26e46a03f5",
+      path: "contracts/documentation/documentation-fragment.json",
+      blobSha: "37aa755bf7959737dc68a10ff346f16b5bc1954b",
+      lastVerifiedAt: "2026-08-13T07:33:23.000Z",
+      verificationEvidence: [
+        "https://github.com/AquilaXk/easysubway-mobile/issues/225",
+        "https://github.com/AquilaXk/easysubway/pull/2854",
+      ],
+    },
+  });
+  assert.deepEqual(catalog.repositories.filter(({ repository }) => repository !== mobile.repository)
+    .map(({ status, fragment }) => ({ status, fragment })), Array(4).fill({ status: "PROPOSED", fragment: null }));
+  const unresolvedErrors = [];
+  validateDocumentationSystemCatalog(catalog, catalogSchema, unresolvedErrors);
+  assert.ok(unresolvedErrors.some((error) => error.includes("ACTIVE fragment resolution contract")));
 
   for (const [mutate, expected] of [
     [(value) => value.repositories.pop(), /minItems 5/],
@@ -2938,11 +2975,14 @@ test("문서 거버넌스 계약은 PR·push base와 dispatch current-only CI �
   assert.match(validatorSource, /execFileSync\("\/usr\/bin\/git"/);
   const workflow = readFileSync(".github/workflows/ci.yml", "utf8");
   assert.match(workflow,
-    /Repository CI \/ Validate PR contract transitions[\s\S]{0,400}github\.event_name == 'pull_request'[\s\S]{0,400}--base-ref "\$\{BASE_REF\}"/);
+    /Repository CI \/ Prepare active documentation fragment workspace[\s\S]{0,800}prepare-documentation-fragment-workspace\.mjs[\s\S]{0,800}documentation-fragment-workspace\.json/);
   assert.match(workflow,
-    /Repository CI \/ Validate push contract transitions[\s\S]{0,400}github\.event_name == 'push'[\s\S]{0,400}github\.event\.before[\s\S]{0,400}--base-ref "\$\{BASE_REF\}"/);
+    /Repository CI \/ Validate PR contract transitions[\s\S]{0,600}github\.event_name == 'pull_request'[\s\S]{0,600}--base-ref "\$\{BASE_REF\}"[\s\S]{0,300}--documentation-fragment-workspace/);
   assert.match(workflow,
-    /Repository CI \/ Validate current contracts[\s\S]{0,400}github\.event_name == 'workflow_dispatch'[\s\S]{0,400}--current-only/);
+    /Repository CI \/ Validate push contract transitions[\s\S]{0,600}github\.event_name == 'push'[\s\S]{0,600}github\.event\.before[\s\S]{0,600}--base-ref "\$\{BASE_REF\}"[\s\S]{0,300}--documentation-fragment-workspace/);
+  assert.match(workflow,
+    /Repository CI \/ Validate current contracts[\s\S]{0,600}github\.event_name == 'workflow_dispatch'[\s\S]{0,600}--current-only[\s\S]{0,300}--documentation-fragment-workspace/);
+  assert.doesNotMatch(workflow, /Validate (?:PR|push|current) contract[^\n]*[\s\S]{0,500}--local-contracts-only/);
 });
 
 test("문서 거버넌스 계약은 workspace가 지정한 잘못된 ADR을 contract gate에서 거부한다", () => {
@@ -3384,7 +3424,9 @@ test("boundaries v2는 extraction target ownership metadata의 배열·빈 값·
 });
 
 test("check-contracts CLI 검증 오류가 없다", () => {
-  assert.deepEqual(collectContractErrors(), []);
+  assert.deepEqual(collectContractErrors(undefined, {
+    documentationFragmentResolution: "LOCAL_CONTRACTS_ONLY",
+  }), []);
 });
 
 test("check-contracts는 inventory·freshness·governance 참조를 함께 검증한다", () => {

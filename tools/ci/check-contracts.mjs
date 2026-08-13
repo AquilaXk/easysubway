@@ -109,9 +109,22 @@ export function loadWorkspace(workspacePath = DEFAULT_WORKSPACE_PATH) {
 
 export function collectContractErrors(
   workspacePath = DEFAULT_WORKSPACE_PATH,
-  { previousArchitectureDecision = null, documentationFragmentWorkspacePath = null } = {},
+  {
+    previousArchitectureDecision = null,
+    documentationFragmentWorkspacePath = null,
+    documentationFragmentResolution = "REQUIRED",
+  } = {},
 ) {
   const errors = [];
+  if (!["REQUIRED", "LOCAL_CONTRACTS_ONLY"].includes(documentationFragmentResolution)) {
+    errors.push("documentation fragment transport: resolution mode가 유효하지 않다");
+    return errors;
+  }
+  if (documentationFragmentResolution === "LOCAL_CONTRACTS_ONLY"
+      && documentationFragmentWorkspacePath != null) {
+    errors.push("documentation fragment transport: local contracts mode는 workspace를 사용할 수 없다");
+    return errors;
+  }
   let workspace;
   try {
     workspace = loadWorkspace(workspacePath);
@@ -151,10 +164,12 @@ export function collectContractErrors(
   if (validateJson(documentationSystemCatalogSchema, workspace.documentationSystemCatalog, errors)) {
     const catalog = loadJson(workspace.documentationSystemCatalog);
     validateDocumentationSystemCatalogSemantics(catalog, errors, workspace.documentationSystemCatalog, false);
-    resolveActiveDocumentationFragments(catalog, documentationFragmentWorkspacePath, errors, {
-      fragmentSchema: contract("documentation/documentation-fragment.schema.json"),
-      resourceSchema: contract("documentation/documentation-resource.schema.json"),
-    });
+    if (documentationFragmentResolution === "REQUIRED") {
+      resolveActiveDocumentationFragments(catalog, documentationFragmentWorkspacePath, errors, {
+        fragmentSchema: contract("documentation/documentation-fragment.schema.json"),
+        resourceSchema: contract("documentation/documentation-resource.schema.json"),
+      });
+    }
   }
   const productClaimCatalogSchema = contract("documentation/product-claim-catalog.schema.json");
   if (validateJson(productClaimCatalogSchema, workspace.productClaimCatalog, errors)) {
@@ -2279,18 +2294,22 @@ function compareText(left, right) {
 
 if (isMainModule(import.meta.url)) {
   const args = process.argv.slice(2);
-  const hasWorkspace = args[0] === "--workspace" && args[1]?.trim() !== "";
-  const fragmentWorkspaceIndex = args.indexOf("--documentation-fragment-workspace");
-  const hasFragmentWorkspace = fragmentWorkspaceIndex === -1
-    || (fragmentWorkspaceIndex === args.length - 2 && args[fragmentWorkspaceIndex + 1].trim() !== "");
-  const contractArgs = fragmentWorkspaceIndex === -1 ? args : args.slice(0, fragmentWorkspaceIndex);
-  const hasBaseRef = contractArgs.length === 4 && contractArgs[2] === "--base-ref" && contractArgs[3].trim() !== "";
-  const isCurrentOnly = contractArgs.length === 3 && contractArgs[2] === "--current-only";
-  const validArgs = hasWorkspace && hasFragmentWorkspace && (hasBaseRef || isCurrentOnly);
+  const isValue = (value) => typeof value === "string" && value.trim() !== "" && !value.startsWith("--");
+  const hasWorkspace = args[0] === "--workspace" && isValue(args[1]);
+  const hasBaseRef = args[2] === "--base-ref" && isValue(args[3])
+    && (args.length === 4 || (args.length === 6
+      && args[4] === "--documentation-fragment-workspace" && isValue(args[5])));
+  const isCurrentOnly = args[2] === "--current-only"
+    && (args.length === 3 || (args.length === 5
+      && args[3] === "--documentation-fragment-workspace" && isValue(args[4]))
+      || (args.length === 4 && args[3] === "--local-contracts-only"));
+  const validArgs = hasWorkspace && (hasBaseRef || isCurrentOnly);
   if (!validArgs) {
-    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json> (--base-ref <40-hex-sha>|--current-only) [--documentation-fragment-workspace <local-json>]");
+    console.error("사용법: node tools/ci/check-contracts.mjs --workspace <workspace.json> ((--base-ref <40-hex-sha>|--current-only) [--documentation-fragment-workspace <local-json>]|--current-only --local-contracts-only)");
     process.exit(1);
   }
+  const fragmentWorkspaceIndex = args.indexOf("--documentation-fragment-workspace");
+  const localContractsOnly = args.length === 4 && args[3] === "--local-contracts-only";
   let previousArchitectureDecision = null;
   try {
     if (hasBaseRef) previousArchitectureDecision = loadArchitectureDecisionAtRef(args[1], args[3]);
@@ -2301,6 +2320,7 @@ if (isMainModule(import.meta.url)) {
   const errors = collectContractErrors(args[1], {
     previousArchitectureDecision,
     documentationFragmentWorkspacePath: fragmentWorkspaceIndex === -1 ? null : args[fragmentWorkspaceIndex + 1],
+    documentationFragmentResolution: localContractsOnly ? "LOCAL_CONTRACTS_ONLY" : "REQUIRED",
   });
   if (errors.length) {
     console.error(errors.map((error) => `- ${error}`).join("\n"));
