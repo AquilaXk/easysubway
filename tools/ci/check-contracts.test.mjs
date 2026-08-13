@@ -49,7 +49,7 @@ import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { validateDocumentationInventoryAuditScope } from "../repo/audit-documentation-inventory.mjs";
 
 const DOCUMENTATION_FRAGMENT_SCHEMA_URI =
-  `https://raw.githubusercontent.com/AquilaXk/easysubway/${"a".repeat(40)}/contracts/documentation/documentation-fragment.schema.json`;
+  "https://raw.githubusercontent.com/AquilaXk/easysubway/32ce139789b97ce1f0c9bb059966cfc19f497480/contracts/documentation/documentation-fragment.schema.json";
 
 test("documentation inventory audit contracts bind the exact five repositories and D01-D05", () => {
   const scope = loadJson("contracts/documentation/documentation-inventory-audit-scope.json");
@@ -2314,11 +2314,12 @@ test("documentation catalog fragment schema requires an immutable canonical Hub 
     fragment.$schema,
     "./documentation-fragment.schema.json",
     "https://raw.githubusercontent.com/AquilaXk/easysubway/main/contracts/documentation/documentation-fragment.schema.json",
+    "https://raw.githubusercontent.com/AquilaXk/easysubway/1f72280ccf45f091b4130054b0a426d55cdb9b4a/contracts/documentation/documentation-fragment.schema.json",
     `https://raw.githubusercontent.com/AquilaXk/easysubway-mobile/${"a".repeat(40)}/contracts/documentation/documentation-fragment.schema.json`,
     `https://raw.githubusercontent.com/AquilaXk/easysubway/${"a".repeat(40)}/contracts/documentation/documentation-resource.schema.json`,
     `${fragment.$schema}?download=1`,
   ].map(($schema) => validateSchema(schema, { ...fragment, $schema }).ok);
-  assert.deepEqual(outcomes, [true, false, false, false, false, false]);
+  assert.deepEqual(outcomes, [true, false, false, false, false, false, false]);
 });
 
 test("문서 거버넌스 계약은 successor의 자체 decision schema와 안전한 schema path만 허용한다", () => {

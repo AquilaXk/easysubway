@@ -33,7 +33,7 @@ const SHA = "a".repeat(40);
 const SOURCE_SHA = "e".repeat(40);
 const WATERMARK = "b".repeat(64);
 const DOCUMENTATION_FRAGMENT_SCHEMA_URI =
-  `https://raw.githubusercontent.com/AquilaXk/easysubway/${"a".repeat(40)}/contracts/documentation/documentation-fragment.schema.json`;
+  "https://raw.githubusercontent.com/AquilaXk/easysubway/32ce139789b97ce1f0c9bb059966cfc19f497480/contracts/documentation/documentation-fragment.schema.json";
 
 function record(repository, overrides = {}) {
   const path = `contracts/${repository.split("/").at(-1)}.json`;

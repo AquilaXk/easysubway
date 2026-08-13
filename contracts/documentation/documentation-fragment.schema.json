@@ -6,7 +6,7 @@
   "required": ["$schema", "schemaVersion", "repository", "sourceSha", "status", "lastVerifiedAt", "verificationEvidence", "resources"],
   "additionalProperties": false,
   "properties": {
-    "$schema": { "type": "string", "pattern": "^https://raw\\.githubusercontent\\.com/AquilaXk/easysubway/[0-9a-f]{40}/contracts/documentation/documentation-fragment\\.schema\\.json$" },
+    "$schema": { "type": "string", "const": "https://raw.githubusercontent.com/AquilaXk/easysubway/32ce139789b97ce1f0c9bb059966cfc19f497480/contracts/documentation/documentation-fragment.schema.json" },
     "schemaVersion": { "type": "integer", "const": 1 },
     "repository": { "type": "string", "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-data", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
     "sourceSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
