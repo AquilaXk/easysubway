@@ -650,6 +650,20 @@ test("documentation catalog resolves exact outer and inner Git blobs", () => {
   }
 });
 
+test("documentation catalog accepts a source commit distinct from the outer fragment commit", () => {
+  const fixture = createSingleDocumentationCatalogWorkspace();
+  try {
+    const root = fixture.repositories[0].root;
+    const fragment = loadJson(join(root, "docs/fragment.json"));
+    fragment.sourceSha = fragment.gitSha;
+    delete fragment.gitSha;
+    commitDocumentationCatalogFragment(fixture, 0, JSON.stringify(fragment));
+    assert.deepEqual(documentationCatalogErrors(fixture), []);
+  } finally {
+    rmSync(fixture.directory, { recursive: true, force: true });
+  }
+});
+
 test("documentation catalog rejects schema-invalid fragment blobs without throwing", () => {
   const fixture = createDocumentationCatalogWorkspace();
   try {
