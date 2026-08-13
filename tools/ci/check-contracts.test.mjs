@@ -48,6 +48,9 @@ import {
 import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { validateDocumentationInventoryAuditScope } from "../repo/audit-documentation-inventory.mjs";
 
+const DOCUMENTATION_FRAGMENT_SCHEMA_URI =
+  "https://raw.githubusercontent.com/AquilaXk/easysubway/32ce139789b97ce1f0c9bb059966cfc19f497480/contracts/documentation/documentation-fragment.schema.json";
+
 test("documentation inventory audit contracts bind the exact five repositories and D01-D05", () => {
   const scope = loadJson("contracts/documentation/documentation-inventory-audit-scope.json");
   const scopeSchema = loadJson("contracts/documentation/documentation-inventory-audit-scope.schema.json");
@@ -531,7 +534,7 @@ function createDocumentationCatalogWorkspace({ activeIndexes = null } = {}) {
       const resourceDigest = createHash("sha256").update(readFileSync(join(root, "docs/resource.txt"))).digest("hex");
       const resourceIdentity = index === 0 ? resourceBlob : resourceDigest;
       const fragment = {
-        $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+        $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI, schemaVersion: 1,
         repository: entry.repository, sourceSha: innerSha, status: "ACTIVE",
         lastVerifiedAt: "2026-08-05T00:00:00.000Z", verificationEvidence: ["evidence:fixture"],
         resources: [documentationCatalogRecord(entry.repository, innerSha, resourceIdentity)],
@@ -2089,7 +2092,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
 
   const fragmentErrors = [];
   validateDocumentationFragment({
-    $schema: "./documentation-fragment.schema.json",
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI,
     schemaVersion: 1,
     repository: "AquilaXk/easysubway",
     sourceSha: "a".repeat(40),
@@ -2102,7 +2105,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
 
   const missingTimestampErrors = [];
   validateDocumentationFragment({
-    $schema: "./documentation-fragment.schema.json",
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI,
     schemaVersion: 1,
     repository: "AquilaXk/easysubway",
     sourceSha: "a".repeat(40),
@@ -2144,7 +2147,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
 
   const unsortedErrors = [];
   validateDocumentationFragment({
-    $schema: "./documentation-fragment.schema.json",
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI,
     schemaVersion: 1,
     repository: "AquilaXk/easysubway",
     sourceSha: "a".repeat(40),
@@ -2173,7 +2176,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     portabilityEvidence: [], portabilityGap: [],
   };
   validateDocumentationFragment({
-    $schema: "./documentation-fragment.schema.json",
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI,
     schemaVersion: 1,
     repository: "AquilaXk/easysubway",
     sourceSha: "a".repeat(40),
@@ -2192,7 +2195,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   trackedRecord.supersedes = [];
   const trackedIdentityErrors = [];
   validateDocumentationFragment({
-    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI, schemaVersion: 1,
     repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [trackedRecord],
   }, fragmentSchema, resourceSchema, trackedIdentityErrors);
@@ -2204,7 +2207,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   unsupportedTrackedIdentity.lastVerifiedIdentity = unsupportedTrackedIdentity.canonicalIdentity;
   const unsupportedTrackedErrors = [];
   validateDocumentationFragment({
-    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI, schemaVersion: 1,
     repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [unsupportedTrackedIdentity],
   }, fragmentSchema, resourceSchema, unsupportedTrackedErrors);
@@ -2218,7 +2221,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     mutate(record);
     const lifecycleErrors = [];
     validateDocumentationFragment({
-      $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+      $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI, schemaVersion: 1,
       repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
       lastVerifiedAt: null, verificationEvidence: [], resources: [record],
     }, fragmentSchema, resourceSchema, lifecycleErrors);
@@ -2235,7 +2238,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   successor.supersedes = [];
   const reciprocalErrors = [];
   validateDocumentationFragment({
-    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI, schemaVersion: 1,
     repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [predecessor, successor],
   }, fragmentSchema, resourceSchema, reciprocalErrors);
@@ -2251,7 +2254,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   cycleB.supersededBy = "surface:a";
   const cycleErrors = [];
   validateDocumentationFragment({
-    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI, schemaVersion: 1,
     repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [cycleA, cycleB],
   }, fragmentSchema, resourceSchema, cycleErrors);
@@ -2265,7 +2268,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
   duplicateCanonicalB.resource = "surface:duplicate-b";
   const duplicateCanonicalErrors = [];
   validateDocumentationFragment({
-    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI, schemaVersion: 1,
     repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA, duplicateCanonicalB],
   }, fragmentSchema, resourceSchema, duplicateCanonicalErrors);
@@ -2279,7 +2282,7 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
     mutate(record);
     const duplicateMemberErrors = [];
     validateDocumentationFragment({
-      $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+      $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI, schemaVersion: 1,
       repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
       lastVerifiedAt: null, verificationEvidence: [], resources: [record],
     }, fragmentSchema, resourceSchema, duplicateMemberErrors);
@@ -2288,11 +2291,35 @@ test("documentation catalog는 proposed 5-repository bootstrap과 fragment lifec
 
   const unresolvedDuplicateErrors = [];
   validateDocumentationFragment({
-    $schema: "./documentation-fragment.schema.json", schemaVersion: 1,
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI, schemaVersion: 1,
     repository: "AquilaXk/easysubway", sourceSha: "a".repeat(40), status: "PROPOSED",
     lastVerifiedAt: null, verificationEvidence: [], resources: [duplicateCanonicalA],
   }, fragmentSchema, resourceSchema, unresolvedDuplicateErrors);
   assert.deepEqual(unresolvedDuplicateErrors, []);
+});
+
+test("documentation catalog fragment schema requires an immutable canonical Hub URI", () => {
+  const schema = loadJson("contracts/documentation/documentation-fragment.schema.json");
+  const fragment = {
+    $schema: DOCUMENTATION_FRAGMENT_SCHEMA_URI,
+    schemaVersion: 1,
+    repository: "AquilaXk/easysubway-mobile",
+    sourceSha: "b".repeat(40),
+    status: "PROPOSED",
+    lastVerifiedAt: null,
+    verificationEvidence: [],
+    resources: [],
+  };
+  const outcomes = [
+    fragment.$schema,
+    "./documentation-fragment.schema.json",
+    "https://raw.githubusercontent.com/AquilaXk/easysubway/main/contracts/documentation/documentation-fragment.schema.json",
+    "https://raw.githubusercontent.com/AquilaXk/easysubway/1f72280ccf45f091b4130054b0a426d55cdb9b4a/contracts/documentation/documentation-fragment.schema.json",
+    `https://raw.githubusercontent.com/AquilaXk/easysubway-mobile/${"a".repeat(40)}/contracts/documentation/documentation-fragment.schema.json`,
+    `https://raw.githubusercontent.com/AquilaXk/easysubway/${"a".repeat(40)}/contracts/documentation/documentation-resource.schema.json`,
+    `${fragment.$schema}?download=1`,
+  ].map(($schema) => validateSchema(schema, { ...fragment, $schema }).ok);
+  assert.deepEqual(outcomes, [true, false, false, false, false, false, false]);
 });
 
 test("문서 거버넌스 계약은 successor의 자체 decision schema와 안전한 schema path만 허용한다", () => {
