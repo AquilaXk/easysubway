@@ -412,6 +412,10 @@ test("documentation inventory audit uses canonical public Git provider", async (
   let commitIdentity = SHA;
   let objectType = "blob";
   let pathLookup = "ready";
+  const previousAlternateObjects = process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
+  const previousSslNoVerify = process.env.GIT_SSL_NO_VERIFY;
+  process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES = "/tmp/untrusted-git-objects";
+  process.env.GIT_SSL_NO_VERIFY = "1";
   const execute = async (executable, arguments_, options) => {
     calls.push({ executable, arguments_, options });
     if (arguments_[0] === "clone") {
@@ -453,6 +457,8 @@ test("documentation inventory audit uses canonical public Git provider", async (
       assert.equal(Object.hasOwn(options.env, "GH_TOKEN"), false);
       assert.equal(Object.hasOwn(options.env, "GITHUB_TOKEN"), false);
       assert.equal(Object.hasOwn(options.env, "GIT_ASKPASS"), false);
+      assert.equal(Object.hasOwn(options.env, "GIT_ALTERNATE_OBJECT_DIRECTORIES"), false);
+      assert.equal(Object.hasOwn(options.env, "GIT_SSL_NO_VERIFY"), false);
       assert.equal(Object.hasOwn(options.env, "SSH_ASKPASS"), false);
       assert.equal(Object.hasOwn(options.env, "SSH_ASKPASS_REQUIRE"), false);
     }
@@ -502,6 +508,10 @@ test("documentation inventory audit uses canonical public Git provider", async (
     }), (error) => error instanceof AuditIncomplete && error.code === "STATE_WATERMARK_DRIFT");
     assert.deepEqual([refreshCount, snapshotCount], [2, 2]);
   } finally {
+    if (previousAlternateObjects == null) delete process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
+    else process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES = previousAlternateObjects;
+    if (previousSslNoVerify == null) delete process.env.GIT_SSL_NO_VERIFY;
+    else process.env.GIT_SSL_NO_VERIFY = previousSslNoVerify;
     rmSync(directory, { recursive: true, force: true });
   }
 });
@@ -549,6 +559,8 @@ test("documentation inventory audit retries transient public Git provider operat
   const delays = [];
   let cloneAttempts = 0;
   let fetchAttempts = 0;
+  let deterministicFailure = false;
+  let deterministicAttempts = 0;
   const execute = async (_executable, arguments_) => {
     if (arguments_[0] === "clone") {
       cloneAttempts += 1;
@@ -558,6 +570,10 @@ test("documentation inventory audit retries transient public Git provider operat
       return { stdout: "", stderr: "" };
     }
     if (arguments_.includes("fetch")) {
+      if (deterministicFailure) {
+        deterministicAttempts += 1;
+        throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "deterministic");
+      }
       fetchAttempts += 1;
       if (fetchAttempts === 1) throw new Error("transient fetch failure");
       return { stdout: "", stderr: "" };
@@ -574,6 +590,12 @@ test("documentation inventory audit retries transient public Git provider operat
     await provider.refresh();
     assert.deepEqual([cloneAttempts, fetchAttempts, delays], [6, 6, [250, 250]]);
     assert.notEqual(cloneDestinations[0], cloneDestinations[1]);
+    deterministicFailure = true;
+    await assert.rejects(
+      () => provider.refresh(),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+    );
+    assert.deepEqual([deterministicAttempts, delays], [1, [250, 250]]);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
@@ -589,6 +611,10 @@ test("documentation inventory audit rejects unsafe Git provider inputs", async (
   );
   await assert.rejects(
     () => auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot: "relative" }),
+    (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+  );
+  await assert.rejects(
+    () => collectLive(SCOPE, { sourceSha: SHA, readHead: null, readContent: null }),
     (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
   );
   const directory = mkdtempSync(join(tmpdir(), "documentation-inventory-git-provider-invalid-"));
@@ -627,6 +653,7 @@ test("documentation inventory audit rejects unsafe Git provider inputs", async (
 
 test("documentation inventory audit workflow uses canonical public Git provider", () => {
   const workflow = readFileSync(".github/workflows/documentation-inventory-audit.yml", "utf8");
-  assert.doesNotMatch(workflow, /GH_TOKEN:\s*\$\{\{ github\.token \}\}/);
+  assert.doesNotMatch(workflow, /^\s*(?:GH_TOKEN|GITHUB_TOKEN)\s*:/m);
+  assert.doesNotMatch(workflow, /\$\{\{\s*secrets\./);
   assert.match(workflow, /--repository-root "\$\{RUNNER_TEMP\}\/documentation-inventory-repositories-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}"/);
 });
