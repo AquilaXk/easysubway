@@ -411,6 +411,7 @@ test("documentation inventory audit uses canonical public Git provider", async (
   const calls = [];
   let commitIdentity = SHA;
   let objectType = "blob";
+  let pathLookup = "ready";
   const execute = async (executable, arguments_, options) => {
     calls.push({ executable, arguments_, options });
     if (arguments_[0] === "clone") {
@@ -420,6 +421,11 @@ test("documentation inventory audit uses canonical public Git provider", async (
     if (arguments_.includes("fetch")) return { stdout: "", stderr: "" };
     if (arguments_.includes("refs/remotes/origin/main^{commit}")) return { stdout: `${SHA}\n`, stderr: "" };
     if (arguments_.includes(`${SHA}^{commit}`)) return { stdout: `${commitIdentity}\n`, stderr: "" };
+    if (arguments_.includes("ls-tree")) {
+      if (pathLookup === "error") throw new Error("Git tree read failed");
+      if (pathLookup === "missing") return { stdout: "", stderr: "" };
+      return { stdout: `100644 blob ${"c".repeat(40)}\t${PATH}\0`, stderr: "" };
+    }
     if (arguments_.includes("rev-parse")) return { stdout: `${"c".repeat(40)}\n`, stderr: "" };
     if (arguments_.includes("-t")) return { stdout: `${objectType}\n`, stderr: "" };
     if (arguments_.includes("cat-file")) return { stdout: Buffer.from("{}"), stderr: Buffer.alloc(0) };
@@ -437,6 +443,19 @@ test("documentation inventory audit uses canonical public Git provider", async (
       encoding: "base64",
       content: Buffer.from("{}").toString("base64"),
     });
+    for (const { executable, options } of calls) {
+      assert.equal(executable, "/usr/bin/git");
+      assert.equal(options.shell, false);
+      assert.equal(options.env.GIT_TERMINAL_PROMPT, "0");
+      assert.equal(options.env.GIT_CONFIG_GLOBAL, "/dev/null");
+      assert.equal(options.env.HOME, join(repositoryRoot, ".home"));
+      assert.equal(options.env.XDG_CONFIG_HOME, join(repositoryRoot, ".home"));
+      assert.equal(Object.hasOwn(options.env, "GH_TOKEN"), false);
+      assert.equal(Object.hasOwn(options.env, "GITHUB_TOKEN"), false);
+      assert.equal(Object.hasOwn(options.env, "GIT_ASKPASS"), false);
+      assert.equal(Object.hasOwn(options.env, "SSH_ASKPASS"), false);
+      assert.equal(Object.hasOwn(options.env, "SSH_ASKPASS_REQUIRE"), false);
+    }
     const showCount = calls.filter(({ arguments_ }) => arguments_.includes("show")).length;
     objectType = "tree";
     await assert.rejects(
@@ -460,15 +479,6 @@ test("documentation inventory audit uses canonical public Git provider", async (
     assert.deepEqual(fetches.map(({ arguments_ }) => arguments_.slice(2)), REPOSITORIES.map((repository) => [
       "fetch", "--no-tags", `https://github.com/${repository}.git`, "+refs/heads/main:refs/remotes/origin/main",
     ]));
-    for (const { executable, options } of calls) {
-      assert.equal(executable, "/usr/bin/git");
-      assert.equal(options.shell, false);
-      assert.equal(options.env.GIT_TERMINAL_PROMPT, "0");
-      assert.equal(options.env.GIT_CONFIG_GLOBAL, "/dev/null");
-      assert.equal(Object.hasOwn(options.env, "GH_TOKEN"), false);
-      assert.equal(Object.hasOwn(options.env, "GITHUB_TOKEN"), false);
-      assert.equal(Object.hasOwn(options.env, "GIT_ASKPASS"), false);
-    }
 
     let refreshCount = 0;
     let snapshotCount = 0;
@@ -491,6 +501,79 @@ test("documentation inventory audit uses canonical public Git provider", async (
       },
     }), (error) => error instanceof AuditIncomplete && error.code === "STATE_WATERMARK_DRIFT");
     assert.deepEqual([refreshCount, snapshotCount], [2, 2]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation inventory audit distinguishes missing Git paths from provider failures", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "documentation-inventory-git-missing-"));
+  const repositoryRoot = join(directory, "repositories");
+  let pathLookup = "missing";
+  const execute = async (_executable, arguments_) => {
+    if (arguments_[0] === "clone") {
+      mkdirSync(arguments_.at(-1));
+      return { stdout: "", stderr: "" };
+    }
+    if (arguments_.includes(`${SHA}^{commit}`)) return { stdout: `${SHA}\n`, stderr: "" };
+    if (arguments_.includes("ls-tree")) {
+      if (pathLookup === "error") throw new Error("Git tree read failed");
+      return { stdout: "", stderr: "" };
+    }
+    if (arguments_.includes("rev-parse")) return { stdout: `${"c".repeat(40)}\n`, stderr: "" };
+    if (arguments_.includes("-t")) return { stdout: "blob\n", stderr: "" };
+    if (arguments_.includes("show")) return { stdout: Buffer.from("{}"), stderr: Buffer.alloc(0) };
+    throw new Error("unexpected Git command");
+  };
+
+  try {
+    const provider = await auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot, execute });
+    await assert.rejects(
+      () => provider.readContent(REPOSITORIES[0], PATH, SHA),
+      (error) => error?.status === 404,
+    );
+    pathLookup = "error";
+    await assert.rejects(
+      () => provider.readContent(REPOSITORIES[0], PATH, SHA),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_UNAVAILABLE",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation inventory audit retries transient public Git provider operations", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "documentation-inventory-git-retry-"));
+  const repositoryRoot = join(directory, "repositories");
+  const cloneDestinations = [];
+  const delays = [];
+  let cloneAttempts = 0;
+  let fetchAttempts = 0;
+  const execute = async (_executable, arguments_) => {
+    if (arguments_[0] === "clone") {
+      cloneAttempts += 1;
+      cloneDestinations.push(arguments_.at(-1));
+      if (cloneAttempts === 1) throw new Error("transient clone failure");
+      mkdirSync(arguments_.at(-1));
+      return { stdout: "", stderr: "" };
+    }
+    if (arguments_.includes("fetch")) {
+      fetchAttempts += 1;
+      if (fetchAttempts === 1) throw new Error("transient fetch failure");
+      return { stdout: "", stderr: "" };
+    }
+    throw new Error("unexpected Git command");
+  };
+
+  try {
+    const provider = await auditModule.createDocumentationInventoryGitProvider(SCOPE, {
+      repositoryRoot,
+      execute,
+      pause: async (delay) => delays.push(delay),
+    });
+    await provider.refresh();
+    assert.deepEqual([cloneAttempts, fetchAttempts, delays], [6, 6, [250, 250]]);
+    assert.notEqual(cloneDestinations[0], cloneDestinations[1]);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
