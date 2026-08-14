@@ -295,6 +295,8 @@ test("documentation inventory audit retries transient structured GitHub response
   };
   assert.equal(JSON.parse(await gh(["api", endpoint], execute, async (delay) => delays.push(delay))).type, "file");
   assert.deepEqual([attempts, delays], [3, [250, 500]]);
+  const dotPathEndpoint = `repos/AquilaXk/easysubway/contents/.github/workflows/ci.yml?ref=${SHA}`;
+  assert.equal(JSON.parse(await gh(["api", dotPathEndpoint], async () => ({ stdout: response("200 OK", { type: "file" }), stderr: "" }))).type, "file");
   await assert.rejects(
     () => gh(["api", endpoint], async () => { throw Object.assign(new Error("missing"), { stdout: response("404 Not Found", { message: "Not Found" }), stderr: "localized stderr" }); }),
     (error) => error?.status === 404,
