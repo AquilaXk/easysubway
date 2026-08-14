@@ -224,9 +224,16 @@ export async function collectSnapshot(scope, { readHead = collectHead, readConte
   return { repositories, watermark: snapshotWatermark(repositories) };
 }
 
-export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot = () => collectSnapshot(scope) } = {}) {
-  const begin = await snapshot();
-  const end = await snapshot();
+export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot = null, readHead = collectHead, readContent = collectContent } = {}) {
+  const contentCache = new Map();
+  const cachedReadContent = (repository, path, sha) => {
+    const key = JSON.stringify([repository, path, sha]);
+    if (!contentCache.has(key)) contentCache.set(key, Promise.resolve().then(() => readContent(repository, path, sha)));
+    return contentCache.get(key);
+  };
+  const takeSnapshot = snapshot ?? (() => collectSnapshot(scope, { readHead, readContent: cachedReadContent }));
+  const begin = await takeSnapshot();
+  const end = await takeSnapshot();
   const beginHub = begin.repositories.find(({ repository }) => repository === "AquilaXk/easysubway")?.headSha;
   const endHub = end.repositories.find(({ repository }) => repository === "AquilaXk/easysubway")?.headSha;
   if (beginHub !== sourceSha || endHub !== sourceSha || begin.watermark !== end.watermark) throw new AuditIncomplete("STATE_WATERMARK_DRIFT", "five-fragment-state", "watermark");
@@ -254,12 +261,47 @@ function includedGitHubResponse(stdout) {
   const lfBoundary = text.indexOf("\n\n");
   const boundary = crlfBoundary >= 0 && (lfBoundary < 0 || crlfBoundary <= lfBoundary) ? crlfBoundary : lfBoundary;
   const separatorLength = boundary === crlfBoundary ? 4 : 2;
-  return { status: Number.isInteger(status) ? status : null, body: boundary >= 0 ? text.slice(boundary + separatorLength) : "" };
+  const headers = {};
+  for (const line of (boundary >= 0 ? text.slice(0, boundary) : text).split(/\r?\n/).slice(1)) {
+    const separator = line.indexOf(":");
+    if (separator > 0) headers[line.slice(0, separator).trim().toLowerCase()] = line.slice(separator + 1).trim();
+  }
+  return { status: Number.isInteger(status) ? status : null, headers, body: boundary >= 0 ? text.slice(boundary + separatorLength) : "" };
 }
 
 const wait = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
+const MAX_RATE_LIMIT_DELAY_MS = 120_000;
 
-export async function gh(args, execute = execFileAsync, pause = wait) {
+function rateLimitRetry(response, attempt, now) {
+  if (![403, 429].includes(response.status)) return { rateLimited: false, delay: null };
+  let message = "";
+  try {
+    const body = JSON.parse(response.body);
+    if (typeof body?.message === "string") message = body.message;
+  } catch { /* A malformed error body is not rate-limit evidence by itself. */ }
+  const remaining = response.headers["x-ratelimit-remaining"];
+  const rateLimited = response.status === 429 || remaining === "0" || /(?:secondary|api) rate limit/i.test(message);
+  if (!rateLimited) return { rateLimited: false, delay: null };
+
+  const retryAfter = response.headers["retry-after"];
+  if (retryAfter != null) {
+    if (!/^(?:0|[1-9][0-9]*)$/.test(retryAfter)) return { rateLimited: true, delay: null };
+    const delay = Number(retryAfter) * 1_000;
+    return { rateLimited: true, delay: Number.isSafeInteger(delay) && delay <= MAX_RATE_LIMIT_DELAY_MS ? delay : null };
+  }
+
+  if (remaining === "0") {
+    const reset = response.headers["x-ratelimit-reset"];
+    if (!/^(?:0|[1-9][0-9]*)$/.test(reset ?? "")) return { rateLimited: true, delay: null };
+    const delay = Math.max(0, Number(reset) * 1_000 - now());
+    return { rateLimited: true, delay: Number.isSafeInteger(delay) && delay <= MAX_RATE_LIMIT_DELAY_MS ? delay : null };
+  }
+
+  const delay = 60_000 * (2 ** attempt);
+  return { rateLimited: true, delay: delay <= MAX_RATE_LIMIT_DELAY_MS ? delay : null };
+}
+
+export async function gh(args, execute = execFileAsync, pause = wait, now = Date.now) {
   const endpoint = args?.[1];
   const repositories = "AquilaXk/easysubway(?:-(?:backend|data|mobile|platform))?";
   const allowed = new RegExp(`^repos/${repositories}(?:/git/ref/heads/main|/contents/[A-Za-z0-9][A-Za-z0-9._/-]*\\?ref=[0-9a-f]{40})$`);
@@ -279,7 +321,13 @@ export async function gh(args, execute = execFileAsync, pause = wait) {
       const response = includedGitHubResponse(error?.stdout);
       const status = Number.isInteger(error?.status) ? error.status : response.status;
       if (status === 404) throw Object.assign(new Error("not found"), { status });
-      const transient = status == null || status === 429 || status >= 500;
+      const rateLimit = rateLimitRetry({ ...response, status }, attempt, now);
+      if (rateLimit.rateLimited) {
+        if (attempt === 2 || rateLimit.delay == null) throw new AuditIncomplete("PROVIDER_RATE_LIMITED", endpoint);
+        await pause(rateLimit.delay);
+        continue;
+      }
+      const transient = status == null || status >= 500;
       if (!transient || attempt === 2) throw error;
       await pause(250 * (2 ** attempt));
     }

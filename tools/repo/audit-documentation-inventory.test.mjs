@@ -298,3 +298,106 @@ test("documentation inventory audit retries transient structured GitHub response
     (error) => error?.status === 404,
   );
 });
+
+test("documentation inventory audit retries rate-limited GitHub responses", async () => {
+  const endpoint = `repos/AquilaXk/easysubway/contents/${PATH}?ref=${SHA}`;
+  const response = (status, body, headers = {}) => [
+    `HTTP/2.0 ${status}`,
+    ...Object.entries(headers).map(([name, value]) => `${name}: ${value}`),
+    "Content-Type: application/json",
+    "",
+    JSON.stringify(body),
+  ].join("\n");
+
+  let attempts = 0;
+  const delays = [];
+  const rateLimitedThenReady = async () => {
+    attempts += 1;
+    if (attempts === 1) throw Object.assign(new Error("secondary rate limit"), {
+      stdout: response("403 Forbidden", { message: "You have exceeded a secondary rate limit." }, { "Retry-After": "2" }),
+    });
+    return { stdout: response("200 OK", { type: "file" }), stderr: "" };
+  };
+  assert.equal(JSON.parse(await gh(["api", endpoint], rateLimitedThenReady, async (delay) => delays.push(delay))).type, "file");
+  assert.deepEqual([attempts, delays], [2, [2_000]]);
+
+  attempts = 0;
+  delays.length = 0;
+  const resetThenReady = async () => {
+    attempts += 1;
+    if (attempts === 1) throw Object.assign(new Error("primary rate limit"), {
+      stdout: response("403 Forbidden", { message: "API rate limit exceeded" }, {
+        "X-RateLimit-Remaining": "0",
+        "X-RateLimit-Reset": "1700000002",
+      }),
+    });
+    return { stdout: response("200 OK", { type: "file" }), stderr: "" };
+  };
+  assert.equal(JSON.parse(await gh(["api", endpoint], resetThenReady, async (delay) => delays.push(delay), () => 1_700_000_000_000)).type, "file");
+  assert.deepEqual([attempts, delays], [2, [2_000]]);
+
+  attempts = 0;
+  delays.length = 0;
+  await assert.rejects(
+    () => gh(["api", endpoint], async () => {
+      attempts += 1;
+      throw Object.assign(new Error("forbidden"), { stdout: response("403 Forbidden", { message: "Resource not accessible by integration" }) });
+    }, async (delay) => delays.push(delay)),
+    (error) => !(error instanceof AuditIncomplete),
+  );
+  assert.deepEqual([attempts, delays], [1, []]);
+
+  attempts = 0;
+  delays.length = 0;
+  await assert.rejects(
+    () => gh(["api", endpoint], async () => {
+      attempts += 1;
+      throw Object.assign(new Error("secondary rate limit"), {
+        stdout: response("429 Too Many Requests", { message: "You have exceeded a secondary rate limit." }),
+      });
+    }, async (delay) => delays.push(delay)),
+    (error) => error instanceof AuditIncomplete && error.code === "PROVIDER_RATE_LIMITED",
+  );
+  assert.deepEqual([attempts, delays], [3, [60_000, 120_000]]);
+
+  for (const retryAfter of ["invalid", "121"]) {
+    attempts = 0;
+    delays.length = 0;
+    await assert.rejects(
+      () => gh(["api", endpoint], async () => {
+        attempts += 1;
+        throw Object.assign(new Error("secondary rate limit"), {
+          stdout: response("429 Too Many Requests", { message: "You have exceeded a secondary rate limit." }, { "Retry-After": retryAfter }),
+        });
+      }, async (delay) => delays.push(delay)),
+      (error) => error instanceof AuditIncomplete && error.code === "PROVIDER_RATE_LIMITED",
+    );
+    assert.deepEqual([attempts, delays], [1, []]);
+  }
+});
+
+test("documentation inventory audit memoizes immutable content", async () => {
+  const headReads = new Map();
+  const contentReads = new Map();
+  const readHead = async (repository) => {
+    headReads.set(repository, (headReads.get(repository) ?? 0) + 1);
+    return SHA;
+  };
+  const readContent = async (repository, path, sha) => {
+    const key = JSON.stringify([repository, path, sha]);
+    contentReads.set(key, (contentReads.get(key) ?? 0) + 1);
+    if (path === PATH) return {
+      type: "file",
+      sha: "d".repeat(40),
+      encoding: "base64",
+      content: Buffer.from(JSON.stringify(fragment(repository))).toString("base64"),
+    };
+    return { type: "file", sha: "c".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") };
+  };
+
+  const result = await collectLive(SCOPE, { sourceSha: SHA, readHead, readContent });
+  assert.equal(result.stateBeginSha256, result.stateEndSha256);
+  assert.deepEqual([...headReads.values()], [2, 2, 2, 2, 2]);
+  assert.equal(contentReads.size, 10);
+  assert.deepEqual([...contentReads.values()], Array(10).fill(1));
+});
