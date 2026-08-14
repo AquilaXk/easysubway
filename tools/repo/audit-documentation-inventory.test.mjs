@@ -359,6 +359,21 @@ test("documentation inventory audit retries rate-limited GitHub responses", asyn
     (error) => error instanceof AuditIncomplete && error.code === "PROVIDER_RATE_LIMITED",
   );
   assert.deepEqual([attempts, delays], [3, [60_000, 120_000]]);
+
+  for (const retryAfter of ["invalid", "121"]) {
+    attempts = 0;
+    delays.length = 0;
+    await assert.rejects(
+      () => gh(["api", endpoint], async () => {
+        attempts += 1;
+        throw Object.assign(new Error("secondary rate limit"), {
+          stdout: response("429 Too Many Requests", { message: "You have exceeded a secondary rate limit." }, { "Retry-After": retryAfter }),
+        });
+      }, async (delay) => delays.push(delay)),
+      (error) => error instanceof AuditIncomplete && error.code === "PROVIDER_RATE_LIMITED",
+    );
+    assert.deepEqual([attempts, delays], [1, []]);
+  }
 });
 
 test("documentation inventory audit memoizes immutable content", async () => {
