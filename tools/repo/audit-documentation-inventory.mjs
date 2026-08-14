@@ -63,7 +63,7 @@ export class AuditIncomplete extends Error {
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const canonicalUtc = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 const exactKeys = (value, keys) => value != null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
-const safePath = (value) => typeof value === "string" && /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(value);
+const safePath = (value) => typeof value === "string" && /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*[?#])\.?[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(value);
 const fallbackScope = () => ({ schemaVersion: 1, repositories: EXPECTED_REPOSITORIES.map((repository) => ({ repository, defaultBranch: "main", fragmentPath: FRAGMENT_PATH, requiredStatus: "ACTIVE" })), dods: [...EXPECTED_DODS] });
 
 function gitEnvironment(home) {
@@ -491,7 +491,7 @@ function rateLimitRetry(response, attempt, now) {
 export async function gh(args, execute = execFileAsync, pause = wait, now = Date.now) {
   const endpoint = args?.[1];
   const repositories = "AquilaXk/easysubway(?:-(?:backend|data|mobile|platform))?";
-  const allowed = new RegExp(`^repos/${repositories}(?:/git/ref/heads/main|/contents/[A-Za-z0-9][A-Za-z0-9._/-]*\\?ref=[0-9a-f]{40})$`);
+  const allowed = new RegExp(`^repos/${repositories}(?:/git/ref/heads/main|/contents/\\.?[A-Za-z0-9][A-Za-z0-9._/-]*\\?ref=[0-9a-f]{40})$`);
   if (args?.length !== 2 || args[0] !== "api" || typeof endpoint !== "string" || !allowed.test(endpoint)) throw new Error("gh read-only allowlist violation");
   const contentIndex = endpoint.indexOf("/contents/");
   if (contentIndex >= 0) {

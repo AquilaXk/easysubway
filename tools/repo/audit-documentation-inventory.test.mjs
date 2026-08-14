@@ -295,6 +295,8 @@ test("documentation inventory audit retries transient structured GitHub response
   };
   assert.equal(JSON.parse(await gh(["api", endpoint], execute, async (delay) => delays.push(delay))).type, "file");
   assert.deepEqual([attempts, delays], [3, [250, 500]]);
+  const dotPathEndpoint = `repos/AquilaXk/easysubway/contents/.github/workflows/ci.yml?ref=${SHA}`;
+  assert.equal(JSON.parse(await gh(["api", dotPathEndpoint], async () => ({ stdout: response("200 OK", { type: "file" }), stderr: "" }))).type, "file");
   await assert.rejects(
     () => gh(["api", endpoint], async () => { throw Object.assign(new Error("missing"), { stdout: response("404 Not Found", { message: "Not Found" }), stderr: "localized stderr" }); }),
     (error) => error?.status === 404,
@@ -412,6 +414,7 @@ test("documentation inventory audit uses canonical public Git provider", async (
   let commitIdentity = SHA;
   let objectType = "blob";
   let pathLookup = "ready";
+  let readPath = PATH;
   const previousAlternateObjects = process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
   const previousSslNoVerify = process.env.GIT_SSL_NO_VERIFY;
   process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES = "/tmp/untrusted-git-objects";
@@ -428,7 +431,7 @@ test("documentation inventory audit uses canonical public Git provider", async (
     if (arguments_.includes("ls-tree")) {
       if (pathLookup === "error") throw new Error("Git tree read failed");
       if (pathLookup === "missing") return { stdout: "", stderr: "" };
-      return { stdout: `100644 blob ${"c".repeat(40)}\t${PATH}\0`, stderr: "" };
+      return { stdout: `100644 blob ${"c".repeat(40)}\t${readPath}\0`, stderr: "" };
     }
     if (arguments_.includes("rev-parse")) return { stdout: `${"c".repeat(40)}\n`, stderr: "" };
     if (arguments_.includes("-t")) return { stdout: `${objectType}\n`, stderr: "" };
@@ -447,6 +450,14 @@ test("documentation inventory audit uses canonical public Git provider", async (
       encoding: "base64",
       content: Buffer.from("{}").toString("base64"),
     });
+    readPath = ".github/workflows/ci.yml";
+    assert.deepEqual(await provider.readContent(REPOSITORIES[0], readPath, SHA), {
+      type: "file",
+      sha: "c".repeat(40),
+      encoding: "base64",
+      content: Buffer.from("{}").toString("base64"),
+    });
+    readPath = PATH;
     for (const { executable, options } of calls) {
       assert.equal(executable, "/usr/bin/git");
       assert.equal(options.shell, false);
