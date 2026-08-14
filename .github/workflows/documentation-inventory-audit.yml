@@ -26,8 +26,6 @@ jobs:
           node-version: "24"
       - name: Audit current five-fragment documentation inventory
         shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           EVIDENCE_DIR="audit-evidence"
@@ -42,6 +40,7 @@ jobs:
             --report-schema contracts/documentation/documentation-inventory-audit-report.schema.json \
             --source-sha "${GITHUB_SHA}" \
             --observed-at "${OBSERVED_AT}" \
+            --repository-root "${RUNNER_TEMP}/documentation-inventory-repositories-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
             --output "${REPORT_PATH}"
       - name: Upload sanitized documentation inventory audit
         if: ${{ always() }}

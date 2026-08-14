@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { open, readFile } from "node:fs/promises";
+import { mkdir, open, readFile, realpath } from "node:fs/promises";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isMainModule } from "../lib/is-main-module.mjs";
@@ -20,6 +21,29 @@ const FRAGMENT_PATH = "contracts/documentation/documentation-fragment.json";
 const SHA = /^[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const execFileAsync = promisify(execFile);
+const GIT_ENV = Object.freeze({
+  GIT_ATTR_NOSYSTEM: "1",
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_CONFIG_SYSTEM: "/dev/null",
+  GIT_LFS_SKIP_SMUDGE: "1",
+  GIT_TERMINAL_PROMPT: "0",
+});
+const GIT_UNSET = Object.freeze([
+  "GH_TOKEN",
+  "GITHUB_TOKEN",
+  "GIT_ASKPASS",
+  "GIT_CONFIG_COUNT",
+  "GIT_CONFIG_PARAMETERS",
+  "GIT_DIR",
+  "GIT_INDEX_FILE",
+  "GIT_NAMESPACE",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_QUARANTINE_PATH",
+  "GIT_SSH_COMMAND",
+  "GIT_WORK_TREE",
+  "SSH_AUTH_SOCK",
+]);
 const FRAGMENT_SCHEMA = JSON.parse(await readFile(new URL("../../contracts/documentation/documentation-fragment.schema.json", import.meta.url), "utf8"));
 const RESOURCE_SCHEMA = JSON.parse(await readFile(new URL("../../contracts/documentation/documentation-resource.schema.json", import.meta.url), "utf8"));
 
@@ -38,6 +62,23 @@ const exactKeys = (value, keys) => value != null && typeof value === "object" &&
 const safePath = (value) => typeof value === "string" && /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(value);
 const fallbackScope = () => ({ schemaVersion: 1, repositories: EXPECTED_REPOSITORIES.map((repository) => ({ repository, defaultBranch: "main", fragmentPath: FRAGMENT_PATH, requiredStatus: "ACTIVE" })), dods: [...EXPECTED_DODS] });
 
+function gitEnvironment() {
+  const env = { ...process.env, ...GIT_ENV };
+  for (const key of GIT_UNSET) delete env[key];
+  return env;
+}
+
+async function executeGit(execute, arguments_, encoding = "utf8") {
+  const result = await execute("/usr/bin/git", arguments_, {
+    encoding,
+    env: gitEnvironment(),
+    shell: false,
+    timeout: 120_000,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  return result.stdout;
+}
+
 export function validateDocumentationInventoryAuditScope(scope, errors = []) {
   if (scope?.schemaVersion !== 1 || !Array.isArray(scope.repositories) || !Array.isArray(scope.dods)) return [...errors, "scope shape mismatch"];
   const repositories = scope.repositories.map((entry) => entry != null && typeof entry === "object" && !Array.isArray(entry) ? entry.repository : null);
@@ -47,6 +88,90 @@ export function validateDocumentationInventoryAuditScope(scope, errors = []) {
     if (entry == null || typeof entry !== "object" || Array.isArray(entry) || !exactKeys(entry, ["repository", "defaultBranch", "fragmentPath", "requiredStatus"]) || entry.defaultBranch !== "main" || entry.fragmentPath !== FRAGMENT_PATH || !safePath(entry.fragmentPath) || entry.requiredStatus !== "ACTIVE") errors.push(`repository contract mismatch:${entry?.repository ?? "unknown"}`);
   }
   return errors;
+}
+
+export async function createDocumentationInventoryGitProvider(scope, {
+  repositoryRoot,
+  execute = execFileAsync,
+} = {}) {
+  if (validateDocumentationInventoryAuditScope(scope).length !== 0
+      || typeof repositoryRoot !== "string"
+      || !isAbsolute(repositoryRoot)
+      || resolve(repositoryRoot) !== repositoryRoot) {
+    throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "repository-root");
+  }
+  let canonicalRoot;
+  try {
+    await realpath(dirname(repositoryRoot));
+    await mkdir(repositoryRoot, { mode: 0o700 });
+    canonicalRoot = await realpath(repositoryRoot);
+  } catch {
+    throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "repository-root");
+  }
+
+  const roots = new Map();
+  for (const { repository, defaultBranch } of scope.repositories) {
+    const destination = join(canonicalRoot, repository.slice(repository.indexOf("/") + 1));
+    try {
+      await executeGit(execute, [
+        "clone",
+        "--no-checkout",
+        "--single-branch",
+        "--branch",
+        defaultBranch,
+        "--no-tags",
+        `https://github.com/${repository}.git`,
+        destination,
+      ]);
+    } catch {
+      throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", repository);
+    }
+    roots.set(repository, destination);
+  }
+
+  const repositoryRootFor = (repository) => {
+    const root = roots.get(repository);
+    if (root == null) throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", repository);
+    return root;
+  };
+  const readHead = async (repository, branch) => {
+    if (branch !== "main") throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", repository);
+    let head;
+    try {
+      head = String(await executeGit(execute, ["-C", repositoryRootFor(repository), "rev-parse", "--verify", `refs/remotes/origin/${branch}^{commit}`])).trim();
+    } catch (error) {
+      if (error instanceof AuditIncomplete) throw error;
+      throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", repository);
+    }
+    if (!SHA.test(head)) throw new AuditIncomplete("HEAD_PROVIDER_MALFORMED", repository);
+    return head;
+  };
+  const readContent = async (repository, path, sha) => {
+    if (!safePath(path) || !SHA.test(sha)) throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", `${repository}:${path}`);
+    const root = repositoryRootFor(repository);
+    let blobSha;
+    try {
+      blobSha = String(await executeGit(execute, ["-C", root, "rev-parse", "--verify", `${sha}:${path}`])).trim();
+    } catch {
+      try {
+        const commit = String(await executeGit(execute, ["-C", root, "rev-parse", "--verify", `${sha}^{commit}`])).trim();
+        if (commit !== sha) throw new Error("commit mismatch");
+      } catch {
+        throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
+      }
+      throw Object.assign(new Error("not found"), { status: 404 });
+    }
+    if (!SHA.test(blobSha)) throw new AuditIncomplete("RESOURCE_PROVIDER_MALFORMED", `${repository}:${path}`, "fragment");
+    let bytes;
+    try {
+      bytes = await executeGit(execute, ["-C", root, "show", `${sha}:${path}`], null);
+    } catch {
+      throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", `${repository}:${path}`);
+    }
+    if (!Buffer.isBuffer(bytes)) bytes = Buffer.from(bytes);
+    return { type: "file", sha: blobSha, encoding: "base64", content: bytes.toString("base64") };
+  };
+  return { readHead, readContent };
 }
 
 function decodeBase64(value, identity) {
@@ -336,7 +461,7 @@ export async function gh(args, execute = execFileAsync, pause = wait, now = Date
 }
 
 function parseArguments(argv) {
-  const names = { "--scope": "scope", "--scope-schema": "scopeSchema", "--report-schema": "reportSchema", "--source-sha": "sourceSha", "--observed-at": "observedAt", "--output": "output" };
+  const names = { "--scope": "scope", "--scope-schema": "scopeSchema", "--report-schema": "reportSchema", "--source-sha": "sourceSha", "--observed-at": "observedAt", "--repository-root": "repositoryRoot", "--output": "output" };
   const result = {};
   for (let index = 0; index < argv.length; index += 2) {
     const key = names[argv[index]];
@@ -380,7 +505,10 @@ export async function runAuditCli({ argv = process.argv.slice(2), read = (path) 
     reportSchema = JSON.parse(reportSchemaText);
     const scopeErrors = [...validateSchema(scopeSchema, scope).errors, ...validateDocumentationInventoryAuditScope(scope)];
     if (scopeErrors.length !== 0) throw new AuditIncomplete("SCOPE_INVALID", "scope", "scope");
-    const live = await (collect ?? (() => collectLive(scope, { sourceSha: args.sourceSha })))();
+    const live = await (collect ?? (async () => {
+      const provider = await createDocumentationInventoryGitProvider(scope, { repositoryRoot: args.repositoryRoot });
+      return collectLive(scope, { sourceSha: args.sourceSha, ...provider });
+    }))();
     report = auditDocumentationInventory({ scope, sourceSha: args.sourceSha, observedAt: args.observedAt, ...live, scopeText });
     const reportErrors = [...validateSchema(reportSchema, report).errors, ...validateDocumentationInventoryAuditReport(report)];
     if (reportErrors.length !== 0) throw new AuditIncomplete("REPORT_INVALID", "report", "report");

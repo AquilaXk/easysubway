@@ -258,7 +258,7 @@ test("documentation inventory audit rejects state drift and writes schema-valid 
   const output = join(directory, "report.json");
   const scopeSchema = readFileSync("contracts/documentation/documentation-inventory-audit-scope.schema.json", "utf8");
   const reportSchema = readFileSync("contracts/documentation/documentation-inventory-audit-report.schema.json", "utf8");
-  const argv = ["--scope", "scope", "--scope-schema", "scope-schema", "--report-schema", "report-schema", "--source-sha", SHA, "--observed-at", "2026-08-11T00:00:00.000Z", "--output", output];
+  const argv = ["--scope", "scope", "--scope-schema", "scope-schema", "--report-schema", "report-schema", "--source-sha", SHA, "--observed-at", "2026-08-11T00:00:00.000Z", "--repository-root", join(directory, "repositories"), "--output", output];
   try {
     const result = await runAuditCli({ argv, read: async (path) => ({ scope: "{", "scope-schema": scopeSchema, "report-schema": reportSchema })[path], collect: async () => { throw new Error("must not collect"); } });
     const report = JSON.parse(readFileSync(output, "utf8"));
@@ -461,6 +461,38 @@ test("documentation inventory audit rejects unsafe Git provider inputs", async (
     () => auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot: "relative" }),
     (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
   );
+  const directory = mkdtempSync(join(tmpdir(), "documentation-inventory-git-provider-invalid-"));
+  const repositoryRoot = join(directory, "repositories");
+  try {
+    const provider = await auditModule.createDocumentationInventoryGitProvider(SCOPE, {
+      repositoryRoot,
+      execute: async (_executable, arguments_) => {
+        if (arguments_[0] === "clone") {
+          mkdirSync(arguments_.at(-1));
+          return { stdout: "", stderr: "" };
+        }
+        throw new Error("must reject before Git read");
+      },
+    });
+    await assert.rejects(
+      () => provider.readHead(REPOSITORIES[0], "release"),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+    );
+    await assert.rejects(
+      () => provider.readContent("AquilaXk/unowned", PATH, SHA),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+    );
+    await assert.rejects(
+      () => provider.readContent(REPOSITORIES[0], "../secret", SHA),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+    );
+    await assert.rejects(
+      () => auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot }),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("documentation inventory audit workflow uses canonical public Git provider", () => {
