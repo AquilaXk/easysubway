@@ -166,19 +166,27 @@ export async function createDocumentationInventoryGitProvider(scope, {
   const readContent = async (repository, path, sha) => {
     if (!safePath(path) || !SHA.test(sha)) throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", `${repository}:${path}`);
     const root = repositoryRootFor(repository);
+    let commit;
+    try {
+      commit = String(await executeGit(execute, ["-C", root, "rev-parse", "--verify", `${sha}^{commit}`])).trim();
+    } catch {
+      throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
+    }
+    if (commit !== sha) throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
     let blobSha;
     try {
       blobSha = String(await executeGit(execute, ["-C", root, "rev-parse", "--verify", `${sha}:${path}`])).trim();
     } catch {
-      try {
-        const commit = String(await executeGit(execute, ["-C", root, "rev-parse", "--verify", `${sha}^{commit}`])).trim();
-        if (commit !== sha) throw new Error("commit mismatch");
-      } catch {
-        throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
-      }
       throw Object.assign(new Error("not found"), { status: 404 });
     }
     if (!SHA.test(blobSha)) throw new AuditIncomplete("RESOURCE_PROVIDER_MALFORMED", `${repository}:${path}`, "fragment");
+    let objectType;
+    try {
+      objectType = String(await executeGit(execute, ["-C", root, "cat-file", "-t", blobSha])).trim();
+    } catch {
+      throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", `${repository}:${path}`);
+    }
+    if (objectType !== "blob") throw new AuditIncomplete("RESOURCE_PROVIDER_MALFORMED", `${repository}:${path}`, "fragment");
     let bytes;
     try {
       bytes = await executeGit(execute, ["-C", root, "show", `${sha}:${path}`], null);
