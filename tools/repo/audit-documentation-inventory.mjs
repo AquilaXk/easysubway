@@ -33,6 +33,7 @@ const GIT_UNSET = Object.freeze([
   "GH_TOKEN",
   "GITHUB_TOKEN",
   "GIT_ASKPASS",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
   "GIT_CONFIG_COUNT",
   "GIT_CONFIG_PARAMETERS",
   "GIT_DIR",
@@ -41,6 +42,7 @@ const GIT_UNSET = Object.freeze([
   "GIT_OBJECT_DIRECTORY",
   "GIT_QUARANTINE_PATH",
   "GIT_SSH_COMMAND",
+  "GIT_SSL_NO_VERIFY",
   "GIT_WORK_TREE",
   "SSH_ASKPASS",
   "SSH_ASKPASS_REQUIRE",
@@ -121,7 +123,7 @@ export async function createDocumentationInventoryGitProvider(scope, {
       try {
         return await runGit(argumentsForAttempt(attempt));
       } catch (error) {
-        if (attempt === 2) throw error;
+        if (error instanceof AuditIncomplete || attempt === 2) throw error;
         await pause(250 * (2 ** attempt));
       }
     }
@@ -278,7 +280,8 @@ async function readTrackedResource(entry, path, sha, identity, { readContent, mi
   return { blobSha: tracked.sha, sha256: sha256(bytes) };
 }
 
-export async function verifyFragment(entry, headSha, { readContent = collectContent } = {}) {
+export async function verifyFragment(entry, headSha, { readContent } = {}) {
+  if (typeof readContent !== "function") throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", entry?.repository ?? "provider");
   let content;
   try { content = await readContent(entry.repository, entry.fragmentPath, headSha); }
   catch (error) {
@@ -390,7 +393,8 @@ function snapshotWatermark(repositories) {
   return sha256(JSON.stringify(repositories.map(({ repository, headSha, state, fragmentStatus, fragmentBlobSha, resourceCount, activeResourceCount, verificationFindings = [] }) => ({ repository, headSha, state, fragmentStatus, fragmentBlobSha, resourceCount, activeResourceCount, verificationFindings }))));
 }
 
-export async function collectSnapshot(scope, { readHead = collectHead, readContent = collectContent } = {}) {
+export async function collectSnapshot(scope, { readHead, readContent } = {}) {
+  if (typeof readHead !== "function" || typeof readContent !== "function") throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "provider");
   const repositories = [];
   for (const entry of scope.repositories) {
     const headSha = await readHead(entry.repository, entry.defaultBranch);
@@ -400,7 +404,12 @@ export async function collectSnapshot(scope, { readHead = collectHead, readConte
   return { repositories, watermark: snapshotWatermark(repositories) };
 }
 
-export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot = null, refresh = async () => {}, readHead = collectHead, readContent = collectContent } = {}) {
+export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot = null, refresh = async () => {}, readHead, readContent } = {}) {
+  if (typeof refresh !== "function"
+      || (snapshot !== null && typeof snapshot !== "function")
+      || (snapshot === null && (typeof readHead !== "function" || typeof readContent !== "function"))) {
+    throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "provider");
+  }
   const contentCache = new Map();
   const cachedReadContent = (repository, path, sha) => {
     const key = JSON.stringify([repository, path, sha]);
