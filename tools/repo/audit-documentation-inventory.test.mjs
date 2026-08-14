@@ -457,6 +457,7 @@ test("documentation inventory audit uses canonical public Git provider", async (
       encoding: "base64",
       content: Buffer.from("{}").toString("base64"),
     });
+    readPath = PATH;
     for (const { executable, options } of calls) {
       assert.equal(executable, "/usr/bin/git");
       assert.equal(options.shell, false);
