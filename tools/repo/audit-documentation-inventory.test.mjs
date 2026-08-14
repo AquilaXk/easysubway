@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -448,8 +448,8 @@ test("documentation inventory audit uses canonical public Git provider", async (
       assert.equal(options.shell, false);
       assert.equal(options.env.GIT_TERMINAL_PROMPT, "0");
       assert.equal(options.env.GIT_CONFIG_GLOBAL, "/dev/null");
-      assert.equal(options.env.HOME, join(repositoryRoot, ".home"));
-      assert.equal(options.env.XDG_CONFIG_HOME, join(repositoryRoot, ".home"));
+      assert.equal(options.env.HOME, join(realpathSync(repositoryRoot), ".home"));
+      assert.equal(options.env.XDG_CONFIG_HOME, join(realpathSync(repositoryRoot), ".home"));
       assert.equal(Object.hasOwn(options.env, "GH_TOKEN"), false);
       assert.equal(Object.hasOwn(options.env, "GITHUB_TOKEN"), false);
       assert.equal(Object.hasOwn(options.env, "GIT_ASKPASS"), false);

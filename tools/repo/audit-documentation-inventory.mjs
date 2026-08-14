@@ -42,6 +42,8 @@ const GIT_UNSET = Object.freeze([
   "GIT_QUARANTINE_PATH",
   "GIT_SSH_COMMAND",
   "GIT_WORK_TREE",
+  "SSH_ASKPASS",
+  "SSH_ASKPASS_REQUIRE",
   "SSH_AUTH_SOCK",
 ]);
 const FRAGMENT_SCHEMA = JSON.parse(await readFile(new URL("../../contracts/documentation/documentation-fragment.schema.json", import.meta.url), "utf8"));
@@ -62,16 +64,16 @@ const exactKeys = (value, keys) => value != null && typeof value === "object" &&
 const safePath = (value) => typeof value === "string" && /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(value);
 const fallbackScope = () => ({ schemaVersion: 1, repositories: EXPECTED_REPOSITORIES.map((repository) => ({ repository, defaultBranch: "main", fragmentPath: FRAGMENT_PATH, requiredStatus: "ACTIVE" })), dods: [...EXPECTED_DODS] });
 
-function gitEnvironment() {
-  const env = { ...process.env, ...GIT_ENV };
+function gitEnvironment(home) {
+  const env = { ...process.env, ...GIT_ENV, HOME: home, XDG_CONFIG_HOME: home };
   for (const key of GIT_UNSET) delete env[key];
   return env;
 }
 
-async function executeGit(execute, arguments_, encoding = "utf8") {
+async function executeGit(execute, arguments_, encoding, home) {
   const result = await execute("/usr/bin/git", arguments_, {
     encoding,
-    env: gitEnvironment(),
+    env: gitEnvironment(home),
     shell: false,
     timeout: 120_000,
     maxBuffer: 8 * 1024 * 1024,
@@ -93,6 +95,7 @@ export function validateDocumentationInventoryAuditScope(scope, errors = []) {
 export async function createDocumentationInventoryGitProvider(scope, {
   repositoryRoot,
   execute = execFileAsync,
+  pause = wait,
 } = {}) {
   if (validateDocumentationInventoryAuditScope(scope).length !== 0
       || typeof repositoryRoot !== "string"
@@ -101,28 +104,48 @@ export async function createDocumentationInventoryGitProvider(scope, {
     throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "repository-root");
   }
   let canonicalRoot;
+  let isolatedHome;
   try {
     await realpath(dirname(repositoryRoot));
     await mkdir(repositoryRoot, { mode: 0o700 });
     canonicalRoot = await realpath(repositoryRoot);
+    isolatedHome = join(canonicalRoot, ".home");
+    await mkdir(isolatedHome, { mode: 0o700 });
   } catch {
     throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "repository-root");
   }
 
+  const runGit = (arguments_, encoding = "utf8") => executeGit(execute, arguments_, encoding, isolatedHome);
+  const retryNetworkGit = async (argumentsForAttempt) => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await runGit(argumentsForAttempt(attempt));
+      } catch (error) {
+        if (attempt === 2) throw error;
+        await pause(250 * (2 ** attempt));
+      }
+    }
+    throw new Error("Git network retry exhausted");
+  };
+
   const roots = new Map();
   for (const { repository, defaultBranch } of scope.repositories) {
-    const destination = join(canonicalRoot, repository.slice(repository.indexOf("/") + 1));
+    const name = repository.slice(repository.indexOf("/") + 1);
+    let destination;
     try {
-      await executeGit(execute, [
-        "clone",
-        "--no-checkout",
-        "--single-branch",
-        "--branch",
-        defaultBranch,
-        "--no-tags",
-        `https://github.com/${repository}.git`,
-        destination,
-      ]);
+      await retryNetworkGit((attempt) => {
+        destination = join(canonicalRoot, `${name}.clone-${attempt + 1}`);
+        return [
+          "clone",
+          "--no-checkout",
+          "--single-branch",
+          "--branch",
+          defaultBranch,
+          "--no-tags",
+          `https://github.com/${repository}.git`,
+          destination,
+        ];
+      });
     } catch {
       throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", repository);
     }
@@ -137,7 +160,7 @@ export async function createDocumentationInventoryGitProvider(scope, {
   const refresh = async () => {
     for (const { repository } of scope.repositories) {
       try {
-        await executeGit(execute, [
+        await retryNetworkGit(() => [
           "-C",
           repositoryRootFor(repository),
           "fetch",
@@ -155,7 +178,7 @@ export async function createDocumentationInventoryGitProvider(scope, {
     if (branch !== "main") throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", repository);
     let head;
     try {
-      head = String(await executeGit(execute, ["-C", repositoryRootFor(repository), "rev-parse", "--verify", `refs/remotes/origin/${branch}^{commit}`])).trim();
+      head = String(await runGit(["-C", repositoryRootFor(repository), "rev-parse", "--verify", `refs/remotes/origin/${branch}^{commit}`])).trim();
     } catch (error) {
       if (error instanceof AuditIncomplete) throw error;
       throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", repository);
@@ -168,28 +191,31 @@ export async function createDocumentationInventoryGitProvider(scope, {
     const root = repositoryRootFor(repository);
     let commit;
     try {
-      commit = String(await executeGit(execute, ["-C", root, "rev-parse", "--verify", `${sha}^{commit}`])).trim();
+      commit = String(await runGit(["-C", root, "rev-parse", "--verify", `${sha}^{commit}`])).trim();
     } catch {
       throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
     }
     if (commit !== sha) throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
-    let blobSha;
+    let entry;
     try {
-      blobSha = String(await executeGit(execute, ["-C", root, "rev-parse", "--verify", `${sha}:${path}`])).trim();
+      entry = String(await runGit(["-C", root, "ls-tree", "-z", "--full-tree", sha, "--", path]));
     } catch {
-      throw Object.assign(new Error("not found"), { status: 404 });
+      throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", `${repository}:${path}`);
     }
-    if (!SHA.test(blobSha)) throw new AuditIncomplete("RESOURCE_PROVIDER_MALFORMED", `${repository}:${path}`, "fragment");
+    if (entry.length === 0) throw Object.assign(new Error("not found"), { status: 404 });
+    const parsed = /^([0-7]{6}) (blob|tree|commit) ([0-9a-f]{40})\t([^\0]+)\0$/.exec(entry);
+    if (parsed == null || parsed[4] !== path || parsed[2] !== "blob") throw new AuditIncomplete("RESOURCE_PROVIDER_MALFORMED", `${repository}:${path}`, "fragment");
+    const blobSha = parsed[3];
     let objectType;
     try {
-      objectType = String(await executeGit(execute, ["-C", root, "cat-file", "-t", blobSha])).trim();
+      objectType = String(await runGit(["-C", root, "cat-file", "-t", blobSha])).trim();
     } catch {
       throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", `${repository}:${path}`);
     }
     if (objectType !== "blob") throw new AuditIncomplete("RESOURCE_PROVIDER_MALFORMED", `${repository}:${path}`, "fragment");
     let bytes;
     try {
-      bytes = await executeGit(execute, ["-C", root, "show", `${sha}:${path}`], null);
+      bytes = await runGit(["-C", root, "show", `${sha}:${path}`], null);
     } catch {
       throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", `${repository}:${path}`);
     }
