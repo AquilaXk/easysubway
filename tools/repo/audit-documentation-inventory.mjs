@@ -134,6 +134,23 @@ export async function createDocumentationInventoryGitProvider(scope, {
     if (root == null) throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", repository);
     return root;
   };
+  const refresh = async () => {
+    for (const { repository } of scope.repositories) {
+      try {
+        await executeGit(execute, [
+          "-C",
+          repositoryRootFor(repository),
+          "fetch",
+          "--no-tags",
+          `https://github.com/${repository}.git`,
+          "+refs/heads/main:refs/remotes/origin/main",
+        ]);
+      } catch (error) {
+        if (error instanceof AuditIncomplete) throw error;
+        throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", repository);
+      }
+    }
+  };
   const readHead = async (repository, branch) => {
     if (branch !== "main") throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", repository);
     let head;
@@ -171,7 +188,7 @@ export async function createDocumentationInventoryGitProvider(scope, {
     if (!Buffer.isBuffer(bytes)) bytes = Buffer.from(bytes);
     return { type: "file", sha: blobSha, encoding: "base64", content: bytes.toString("base64") };
   };
-  return { readHead, readContent };
+  return { refresh, readHead, readContent };
 }
 
 function decodeBase64(value, identity) {
@@ -349,7 +366,7 @@ export async function collectSnapshot(scope, { readHead = collectHead, readConte
   return { repositories, watermark: snapshotWatermark(repositories) };
 }
 
-export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot = null, readHead = collectHead, readContent = collectContent } = {}) {
+export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot = null, refresh = async () => {}, readHead = collectHead, readContent = collectContent } = {}) {
   const contentCache = new Map();
   const cachedReadContent = (repository, path, sha) => {
     const key = JSON.stringify([repository, path, sha]);
@@ -357,7 +374,9 @@ export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot 
     return contentCache.get(key);
   };
   const takeSnapshot = snapshot ?? (() => collectSnapshot(scope, { readHead, readContent: cachedReadContent }));
+  await refresh();
   const begin = await takeSnapshot();
+  await refresh();
   const end = await takeSnapshot();
   const beginHub = begin.repositories.find(({ repository }) => repository === "AquilaXk/easysubway")?.headSha;
   const endHub = end.repositories.find(({ repository }) => repository === "AquilaXk/easysubway")?.headSha;

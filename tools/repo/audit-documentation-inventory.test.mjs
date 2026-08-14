@@ -415,6 +415,7 @@ test("documentation inventory audit uses canonical public Git provider", async (
       mkdirSync(arguments_.at(-1));
       return { stdout: "", stderr: "" };
     }
+    if (arguments_.includes("fetch")) return { stdout: "", stderr: "" };
     if (arguments_.includes("refs/remotes/origin/main^{commit}")) return { stdout: `${SHA}\n`, stderr: "" };
     if (arguments_.includes("rev-parse")) return { stdout: `${"c".repeat(40)}\n`, stderr: "" };
     if (arguments_.includes("show")) return { stdout: Buffer.from("{}"), stderr: Buffer.alloc(0) };
@@ -423,6 +424,7 @@ test("documentation inventory audit uses canonical public Git provider", async (
 
   try {
     const provider = await auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot, execute });
+    await provider.refresh();
     assert.equal(await provider.readHead(REPOSITORIES[0], "main"), SHA);
     assert.deepEqual(await provider.readContent(REPOSITORIES[0], PATH, SHA), {
       type: "file",
@@ -431,9 +433,14 @@ test("documentation inventory audit uses canonical public Git provider", async (
       content: Buffer.from("{}").toString("base64"),
     });
     const clones = calls.filter(({ arguments_ }) => arguments_[0] === "clone");
+    const fetches = calls.filter(({ arguments_ }) => arguments_.includes("fetch"));
     assert.equal(clones.length, 5);
+    assert.equal(fetches.length, 5);
     assert.deepEqual(clones.map(({ arguments_ }) => arguments_.slice(0, -1)), REPOSITORIES.map((repository) => [
       "clone", "--no-checkout", "--single-branch", "--branch", "main", "--no-tags", `https://github.com/${repository}.git`,
+    ]));
+    assert.deepEqual(fetches.map(({ arguments_ }) => arguments_.slice(2)), REPOSITORIES.map((repository) => [
+      "fetch", "--no-tags", `https://github.com/${repository}.git`, "+refs/heads/main:refs/remotes/origin/main",
     ]));
     for (const { executable, options } of calls) {
       assert.equal(executable, "/usr/bin/git");
@@ -444,6 +451,28 @@ test("documentation inventory audit uses canonical public Git provider", async (
       assert.equal(Object.hasOwn(options.env, "GITHUB_TOKEN"), false);
       assert.equal(Object.hasOwn(options.env, "GIT_ASKPASS"), false);
     }
+
+    let refreshCount = 0;
+    let snapshotCount = 0;
+    const pending = () => REPOSITORIES.map((repository) => ({
+      repository,
+      headSha: repository === REPOSITORIES[0] && snapshotCount === 2 ? SOURCE_SHA : SHA,
+      state: "PENDING",
+      fragmentStatus: "MISSING",
+      fragmentBlobSha: null,
+      fragment: null,
+      resourceCount: 0,
+      activeResourceCount: 0,
+    }));
+    await assert.rejects(() => collectLive(SCOPE, {
+      sourceSha: SHA,
+      refresh: async () => { refreshCount += 1; },
+      collectSnapshot: async () => {
+        snapshotCount += 1;
+        return { repositories: pending(), watermark: `${snapshotCount}`.padStart(64, "0") };
+      },
+    }), (error) => error instanceof AuditIncomplete && error.code === "STATE_WATERMARK_DRIFT");
+    assert.deepEqual([refreshCount, snapshotCount], [2, 2]);
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
