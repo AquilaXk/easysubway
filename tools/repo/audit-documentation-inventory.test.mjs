@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -15,6 +15,8 @@ import {
   validateDocumentationInventoryAuditScope,
   verifyFragment,
 } from "./audit-documentation-inventory.mjs";
+
+const auditModule = await import("./audit-documentation-inventory.mjs");
 
 const REPOSITORIES = [
   "AquilaXk/easysubway",
@@ -400,4 +402,69 @@ test("documentation inventory audit memoizes immutable content", async () => {
   assert.deepEqual([...headReads.values()], [2, 2, 2, 2, 2]);
   assert.equal(contentReads.size, 10);
   assert.deepEqual([...contentReads.values()], Array(10).fill(1));
+});
+
+test("documentation inventory audit uses canonical public Git provider", async () => {
+  assert.equal(typeof auditModule.createDocumentationInventoryGitProvider, "function");
+  const directory = mkdtempSync(join(tmpdir(), "documentation-inventory-git-provider-"));
+  const repositoryRoot = join(directory, "repositories");
+  const calls = [];
+  const execute = async (executable, arguments_, options) => {
+    calls.push({ executable, arguments_, options });
+    if (arguments_[0] === "clone") {
+      mkdirSync(arguments_.at(-1));
+      return { stdout: "", stderr: "" };
+    }
+    if (arguments_.includes("refs/remotes/origin/main^{commit}")) return { stdout: `${SHA}\n`, stderr: "" };
+    if (arguments_.includes("rev-parse")) return { stdout: `${"c".repeat(40)}\n`, stderr: "" };
+    if (arguments_.includes("show")) return { stdout: Buffer.from("{}"), stderr: Buffer.alloc(0) };
+    throw new Error("unexpected Git command");
+  };
+
+  try {
+    const provider = await auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot, execute });
+    assert.equal(await provider.readHead(REPOSITORIES[0], "main"), SHA);
+    assert.deepEqual(await provider.readContent(REPOSITORIES[0], PATH, SHA), {
+      type: "file",
+      sha: "c".repeat(40),
+      encoding: "base64",
+      content: Buffer.from("{}").toString("base64"),
+    });
+    const clones = calls.filter(({ arguments_ }) => arguments_[0] === "clone");
+    assert.equal(clones.length, 5);
+    assert.deepEqual(clones.map(({ arguments_ }) => arguments_.slice(0, -1)), REPOSITORIES.map((repository) => [
+      "clone", "--no-checkout", "--single-branch", "--branch", "main", "--no-tags", `https://github.com/${repository}.git`,
+    ]));
+    for (const { executable, options } of calls) {
+      assert.equal(executable, "/usr/bin/git");
+      assert.equal(options.shell, false);
+      assert.equal(options.env.GIT_TERMINAL_PROMPT, "0");
+      assert.equal(options.env.GIT_CONFIG_GLOBAL, "/dev/null");
+      assert.equal(Object.hasOwn(options.env, "GH_TOKEN"), false);
+      assert.equal(Object.hasOwn(options.env, "GITHUB_TOKEN"), false);
+      assert.equal(Object.hasOwn(options.env, "GIT_ASKPASS"), false);
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation inventory audit rejects unsafe Git provider inputs", async () => {
+  assert.equal(typeof auditModule.createDocumentationInventoryGitProvider, "function");
+  const invalidScope = structuredClone(SCOPE);
+  invalidScope.repositories[0].repository = "AquilaXk/unowned";
+  await assert.rejects(
+    () => auditModule.createDocumentationInventoryGitProvider(invalidScope, { repositoryRoot: "/tmp/documentation-inventory-invalid" }),
+    (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+  );
+  await assert.rejects(
+    () => auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot: "relative" }),
+    (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+  );
+});
+
+test("documentation inventory audit workflow uses canonical public Git provider", () => {
+  const workflow = readFileSync(".github/workflows/documentation-inventory-audit.yml", "utf8");
+  assert.doesNotMatch(workflow, /GH_TOKEN:\s*\$\{\{ github\.token \}\}/);
+  assert.match(workflow, /--repository-root "\$\{RUNNER_TEMP\}\/documentation-inventory-repositories-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}"/);
 });
