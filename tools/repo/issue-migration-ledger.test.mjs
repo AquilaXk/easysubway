@@ -423,12 +423,12 @@ test("post-snapshot amendments는 snapshot 밖 hub issue의 분류를 기록한�
   assert.deepEqual(amendments.amendments.map(({ sourceIssue }) => sourceIssue), [
     1685, 2649, 2700, 2705, 2710, 2712, 2714, 2720, 2727, 2728, 2729,
     2731, 2732, 2734, 2739, 2740, 2741, 2742, 2743, 2747, 2748, 2764,
-    2765, 2766, 2767, 2768, 2776, 2786, 2811, 2812,
+    2765, 2766, 2767, 2768, 2776, 2786, 2811, 2812, 2835, 2840, 2867, 2869,
   ]);
   assert.deepEqual(
     Object.fromEntries(
       amendments.amendments
-        .filter(({ sourceIssue }) => [2727, 2728, 2743, 2786, 2811, 2812].includes(sourceIssue))
+        .filter(({ sourceIssue }) => [2727, 2728, 2743, 2786, 2811, 2812, 2835, 2840, 2867, 2869].includes(sourceIssue))
         .map(({ sourceIssue, title }) => [sourceIssue, title]),
     ),
     {
@@ -438,6 +438,10 @@ test("post-snapshot amendments는 snapshot 밖 hub issue의 분류를 기록한�
       2786: "[Release][Contract][P1] D22.2 product-gate issue owner identity 정합",
       2811: "[Security][PLAN-DOC][P1] D20 same-window five-owner public-sensitivity live closure",
       2812: "[Docs][PLAN-DOC][P1] D35 eight-owner terminal-locator live closure",
+      2835: "[Operations][Post-Go][P1] Journey V3 public release 2h·24h·7d·30d observation",
+      2840: "[Refactor][Release][P1] system manifest product identity·governance revision 분리",
+      2867: "[PLAN-DOC][Hub] Data ACTIVE fragment catalog 소비",
+      2869: "[PLAN-DOC][Hub] Platform ACTIVE fragment catalog 소비",
     },
   );
   assert.deepEqual(
