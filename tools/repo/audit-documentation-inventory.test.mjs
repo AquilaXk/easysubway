@@ -409,6 +409,8 @@ test("documentation inventory audit uses canonical public Git provider", async (
   const directory = mkdtempSync(join(tmpdir(), "documentation-inventory-git-provider-"));
   const repositoryRoot = join(directory, "repositories");
   const calls = [];
+  let commitIdentity = SHA;
+  let objectType = "blob";
   const execute = async (executable, arguments_, options) => {
     calls.push({ executable, arguments_, options });
     if (arguments_[0] === "clone") {
@@ -417,7 +419,10 @@ test("documentation inventory audit uses canonical public Git provider", async (
     }
     if (arguments_.includes("fetch")) return { stdout: "", stderr: "" };
     if (arguments_.includes("refs/remotes/origin/main^{commit}")) return { stdout: `${SHA}\n`, stderr: "" };
+    if (arguments_.includes(`${SHA}^{commit}`)) return { stdout: `${commitIdentity}\n`, stderr: "" };
     if (arguments_.includes("rev-parse")) return { stdout: `${"c".repeat(40)}\n`, stderr: "" };
+    if (arguments_.includes("-t")) return { stdout: `${objectType}\n`, stderr: "" };
+    if (arguments_.includes("cat-file")) return { stdout: Buffer.from("{}"), stderr: Buffer.alloc(0) };
     if (arguments_.includes("show")) return { stdout: Buffer.from("{}"), stderr: Buffer.alloc(0) };
     throw new Error("unexpected Git command");
   };
@@ -432,6 +437,19 @@ test("documentation inventory audit uses canonical public Git provider", async (
       encoding: "base64",
       content: Buffer.from("{}").toString("base64"),
     });
+    const showCount = calls.filter(({ arguments_ }) => arguments_.includes("show")).length;
+    objectType = "tree";
+    await assert.rejects(
+      () => provider.readContent(REPOSITORIES[0], PATH, SHA),
+      (error) => error instanceof AuditIncomplete && error.code === "RESOURCE_PROVIDER_MALFORMED",
+    );
+    assert.equal(calls.filter(({ arguments_ }) => arguments_.includes("show")).length, showCount);
+    objectType = "blob";
+    commitIdentity = "b".repeat(40);
+    await assert.rejects(
+      () => provider.readContent(REPOSITORIES[0], PATH, SHA),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_COMMIT_MISSING",
+    );
     const clones = calls.filter(({ arguments_ }) => arguments_[0] === "clone");
     const fetches = calls.filter(({ arguments_ }) => arguments_.includes("fetch"));
     assert.equal(clones.length, 5);
