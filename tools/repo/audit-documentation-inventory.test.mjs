@@ -412,6 +412,7 @@ test("documentation inventory audit uses canonical public Git provider", async (
   let commitIdentity = SHA;
   let objectType = "blob";
   let pathLookup = "ready";
+  let readPath = PATH;
   const previousAlternateObjects = process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
   const previousSslNoVerify = process.env.GIT_SSL_NO_VERIFY;
   process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES = "/tmp/untrusted-git-objects";
@@ -428,7 +429,7 @@ test("documentation inventory audit uses canonical public Git provider", async (
     if (arguments_.includes("ls-tree")) {
       if (pathLookup === "error") throw new Error("Git tree read failed");
       if (pathLookup === "missing") return { stdout: "", stderr: "" };
-      return { stdout: `100644 blob ${"c".repeat(40)}\t${PATH}\0`, stderr: "" };
+      return { stdout: `100644 blob ${"c".repeat(40)}\t${readPath}\0`, stderr: "" };
     }
     if (arguments_.includes("rev-parse")) return { stdout: `${"c".repeat(40)}\n`, stderr: "" };
     if (arguments_.includes("-t")) return { stdout: `${objectType}\n`, stderr: "" };
@@ -442,6 +443,13 @@ test("documentation inventory audit uses canonical public Git provider", async (
     await provider.refresh();
     assert.equal(await provider.readHead(REPOSITORIES[0], "main"), SHA);
     assert.deepEqual(await provider.readContent(REPOSITORIES[0], PATH, SHA), {
+      type: "file",
+      sha: "c".repeat(40),
+      encoding: "base64",
+      content: Buffer.from("{}").toString("base64"),
+    });
+    readPath = ".github/workflows/ci.yml";
+    assert.deepEqual(await provider.readContent(REPOSITORIES[0], readPath, SHA), {
       type: "file",
       sha: "c".repeat(40),
       encoding: "base64",
