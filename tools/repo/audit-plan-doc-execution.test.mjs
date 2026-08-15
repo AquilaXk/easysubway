@@ -67,8 +67,12 @@ function matchingLive(scope = SCOPE) {
 }
 
 test("plan-doc execution audit scope fixes the exact historical inventory and self binding", () => {
-  assert.equal(SCOPE.historical.length, 38);
-  assert.equal(SCOPE.self.issueNumber, 2849);
+  assert.equal(SCOPE.schemaVersion, 2);
+  assert.equal(SCOPE.historical.length, 64);
+  assert.deepEqual(SCOPE.repositories, [
+    "AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform",
+  ]);
+  assert.equal(SCOPE.self.issueNumber, 2881);
   const byPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
   for (const [prNumber, [issueNumber, mergeSha, relation = "CLOSES"]] of REFRESH_RECORDS) {
     assert.deepEqual(byPr.get(prNumber), {

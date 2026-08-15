@@ -142,11 +142,13 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
   const scope = loadJson("contracts/documentation/plan-doc-execution-audit-scope.json");
   const scopeSchema = loadJson("contracts/documentation/plan-doc-execution-audit-scope.schema.json");
   const reportSchema = loadJson("contracts/documentation/plan-doc-execution-audit-report.schema.json");
-  assert.equal(scope.historical.length, 38);
-  assert.equal(scope.self.issueNumber, 2849);
-  assert.equal(scopeSchema.properties.historical.minItems, 38);
-  assert.equal(scopeSchema.properties.historical.maxItems, 38);
-  assert.equal(scopeSchema.properties.self.properties.issueNumber.const, 2849);
+  assert.equal(scope.schemaVersion, 2);
+  assert.equal(scope.historical.length, 64);
+  assert.deepEqual(scope.repositories, ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"]);
+  assert.equal(scope.self.issueNumber, 2881);
+  assert.equal(scopeSchema.properties.historical.minItems, 64);
+  assert.equal(scopeSchema.properties.historical.maxItems, 64);
+  assert.equal(scopeSchema.properties.self.properties.issueNumber.const, 2881);
   const recordsByPr = new Map(scope.historical.map((record) => [record.prNumber, record]));
   for (const [prNumber, issueNumber] of [[2798, 2797], [2799, 2797], [2801, 2800], [2803, 2802], [2806, 2805], [2808, 2807], [2810, 2809], [2813, 2729], [2815, 2814], [2817, 2816], [2819, 2818], [2822, 2821], [2824, 2820], [2826, 2825], [2828, 2827], [2830, 2829], [2832, 2831], [2834, 2833], [2842, 2841], [2844, 2843], [2846, 2845], [2848, 2847]]) {
     assert.equal(recordsByPr.get(prNumber)?.issueNumber, issueNumber);
