@@ -69,7 +69,7 @@ function relationMatches(record, observed) {
   const number = record.issueNumber;
   const body = String(observed.relationText ?? "");
   const closes = new RegExp(`(?:^|\\n)\\s*Closes\\s+#${number}\\s*(?:$|\\n)`, "m").test(body);
-  const refs = new RegExp(`(?:^|\\n)Refs #${number}(?: +[—–\\-:][^\\r\\n]*)?(?=$|\\r?\\n(?![—–\\-:]))`).test(body);
+  const refs = new RegExp(`(?:^|\\n)Refs #${number}(?: +[—–\\-:][^\\r\\n]*)?(?=$|\\r?\\n(?![ \\t]*[—–\\-:]))`).test(body);
   const closingIssues = observed.closingIssues ?? [];
   return record.relation === "CLOSES"
     ? closes && closingIssues.length === 1 && closingIssues[0]?.number === number && closingIssues[0]?.state === "CLOSED"
@@ -129,7 +129,7 @@ export function createPlanDocExecutionReport({ scope, scopeText, sourceSha, obse
 }
 function reportRecord(kind, record) { return { kind, repository: record.repository, issueNumber: record.issueNumber, prNumber: record.prNumber, mergeSha: record.mergeSha, changedFiles: [...record.changedFiles].sort(codepointCompare) }; }
 function sanitizeIncomplete({ stage, code, affectedIdentity }) { return { stage: String(stage).replace(/[^a-z0-9-]/g, "-").replace(/^-+|-+$/g, "") || "unknown", code: String(code).replace(/[^A-Z0-9_]/g, "_"), affectedIdentity: String(affectedIdentity).replace(/[^A-Za-z0-9:._/-]/g, "_") }; }
-function compareIncomplete(a, b) { return codepointCompare(`${a.stage}\0${a.code}\0${a.affectedIdentity}`); }
+function compareIncomplete(a, b) { return codepointCompare(a.stage, b.stage) || codepointCompare(a.code, b.code) || codepointCompare(a.affectedIdentity, b.affectedIdentity); }
 function sha256(value) { return createHash("sha256").update(value).digest("hex"); }
 
 export async function runGh(args, execute = execFileAsync) {
