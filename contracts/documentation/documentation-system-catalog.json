@@ -72,6 +72,20 @@
         ]
       }
     },
-    { "repository": "AquilaXk/easysubway-platform", "status": "PROPOSED", "fragment": null }
+    {
+      "repository": "AquilaXk/easysubway-platform",
+      "status": "ACTIVE",
+      "fragment": {
+        "gitSha": "cd23457fde3bfd734082ce1909ba87a575dde5fd",
+        "path": "contracts/documentation/documentation-fragment.json",
+        "blobSha": "4f9cb6ceb261586ffcf71c7dd03ab1058801eae1",
+        "lastVerifiedAt": "2026-08-14T15:50:40.000Z",
+        "verificationEvidence": [
+          "https://github.com/AquilaXk/easysubway-platform/issues/1",
+          "https://github.com/AquilaXk/easysubway-platform/issues/109",
+          "https://github.com/AquilaXk/easysubway-platform/issues/120"
+        ]
+      }
+    }
   ]
 }
