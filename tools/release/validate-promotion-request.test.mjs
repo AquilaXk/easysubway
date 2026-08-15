@@ -68,6 +68,14 @@ test("validator도 inventory의 안전한 경로·정렬·정확한 field를 fai
   }
 });
 
+test("validator는 server route bundle 없는 hand-built inventory를 거부한다", () => {
+  const fixture = createFixture();
+  try {
+    writeFileSync(fixture.inventoryPath, JSON.stringify({ schemaVersion: 1, artifactKind: "datapack-candidate-inventory", entries: [{ path: "artifact.bin", sizeBytes: 1, sha256: "d".repeat(64) }] }));
+    assert.notEqual(run(fixture).status, 0);
+  } finally { fixture.cleanup(); }
+});
+
 function createFixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "promotion-validate-"));
   const inventoryBytes = Buffer.from(JSON.stringify(inventoryValue()));
@@ -107,7 +115,7 @@ function replaceCompatibility(fixture, value) {
   fixture.request.compatibilityEvidenceSha256 = sha256(bytes);
   writeRequest(fixture);
 }
-function inventoryValue() { return { schemaVersion: 1, artifactKind: "datapack-candidate-inventory", entries: [{ path: "artifact.bin", sizeBytes: 1, sha256: "d".repeat(64) }] }; }
+function inventoryValue() { return { schemaVersion: 1, artifactKind: "datapack-candidate-inventory", entries: [{ path: "artifact.bin", sizeBytes: 1, sha256: "d".repeat(64) }, { path: "server-route-bundle/manifest.json", sizeBytes: 1, sha256: "e".repeat(64) }] }; }
 function approvedReview() { return { state: "approved", environments: [{ name: "datapack-promotion" }], user: { login: "AquilaXk" } }; }
 function componentValue(workflowRunId, artifactInventorySha256) { return { schemaVersion: 1, component: "data", repository: "AquilaXk/easysubway-data", gitSha: "a".repeat(40), workflowRunId, dataVersion: "1", releaseSequence: 1, manifestSha256: "b".repeat(64), provenance: { sourceSnapshotSetHash: "c".repeat(64) }, artifactInventorySha256, contractVersion: "datapack-contract-v3", issueRef: "AquilaXk/easysubway#2705" }; }
 function compatibilityValue(component) { return { schemaVersion: 1, artifactKind: "datapack-mobile-compatibility-evidence", decision: "PASS", candidate: structuredClone(component) }; }
