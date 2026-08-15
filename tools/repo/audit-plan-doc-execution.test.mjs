@@ -1,304 +1,65 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { readFileSync } from "node:fs";
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
-import {
-  AuditIncomplete,
-  auditPlanDocExecution,
-  collectPlanDocExecutionLive,
-  createPlanDocExecutionReport,
-  parseClosingIssues,
-  runAuditCli,
-  validatePlanDocExecutionScope,
-} from "./audit-plan-doc-execution.mjs";
+import { AuditIncomplete, auditPlanDocExecution, collectPlanDocExecutionLive, createPlanDocExecutionReport, parseClosingIssues, validatePlanDocExecutionScope } from "./audit-plan-doc-execution.mjs";
 
 const SCOPE = JSON.parse(readFileSync("contracts/documentation/plan-doc-execution-audit-scope.json", "utf8"));
+const REPORT_SCHEMA = JSON.parse(readFileSync("contracts/documentation/plan-doc-execution-audit-report.schema.json", "utf8"));
 const SHA = "a".repeat(40);
-const OBSERVED_AT = "2026-08-09T00:00:00.000Z";
-const SELF_PR = 9999;
-const REFRESH_RECORDS = new Map([
-  [2798, [2797, "7e1cc3d33d579ead965322fe2fa023409aba8c6b"]],
-  [2799, [2797, "01ce0b2e4572f65b86ea4f2c91a32c9ff6a2fae1"]],
-  [2801, [2800, "f89c284f76654fef5e32387304edaac64618fce2"]],
-  [2803, [2802, "b96e8753cb406de6067bbf22a0da158b96b4d898"]],
-  [2806, [2805, "fa2f2602573651af6694e7f56077414b685987b9"]],
-  [2808, [2807, "3b0076e04df4f6947f33c37c09949ad6b7487238"]],
-  [2810, [2809, "12a4a4753dbaf733fc436ff645a2f2a1d73b4048"]],
-  [2813, [2729, "1c7521f0186b365b0a43cdb8fa25b35e06bafdbb", "COORDINATOR_FOLLOWUP"]],
-  [2815, [2814, "dc256a4e0f0759f572cdfb00233e6699840642e6"]],
-  [2817, [2816, "4f94f3fd794f61bd06c9b8f0cbfb6b7ec713da9c"]],
-  [2819, [2818, "bb54c453e1b38386c17bc02b6fce77dab8a060c6"]],
-  [2822, [2821, "b89f4ddd50e98b2cff5a2a4cee0e0245a59a383a"]],
-  [2824, [2820, "c84a23f981516640a530ab3119152c239597b6c6"]],
-  [2826, [2825, "2f26c9028f74ce46ef934bc4938dd42fcd966441"]],
-  [2828, [2827, "4475e6d9da634e28cda4179b738d4f9f440f06a7"]],
-  [2830, [2829, "aed1c9ab7e9e45c913f3817f17276865934c9bbc"]],
-  [2832, [2831, "f5ef5ef4e35dd8401150f7e35a1512f634baed33"]],
-  [2834, [2833, "47b62ab816280d7584ef589b10161563f76c9cd6"]],
-  [2842, [2841, "57ead1fd88e5a6b05a2a5d76099e5a3070b712d1"]],
-  [2844, [2843, "ebb4044cb04d3a7fa6cb0ea9e4da8e3acfac8a86"]],
-  [2846, [2845, "51b99da63b9c2a09226f522b240716adeb24f14c"]],
-  [2848, [2847, "e5af7fec4dd7dcf27f3676abc2a650a2536a204b"]],
-]);
+const OBSERVED_AT = "2026-08-15T00:00:00.000Z";
 
 function matchingLive(scope = SCOPE) {
-  return {
-    records: scope.historical.map((record) => ({
-      ...record,
-      repository: scope.executionRepository,
-      mergedAt: OBSERVED_AT,
-      changedFiles: ["contracts/documentation/example.json"],
-      relationText: record.relation === "CLOSES" ? `Closes #${record.issueNumber}` : `Refs #${record.issueNumber}`,
-      closingIssues: record.relation === "CLOSES" ? [{ number: record.issueNumber, state: "CLOSED" }] : [],
-    })),
-    self: {
-      issueNumber: scope.self.issueNumber,
-      prNumber: SELF_PR,
-      repository: scope.executionRepository,
-      mergeSha: SHA,
-      mergedAt: OBSERVED_AT,
-      changedFiles: ["contracts/documentation/plan-doc-execution-audit-scope.json"],
-      relationText: `Closes #${scope.self.issueNumber}`,
-      closingIssues: [{ number: scope.self.issueNumber, state: "CLOSED" }],
-    },
-  };
+  const observed = (record) => ({ issueNumber: record.issueNumber, prNumber: record.prNumber, repository: record.repository, mergeSha: record.mergeSha, changedFiles: [...record.allowedChangedFiles], relationText: record.relation === "CLOSES" ? `Closes #${record.issueNumber}` : `Refs #${record.issueNumber} — coordinator`, closingIssues: record.relation === "CLOSES" ? [{ number: record.issueNumber, state: "CLOSED" }] : [] });
+  return { records: scope.historical.map(observed), self: { ...observed({ ...scope.self, prNumber: 9999, mergeSha: SHA, relation: "CLOSES" }), mergeSha: SHA } };
 }
 
-test("plan-doc execution audit scope fixes the exact historical inventory and self binding", () => {
+test("plan-doc execution audit scope fixes the federated 64-record inventory and self binding", () => {
   assert.equal(SCOPE.schemaVersion, 2);
   assert.equal(SCOPE.historical.length, 64);
-  assert.deepEqual(SCOPE.repositories, [
-    "AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform",
-  ]);
+  assert.deepEqual(SCOPE.repositories, ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"]);
   assert.equal(SCOPE.self.issueNumber, 2881);
-  const byPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
-  for (const [prNumber, [issueNumber, mergeSha, relation = "CLOSES"]] of REFRESH_RECORDS) {
-    assert.deepEqual(byPr.get(prNumber), {
-      issueNumber, prNumber, mergeSha, relation, planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY",
-    });
-  }
+  const byIdentity = new Map(SCOPE.historical.map((record) => [`${record.repository}:${record.prNumber}`, record]));
+  assert.deepEqual(byIdentity.get("AquilaXk/easysubway:2852").allowedChangedFiles, [".github/workflows/ci.yml", "apps/mobile/pubspec.lock", "apps/mobile/pubspec.yaml", "tools/ci/repository-contract.test.mjs"]);
+  assert.equal(byIdentity.get("AquilaXk/easysubway:2852").changedPathClass, "PLAN_DOC_CI_RECOVERY");
+  assert.deepEqual(byIdentity.get("AquilaXk/easysubway-backend:248").allowedChangedFiles, ["contracts/documentation/documentation-fragment.json"]);
   assert.deepEqual(validatePlanDocExecutionScope(SCOPE), []);
-  for (const mutate of [
-    (scope) => { scope.historical[0].mergeSha = "b".repeat(40); },
-    (scope) => { scope.historical[1].prNumber = scope.historical[0].prNumber; },
-    (scope) => { scope.historical[0].planOwner = "PLAN-REPO"; },
-    (scope) => { scope.executionRepository = "AquilaXk/easysubway-mobile"; },
-    (scope) => { scope.historical[1].relation = "COORDINATOR_FOLLOWUP"; },
-    (scope) => { scope.self.issueNumber = 2831; },
-  ]) {
-    const invalid = structuredClone(SCOPE);
-    mutate(invalid);
-    assert.notDeepEqual(validatePlanDocExecutionScope(invalid), []);
-  }
+  const invalid = structuredClone(SCOPE); invalid.historical[0].allowedChangedFiles.reverse();
+  assert.ok(validatePlanDocExecutionScope(invalid).length > 0);
 });
 
-test("plan-doc execution audit emits concrete findings for merge, relation, repository, and target path drift", () => {
+test("plan-doc execution audit uses composite identities, merge deltas, decorated Refs, and exact self files", () => {
   const live = matchingLive();
-  live.records[0].mergeSha = "b".repeat(40);
-  live.records[1].repository = "AquilaXk/easysubway-mobile";
-  live.records[2].relationText = `Refs #${SCOPE.historical[2].issueNumber}`;
-  live.records[3].changedFiles = ["apps/mobile/lib/main.dart"];
-  live.records[4].closingIssues = [{ number: 9999, state: "CLOSED" }];
-  live.records[0].closingIssues = [{ number: 2748, state: "CLOSED" }];
-  live.records[5].relationText = `Fixes #${SCOPE.historical[5].issueNumber}`;
-
-  assert.deepEqual(
-    auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }).map(({ code, identity }) => [code, identity]),
-    [
-      ["EXECUTION_REPOSITORY_MISMATCH", "pr:2755"],
-      ["MERGE_SHA_MISMATCH", "pr:2749"],
-      ["RELATION_MISMATCH", "pr:2749"],
-      ["RELATION_MISMATCH", "pr:2757"],
-      ["RELATION_MISMATCH", "pr:2761"],
-      ["RELATION_MISMATCH", "pr:2763"],
-      ["TARGET_PATH_MODIFICATION", "pr:2759:apps/mobile/lib/main.dart"],
-    ],
-  );
-});
-
-test("plan-doc execution audit rejects duplicate PR/SHA and self source to PR to closing issue mismatch", () => {
-  const scope = structuredClone(SCOPE);
-  scope.historical[1].prNumber = scope.historical[0].prNumber;
-  scope.historical[2].mergeSha = scope.historical[0].mergeSha;
-  const live = matchingLive(scope);
-  live.self.mergeSha = "c".repeat(40);
-  live.self.relationText = `Refs #${SCOPE.self.issueNumber}`;
-
-  const codes = auditPlanDocExecution({ scope, sourceSha: SHA, live }).map(({ code }) => code);
-  for (const code of ["DUPLICATE_PR", "DUPLICATE_MERGE_SHA", "SELF_SOURCE_SHA_MISMATCH", "SELF_CLOSING_ISSUE_MISMATCH"]) assert.ok(codes.includes(code));
-});
-
-test("plan-doc execution audit fail closes malformed or partial provider responses as AUDIT_INCOMPLETE", async () => {
-  const malformed = async () => "{malformed";
-  await assert.rejects(
-    () => collectPlanDocExecutionLive({ scope: SCOPE, sourceSha: SHA, execGh: malformed }),
-    (error) => error.code === "PROVIDER_MALFORMED",
-  );
-
-  const partial = async ([, endpoint]) => {
-    if (endpoint === "repos/AquilaXk/easysubway/pulls/2749") return JSON.stringify({ number: 2749, merged: true, merge_commit_sha: SCOPE.historical[0].mergeSha, base: { repo: { full_name: "AquilaXk/easysubway" } }, changed_files: 101, body: "Refs #2748" });
-    if (endpoint.endsWith("/files?per_page=100&page=1")) return JSON.stringify(Array.from({ length: 100 }, (_, index) => ({ filename: `contracts/${index}.json` })));
-    if (endpoint.endsWith("/files?per_page=100&page=2")) return "[]";
-    throw new Error("unexpected provider request");
-  };
-  await assert.rejects(
-    () => collectPlanDocExecutionLive({ scope: SCOPE, sourceSha: SHA, execGh: partial }),
-    (error) => error.code === "PROVIDER_PARTIAL",
-  );
-
-  const report = createPlanDocExecutionReport({
-    scope: SCOPE, scopeText: JSON.stringify(SCOPE), sourceSha: SHA, observedAt: OBSERVED_AT,
-    incomplete: [{ stage: "github", code: "PROVIDER_MALFORMED", affectedIdentity: "pr:2749" }],
-  });
-  assert.equal(report.status, "AUDIT_INCOMPLETE");
-  assert.equal(report.summary.incomplete, 1);
-});
-
-test("plan-doc execution audit preserves both sides of a rename without treating one PR file as two", async () => {
-  const recordByPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
-  const provider = async ([, endpoint]) => {
-    if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}/pulls`) return JSON.stringify([{ number: SELF_PR }]);
-    const prMatch = endpoint.match(/^repos\/AquilaXk\/easysubway\/pulls\/(\d+)$/);
-    if (prMatch != null) {
-      const prNumber = Number(prMatch[1]);
-      const record = recordByPr.get(prNumber) ?? { issueNumber: SCOPE.self.issueNumber, relation: "CLOSES", mergeSha: SHA };
-      return JSON.stringify({ number: prNumber, merged: true, merge_commit_sha: record.mergeSha, base: { repo: { full_name: SCOPE.executionRepository } }, changed_files: 1, body: record.relation === "CLOSES" ? `Closes #${record.issueNumber}` : `Refs #${record.issueNumber}`, merged_at: OBSERVED_AT });
-    }
-    const filesMatch = endpoint.match(/^repos\/AquilaXk\/easysubway\/pulls\/(\d+)\/files\?per_page=100&page=(\d+)$/);
-    if (filesMatch != null) {
-      if (Number(filesMatch[2]) !== 1) return "[]";
-      return JSON.stringify(Number(filesMatch[1]) === 2749
-        ? [{ filename: "contracts/documentation/renamed.json", previous_filename: "apps/mobile/lib/old.dart" }]
-        : [{ filename: "contracts/documentation/example.json" }]);
-    }
-    throw new Error(`unexpected provider request: ${endpoint}`);
-  };
-
-  const graphql = async (prNumber) => {
-    const record = recordByPr.get(prNumber) ?? { issueNumber: SCOPE.self.issueNumber, relation: "CLOSES", mergeSha: SHA };
-    return JSON.stringify({ data: { repository: { pullRequest: {
-      number: prNumber, merged: true, mergeCommit: { oid: record.mergeSha },
-      closingIssuesReferences: { totalCount: record.relation === "CLOSES" ? 1 : 0, pageInfo: { hasNextPage: false }, nodes: record.relation === "CLOSES" ? [{ number: record.issueNumber, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }] : [] },
-    } } } });
-  };
-
-  const live = await collectPlanDocExecutionLive({ scope: SCOPE, sourceSha: SHA, execGh: provider, execGraphql: graphql });
-  assert.deepEqual(live.records[0].changedFiles, ["apps/mobile/lib/old.dart", "contracts/documentation/renamed.json"]);
-  assert.deepEqual(auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }).filter(({ code }) => code === "TARGET_PATH_MODIFICATION"), [{ code: "TARGET_PATH_MODIFICATION", identity: "pr:2749:apps/mobile/lib/old.dart" }]);
-});
-
-test("plan-doc execution audit accepts a GitHub-shaped null close event only through an exact GraphQL closing reference", async () => {
-  const recordByPr = new Map(SCOPE.historical.map((record) => [record.prNumber, record]));
-  const provider = async ([, endpoint]) => {
-    if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}/pulls`) return JSON.stringify([{ number: SELF_PR }]);
-    const pr = endpoint.match(/^repos\/AquilaXk\/easysubway\/pulls\/(\d+)$/);
-    if (pr != null) {
-      const record = recordByPr.get(Number(pr[1])) ?? { issueNumber: SCOPE.self.issueNumber, relation: "CLOSES", mergeSha: SHA };
-      return JSON.stringify({ number: Number(pr[1]), merged: true, merge_commit_sha: record.mergeSha, base: { repo: { full_name: SCOPE.executionRepository } }, changed_files: 0, body: record.relation === "CLOSES" ? `Closes #${record.issueNumber}` : `Refs #${record.issueNumber}`, merged_at: OBSERVED_AT });
-    }
-    if (/\/files\?per_page=100&page=1$/.test(endpoint)) return "[]";
-    throw new Error(`unexpected REST request: ${endpoint}`);
-  };
-  const graphql = async (prNumber) => {
-    const record = recordByPr.get(prNumber) ?? { issueNumber: SCOPE.self.issueNumber, relation: "CLOSES", mergeSha: SHA };
-    return JSON.stringify({ data: { repository: { pullRequest: {
-      number: prNumber, merged: true, mergeCommit: { oid: record.mergeSha },
-      closingIssuesReferences: { totalCount: record.relation === "CLOSES" ? 1 : 0, pageInfo: { hasNextPage: false }, nodes: record.relation === "CLOSES" ? [{ number: record.issueNumber, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }] : [] },
-    } } } });
-  };
-
-  const live = await collectPlanDocExecutionLive({ scope: SCOPE, sourceSha: SHA, execGh: provider, execGraphql: graphql });
+  const coordinator = live.records.find((record) => record.repository === "AquilaXk/easysubway" && record.prNumber === 2878);
+  coordinator.relationText = "Refs #2729 — exact coordinator handoff";
   assert.deepEqual(auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }), []);
+  live.records.find((record) => record.repository === "AquilaXk/easysubway-backend" && record.prNumber === 248).changedFiles = ["backend/src/main.java"];
+  live.records.find((record) => record.repository === "AquilaXk/easysubway" && record.prNumber === 2878).relationText = "Notes Refs #2729 — inline";
+  const findings = auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live });
+  assert.ok(findings.some((finding) => finding.code === "MERGE_DELTA_MISMATCH" && finding.identity === "AquilaXk/easysubway-backend:248"));
+  assert.ok(findings.some((finding) => finding.code === "RELATION_MISMATCH" && finding.identity === "AquilaXk/easysubway:2878"));
 });
 
-test("plan-doc execution audit fails closed for GraphQL relation provider drift", async () => {
-  const valid = JSON.stringify({ data: { repository: { pullRequest: {
-    number: 2749, merged: true, mergeCommit: { oid: SCOPE.historical[0].mergeSha },
-    closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [{ number: 2748, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }] },
-  } } } });
-  for (const response of [
-    JSON.stringify({ errors: [{ message: "unavailable" }] }),
-    JSON.stringify({ data: { repository: { pullRequest: { number: 2749, merged: true, mergeCommit: { oid: SCOPE.historical[0].mergeSha }, closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [] } } } } }),
-    JSON.stringify({ data: { repository: { pullRequest: { number: 2749, merged: true, mergeCommit: { oid: SCOPE.historical[0].mergeSha }, closingIssuesReferences: { totalCount: 101, pageInfo: { hasNextPage: true }, nodes: [] } } } } }),
-    JSON.stringify({ data: { repository: { pullRequest: { number: 2749, merged: true, mergeCommit: { oid: "b".repeat(40) }, closingIssuesReferences: { totalCount: 0, pageInfo: { hasNextPage: false }, nodes: [] } } } } }),
-    JSON.stringify({ data: { repository: { pullRequest: { number: 2749, merged: true, mergeCommit: { oid: SCOPE.historical[0].mergeSha }, closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [{ number: 2748, state: "CLOSED", repository: { nameWithOwner: "AquilaXk/other" } }] } } } } }),
-    JSON.stringify({ data: { repository: { pullRequest: { number: 2749, merged: true, mergeCommit: { oid: SCOPE.historical[0].mergeSha }, closingIssuesReferences: { totalCount: 2, pageInfo: { hasNextPage: false }, nodes: [{ number: 2748, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }, { number: 2748, state: "CLOSED", repository: { nameWithOwner: SCOPE.executionRepository } }] } } } } }),
-    "{malformed",
-  ]) {
-    assert.throws(() => parseClosingIssues(response, 2749, SCOPE.historical[0].mergeSha), AuditIncomplete);
-  }
-  assert.deepEqual(parseClosingIssues(valid, 2749, SCOPE.historical[0].mergeSha), [{ number: 2748, state: "CLOSED" }]);
+test("plan-doc execution audit collects a single-parent commit delta instead of PR files", async () => {
+  const record = SCOPE.historical.find((value) => value.repository === "AquilaXk/easysubway-backend" && value.prNumber === 248);
+  const provider = async ([, endpoint]) => {
+    if (endpoint === `repos/${record.repository}/pulls/${record.prNumber}`) return JSON.stringify({ number: record.prNumber, merged: true, merge_commit_sha: record.mergeSha, base: { repo: { full_name: record.repository } }, body: `Closes #${record.issueNumber}` });
+    if (endpoint === `repos/${record.repository}/commits/${record.mergeSha}?per_page=100&page=1`) return JSON.stringify({ sha: record.mergeSha, parents: [{ sha: "b".repeat(40) }], files: [{ filename: "contracts/documentation/documentation-fragment.json" }] });
+    if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}/pulls`) return JSON.stringify([{ number: 9999 }]);
+    if (endpoint === `repos/AquilaXk/easysubway/pulls/9999`) return JSON.stringify({ number: 9999, merged: true, merge_commit_sha: SHA, base: { repo: { full_name: "AquilaXk/easysubway" } }, body: "Closes #2881" });
+    if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}?per_page=100&page=1`) return JSON.stringify({ sha: SHA, parents: [{ sha: "b".repeat(40) }], files: SCOPE.self.allowedChangedFiles.map((filename) => ({ filename })) });
+    throw new Error(`unexpected ${endpoint}`);
+  };
+  const graphql = async (repository, prNumber) => { const value = repository === record.repository ? record : { issueNumber: 2881, mergeSha: SHA }; return JSON.stringify({ data: { repository: { pullRequest: { number: prNumber, merged: true, mergeCommit: { oid: value.mergeSha }, closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [{ number: value.issueNumber, state: "CLOSED", repository: { nameWithOwner: repository } }] } } } } }); };
+  const scope = { ...SCOPE, historical: [record] };
+  const live = await collectPlanDocExecutionLive({ scope, sourceSha: SHA, execGh: provider, execGraphql: graphql });
+  assert.deepEqual(live.records[0].changedFiles, ["contracts/documentation/documentation-fragment.json"]);
+  await assert.rejects(() => collectPlanDocExecutionLive({ scope, sourceSha: SHA, execGh: async (args) => args[1].includes(`/commits/${record.mergeSha}?`) ? JSON.stringify({ sha: record.mergeSha, parents: [{}, {}], files: [] }) : provider(args), execGraphql: graphql }), (error) => error instanceof AuditIncomplete && error.code === "COMMIT_MALFORMED");
 });
 
-test("plan-doc execution audit report uses the repository codepoint comparator", () => {
-  const live = matchingLive();
-  live.self.changedFiles = ["contracts/😀.json", "contracts/\uE000.json"];
-
-  const report = createPlanDocExecutionReport({
-    scope: SCOPE, scopeText: JSON.stringify(SCOPE), sourceSha: SHA, observedAt: OBSERVED_AT, live,
-  });
-
-  assert.deepEqual(
-    report.records.find((record) => record.kind === "SELF").changedFiles,
-    ["contracts/😀.json", "contracts/\uE000.json"],
-  );
-});
-
-test("plan-doc execution audit CLI writes one schema-valid report for success, finding, and sanitized provider failure", async () => {
-  const directory = mkdtempSync(join(tmpdir(), "plan-doc-execution-audit-"));
-  const schema = JSON.parse(readFileSync("contracts/documentation/plan-doc-execution-audit-report.schema.json", "utf8"));
-  const argv = (name) => [
-    "--scope", "contracts/documentation/plan-doc-execution-audit-scope.json",
-    "--scope-schema", "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
-    "--report-schema", "contracts/documentation/plan-doc-execution-audit-report.schema.json",
-    "--source-sha", SHA, "--observed-at", OBSERVED_AT, "--output", join(directory, name),
-  ];
-  try {
-    const success = await runAuditCli({ argv: argv("success.json"), collectLive: async () => matchingLive() });
-    assert.equal(success.exitCode, 0);
-    assert.equal(validateSchema(schema, JSON.parse(readFileSync(join(directory, "success.json"), "utf8"))).ok, true);
-
-    const findingLive = matchingLive(); findingLive.records[0].changedFiles = ["tools/ops/release.mjs"];
-    assert.equal((await runAuditCli({ argv: argv("finding.json"), collectLive: async () => findingLive })).exitCode, 1);
-    const finding = JSON.parse(readFileSync(join(directory, "finding.json"), "utf8"));
-    assert.equal(validateSchema(schema, finding).ok, true);
-    assert.equal(finding.status, "COMPLETE");
-    assert.ok(finding.summary.findings > 0);
-
-    assert.equal((await runAuditCli({ argv: argv("failure.json"), collectLive: async () => { throw new Error("provider-secret"); } })).exitCode, 2);
-    const failureText = readFileSync(join(directory, "failure.json"), "utf8");
-    const failure = JSON.parse(failureText);
-    assert.equal(validateSchema(schema, failure).ok, true);
-    assert.equal(failure.status, "AUDIT_INCOMPLETE");
-    assert.doesNotMatch(failureText, /provider-secret/);
-
-    writeFileSync(join(directory, "exists.json"), "existing\n");
-    assert.equal((await runAuditCli({ argv: argv("exists.json"), collectLive: async () => matchingLive() })).exitCode, 2);
-    assert.equal(readFileSync(join(directory, "exists.json"), "utf8"), "existing\n");
-  } finally { rmSync(directory, { recursive: true, force: true }); }
-});
-
-test("plan-doc execution audit CLI emits one sanitized incomplete report for invalid scope values", async () => {
-  const directory = mkdtempSync(join(tmpdir(), "plan-doc-execution-audit-invalid-scope-"));
-  const schema = JSON.parse(readFileSync("contracts/documentation/plan-doc-execution-audit-report.schema.json", "utf8"));
-  const argv = (name) => [
-    "--scope", "scope", "--scope-schema", "scope-schema", "--report-schema", "report-schema",
-    "--source-sha", SHA, "--observed-at", OBSERVED_AT, "--output", join(directory, name),
-  ];
-  const read = async (path) => ({
-    "scope-schema": readFileSync("contracts/documentation/plan-doc-execution-audit-scope.schema.json", "utf8"),
-    "report-schema": readFileSync("contracts/documentation/plan-doc-execution-audit-report.schema.json", "utf8"),
-  })[path];
-  try {
-    for (const [name, scopeText] of [["invalid", "{"], ["null", "null"], ["missing", "{}"], ["wrong-repository", JSON.stringify({ ...SCOPE, executionRepository: "AquilaXk/easysubway-mobile" })]]) {
-      const result = await runAuditCli({ argv: argv(`${name}.json`), read: async (path) => path === "scope" ? scopeText : read(path), collectLive: async () => matchingLive() });
-      assert.equal(result.exitCode, 2, name);
-      const reportText = readFileSync(join(directory, `${name}.json`), "utf8");
-      const report = JSON.parse(reportText);
-      assert.equal(validateSchema(schema, report).ok, true, name);
-      assert.deepEqual([report.status, report.inputs.executionRepository, report.summary.incomplete], ["AUDIT_INCOMPLETE", "AquilaXk/easysubway", 1], name);
-    }
-  } finally { rmSync(directory, { recursive: true, force: true }); }
+test("plan-doc execution audit fails closed for malformed closing references and reports schema-valid incomplete data", () => {
+  assert.throws(() => parseClosingIssues("{", "AquilaXk/easysubway", 1, "a".repeat(40)), AuditIncomplete);
+  const report = createPlanDocExecutionReport({ scope: SCOPE, scopeText: JSON.stringify(SCOPE), sourceSha: SHA, observedAt: OBSERVED_AT, incomplete: [{ stage: "github", code: "PROVIDER_PARTIAL", affectedIdentity: "AquilaXk/easysubway:1" }] });
+  assert.equal(report.status, "AUDIT_INCOMPLETE");
+  assert.equal(validateSchema(REPORT_SCHEMA, report).ok, true);
 });

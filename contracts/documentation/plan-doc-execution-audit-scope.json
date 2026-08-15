@@ -1,47 +1,1002 @@
 {
-  "schemaVersion": 1,
-  "executionRepository": "AquilaXk/easysubway",
-  "planOwner": "PLAN-DOC",
-  "forbiddenTargetPathPrefixes": ["apps/mobile/", "backend/", "infra/", "tools/datapack/", "tools/ops/", "tools/release/"],
-  "historical": [
-    { "issueNumber": 2748, "prNumber": 2749, "mergeSha": "5ad660a7f07563999c1c076790614e7e717e0ea7", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2754, "prNumber": 2755, "mergeSha": "0568c2195ccac35f0d46f6bb3594093471310977", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2756, "prNumber": 2757, "mergeSha": "2b102c1b50f495d628617e61ae95f81944b69c20", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2758, "prNumber": 2759, "mergeSha": "00c6109bf91e052fc0d9944a84fde1601c1c50c1", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2760, "prNumber": 2761, "mergeSha": "decc1072aa8c8facbfa0143fa1f8fe7646bc016d", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2762, "prNumber": 2763, "mergeSha": "560e07239e9ef99b3bfea2ab4bf758b5115acb43", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2729, "prNumber": 2730, "mergeSha": "4ccf78d8bf60db2d25233d6fe744daf805c7b0ac", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2733, "prNumber": 2775, "mergeSha": "96119c4d723d9c60fcd8999da8e58af0731b0847", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2781, "prNumber": 2782, "mergeSha": "6194860b5cb13334b91410374fd2504ee056684c", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2783, "prNumber": 2784, "mergeSha": "3ea7ef2929ce680268783a1a14476138beb2b521", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2785, "prNumber": 2787, "mergeSha": "79bcd0b8e05eb90907c411bdde9b30e24592ce53", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2729, "prNumber": 2788, "mergeSha": "a44259fcbdd5538586f4aabaa9a6cb844a41dc03", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2748, "prNumber": 2789, "mergeSha": "90a169d9b35e4845bfd03d518522544b66dd189f", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2790, "prNumber": 2791, "mergeSha": "40d1bb13906a6a96a3c7342b0923ad180d290234", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2792, "prNumber": 2793, "mergeSha": "3d1590baa98c929ceabd0d2d44414cebcc643c6f", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2795, "prNumber": 2796, "mergeSha": "b853fe6101c7848a8d556bf21b882b3f0e3060a9", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2797, "prNumber": 2798, "mergeSha": "7e1cc3d33d579ead965322fe2fa023409aba8c6b", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2797, "prNumber": 2799, "mergeSha": "01ce0b2e4572f65b86ea4f2c91a32c9ff6a2fae1", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2800, "prNumber": 2801, "mergeSha": "f89c284f76654fef5e32387304edaac64618fce2", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2802, "prNumber": 2803, "mergeSha": "b96e8753cb406de6067bbf22a0da158b96b4d898", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2805, "prNumber": 2806, "mergeSha": "fa2f2602573651af6694e7f56077414b685987b9", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2807, "prNumber": 2808, "mergeSha": "3b0076e04df4f6947f33c37c09949ad6b7487238", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2809, "prNumber": 2810, "mergeSha": "12a4a4753dbaf733fc436ff645a2f2a1d73b4048", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2729, "prNumber": 2813, "mergeSha": "1c7521f0186b365b0a43cdb8fa25b35e06bafdbb", "relation": "COORDINATOR_FOLLOWUP", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2814, "prNumber": 2815, "mergeSha": "dc256a4e0f0759f572cdfb00233e6699840642e6", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2816, "prNumber": 2817, "mergeSha": "4f94f3fd794f61bd06c9b8f0cbfb6b7ec713da9c", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2818, "prNumber": 2819, "mergeSha": "bb54c453e1b38386c17bc02b6fce77dab8a060c6", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2821, "prNumber": 2822, "mergeSha": "b89f4ddd50e98b2cff5a2a4cee0e0245a59a383a", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2820, "prNumber": 2824, "mergeSha": "c84a23f981516640a530ab3119152c239597b6c6", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2825, "prNumber": 2826, "mergeSha": "2f26c9028f74ce46ef934bc4938dd42fcd966441", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2827, "prNumber": 2828, "mergeSha": "4475e6d9da634e28cda4179b738d4f9f440f06a7", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2829, "prNumber": 2830, "mergeSha": "aed1c9ab7e9e45c913f3817f17276865934c9bbc", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2831, "prNumber": 2832, "mergeSha": "f5ef5ef4e35dd8401150f7e35a1512f634baed33", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2833, "prNumber": 2834, "mergeSha": "47b62ab816280d7584ef589b10161563f76c9cd6", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2841, "prNumber": 2842, "mergeSha": "57ead1fd88e5a6b05a2a5d76099e5a3070b712d1", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2843, "prNumber": 2844, "mergeSha": "ebb4044cb04d3a7fa6cb0ea9e4da8e3acfac8a86", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2845, "prNumber": 2846, "mergeSha": "51b99da63b9c2a09226f522b240716adeb24f14c", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" },
-    { "issueNumber": 2847, "prNumber": 2848, "mergeSha": "e5af7fec4dd7dcf27f3676abc2a650a2536a204b", "relation": "CLOSES", "planOwner": "PLAN-DOC", "changedPathClass": "HUB_GOVERNANCE_ONLY" }
+  "schemaVersion": 2,
+  "repositories": [
+    "AquilaXk/easysubway",
+    "AquilaXk/easysubway-backend",
+    "AquilaXk/easysubway-data",
+    "AquilaXk/easysubway-mobile",
+    "AquilaXk/easysubway-platform"
   ],
-  "self": { "issueNumber": 2849, "planOwner": "PLAN-DOC" }
+  "planOwner": "PLAN-DOC",
+  "historical": [
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2748,
+      "prNumber": 2749,
+      "mergeSha": "5ad660a7f07563999c1c076790614e7e717e0ea7",
+      "relation": "COORDINATOR_FOLLOWUP",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/ci.yml",
+        "contracts/documentation/ADR-HUB-0001.json",
+        "contracts/documentation/architecture-decision.schema.json",
+        "contracts/workspaces/hub.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2754,
+      "prNumber": 2755,
+      "mergeSha": "0568c2195ccac35f0d46f6bb3594093471310977",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/ADR-HUB-0001-decision.schema.json",
+        "contracts/documentation/ADR-HUB-0001.json",
+        "contracts/documentation/architecture-decision.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2756,
+      "prNumber": 2757,
+      "mergeSha": "2b102c1b50f495d628617e61ae95f81944b69c20",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "tools/ci/documentation-inventory.mjs",
+        "tools/ci/documentation-inventory.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2758,
+      "prNumber": 2759,
+      "mergeSha": "00c6109bf91e052fc0d9944a84fde1601c1c50c1",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/PULL_REQUEST_TEMPLATE/full.md",
+        ".github/PULL_REQUEST_TEMPLATE/short.md",
+        ".github/pull_request_template.md",
+        "contracts/documentation/documentation-fragment.schema.json",
+        "contracts/documentation/documentation-resource.schema.json",
+        "contracts/documentation/documentation-system-catalog.json",
+        "contracts/documentation/documentation-system-catalog.schema.json",
+        "contracts/workspaces/hub.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/ci/documentation-inventory.mjs",
+        "tools/ci/documentation-inventory.test.mjs",
+        "tools/ci/repository-contract.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2760,
+      "prNumber": 2761,
+      "mergeSha": "decc1072aa8c8facbfa0143fa1f8fe7646bc016d",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2762,
+      "prNumber": 2763,
+      "mergeSha": "560e07239e9ef99b3bfea2ab4bf758b5115acb43",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "README.md",
+        "contracts/documentation/product-claim-catalog.json",
+        "contracts/documentation/product-claim-catalog.schema.json",
+        "contracts/workspaces/hub.json",
+        "release/product-gates/forbidden-release-claims.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/ci/check-mobile-release-claims.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2729,
+      "prNumber": 2730,
+      "mergeSha": "4ccf78d8bf60db2d25233d6fe744daf805c7b0ac",
+      "relation": "COORDINATOR_FOLLOWUP",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/repository-split-issue-amendments.schema.json",
+        "contracts/repository-split-issues.schema.json",
+        "release/migrations/repository-split-issues-amendments.json",
+        "release/migrations/repository-split-issues.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-issue-migration-live.mjs",
+        "tools/repo/audit-issue-migration-live.test.mjs",
+        "tools/repo/issue-migration-ledger.mjs",
+        "tools/repo/issue-migration-ledger.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2733,
+      "prNumber": 2775,
+      "mergeSha": "96119c4d723d9c60fcd8999da8e58af0731b0847",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/reference-audit-report.schema.json",
+        "contracts/documentation/reference-audit-scope.json",
+        "contracts/documentation/reference-audit-scope.schema.json",
+        "contracts/workspaces/hub.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-active-reference-drift.mjs",
+        "tools/repo/audit-active-reference-drift.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2781,
+      "prNumber": 2782,
+      "mergeSha": "6194860b5cb13334b91410374fd2504ee056684c",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/documentation-reference-audit.yml",
+        "tools/ci/repository-contract.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2783,
+      "prNumber": 2784,
+      "mergeSha": "3ea7ef2929ce680268783a1a14476138beb2b521",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/reference-audit-report.schema.json",
+        "contracts/documentation/reference-audit-scope.json",
+        "contracts/documentation/reference-audit-scope.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-active-reference-drift.mjs",
+        "tools/repo/audit-active-reference-drift.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2785,
+      "prNumber": 2787,
+      "mergeSha": "79bcd0b8e05eb90907c411bdde9b30e24592ce53",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "release/migrations/repository-split-issues-amendments.json",
+        "tools/repo/issue-migration-ledger.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2729,
+      "prNumber": 2788,
+      "mergeSha": "a44259fcbdd5538586f4aabaa9a6cb844a41dc03",
+      "relation": "COORDINATOR_FOLLOWUP",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "release/migrations/repository-split-issues-amendments.json",
+        "tools/repo/issue-migration-ledger.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2748,
+      "prNumber": 2789,
+      "mergeSha": "90a169d9b35e4845bfd03d518522544b66dd189f",
+      "relation": "COORDINATOR_FOLLOWUP",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/public-sensitivity-audit-report.schema.json",
+        "contracts/documentation/public-sensitivity-audit-scope.json",
+        "contracts/documentation/public-sensitivity-audit-scope.schema.json",
+        "contracts/documentation/public-sensitivity-owner-receipt.schema.json",
+        "contracts/workspaces/hub.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-public-sensitivity.mjs",
+        "tools/repo/audit-public-sensitivity.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2790,
+      "prNumber": 2791,
+      "mergeSha": "40d1bb13906a6a96a3c7342b0923ad180d290234",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/public-sensitivity-audit-report.schema.json",
+        "contracts/documentation/public-sensitivity-owner-receipt.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-public-sensitivity.mjs",
+        "tools/repo/audit-public-sensitivity.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2792,
+      "prNumber": 2793,
+      "mergeSha": "3d1590baa98c929ceabd0d2d44414cebcc643c6f",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/public-sensitivity-audit.yml",
+        ".github/workflows/public-sensitivity-owner-receipt.yml",
+        "tools/ci/public-sensitivity-workflows.test.mjs",
+        "tools/repo/produce-public-sensitivity-owner-receipt.mjs",
+        "tools/repo/produce-public-sensitivity-owner-receipt.test.mjs",
+        "tools/repo/run-public-sensitivity-audit.mjs",
+        "tools/repo/run-public-sensitivity-audit.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2795,
+      "prNumber": 2796,
+      "mergeSha": "b853fe6101c7848a8d556bf21b882b3f0e3060a9",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/public-sensitivity-owner-receipt-caller.yml",
+        "tools/ci/public-sensitivity-owner-receipt-caller.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2797,
+      "prNumber": 2798,
+      "mergeSha": "7e1cc3d33d579ead965322fe2fa023409aba8c6b",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/plan-doc-execution-audit.yml",
+        "contracts/documentation/plan-doc-execution-audit-report.schema.json",
+        "contracts/documentation/plan-doc-execution-audit-scope.json",
+        "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
+        "contracts/workspaces/hub.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/ci/repository-contract.test.mjs",
+        "tools/repo/audit-plan-doc-execution.mjs",
+        "tools/repo/audit-plan-doc-execution.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2797,
+      "prNumber": 2799,
+      "mergeSha": "01ce0b2e4572f65b86ea4f2c91a32c9ff6a2fae1",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "tools/repo/audit-plan-doc-execution.mjs",
+        "tools/repo/audit-plan-doc-execution.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2800,
+      "prNumber": 2801,
+      "mergeSha": "f89c284f76654fef5e32387304edaac64618fce2",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/post-go-boundary-audit.yml",
+        "contracts/documentation/post-go-boundary-audit-report.schema.json",
+        "contracts/documentation/post-go-boundary-audit-scope.json",
+        "contracts/documentation/post-go-boundary-audit-scope.schema.json",
+        "contracts/workspaces/hub.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/ci/repository-contract.test.mjs",
+        "tools/repo/audit-post-go-boundary.mjs",
+        "tools/repo/audit-post-go-boundary.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2802,
+      "prNumber": 2803,
+      "mergeSha": "b96e8753cb406de6067bbf22a0da158b96b4d898",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/external-terminal-locator-audit.yml",
+        "contracts/documentation/external-terminal-locator-audit-report.schema.json",
+        "contracts/documentation/external-terminal-locator-audit-scope.json",
+        "contracts/documentation/external-terminal-locator-audit-scope.schema.json",
+        "contracts/workspaces/hub.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/ci/repository-contract.test.mjs",
+        "tools/repo/audit-external-terminal-locators.mjs",
+        "tools/repo/audit-external-terminal-locators.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2805,
+      "prNumber": 2806,
+      "mergeSha": "fa2f2602573651af6694e7f56077414b685987b9",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/public-sensitivity-owner-receipt.yml",
+        "tools/ci/public-sensitivity-workflows.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2807,
+      "prNumber": 2808,
+      "mergeSha": "3b0076e04df4f6947f33c37c09949ad6b7487238",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/public-sensitivity-owner-receipt-caller.yml",
+        "tools/ci/public-sensitivity-owner-receipt-caller.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2809,
+      "prNumber": 2810,
+      "mergeSha": "12a4a4753dbaf733fc436ff645a2f2a1d73b4048",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/plan-doc-execution-audit-scope.json",
+        "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-plan-doc-execution.mjs",
+        "tools/repo/audit-plan-doc-execution.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2729,
+      "prNumber": 2813,
+      "mergeSha": "1c7521f0186b365b0a43cdb8fa25b35e06bafdbb",
+      "relation": "COORDINATOR_FOLLOWUP",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "release/migrations/repository-split-issues-amendments.json",
+        "tools/repo/issue-migration-ledger.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2814,
+      "prNumber": 2815,
+      "mergeSha": "dc256a4e0f0759f572cdfb00233e6699840642e6",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/plan-doc-execution-audit-scope.json",
+        "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-plan-doc-execution.mjs",
+        "tools/repo/audit-plan-doc-execution.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2816,
+      "prNumber": 2817,
+      "mergeSha": "4f94f3fd794f61bd06c9b8f0cbfb6b7ec713da9c",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/clean-checkout-reproducibility-audit.yml",
+        "contracts/documentation/clean-checkout-reproducibility-audit-report.schema.json",
+        "contracts/documentation/clean-checkout-reproducibility-audit-scope.json",
+        "contracts/documentation/clean-checkout-reproducibility-audit-scope.schema.json",
+        "contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json",
+        "contracts/documentation/clean-checkout-reproducibility-owner-receipt.schema.json",
+        "contracts/workspaces/hub.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/ci/repository-contract.test.mjs",
+        "tools/repo/audit-clean-checkout-reproducibility.mjs",
+        "tools/repo/audit-clean-checkout-reproducibility.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2818,
+      "prNumber": 2819,
+      "mergeSha": "bb54c453e1b38386c17bc02b6fce77dab8a060c6",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/plan-doc-execution-audit-scope.json",
+        "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-plan-doc-execution.mjs",
+        "tools/repo/audit-plan-doc-execution.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2821,
+      "prNumber": 2822,
+      "mergeSha": "b89f4ddd50e98b2cff5a2a4cee0e0245a59a383a",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-clean-checkout-reproducibility.mjs",
+        "tools/repo/audit-clean-checkout-reproducibility.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2820,
+      "prNumber": 2824,
+      "mergeSha": "c84a23f981516640a530ab3119152c239597b6c6",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/actions/clean-checkout-reproducibility-owner-receipt/action.yml",
+        ".github/workflows/clean-checkout-reproducibility-owner-receipt.yml",
+        "tools/ci/repository-contract.test.mjs",
+        "tools/repo/audit-clean-checkout-reproducibility.mjs",
+        "tools/repo/produce-clean-checkout-reproducibility-owner-receipt.mjs",
+        "tools/repo/produce-clean-checkout-reproducibility-owner-receipt.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2825,
+      "prNumber": 2826,
+      "mergeSha": "2f26c9028f74ce46ef934bc4938dd42fcd966441",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/clean-checkout-reproducibility-owner-receipt-caller.yml",
+        "contracts/documentation/clean-checkout-reproducibility-owner-contract.json",
+        "tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs",
+        "tools/ci/run-clean-checkout-reproducibility-phase.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2827,
+      "prNumber": 2828,
+      "mergeSha": "4475e6d9da634e28cda4179b738d4f9f440f06a7",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/clean-checkout-reproducibility-owner-receipt.yml",
+        "tools/repo/produce-clean-checkout-reproducibility-owner-receipt.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2829,
+      "prNumber": 2830,
+      "mergeSha": "aed1c9ab7e9e45c913f3817f17276865934c9bbc",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/clean-checkout-reproducibility-owner-receipt-caller.yml",
+        "tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2831,
+      "prNumber": 2832,
+      "mergeSha": "f5ef5ef4e35dd8401150f7e35a1512f634baed33",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/plan-doc-execution-audit-scope.json",
+        "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-plan-doc-execution.mjs",
+        "tools/repo/audit-plan-doc-execution.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2833,
+      "prNumber": 2834,
+      "mergeSha": "47b62ab816280d7584ef589b10161563f76c9cd6",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/documentation-inventory-audit.yml",
+        "contracts/documentation/documentation-inventory-audit-report.schema.json",
+        "contracts/documentation/documentation-inventory-audit-scope.json",
+        "contracts/documentation/documentation-inventory-audit-scope.schema.json",
+        "contracts/workspaces/hub.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/ci/repository-contract.test.mjs",
+        "tools/repo/audit-documentation-inventory.mjs",
+        "tools/repo/audit-documentation-inventory.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2841,
+      "prNumber": 2842,
+      "mergeSha": "57ead1fd88e5a6b05a2a5d76099e5a3070b712d1",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/clean-checkout-reproducibility-audit-report.schema.json",
+        "contracts/documentation/clean-checkout-reproducibility-audit-scope.json",
+        "contracts/documentation/clean-checkout-reproducibility-audit-scope.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-clean-checkout-reproducibility.mjs",
+        "tools/repo/audit-clean-checkout-reproducibility.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2843,
+      "prNumber": 2844,
+      "mergeSha": "ebb4044cb04d3a7fa6cb0ea9e4da8e3acfac8a86",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/clean-checkout-reproducibility-audit.yml",
+        "contracts/documentation/clean-checkout-reproducibility-audit-scope.json",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/ci/repository-contract.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2845,
+      "prNumber": 2846,
+      "mergeSha": "51b99da63b9c2a09226f522b240716adeb24f14c",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs",
+        "tools/ci/lib/json-schema-lite.mjs",
+        "tools/ci/lib/json-schema-lite.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2847,
+      "prNumber": 2848,
+      "mergeSha": "e5af7fec4dd7dcf27f3676abc2a650a2536a204b",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "tools/repo/audit-clean-checkout-reproducibility.mjs",
+        "tools/repo/audit-clean-checkout-reproducibility.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2849,
+      "prNumber": 2850,
+      "mergeSha": "af68918e9dec3324214f342ce9674484baec9bde",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/plan-doc-execution-audit-scope.json",
+        "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-plan-doc-execution.mjs",
+        "tools/repo/audit-plan-doc-execution.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2851,
+      "prNumber": 2852,
+      "mergeSha": "2620ea1832b500bfe5836a409894113df50dad4b",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "PLAN_DOC_CI_RECOVERY",
+      "allowedChangedFiles": [
+        ".github/workflows/ci.yml",
+        "apps/mobile/pubspec.lock",
+        "apps/mobile/pubspec.yaml",
+        "tools/ci/repository-contract.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2853,
+      "prNumber": 2854,
+      "mergeSha": "1f72280ccf45f091b4130054b0a426d55cdb9b4a",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-documentation-inventory.mjs",
+        "tools/repo/audit-documentation-inventory.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2855,
+      "prNumber": 2856,
+      "mergeSha": "558ca5bd2070ec5d8431c0cd592b83f622ead6b2",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.schema.json",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-documentation-inventory.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2857,
+      "prNumber": 2858,
+      "mergeSha": "461e914b1063f5fc40b4c5292285b69be7baac81",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/ci.yml",
+        "contracts/documentation/ADR-HUB-0001.json",
+        "contracts/documentation/documentation-system-catalog.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs",
+        "tools/ci/prepare-documentation-fragment-workspace.mjs",
+        "tools/ci/prepare-documentation-fragment-workspace.test.mjs",
+        "tools/ci/run-clean-checkout-reproducibility-phase.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2859,
+      "prNumber": 2860,
+      "mergeSha": "2461b8ddf7cad7effa3b1d2b8024bd36c4a7e983",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-system-catalog.json",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/ci/prepare-documentation-fragment-workspace.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2861,
+      "prNumber": 2862,
+      "mergeSha": "8137755a4dda4c0ab0d60ebedb343cdc51fc61ab",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2863,
+      "prNumber": 2864,
+      "mergeSha": "71d03cbb20cca0a1b358c921febe9ca646ad06b3",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2865,
+      "prNumber": 2866,
+      "mergeSha": "985103fe581140b4596405bf871d0641c44f58bc",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-system-catalog.json",
+        "tools/ci/check-contracts.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2870,
+      "prNumber": 2871,
+      "mergeSha": "7b1020febf8b8a9a2024ceb3b8cc980da7401442",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "tools/repo/audit-documentation-inventory.mjs",
+        "tools/repo/audit-documentation-inventory.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2872,
+      "prNumber": 2873,
+      "mergeSha": "328269f47f6e9192899b669e620a0261ff7475ab",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        ".github/workflows/documentation-inventory-audit.yml",
+        "tools/repo/audit-documentation-inventory.mjs",
+        "tools/repo/audit-documentation-inventory.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2874,
+      "prNumber": 2875,
+      "mergeSha": "f03313c7357cedac940b1ae28770d833d526c309",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "tools/repo/audit-documentation-inventory.mjs",
+        "tools/repo/audit-documentation-inventory.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2876,
+      "prNumber": 2877,
+      "mergeSha": "ed94662b7b9065dcf7ebb787949724c06ab9edd0",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2729,
+      "prNumber": 2878,
+      "mergeSha": "5bfc3a972104c895a149a1a2595e5d41bb209ac8",
+      "relation": "COORDINATOR_FOLLOWUP",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "release/migrations/repository-split-issues-amendments.json",
+        "tools/repo/issue-migration-ledger.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2867,
+      "prNumber": 2868,
+      "mergeSha": "91f282a4fe6e4b9fa30c1db9d0f3c6a836a20c35",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-system-catalog.json",
+        "tools/ci/check-contracts.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2869,
+      "prNumber": 2880,
+      "mergeSha": "335980e56fd884d5925c8de308bcf879ab3e53a0",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-system-catalog.json",
+        "tools/ci/check-contracts.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-mobile",
+      "issueNumber": 225,
+      "prNumber": 227,
+      "mergeSha": "397a475a988c65fb31600142d5c79f26e46a03f5",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-data",
+      "issueNumber": 237,
+      "prNumber": 238,
+      "mergeSha": "1348750a0f3dd2550798388a6638e5cc4a4fd0ad",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-backend",
+      "issueNumber": 249,
+      "prNumber": 250,
+      "mergeSha": "1e0c8adf21e6158866eec5ce934e44737a666aa6",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_PUBLIC_DOCUMENTATION",
+      "allowedChangedFiles": [
+        "README.md",
+        "backend/src/main/resources/templates/legal/privacy.html",
+        "backend/src/test/java/com/easysubway/health/adapter/in/web/HealthCheckControllerTest.java"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-backend",
+      "issueNumber": 247,
+      "prNumber": 248,
+      "mergeSha": "e506d2c8718ad6af681e9389fba780673e1f24d2",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-platform",
+      "issueNumber": 109,
+      "prNumber": 110,
+      "mergeSha": "f2d42c4c0913ba9951b93ab5588c370c69a193a6",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-data",
+      "issueNumber": 281,
+      "prNumber": 283,
+      "mergeSha": "9ce028bc2ab1fb46b7962bf0ea5a408a5f4b2014",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-mobile",
+      "issueNumber": 250,
+      "prNumber": 251,
+      "mergeSha": "bce8a2bd7b2653ef4e24230374108fe02f541e52",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-platform",
+      "issueNumber": 120,
+      "prNumber": 121,
+      "mergeSha": "cd23457fde3bfd734082ce1909ba87a575dde5fd",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-data",
+      "issueNumber": 286,
+      "prNumber": 289,
+      "mergeSha": "e13c01763ba7f4aca6e809e2a5c6a7dc8833d00b",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-data",
+      "issueNumber": 304,
+      "prNumber": 305,
+      "mergeSha": "d238ef7d0d4fcd78ee6a50e120294b1c31ff6004",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    }
+  ],
+  "self": {
+    "repository": "AquilaXk/easysubway",
+    "issueNumber": 2881,
+    "planOwner": "PLAN-DOC",
+    "changedPathClass": "HUB_GOVERNANCE_ONLY",
+    "allowedChangedFiles": [
+      "contracts/documentation/plan-doc-execution-audit-report.schema.json",
+      "contracts/documentation/plan-doc-execution-audit-scope.json",
+      "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
+      "tools/ci/check-contracts.mjs",
+      "tools/ci/check-contracts.test.mjs",
+      "tools/repo/audit-plan-doc-execution.mjs",
+      "tools/repo/audit-plan-doc-execution.test.mjs"
+    ]
+  }
 }
