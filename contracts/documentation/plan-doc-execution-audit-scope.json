@@ -982,17 +982,59 @@
       "allowedChangedFiles": [
         "contracts/documentation/documentation-fragment.json"
       ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2881,
+      "prNumber": 2882,
+      "mergeSha": "1057c4defa13edc39a631516e463e789857ba854",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/plan-doc-execution-audit-report.schema.json",
+        "contracts/documentation/plan-doc-execution-audit-scope.json",
+        "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-plan-doc-execution.mjs",
+        "tools/repo/audit-plan-doc-execution.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-data",
+      "issueNumber": 310,
+      "prNumber": 311,
+      "mergeSha": "da6b58662a0e84acde1ac1223732e4d3f54874cb",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2884,
+      "prNumber": 2885,
+      "mergeSha": "813556b82969ef59ac25cda6318b730dc4c79c0b",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
+        "tools/ci/check-contracts.test.mjs"
+      ]
     }
   ],
   "self": {
     "repository": "AquilaXk/easysubway",
-    "issueNumber": 2881,
+    "issueNumber": 2886,
     "planOwner": "PLAN-DOC",
     "changedPathClass": "HUB_GOVERNANCE_ONLY",
     "allowedChangedFiles": [
-      "contracts/documentation/plan-doc-execution-audit-report.schema.json",
+      "contracts/documentation/documentation-fragment.json",
       "contracts/documentation/plan-doc-execution-audit-scope.json",
-      "contracts/documentation/plan-doc-execution-audit-scope.schema.json",
       "tools/ci/check-contracts.mjs",
       "tools/ci/check-contracts.test.mjs",
       "tools/repo/audit-plan-doc-execution.mjs",
