@@ -157,12 +157,17 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
   assert.deepEqual(recordsByIdentity.get("AquilaXk/easysubway-backend:248")?.allowedChangedFiles, ["contracts/documentation/documentation-fragment.json"]);
   assert.equal(validateSchema(scopeSchema, scope).ok, true);
   assert.deepEqual(validatePlanDocExecutionAuditScope(scope), []);
-  const structurallyValidButCurrentlyWrong = structuredClone(scope);
-  structurallyValidButCurrentlyWrong.historical = [structurallyValidButCurrentlyWrong.historical[0]];
-  structurallyValidButCurrentlyWrong.self.issueNumber = 1;
-  structurallyValidButCurrentlyWrong.self.allowedChangedFiles = [structurallyValidButCurrentlyWrong.self.allowedChangedFiles[0]];
-  assert.equal(validateSchema(scopeSchema, structurallyValidButCurrentlyWrong).ok, true);
-  assert.ok(validatePlanDocExecutionAuditScope(structurallyValidButCurrentlyWrong).length > 0);
+  for (const [name, mutate] of [
+    ["historical count", (value) => { value.historical = [value.historical[0]]; }],
+    ["self issue", (value) => { value.self.issueNumber = 1; }],
+    ["self allowedChangedFiles count", (value) => { value.self.allowedChangedFiles = [value.self.allowedChangedFiles[0]]; }],
+    ["historical allowedChangedFiles path", (value) => { value.historical.find((record) => record.repository === "AquilaXk/easysubway-backend" && record.prNumber === 248).allowedChangedFiles = ["contracts/documentation/alternate.json"]; }],
+  ]) {
+    const structurallyValidButCurrentlyWrong = structuredClone(scope);
+    mutate(structurallyValidButCurrentlyWrong);
+    assert.equal(validateSchema(scopeSchema, structurallyValidButCurrentlyWrong).ok, true, name);
+    assert.ok(validatePlanDocExecutionAuditScope(structurallyValidButCurrentlyWrong).length > 0, name);
+  }
   assert.deepEqual(validatePlanDocExecutionAuditReportSchema(reportSchema), []);
   const invalid = structuredClone(scope); invalid.historical[0].mergeSha = "a".repeat(40);
   assert.ok(validatePlanDocExecutionAuditScope(invalid).length > 0);
