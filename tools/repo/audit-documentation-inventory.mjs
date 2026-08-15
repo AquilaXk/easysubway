@@ -1,7 +1,8 @@
 #!/usr/bin/env node
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
-import { open, readFile } from "node:fs/promises";
+import { mkdir, open, readFile, realpath } from "node:fs/promises";
+import { dirname, isAbsolute, join, resolve } from "node:path";
 import { promisify } from "node:util";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isMainModule } from "../lib/is-main-module.mjs";
@@ -20,6 +21,33 @@ const FRAGMENT_PATH = "contracts/documentation/documentation-fragment.json";
 const SHA = /^[0-9a-f]{40}$/;
 const DIGEST = /^[0-9a-f]{64}$/;
 const execFileAsync = promisify(execFile);
+const GIT_ENV = Object.freeze({
+  GIT_ATTR_NOSYSTEM: "1",
+  GIT_CONFIG_GLOBAL: "/dev/null",
+  GIT_CONFIG_NOSYSTEM: "1",
+  GIT_CONFIG_SYSTEM: "/dev/null",
+  GIT_LFS_SKIP_SMUDGE: "1",
+  GIT_TERMINAL_PROMPT: "0",
+});
+const GIT_UNSET = Object.freeze([
+  "GH_TOKEN",
+  "GITHUB_TOKEN",
+  "GIT_ASKPASS",
+  "GIT_ALTERNATE_OBJECT_DIRECTORIES",
+  "GIT_CONFIG_COUNT",
+  "GIT_CONFIG_PARAMETERS",
+  "GIT_DIR",
+  "GIT_INDEX_FILE",
+  "GIT_NAMESPACE",
+  "GIT_OBJECT_DIRECTORY",
+  "GIT_QUARANTINE_PATH",
+  "GIT_SSH_COMMAND",
+  "GIT_SSL_NO_VERIFY",
+  "GIT_WORK_TREE",
+  "SSH_ASKPASS",
+  "SSH_ASKPASS_REQUIRE",
+  "SSH_AUTH_SOCK",
+]);
 const FRAGMENT_SCHEMA = JSON.parse(await readFile(new URL("../../contracts/documentation/documentation-fragment.schema.json", import.meta.url), "utf8"));
 const RESOURCE_SCHEMA = JSON.parse(await readFile(new URL("../../contracts/documentation/documentation-resource.schema.json", import.meta.url), "utf8"));
 
@@ -35,8 +63,25 @@ export class AuditIncomplete extends Error {
 const sha256 = (value) => createHash("sha256").update(value).digest("hex");
 const canonicalUtc = (value) => typeof value === "string" && /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/.test(value) && Number.isFinite(Date.parse(value)) && new Date(value).toISOString() === value;
 const exactKeys = (value, keys) => value != null && typeof value === "object" && !Array.isArray(value) && Object.keys(value).length === keys.length && keys.every((key) => Object.hasOwn(value, key));
-const safePath = (value) => typeof value === "string" && /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(value);
+const safePath = (value) => typeof value === "string" && /^(?!\/)(?!.*(?:^|\/)\.{1,2}(?:\/|$))(?!.*[?#])\.?[A-Za-z0-9][A-Za-z0-9._/-]*$/.test(value);
 const fallbackScope = () => ({ schemaVersion: 1, repositories: EXPECTED_REPOSITORIES.map((repository) => ({ repository, defaultBranch: "main", fragmentPath: FRAGMENT_PATH, requiredStatus: "ACTIVE" })), dods: [...EXPECTED_DODS] });
+
+function gitEnvironment(home) {
+  const env = { ...process.env, ...GIT_ENV, HOME: home, XDG_CONFIG_HOME: home };
+  for (const key of GIT_UNSET) delete env[key];
+  return env;
+}
+
+async function executeGit(execute, arguments_, encoding, home) {
+  const result = await execute("/usr/bin/git", arguments_, {
+    encoding,
+    env: gitEnvironment(home),
+    shell: false,
+    timeout: 120_000,
+    maxBuffer: 8 * 1024 * 1024,
+  });
+  return result.stdout;
+}
 
 export function validateDocumentationInventoryAuditScope(scope, errors = []) {
   if (scope?.schemaVersion !== 1 || !Array.isArray(scope.repositories) || !Array.isArray(scope.dods)) return [...errors, "scope shape mismatch"];
@@ -47,6 +92,139 @@ export function validateDocumentationInventoryAuditScope(scope, errors = []) {
     if (entry == null || typeof entry !== "object" || Array.isArray(entry) || !exactKeys(entry, ["repository", "defaultBranch", "fragmentPath", "requiredStatus"]) || entry.defaultBranch !== "main" || entry.fragmentPath !== FRAGMENT_PATH || !safePath(entry.fragmentPath) || entry.requiredStatus !== "ACTIVE") errors.push(`repository contract mismatch:${entry?.repository ?? "unknown"}`);
   }
   return errors;
+}
+
+export async function createDocumentationInventoryGitProvider(scope, {
+  repositoryRoot,
+  execute = execFileAsync,
+  pause = wait,
+} = {}) {
+  if (validateDocumentationInventoryAuditScope(scope).length !== 0
+      || typeof repositoryRoot !== "string"
+      || !isAbsolute(repositoryRoot)
+      || resolve(repositoryRoot) !== repositoryRoot) {
+    throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "repository-root");
+  }
+  let canonicalRoot;
+  let isolatedHome;
+  try {
+    await realpath(dirname(repositoryRoot));
+    await mkdir(repositoryRoot, { mode: 0o700 });
+    canonicalRoot = await realpath(repositoryRoot);
+    isolatedHome = join(canonicalRoot, ".home");
+    await mkdir(isolatedHome, { mode: 0o700 });
+  } catch {
+    throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "repository-root");
+  }
+
+  const runGit = (arguments_, encoding = "utf8") => executeGit(execute, arguments_, encoding, isolatedHome);
+  const retryNetworkGit = async (argumentsForAttempt) => {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        return await runGit(argumentsForAttempt(attempt));
+      } catch (error) {
+        if (error instanceof AuditIncomplete || attempt === 2) throw error;
+        await pause(250 * (2 ** attempt));
+      }
+    }
+    throw new Error("Git network retry exhausted");
+  };
+
+  const roots = new Map();
+  for (const { repository, defaultBranch } of scope.repositories) {
+    const name = repository.slice(repository.indexOf("/") + 1);
+    let destination;
+    try {
+      await retryNetworkGit((attempt) => {
+        destination = join(canonicalRoot, `${name}.clone-${attempt + 1}`);
+        return [
+          "clone",
+          "--no-checkout",
+          "--single-branch",
+          "--branch",
+          defaultBranch,
+          "--no-tags",
+          `https://github.com/${repository}.git`,
+          destination,
+        ];
+      });
+    } catch {
+      throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", repository);
+    }
+    roots.set(repository, destination);
+  }
+
+  const repositoryRootFor = (repository) => {
+    const root = roots.get(repository);
+    if (root == null) throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", repository);
+    return root;
+  };
+  const refresh = async () => {
+    for (const { repository } of scope.repositories) {
+      try {
+        await retryNetworkGit(() => [
+          "-C",
+          repositoryRootFor(repository),
+          "fetch",
+          "--no-tags",
+          `https://github.com/${repository}.git`,
+          "+refs/heads/main:refs/remotes/origin/main",
+        ]);
+      } catch (error) {
+        if (error instanceof AuditIncomplete) throw error;
+        throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", repository);
+      }
+    }
+  };
+  const readHead = async (repository, branch) => {
+    if (branch !== "main") throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", repository);
+    let head;
+    try {
+      head = String(await runGit(["-C", repositoryRootFor(repository), "rev-parse", "--verify", `refs/remotes/origin/${branch}^{commit}`])).trim();
+    } catch (error) {
+      if (error instanceof AuditIncomplete) throw error;
+      throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", repository);
+    }
+    if (!SHA.test(head)) throw new AuditIncomplete("HEAD_PROVIDER_MALFORMED", repository);
+    return head;
+  };
+  const readContent = async (repository, path, sha) => {
+    if (!safePath(path) || !SHA.test(sha)) throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", `${repository}:${path}`);
+    const root = repositoryRootFor(repository);
+    let commit;
+    try {
+      commit = String(await runGit(["-C", root, "rev-parse", "--verify", `${sha}^{commit}`])).trim();
+    } catch {
+      throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
+    }
+    if (commit !== sha) throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
+    let entry;
+    try {
+      entry = String(await runGit(["-C", root, "ls-tree", "-z", "--full-tree", sha, "--", path]));
+    } catch {
+      throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", `${repository}:${path}`);
+    }
+    if (entry.length === 0) throw Object.assign(new Error("not found"), { status: 404 });
+    const parsed = /^([0-7]{6}) (blob|tree|commit) ([0-9a-f]{40})\t([^\0]+)\0$/.exec(entry);
+    if (parsed == null || parsed[4] !== path || parsed[2] !== "blob") throw new AuditIncomplete("RESOURCE_PROVIDER_MALFORMED", `${repository}:${path}`, "fragment");
+    const blobSha = parsed[3];
+    let objectType;
+    try {
+      objectType = String(await runGit(["-C", root, "cat-file", "-t", blobSha])).trim();
+    } catch {
+      throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", `${repository}:${path}`);
+    }
+    if (objectType !== "blob") throw new AuditIncomplete("RESOURCE_PROVIDER_MALFORMED", `${repository}:${path}`, "fragment");
+    let bytes;
+    try {
+      bytes = await runGit(["-C", root, "show", `${sha}:${path}`], null);
+    } catch {
+      throw new AuditIncomplete("GIT_PROVIDER_UNAVAILABLE", `${repository}:${path}`);
+    }
+    if (!Buffer.isBuffer(bytes)) bytes = Buffer.from(bytes);
+    return { type: "file", sha: blobSha, encoding: "base64", content: bytes.toString("base64") };
+  };
+  return { refresh, readHead, readContent };
 }
 
 function decodeBase64(value, identity) {
@@ -102,7 +280,8 @@ async function readTrackedResource(entry, path, sha, identity, { readContent, mi
   return { blobSha: tracked.sha, sha256: sha256(bytes) };
 }
 
-export async function verifyFragment(entry, headSha, { readContent = collectContent } = {}) {
+export async function verifyFragment(entry, headSha, { readContent } = {}) {
+  if (typeof readContent !== "function") throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", entry?.repository ?? "provider");
   let content;
   try { content = await readContent(entry.repository, entry.fragmentPath, headSha); }
   catch (error) {
@@ -214,7 +393,8 @@ function snapshotWatermark(repositories) {
   return sha256(JSON.stringify(repositories.map(({ repository, headSha, state, fragmentStatus, fragmentBlobSha, resourceCount, activeResourceCount, verificationFindings = [] }) => ({ repository, headSha, state, fragmentStatus, fragmentBlobSha, resourceCount, activeResourceCount, verificationFindings }))));
 }
 
-export async function collectSnapshot(scope, { readHead = collectHead, readContent = collectContent } = {}) {
+export async function collectSnapshot(scope, { readHead, readContent } = {}) {
+  if (typeof readHead !== "function" || typeof readContent !== "function") throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "provider");
   const repositories = [];
   for (const entry of scope.repositories) {
     const headSha = await readHead(entry.repository, entry.defaultBranch);
@@ -224,9 +404,23 @@ export async function collectSnapshot(scope, { readHead = collectHead, readConte
   return { repositories, watermark: snapshotWatermark(repositories) };
 }
 
-export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot = () => collectSnapshot(scope) } = {}) {
-  const begin = await snapshot();
-  const end = await snapshot();
+export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot = null, refresh = async () => {}, readHead, readContent } = {}) {
+  if (typeof refresh !== "function"
+      || (snapshot !== null && typeof snapshot !== "function")
+      || (snapshot === null && (typeof readHead !== "function" || typeof readContent !== "function"))) {
+    throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "provider");
+  }
+  const contentCache = new Map();
+  const cachedReadContent = (repository, path, sha) => {
+    const key = JSON.stringify([repository, path, sha]);
+    if (!contentCache.has(key)) contentCache.set(key, Promise.resolve().then(() => readContent(repository, path, sha)));
+    return contentCache.get(key);
+  };
+  const takeSnapshot = snapshot ?? (() => collectSnapshot(scope, { readHead, readContent: cachedReadContent }));
+  await refresh();
+  const begin = await takeSnapshot();
+  await refresh();
+  const end = await takeSnapshot();
   const beginHub = begin.repositories.find(({ repository }) => repository === "AquilaXk/easysubway")?.headSha;
   const endHub = end.repositories.find(({ repository }) => repository === "AquilaXk/easysubway")?.headSha;
   if (beginHub !== sourceSha || endHub !== sourceSha || begin.watermark !== end.watermark) throw new AuditIncomplete("STATE_WATERMARK_DRIFT", "five-fragment-state", "watermark");
@@ -254,15 +448,50 @@ function includedGitHubResponse(stdout) {
   const lfBoundary = text.indexOf("\n\n");
   const boundary = crlfBoundary >= 0 && (lfBoundary < 0 || crlfBoundary <= lfBoundary) ? crlfBoundary : lfBoundary;
   const separatorLength = boundary === crlfBoundary ? 4 : 2;
-  return { status: Number.isInteger(status) ? status : null, body: boundary >= 0 ? text.slice(boundary + separatorLength) : "" };
+  const headers = {};
+  for (const line of (boundary >= 0 ? text.slice(0, boundary) : text).split(/\r?\n/).slice(1)) {
+    const separator = line.indexOf(":");
+    if (separator > 0) headers[line.slice(0, separator).trim().toLowerCase()] = line.slice(separator + 1).trim();
+  }
+  return { status: Number.isInteger(status) ? status : null, headers, body: boundary >= 0 ? text.slice(boundary + separatorLength) : "" };
 }
 
 const wait = (delay) => new Promise((resolve) => setTimeout(resolve, delay));
+const MAX_RATE_LIMIT_DELAY_MS = 120_000;
 
-export async function gh(args, execute = execFileAsync, pause = wait) {
+function rateLimitRetry(response, attempt, now) {
+  if (![403, 429].includes(response.status)) return { rateLimited: false, delay: null };
+  let message = "";
+  try {
+    const body = JSON.parse(response.body);
+    if (typeof body?.message === "string") message = body.message;
+  } catch { /* A malformed error body is not rate-limit evidence by itself. */ }
+  const remaining = response.headers["x-ratelimit-remaining"];
+  const rateLimited = response.status === 429 || remaining === "0" || /(?:secondary|api) rate limit/i.test(message);
+  if (!rateLimited) return { rateLimited: false, delay: null };
+
+  const retryAfter = response.headers["retry-after"];
+  if (retryAfter != null) {
+    if (!/^(?:0|[1-9][0-9]*)$/.test(retryAfter)) return { rateLimited: true, delay: null };
+    const delay = Number(retryAfter) * 1_000;
+    return { rateLimited: true, delay: Number.isSafeInteger(delay) && delay <= MAX_RATE_LIMIT_DELAY_MS ? delay : null };
+  }
+
+  if (remaining === "0") {
+    const reset = response.headers["x-ratelimit-reset"];
+    if (!/^(?:0|[1-9][0-9]*)$/.test(reset ?? "")) return { rateLimited: true, delay: null };
+    const delay = Math.max(0, Number(reset) * 1_000 - now());
+    return { rateLimited: true, delay: Number.isSafeInteger(delay) && delay <= MAX_RATE_LIMIT_DELAY_MS ? delay : null };
+  }
+
+  const delay = 60_000 * (2 ** attempt);
+  return { rateLimited: true, delay: delay <= MAX_RATE_LIMIT_DELAY_MS ? delay : null };
+}
+
+export async function gh(args, execute = execFileAsync, pause = wait, now = Date.now) {
   const endpoint = args?.[1];
   const repositories = "AquilaXk/easysubway(?:-(?:backend|data|mobile|platform))?";
-  const allowed = new RegExp(`^repos/${repositories}(?:/git/ref/heads/main|/contents/[A-Za-z0-9][A-Za-z0-9._/-]*\\?ref=[0-9a-f]{40})$`);
+  const allowed = new RegExp(`^repos/${repositories}(?:/git/ref/heads/main|/contents/\\.?[A-Za-z0-9][A-Za-z0-9._/-]*\\?ref=[0-9a-f]{40})$`);
   if (args?.length !== 2 || args[0] !== "api" || typeof endpoint !== "string" || !allowed.test(endpoint)) throw new Error("gh read-only allowlist violation");
   const contentIndex = endpoint.indexOf("/contents/");
   if (contentIndex >= 0) {
@@ -279,7 +508,13 @@ export async function gh(args, execute = execFileAsync, pause = wait) {
       const response = includedGitHubResponse(error?.stdout);
       const status = Number.isInteger(error?.status) ? error.status : response.status;
       if (status === 404) throw Object.assign(new Error("not found"), { status });
-      const transient = status == null || status === 429 || status >= 500;
+      const rateLimit = rateLimitRetry({ ...response, status }, attempt, now);
+      if (rateLimit.rateLimited) {
+        if (attempt === 2 || rateLimit.delay == null) throw new AuditIncomplete("PROVIDER_RATE_LIMITED", endpoint);
+        await pause(rateLimit.delay);
+        continue;
+      }
+      const transient = status == null || status >= 500;
       if (!transient || attempt === 2) throw error;
       await pause(250 * (2 ** attempt));
     }
@@ -288,7 +523,7 @@ export async function gh(args, execute = execFileAsync, pause = wait) {
 }
 
 function parseArguments(argv) {
-  const names = { "--scope": "scope", "--scope-schema": "scopeSchema", "--report-schema": "reportSchema", "--source-sha": "sourceSha", "--observed-at": "observedAt", "--output": "output" };
+  const names = { "--scope": "scope", "--scope-schema": "scopeSchema", "--report-schema": "reportSchema", "--source-sha": "sourceSha", "--observed-at": "observedAt", "--repository-root": "repositoryRoot", "--output": "output" };
   const result = {};
   for (let index = 0; index < argv.length; index += 2) {
     const key = names[argv[index]];
@@ -332,7 +567,10 @@ export async function runAuditCli({ argv = process.argv.slice(2), read = (path) 
     reportSchema = JSON.parse(reportSchemaText);
     const scopeErrors = [...validateSchema(scopeSchema, scope).errors, ...validateDocumentationInventoryAuditScope(scope)];
     if (scopeErrors.length !== 0) throw new AuditIncomplete("SCOPE_INVALID", "scope", "scope");
-    const live = await (collect ?? (() => collectLive(scope, { sourceSha: args.sourceSha })))();
+    const live = await (collect ?? (async () => {
+      const provider = await createDocumentationInventoryGitProvider(scope, { repositoryRoot: args.repositoryRoot });
+      return collectLive(scope, { sourceSha: args.sourceSha, ...provider });
+    }))();
     report = auditDocumentationInventory({ scope, sourceSha: args.sourceSha, observedAt: args.observedAt, ...live, scopeText });
     const reportErrors = [...validateSchema(reportSchema, report).errors, ...validateDocumentationInventoryAuditReport(report)];
     if (reportErrors.length !== 0) throw new AuditIncomplete("REPORT_INVALID", "report", "report");

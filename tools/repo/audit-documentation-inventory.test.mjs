@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
@@ -15,6 +15,8 @@ import {
   validateDocumentationInventoryAuditScope,
   verifyFragment,
 } from "./audit-documentation-inventory.mjs";
+
+const auditModule = await import("./audit-documentation-inventory.mjs");
 
 const REPOSITORIES = [
   "AquilaXk/easysubway",
@@ -256,7 +258,7 @@ test("documentation inventory audit rejects state drift and writes schema-valid 
   const output = join(directory, "report.json");
   const scopeSchema = readFileSync("contracts/documentation/documentation-inventory-audit-scope.schema.json", "utf8");
   const reportSchema = readFileSync("contracts/documentation/documentation-inventory-audit-report.schema.json", "utf8");
-  const argv = ["--scope", "scope", "--scope-schema", "scope-schema", "--report-schema", "report-schema", "--source-sha", SHA, "--observed-at", "2026-08-11T00:00:00.000Z", "--output", output];
+  const argv = ["--scope", "scope", "--scope-schema", "scope-schema", "--report-schema", "report-schema", "--source-sha", SHA, "--observed-at", "2026-08-11T00:00:00.000Z", "--repository-root", join(directory, "repositories"), "--output", output];
   try {
     const result = await runAuditCli({ argv, read: async (path) => ({ scope: "{", "scope-schema": scopeSchema, "report-schema": reportSchema })[path], collect: async () => { throw new Error("must not collect"); } });
     const report = JSON.parse(readFileSync(output, "utf8"));
@@ -293,8 +295,376 @@ test("documentation inventory audit retries transient structured GitHub response
   };
   assert.equal(JSON.parse(await gh(["api", endpoint], execute, async (delay) => delays.push(delay))).type, "file");
   assert.deepEqual([attempts, delays], [3, [250, 500]]);
+  const dotPathEndpoint = `repos/AquilaXk/easysubway/contents/.github/workflows/ci.yml?ref=${SHA}`;
+  assert.equal(JSON.parse(await gh(["api", dotPathEndpoint], async () => ({ stdout: response("200 OK", { type: "file" }), stderr: "" }))).type, "file");
   await assert.rejects(
     () => gh(["api", endpoint], async () => { throw Object.assign(new Error("missing"), { stdout: response("404 Not Found", { message: "Not Found" }), stderr: "localized stderr" }); }),
     (error) => error?.status === 404,
   );
+});
+
+test("documentation inventory audit retries rate-limited GitHub responses", async () => {
+  const endpoint = `repos/AquilaXk/easysubway/contents/${PATH}?ref=${SHA}`;
+  const response = (status, body, headers = {}) => [
+    `HTTP/2.0 ${status}`,
+    ...Object.entries(headers).map(([name, value]) => `${name}: ${value}`),
+    "Content-Type: application/json",
+    "",
+    JSON.stringify(body),
+  ].join("\n");
+
+  let attempts = 0;
+  const delays = [];
+  const rateLimitedThenReady = async () => {
+    attempts += 1;
+    if (attempts === 1) throw Object.assign(new Error("secondary rate limit"), {
+      stdout: response("403 Forbidden", { message: "You have exceeded a secondary rate limit." }, { "Retry-After": "2" }),
+    });
+    return { stdout: response("200 OK", { type: "file" }), stderr: "" };
+  };
+  assert.equal(JSON.parse(await gh(["api", endpoint], rateLimitedThenReady, async (delay) => delays.push(delay))).type, "file");
+  assert.deepEqual([attempts, delays], [2, [2_000]]);
+
+  attempts = 0;
+  delays.length = 0;
+  const resetThenReady = async () => {
+    attempts += 1;
+    if (attempts === 1) throw Object.assign(new Error("primary rate limit"), {
+      stdout: response("403 Forbidden", { message: "API rate limit exceeded" }, {
+        "X-RateLimit-Remaining": "0",
+        "X-RateLimit-Reset": "1700000002",
+      }),
+    });
+    return { stdout: response("200 OK", { type: "file" }), stderr: "" };
+  };
+  assert.equal(JSON.parse(await gh(["api", endpoint], resetThenReady, async (delay) => delays.push(delay), () => 1_700_000_000_000)).type, "file");
+  assert.deepEqual([attempts, delays], [2, [2_000]]);
+
+  attempts = 0;
+  delays.length = 0;
+  await assert.rejects(
+    () => gh(["api", endpoint], async () => {
+      attempts += 1;
+      throw Object.assign(new Error("forbidden"), { stdout: response("403 Forbidden", { message: "Resource not accessible by integration" }) });
+    }, async (delay) => delays.push(delay)),
+    (error) => !(error instanceof AuditIncomplete),
+  );
+  assert.deepEqual([attempts, delays], [1, []]);
+
+  attempts = 0;
+  delays.length = 0;
+  await assert.rejects(
+    () => gh(["api", endpoint], async () => {
+      attempts += 1;
+      throw Object.assign(new Error("secondary rate limit"), {
+        stdout: response("429 Too Many Requests", { message: "You have exceeded a secondary rate limit." }),
+      });
+    }, async (delay) => delays.push(delay)),
+    (error) => error instanceof AuditIncomplete && error.code === "PROVIDER_RATE_LIMITED",
+  );
+  assert.deepEqual([attempts, delays], [3, [60_000, 120_000]]);
+
+  for (const retryAfter of ["invalid", "121"]) {
+    attempts = 0;
+    delays.length = 0;
+    await assert.rejects(
+      () => gh(["api", endpoint], async () => {
+        attempts += 1;
+        throw Object.assign(new Error("secondary rate limit"), {
+          stdout: response("429 Too Many Requests", { message: "You have exceeded a secondary rate limit." }, { "Retry-After": retryAfter }),
+        });
+      }, async (delay) => delays.push(delay)),
+      (error) => error instanceof AuditIncomplete && error.code === "PROVIDER_RATE_LIMITED",
+    );
+    assert.deepEqual([attempts, delays], [1, []]);
+  }
+});
+
+test("documentation inventory audit memoizes immutable content", async () => {
+  const headReads = new Map();
+  const contentReads = new Map();
+  const readHead = async (repository) => {
+    headReads.set(repository, (headReads.get(repository) ?? 0) + 1);
+    return SHA;
+  };
+  const readContent = async (repository, path, sha) => {
+    const key = JSON.stringify([repository, path, sha]);
+    contentReads.set(key, (contentReads.get(key) ?? 0) + 1);
+    if (path === PATH) return {
+      type: "file",
+      sha: "d".repeat(40),
+      encoding: "base64",
+      content: Buffer.from(JSON.stringify(fragment(repository))).toString("base64"),
+    };
+    return { type: "file", sha: "c".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") };
+  };
+
+  const result = await collectLive(SCOPE, { sourceSha: SHA, readHead, readContent });
+  assert.equal(result.stateBeginSha256, result.stateEndSha256);
+  assert.deepEqual([...headReads.values()], [2, 2, 2, 2, 2]);
+  assert.equal(contentReads.size, 10);
+  assert.deepEqual([...contentReads.values()], Array(10).fill(1));
+});
+
+test("documentation inventory audit uses canonical public Git provider", async () => {
+  assert.equal(typeof auditModule.createDocumentationInventoryGitProvider, "function");
+  const directory = mkdtempSync(join(tmpdir(), "documentation-inventory-git-provider-"));
+  const repositoryRoot = join(directory, "repositories");
+  const calls = [];
+  let commitIdentity = SHA;
+  let objectType = "blob";
+  let pathLookup = "ready";
+  let readPath = PATH;
+  const previousAlternateObjects = process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
+  const previousSslNoVerify = process.env.GIT_SSL_NO_VERIFY;
+  process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES = "/tmp/untrusted-git-objects";
+  process.env.GIT_SSL_NO_VERIFY = "1";
+  const execute = async (executable, arguments_, options) => {
+    calls.push({ executable, arguments_, options });
+    if (arguments_[0] === "clone") {
+      mkdirSync(arguments_.at(-1));
+      return { stdout: "", stderr: "" };
+    }
+    if (arguments_.includes("fetch")) return { stdout: "", stderr: "" };
+    if (arguments_.includes("refs/remotes/origin/main^{commit}")) return { stdout: `${SHA}\n`, stderr: "" };
+    if (arguments_.includes(`${SHA}^{commit}`)) return { stdout: `${commitIdentity}\n`, stderr: "" };
+    if (arguments_.includes("ls-tree")) {
+      if (pathLookup === "error") throw new Error("Git tree read failed");
+      if (pathLookup === "missing") return { stdout: "", stderr: "" };
+      return { stdout: `100644 blob ${"c".repeat(40)}\t${readPath}\0`, stderr: "" };
+    }
+    if (arguments_.includes("rev-parse")) return { stdout: `${"c".repeat(40)}\n`, stderr: "" };
+    if (arguments_.includes("-t")) return { stdout: `${objectType}\n`, stderr: "" };
+    if (arguments_.includes("cat-file")) return { stdout: Buffer.from("{}"), stderr: Buffer.alloc(0) };
+    if (arguments_.includes("show")) return { stdout: Buffer.from("{}"), stderr: Buffer.alloc(0) };
+    throw new Error("unexpected Git command");
+  };
+
+  try {
+    const provider = await auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot, execute });
+    await provider.refresh();
+    assert.equal(await provider.readHead(REPOSITORIES[0], "main"), SHA);
+    assert.deepEqual(await provider.readContent(REPOSITORIES[0], PATH, SHA), {
+      type: "file",
+      sha: "c".repeat(40),
+      encoding: "base64",
+      content: Buffer.from("{}").toString("base64"),
+    });
+    readPath = ".github/workflows/ci.yml";
+    assert.deepEqual(await provider.readContent(REPOSITORIES[0], readPath, SHA), {
+      type: "file",
+      sha: "c".repeat(40),
+      encoding: "base64",
+      content: Buffer.from("{}").toString("base64"),
+    });
+    readPath = PATH;
+    for (const { executable, options } of calls) {
+      assert.equal(executable, "/usr/bin/git");
+      assert.equal(options.shell, false);
+      assert.equal(options.env.GIT_TERMINAL_PROMPT, "0");
+      assert.equal(options.env.GIT_CONFIG_GLOBAL, "/dev/null");
+      assert.equal(options.env.HOME, join(realpathSync(repositoryRoot), ".home"));
+      assert.equal(options.env.XDG_CONFIG_HOME, join(realpathSync(repositoryRoot), ".home"));
+      assert.equal(Object.hasOwn(options.env, "GH_TOKEN"), false);
+      assert.equal(Object.hasOwn(options.env, "GITHUB_TOKEN"), false);
+      assert.equal(Object.hasOwn(options.env, "GIT_ASKPASS"), false);
+      assert.equal(Object.hasOwn(options.env, "GIT_ALTERNATE_OBJECT_DIRECTORIES"), false);
+      assert.equal(Object.hasOwn(options.env, "GIT_SSL_NO_VERIFY"), false);
+      assert.equal(Object.hasOwn(options.env, "SSH_ASKPASS"), false);
+      assert.equal(Object.hasOwn(options.env, "SSH_ASKPASS_REQUIRE"), false);
+    }
+    const showCount = calls.filter(({ arguments_ }) => arguments_.includes("show")).length;
+    objectType = "tree";
+    await assert.rejects(
+      () => provider.readContent(REPOSITORIES[0], PATH, SHA),
+      (error) => error instanceof AuditIncomplete && error.code === "RESOURCE_PROVIDER_MALFORMED",
+    );
+    assert.equal(calls.filter(({ arguments_ }) => arguments_.includes("show")).length, showCount);
+    objectType = "blob";
+    commitIdentity = "b".repeat(40);
+    await assert.rejects(
+      () => provider.readContent(REPOSITORIES[0], PATH, SHA),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_COMMIT_MISSING",
+    );
+    const clones = calls.filter(({ arguments_ }) => arguments_[0] === "clone");
+    const fetches = calls.filter(({ arguments_ }) => arguments_.includes("fetch"));
+    assert.equal(clones.length, 5);
+    assert.equal(fetches.length, 5);
+    assert.deepEqual(clones.map(({ arguments_ }) => arguments_.slice(0, -1)), REPOSITORIES.map((repository) => [
+      "clone", "--no-checkout", "--single-branch", "--branch", "main", "--no-tags", `https://github.com/${repository}.git`,
+    ]));
+    assert.deepEqual(fetches.map(({ arguments_ }) => arguments_.slice(2)), REPOSITORIES.map((repository) => [
+      "fetch", "--no-tags", `https://github.com/${repository}.git`, "+refs/heads/main:refs/remotes/origin/main",
+    ]));
+
+    let refreshCount = 0;
+    let snapshotCount = 0;
+    const pending = () => REPOSITORIES.map((repository) => ({
+      repository,
+      headSha: repository === REPOSITORIES[0] && snapshotCount === 2 ? SOURCE_SHA : SHA,
+      state: "PENDING",
+      fragmentStatus: "MISSING",
+      fragmentBlobSha: null,
+      fragment: null,
+      resourceCount: 0,
+      activeResourceCount: 0,
+    }));
+    await assert.rejects(() => collectLive(SCOPE, {
+      sourceSha: SHA,
+      refresh: async () => { refreshCount += 1; },
+      collectSnapshot: async () => {
+        snapshotCount += 1;
+        return { repositories: pending(), watermark: `${snapshotCount}`.padStart(64, "0") };
+      },
+    }), (error) => error instanceof AuditIncomplete && error.code === "STATE_WATERMARK_DRIFT");
+    assert.deepEqual([refreshCount, snapshotCount], [2, 2]);
+  } finally {
+    if (previousAlternateObjects == null) delete process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES;
+    else process.env.GIT_ALTERNATE_OBJECT_DIRECTORIES = previousAlternateObjects;
+    if (previousSslNoVerify == null) delete process.env.GIT_SSL_NO_VERIFY;
+    else process.env.GIT_SSL_NO_VERIFY = previousSslNoVerify;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation inventory audit distinguishes missing Git paths from provider failures", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "documentation-inventory-git-missing-"));
+  const repositoryRoot = join(directory, "repositories");
+  let pathLookup = "missing";
+  const execute = async (_executable, arguments_) => {
+    if (arguments_[0] === "clone") {
+      mkdirSync(arguments_.at(-1));
+      return { stdout: "", stderr: "" };
+    }
+    if (arguments_.includes(`${SHA}^{commit}`)) return { stdout: `${SHA}\n`, stderr: "" };
+    if (arguments_.includes("ls-tree")) {
+      if (pathLookup === "error") throw new Error("Git tree read failed");
+      return { stdout: "", stderr: "" };
+    }
+    if (arguments_.includes("rev-parse")) return { stdout: `${"c".repeat(40)}\n`, stderr: "" };
+    if (arguments_.includes("-t")) return { stdout: "blob\n", stderr: "" };
+    if (arguments_.includes("show")) return { stdout: Buffer.from("{}"), stderr: Buffer.alloc(0) };
+    throw new Error("unexpected Git command");
+  };
+
+  try {
+    const provider = await auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot, execute });
+    await assert.rejects(
+      () => provider.readContent(REPOSITORIES[0], PATH, SHA),
+      (error) => error?.status === 404,
+    );
+    pathLookup = "error";
+    await assert.rejects(
+      () => provider.readContent(REPOSITORIES[0], PATH, SHA),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_UNAVAILABLE",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation inventory audit retries transient public Git provider operations", async () => {
+  const directory = mkdtempSync(join(tmpdir(), "documentation-inventory-git-retry-"));
+  const repositoryRoot = join(directory, "repositories");
+  const cloneDestinations = [];
+  const delays = [];
+  let cloneAttempts = 0;
+  let fetchAttempts = 0;
+  let deterministicFailure = false;
+  let deterministicAttempts = 0;
+  const execute = async (_executable, arguments_) => {
+    if (arguments_[0] === "clone") {
+      cloneAttempts += 1;
+      cloneDestinations.push(arguments_.at(-1));
+      if (cloneAttempts === 1) throw new Error("transient clone failure");
+      mkdirSync(arguments_.at(-1));
+      return { stdout: "", stderr: "" };
+    }
+    if (arguments_.includes("fetch")) {
+      if (deterministicFailure) {
+        deterministicAttempts += 1;
+        throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "deterministic");
+      }
+      fetchAttempts += 1;
+      if (fetchAttempts === 1) throw new Error("transient fetch failure");
+      return { stdout: "", stderr: "" };
+    }
+    throw new Error("unexpected Git command");
+  };
+
+  try {
+    const provider = await auditModule.createDocumentationInventoryGitProvider(SCOPE, {
+      repositoryRoot,
+      execute,
+      pause: async (delay) => delays.push(delay),
+    });
+    await provider.refresh();
+    assert.deepEqual([cloneAttempts, fetchAttempts, delays], [6, 6, [250, 250]]);
+    assert.notEqual(cloneDestinations[0], cloneDestinations[1]);
+    deterministicFailure = true;
+    await assert.rejects(
+      () => provider.refresh(),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+    );
+    assert.deepEqual([deterministicAttempts, delays], [1, [250, 250]]);
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation inventory audit rejects unsafe Git provider inputs", async () => {
+  assert.equal(typeof auditModule.createDocumentationInventoryGitProvider, "function");
+  const invalidScope = structuredClone(SCOPE);
+  invalidScope.repositories[0].repository = "AquilaXk/unowned";
+  await assert.rejects(
+    () => auditModule.createDocumentationInventoryGitProvider(invalidScope, { repositoryRoot: "/tmp/documentation-inventory-invalid" }),
+    (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+  );
+  await assert.rejects(
+    () => auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot: "relative" }),
+    (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+  );
+  await assert.rejects(
+    () => collectLive(SCOPE, { sourceSha: SHA, readHead: null, readContent: null }),
+    (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+  );
+  const directory = mkdtempSync(join(tmpdir(), "documentation-inventory-git-provider-invalid-"));
+  const repositoryRoot = join(directory, "repositories");
+  try {
+    const provider = await auditModule.createDocumentationInventoryGitProvider(SCOPE, {
+      repositoryRoot,
+      execute: async (_executable, arguments_) => {
+        if (arguments_[0] === "clone") {
+          mkdirSync(arguments_.at(-1));
+          return { stdout: "", stderr: "" };
+        }
+        throw new Error("must reject before Git read");
+      },
+    });
+    await assert.rejects(
+      () => provider.readHead(REPOSITORIES[0], "release"),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+    );
+    await assert.rejects(
+      () => provider.readContent("AquilaXk/unowned", PATH, SHA),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+    );
+    await assert.rejects(
+      () => provider.readContent(REPOSITORIES[0], "../secret", SHA),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+    );
+    await assert.rejects(
+      () => auditModule.createDocumentationInventoryGitProvider(SCOPE, { repositoryRoot }),
+      (error) => error instanceof AuditIncomplete && error.code === "GIT_PROVIDER_INPUT_INVALID",
+    );
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test("documentation inventory audit workflow uses canonical public Git provider", () => {
+  const workflow = readFileSync(".github/workflows/documentation-inventory-audit.yml", "utf8");
+  assert.doesNotMatch(workflow, /^\s*(?:GH_TOKEN|GITHUB_TOKEN)\s*:/m);
+  assert.doesNotMatch(workflow, /\$\{\{\s*secrets\./);
+  assert.match(workflow, /--repository-root "\$\{RUNNER_TEMP\}\/documentation-inventory-repositories-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}"/);
 });
