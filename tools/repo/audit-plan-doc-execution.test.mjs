@@ -87,11 +87,24 @@ test("plan-doc execution audit preserves duplicate, self, GraphQL, commit-page, 
   live.self.relationText = "Refs #2881";
   const codes = auditPlanDocExecution({ scope: invalidScope, sourceSha: SHA, live }).map((finding) => finding.code);
   for (const code of ["DUPLICATE_RECORD_IDENTITY", "DUPLICATE_MERGE_IDENTITY", "SELF_SOURCE_SHA_MISMATCH", "SELF_CLOSING_ISSUE_MISMATCH"]) assert.ok(codes.includes(code));
+  const drift = matchingLive();
+  drift.records[0].mergeSha = "d".repeat(40);
+  drift.records[1].repository = "AquilaXk/other";
+  const driftCodes = auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live: drift }).map((finding) => finding.code);
+  assert.ok(driftCodes.includes("MERGE_SHA_MISMATCH"));
+  assert.ok(driftCodes.includes("EXECUTION_REPOSITORY_MISMATCH"));
 
   const record = SCOPE.historical.find((value) => value.repository === "AquilaXk/easysubway-backend" && value.prNumber === 248);
   const graphqlError = JSON.stringify({ errors: [{ message: "unavailable" }] });
   assert.throws(() => parseClosingIssues(graphqlError, record.repository, record.prNumber, record.mergeSha), AuditIncomplete);
   assert.throws(() => parseClosingIssues(JSON.stringify({ data: { repository: { pullRequest: { number: record.prNumber, merged: true, mergeCommit: { oid: record.mergeSha }, closingIssuesReferences: { totalCount: 2, pageInfo: { hasNextPage: true }, nodes: [] } } } } }), record.repository, record.prNumber, record.mergeSha), AuditIncomplete);
+  for (const response of [
+    JSON.stringify({ data: { repository: { pullRequest: { number: record.prNumber, merged: true, mergeCommit: { oid: "e".repeat(40) }, closingIssuesReferences: { totalCount: 0, pageInfo: { hasNextPage: false }, nodes: [] } } } } }),
+    JSON.stringify({ data: { repository: { pullRequest: { number: record.prNumber, merged: true, mergeCommit: { oid: record.mergeSha }, closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [{ number: record.issueNumber, state: "CLOSED", repository: { nameWithOwner: "AquilaXk/other" } }] } } } } }),
+    JSON.stringify({ data: { repository: { pullRequest: { number: record.prNumber, merged: true, mergeCommit: { oid: record.mergeSha }, closingIssuesReferences: { totalCount: 2, pageInfo: { hasNextPage: false }, nodes: [{ number: record.issueNumber, state: "CLOSED", repository: { nameWithOwner: record.repository } }, { number: record.issueNumber, state: "CLOSED", repository: { nameWithOwner: record.repository } }] } } } } }),
+    JSON.stringify({ data: { repository: { pullRequest: { number: record.prNumber, merged: true, mergeCommit: { oid: record.mergeSha }, closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [{ number: record.issueNumber, state: "OPEN", repository: { nameWithOwner: record.repository } }] } } } } }),
+    "{malformed",
+  ]) assert.throws(() => parseClosingIssues(response, record.repository, record.prNumber, record.mergeSha), AuditIncomplete);
 
   const provider = async ([, endpoint]) => {
     if (endpoint === `repos/${record.repository}/pulls/${record.prNumber}`) return JSON.stringify({ number: record.prNumber, merged: true, merge_commit_sha: record.mergeSha, base: { repo: { full_name: record.repository } }, body: `Closes #${record.issueNumber}` });
@@ -121,6 +134,13 @@ test("plan-doc execution audit preserves duplicate, self, GraphQL, commit-page, 
     const exists = await runAuditCli({ argv: [...argv.slice(0, -1), join(directory, "exists.json")], read, collectLive: async () => matchingLive() });
     assert.equal(exists.exitCode, 2); assert.equal(readFileSync(join(directory, "exists.json"), "utf8"), "existing\n");
     const failure = await runAuditCli({ argv: [...argv.slice(0, -1), join(directory, "failure.json")], read, collectLive: async () => { throw new Error("provider-secret"); } });
-    assert.equal(failure.exitCode, 2); assert.doesNotMatch(readFileSync(join(directory, "failure.json"), "utf8"), /provider-secret/);
+    const failureReport = JSON.parse(readFileSync(join(directory, "failure.json"), "utf8"));
+    assert.equal(failure.exitCode, 2); assert.equal(validateSchema(REPORT_SCHEMA, failureReport).ok, true); assert.deepEqual([failureReport.status, failureReport.summary.incomplete], ["AUDIT_INCOMPLETE", 1]); assert.doesNotMatch(JSON.stringify(failureReport), /provider-secret/);
+    for (const [name, scopeText] of [["malformed", "{"], ["null", "null"], ["empty", "{}"], ["wrong-repositories", JSON.stringify({ ...SCOPE, repositories: ["AquilaXk/easysubway-mobile"] })]]) {
+      const output = join(directory, `${name}.json`);
+      const invalid = await runAuditCli({ argv: [...argv.slice(0, -1), output], read: async (path) => path === "scope" ? scopeText : read(path), collectLive: async () => matchingLive() });
+      const invalidReport = JSON.parse(readFileSync(output, "utf8"));
+      assert.equal(invalid.exitCode, 2, name); assert.equal(validateSchema(REPORT_SCHEMA, invalidReport).ok, true, name); assert.deepEqual([invalidReport.status, invalidReport.summary.incomplete], ["AUDIT_INCOMPLETE", 1], name);
+    }
   } finally { rmSync(directory, { recursive: true, force: true }); }
 });
