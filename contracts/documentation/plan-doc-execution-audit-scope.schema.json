@@ -11,7 +11,7 @@
       "items": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] }
     },
     "planOwner": { "const": "PLAN-DOC" },
-    "historical": { "type": "array", "minItems": 64, "maxItems": 64, "items": {
+    "historical": { "type": "array", "minItems": 1, "items": {
       "type": "object", "additionalProperties": false,
       "required": ["repository", "issueNumber", "prNumber", "mergeSha", "relation", "planOwner", "changedPathClass", "allowedChangedFiles"],
       "properties": {
@@ -25,8 +25,8 @@
       "type": "object", "additionalProperties": false,
       "required": ["repository", "issueNumber", "planOwner", "changedPathClass", "allowedChangedFiles"],
       "properties": {
-        "repository": { "const": "AquilaXk/easysubway" }, "issueNumber": { "const": 2881 }, "planOwner": { "const": "PLAN-DOC" },
-        "changedPathClass": { "const": "HUB_GOVERNANCE_ONLY" }, "allowedChangedFiles": { "type": "array", "minItems": 7, "maxItems": 7, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._/-]+$" } }
+        "repository": { "const": "AquilaXk/easysubway" }, "issueNumber": { "type": "integer", "minimum": 1 }, "planOwner": { "const": "PLAN-DOC" },
+        "changedPathClass": { "const": "HUB_GOVERNANCE_ONLY" }, "allowedChangedFiles": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1, "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))[A-Za-z0-9._/-]+$" } }
       }
     }
   }
