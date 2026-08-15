@@ -85,6 +85,9 @@ export function validateInventory(value) {
     }
     previousPath = entry.path;
   }
+  if (!value.entries.some((entry) => entry.path.startsWith("server-route-bundle/") && entry.sizeBytes >= 1)) {
+    throw new Error("inventory server route bundle is required");
+  }
   return value;
 }
 

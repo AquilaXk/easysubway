@@ -68,6 +68,16 @@ test("validator도 inventory의 안전한 경로·정렬·정확한 field를 fai
   }
 });
 
+test("validator는 server route bundle 없는 hand-built inventory를 거부한다", () => {
+  const fixture = createFixture();
+  try {
+    rebindInventory(fixture, { schemaVersion: 1, artifactKind: "datapack-candidate-inventory", entries: [{ path: "artifact.bin", sizeBytes: 1, sha256: "d".repeat(64) }] });
+    const result = run(fixture);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /inventory server route bundle is required/);
+  } finally { fixture.cleanup(); }
+});
+
 function createFixture() {
   const root = mkdtempSync(path.join(os.tmpdir(), "promotion-validate-"));
   const inventoryBytes = Buffer.from(JSON.stringify(inventoryValue()));
@@ -107,7 +117,19 @@ function replaceCompatibility(fixture, value) {
   fixture.request.compatibilityEvidenceSha256 = sha256(bytes);
   writeRequest(fixture);
 }
-function inventoryValue() { return { schemaVersion: 1, artifactKind: "datapack-candidate-inventory", entries: [{ path: "artifact.bin", sizeBytes: 1, sha256: "d".repeat(64) }] }; }
+function rebindInventory(fixture, value) {
+  const bytes = Buffer.from(JSON.stringify(value));
+  const artifactInventorySha256 = sha256(bytes);
+  const components = ["123", "124", "125"].map((workflowRunId) => componentValue(workflowRunId, artifactInventorySha256));
+  writeFileSync(fixture.inventoryPath, bytes);
+  writeFileSync(fixture.componentPath, JSON.stringify(components[0]));
+  fixture.evidence.candidates = components;
+  fixture.evidence.artifactInventorySha256 = artifactInventorySha256;
+  fixture.request.candidate = structuredClone(components[0]);
+  replaceCompatibility(fixture, compatibilityValue(components[0]));
+  writeEvidence(fixture);
+}
+function inventoryValue() { return { schemaVersion: 1, artifactKind: "datapack-candidate-inventory", entries: [{ path: "artifact.bin", sizeBytes: 1, sha256: "d".repeat(64) }, { path: "server-route-bundle/manifest.json", sizeBytes: 1, sha256: "e".repeat(64) }] }; }
 function approvedReview() { return { state: "approved", environments: [{ name: "datapack-promotion" }], user: { login: "AquilaXk" } }; }
 function componentValue(workflowRunId, artifactInventorySha256) { return { schemaVersion: 1, component: "data", repository: "AquilaXk/easysubway-data", gitSha: "a".repeat(40), workflowRunId, dataVersion: "1", releaseSequence: 1, manifestSha256: "b".repeat(64), provenance: { sourceSnapshotSetHash: "c".repeat(64) }, artifactInventorySha256, contractVersion: "datapack-contract-v3", issueRef: "AquilaXk/easysubway#2705" }; }
 function compatibilityValue(component) { return { schemaVersion: 1, artifactKind: "datapack-mobile-compatibility-evidence", decision: "PASS", candidate: structuredClone(component) }; }

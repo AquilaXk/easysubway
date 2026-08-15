@@ -89,6 +89,17 @@ test("candidate root의 symlink·실제 inventory drift·identity·approval·com
   ]) assertRejectedWithoutOutputDamage(mutate);
 });
 
+test("세 parity candidate inventory에는 recorded server route bundle이 필수다", () => {
+  const fixture = createFixture();
+  try {
+    fixture.roots.forEach((root) => unlinkSync(path.join(root, "server-route-bundle/manifest.json")));
+    refreshCandidateMetadata(fixture);
+    assert.notEqual(run(fixture).status, 0);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("candidate signature validation key가 없으면 fail closed한다", () => {
   for (const env of [
     { EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: "" },
@@ -209,6 +220,7 @@ function createFixture() {
   const roots = ["123", "124", "125"].map((workflowRunId, index) => {
     const candidateRoot = path.join(root, `candidate-${index + 1}`);
     file(candidateRoot, "artifact.bin", "artifact");
+    file(candidateRoot, "server-route-bundle/manifest.json", "signed-route-bundle");
     file(candidateRoot, "catalog/capital-v1.sqlite.gz", "pack");
     const provenance = { schemaVersion: 1, artifactKind: "datapack-field-provenance", candidateBuild: { sourceSnapshotSetHash: "c".repeat(64) } };
     file(candidateRoot, "current.provenance.json", JSON.stringify(provenance));
@@ -268,7 +280,7 @@ function approvedReview() {
 }
 
 function inventoryValue(root) {
-  const entries = ["artifact.bin", "catalog/current.json", "current.provenance.json", "catalog/capital-v1.sqlite.gz", "catalog/extra.sqlite.gz"]
+  const entries = ["artifact.bin", "server-route-bundle/manifest.json", "catalog/current.json", "current.provenance.json", "catalog/capital-v1.sqlite.gz", "catalog/extra.sqlite.gz"]
     .filter((entry) => exists(path.join(root, entry))).sort().map((entry) => {
     const bytes = readFileSync(path.join(root, entry));
     return { path: entry, sizeBytes: bytes.length, sha256: sha256(bytes) };
