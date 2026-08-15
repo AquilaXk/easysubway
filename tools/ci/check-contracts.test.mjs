@@ -166,6 +166,7 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
     ["scopeSha256", (schema) => { schema.properties.inputs.properties.scopeSha256.pattern = ".+"; }],
     ["input repositories type", (schema) => { schema.properties.inputs.properties.repositories.type = "string"; }],
     ["input repositories count", (schema) => { schema.properties.inputs.properties.repositories.minItems = 4; }],
+    ["input repositories maximum", (schema) => { schema.properties.inputs.properties.repositories.maxItems = 6; }],
     ["input repositories uniqueness", (schema) => { schema.properties.inputs.properties.repositories.uniqueItems = false; }],
     ["input repositories exact enum", (schema) => { schema.properties.inputs.properties.repositories.items.enum = ["AquilaXk/easysubway"]; }],
     ["record repository", (schema) => { schema.properties.records.items.properties.repository.enum = ["AquilaXk/other"]; }],
