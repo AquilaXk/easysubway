@@ -26,6 +26,34 @@ test("data contract bundle은 target producer 입력만 exact bytes로 고정한
   }
 });
 
+test("datapack freshness SLA는 기존 source class와 연간 공식 환승 파일 정책을 고정한다", async () => {
+  const policy = JSON.parse(await readFile("release/product-gates/datapack-freshness-sla.json", "utf8"));
+  const classes = new Map(policy.sourceClasses.map((sourceClass) => [sourceClass.id, sourceClass]));
+
+  assert.deepEqual(
+    policy.sourceClasses.map((sourceClass) => sourceClass.id),
+    [
+      "static_network_metadata",
+      "static_accessibility_facility",
+      "planned_timetable",
+      "route_map_asset",
+      "realtime_overlay",
+      "annual_official_file",
+    ],
+  );
+  assert.deepEqual(classes.get("annual_official_file"), {
+    id: "annual_official_file",
+    sourceIds: ["molit-railway-transfer-movement", "seoul-metro-transfer-distance-duration"],
+    examples: ["official annual railway transfer movement CSV"],
+    basisField: "observedAt",
+    reverificationCadence: "P1Y",
+    offlinePackEligible: true,
+    eventTriggers: ["official file revision", "station transfer path revision", "line or station opening"],
+    changePublishSla: "P14D",
+    freshnessMetric: "freshnessValidRatio",
+  });
+});
+
 test("production datapack은 retired movement source를 required·selected·coverage·candidate·direct-route 성공 surface에 포함하지 않는다", async () => {
   const readJson = async (file) => JSON.parse(await readFile(file, "utf8"));
   const [scope, bundle, input, candidate, reviewed, canonical, inventory, mobileInventory] = await Promise.all([
