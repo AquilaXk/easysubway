@@ -142,31 +142,17 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
   const scope = loadJson("contracts/documentation/plan-doc-execution-audit-scope.json");
   const scopeSchema = loadJson("contracts/documentation/plan-doc-execution-audit-scope.schema.json");
   const reportSchema = loadJson("contracts/documentation/plan-doc-execution-audit-report.schema.json");
-  assert.equal(scope.historical.length, 38);
-  assert.equal(scope.self.issueNumber, 2849);
-  assert.equal(scopeSchema.properties.historical.minItems, 38);
-  assert.equal(scopeSchema.properties.historical.maxItems, 38);
-  assert.equal(scopeSchema.properties.self.properties.issueNumber.const, 2849);
-  const recordsByPr = new Map(scope.historical.map((record) => [record.prNumber, record]));
-  for (const [prNumber, issueNumber] of [[2798, 2797], [2799, 2797], [2801, 2800], [2803, 2802], [2806, 2805], [2808, 2807], [2810, 2809], [2813, 2729], [2815, 2814], [2817, 2816], [2819, 2818], [2822, 2821], [2824, 2820], [2826, 2825], [2828, 2827], [2830, 2829], [2832, 2831], [2834, 2833], [2842, 2841], [2844, 2843], [2846, 2845], [2848, 2847]]) {
-    assert.equal(recordsByPr.get(prNumber)?.issueNumber, issueNumber);
-  }
-  assert.equal(recordsByPr.get(2810)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2813)?.relation, "COORDINATOR_FOLLOWUP");
-  assert.equal(recordsByPr.get(2815)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2817)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2819)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2822)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2824)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2826)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2828)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2830)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2832)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2834)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2842)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2844)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2846)?.relation, "CLOSES");
-  assert.equal(recordsByPr.get(2848)?.relation, "CLOSES");
+  assert.equal(scope.schemaVersion, 2);
+  assert.equal(scope.historical.length, 64);
+  assert.deepEqual(scope.repositories, ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"]);
+  assert.equal(scope.self.issueNumber, 2881);
+  assert.equal(scopeSchema.properties.historical.minItems, 64);
+  assert.equal(scopeSchema.properties.historical.maxItems, 64);
+  assert.equal(scopeSchema.properties.self.properties.issueNumber.const, 2881);
+  const recordsByIdentity = new Map(scope.historical.map((record) => [`${record.repository}:${record.prNumber}`, record]));
+  assert.equal(recordsByIdentity.get("AquilaXk/easysubway:2878")?.relation, "COORDINATOR_FOLLOWUP");
+  assert.equal(recordsByIdentity.get("AquilaXk/easysubway:2852")?.changedPathClass, "PLAN_DOC_CI_RECOVERY");
+  assert.deepEqual(recordsByIdentity.get("AquilaXk/easysubway-backend:248")?.allowedChangedFiles, ["contracts/documentation/documentation-fragment.json"]);
   assert.equal(validateSchema(scopeSchema, scope).ok, true);
   assert.deepEqual(validatePlanDocExecutionAuditScope(scope), []);
   assert.deepEqual(validatePlanDocExecutionAuditReportSchema(reportSchema), []);
@@ -178,7 +164,12 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
   assert.ok(validatePlanDocExecutionAuditReportSchema(weakened).length > 0);
   for (const [name, mutate] of [
     ["scopeSha256", (schema) => { schema.properties.inputs.properties.scopeSha256.pattern = ".+"; }],
-    ["record repository", (schema) => { schema.properties.records.items.properties.repository.const = "AquilaXk/other"; }],
+    ["input repositories type", (schema) => { schema.properties.inputs.properties.repositories.type = "string"; }],
+    ["input repositories count", (schema) => { schema.properties.inputs.properties.repositories.minItems = 4; }],
+    ["input repositories maximum", (schema) => { schema.properties.inputs.properties.repositories.maxItems = 6; }],
+    ["input repositories uniqueness", (schema) => { schema.properties.inputs.properties.repositories.uniqueItems = false; }],
+    ["input repositories exact enum", (schema) => { schema.properties.inputs.properties.repositories.items.enum = ["AquilaXk/easysubway"]; }],
+    ["record repository", (schema) => { schema.properties.records.items.properties.repository.enum = ["AquilaXk/other"]; }],
     ["mergeSha", (schema) => { schema.properties.records.items.properties.mergeSha.pattern = ".+"; }],
     ["changedFiles uniqueness", (schema) => { schema.properties.records.items.properties.changedFiles.uniqueItems = false; }],
     ["records", (schema) => { schema.properties.records.items.required = schema.properties.records.items.required.filter((field) => field !== "changedFiles"); }],

@@ -903,10 +903,10 @@ export function validatePublicSensitivityAuditReportSchema(schema, errors = [], 
 }
 
 export function validatePlanDocExecutionAuditScope(scope, errors = [], path = "plan-doc-execution-audit-scope") {
-  if (scope?.schemaVersion !== 1 || scope?.executionRepository !== "AquilaXk/easysubway" || scope?.planOwner !== "PLAN-DOC" || scope?.self?.issueNumber !== 2849 || scope?.self?.planOwner !== "PLAN-DOC") errors.push(`${path}: exact PLAN-DOC self binding이 필요하다`);
-  if (JSON.stringify(scope?.forbiddenTargetPathPrefixes) !== JSON.stringify(["apps/mobile/", "backend/", "infra/", "tools/datapack/", "tools/ops/", "tools/release/"])) errors.push(`${path}: target path deny inventory는 exact여야 한다`);
+  const repositories = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
+  if (scope?.schemaVersion !== 2 || scope?.planOwner !== "PLAN-DOC" || scope?.self?.repository !== "AquilaXk/easysubway" || scope?.self?.issueNumber !== 2881 || scope?.self?.planOwner !== "PLAN-DOC" || JSON.stringify(scope?.repositories) !== JSON.stringify(repositories)) errors.push(`${path}: exact federated PLAN-DOC self binding이 필요하다`);
   const records = scope?.historical;
-  if (!Array.isArray(records) || records.length !== 38 || new Set(records.map(({ prNumber }) => prNumber)).size !== 38 || new Set(records.map(({ mergeSha }) => mergeSha)).size !== 38 || records.some((record) => record?.planOwner !== "PLAN-DOC" || record?.changedPathClass !== "HUB_GOVERNANCE_ONLY")) errors.push(`${path}: exact historical PLAN-DOC inventory가 필요하다`);
+  if (!Array.isArray(records) || records.length !== 64 || new Set(records.map((record) => `${record?.repository}:${record?.prNumber}`)).size !== 64 || new Set(records.map((record) => `${record?.repository}:${record?.mergeSha}`)).size !== 64 || records.some((record) => record?.planOwner !== "PLAN-DOC" || !Array.isArray(record?.allowedChangedFiles))) errors.push(`${path}: exact federated historical PLAN-DOC inventory가 필요하다`);
   errors.push(...validatePlanDocExecutionAuditInventory(scope).map((error) => `${path}: ${error}`));
   return errors;
 }
@@ -916,11 +916,13 @@ export function validatePlanDocExecutionAuditReportSchema(schema, errors = [], p
   const record = report?.records?.items;
   const finding = report?.findings?.items;
   const incomplete = report?.incomplete?.items;
+  const inputRepositories = report?.inputs?.properties?.repositories;
   if (schema?.type !== "object" || schema?.additionalProperties !== false || JSON.stringify(schema?.required) !== JSON.stringify(["schemaVersion", "status", "observedAt", "inputs", "summary", "records", "findings", "incomplete"])) errors.push(`${path}: strict report schema가 필요하다`);
-  if (report?.schemaVersion?.const !== 1 || JSON.stringify(report?.status?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"]) || report?.inputs?.properties?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || report?.inputs?.properties?.scopeSha256?.pattern !== "^[0-9a-f]{64}$" || report?.inputs?.properties?.executionRepository?.const !== "AquilaXk/easysubway") errors.push(`${path}: source/repository status contract가 필요하다`);
-  if (record?.properties?.repository?.const !== "AquilaXk/easysubway" || record?.properties?.mergeSha?.pattern !== "^[0-9a-f]{40}$" || record?.properties?.changedFiles?.uniqueItems !== true) errors.push(`${path}: strict execution record contract가 필요하다`);
+  const repositories = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
+  if (report?.schemaVersion?.const !== 2 || JSON.stringify(report?.status?.enum) !== JSON.stringify(["COMPLETE", "AUDIT_INCOMPLETE"]) || report?.inputs?.properties?.sourceSha?.pattern !== "^[0-9a-f]{40}$" || report?.inputs?.properties?.scopeSha256?.pattern !== "^[0-9a-f]{64}$" || inputRepositories?.type !== "array" || inputRepositories?.minItems !== 5 || inputRepositories?.maxItems !== 5 || inputRepositories?.uniqueItems !== true || JSON.stringify(inputRepositories?.items?.enum) !== JSON.stringify(repositories)) errors.push(`${path}: federated source/repository status contract가 필요하다`);
+  if (JSON.stringify(record?.properties?.repository?.enum) !== JSON.stringify(repositories) || record?.properties?.mergeSha?.pattern !== "^[0-9a-f]{40}$" || record?.properties?.changedFiles?.uniqueItems !== true) errors.push(`${path}: strict federated execution record contract가 필요하다`);
   if (record?.additionalProperties !== false || finding?.additionalProperties !== false || incomplete?.additionalProperties !== false || report?.findings?.uniqueItems !== true || report?.incomplete?.uniqueItems !== true) errors.push(`${path}: strict finding/incomplete records가 필요하다`);
-  if (JSON.stringify(record?.required) !== JSON.stringify(["kind", "issueNumber", "prNumber", "repository", "mergeSha", "changedFiles"]) || JSON.stringify(finding?.required) !== JSON.stringify(["code", "identity"]) || JSON.stringify(incomplete?.required) !== JSON.stringify(["stage", "code", "affectedIdentity"])) errors.push(`${path}: records/findings/incomplete exact required lists가 필요하다`);
+  if (JSON.stringify(record?.required) !== JSON.stringify(["kind", "repository", "issueNumber", "prNumber", "mergeSha", "changedFiles"]) || JSON.stringify(finding?.required) !== JSON.stringify(["code", "identity"]) || JSON.stringify(incomplete?.required) !== JSON.stringify(["stage", "code", "affectedIdentity"])) errors.push(`${path}: records/findings/incomplete exact required lists가 필요하다`);
   const parity = schema?.oneOf;
   if (!Array.isArray(parity) || parity.length !== 2 || parity[0]?.properties?.status?.const !== "COMPLETE" || parity[0]?.properties?.incomplete?.maxItems !== 0 || parity[1]?.properties?.status?.const !== "AUDIT_INCOMPLETE" || parity[1]?.properties?.incomplete?.minItems !== 1) errors.push(`${path}: incomplete fail-closed parity가 필요하다`);
   return errors;
