@@ -18,9 +18,9 @@ function matchingLive(scope = SCOPE) {
 
 test("plan-doc execution audit scope fixes the federated 64-record inventory and self binding", () => {
   assert.equal(SCOPE.schemaVersion, 2);
-  assert.equal(SCOPE.historical.length, 64);
+  assert.equal(SCOPE.historical.length, 67);
   assert.deepEqual(SCOPE.repositories, ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"]);
-  assert.equal(SCOPE.self.issueNumber, 2881);
+  assert.equal(SCOPE.self.issueNumber, 2886);
   const byIdentity = new Map(SCOPE.historical.map((record) => [`${record.repository}:${record.prNumber}`, record]));
   assert.deepEqual(byIdentity.get("AquilaXk/easysubway:2852").allowedChangedFiles, [".github/workflows/ci.yml", "apps/mobile/pubspec.lock", "apps/mobile/pubspec.yaml", "tools/ci/repository-contract.test.mjs"]);
   assert.equal(byIdentity.get("AquilaXk/easysubway:2852").changedPathClass, "PLAN_DOC_CI_RECOVERY");
