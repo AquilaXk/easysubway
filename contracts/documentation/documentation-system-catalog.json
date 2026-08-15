@@ -42,7 +42,22 @@
         ]
       }
     },
-    { "repository": "AquilaXk/easysubway-data", "status": "PROPOSED", "fragment": null },
+    {
+      "repository": "AquilaXk/easysubway-data",
+      "status": "ACTIVE",
+      "fragment": {
+        "gitSha": "e13c01763ba7f4aca6e809e2a5c6a7dc8833d00b",
+        "path": "contracts/documentation/documentation-fragment.json",
+        "blobSha": "337d73ee1fd5c40c4686f7383100ddfbbf669fcd",
+        "lastVerifiedAt": "2026-08-14T18:05:42.000Z",
+        "verificationEvidence": [
+          "https://github.com/AquilaXk/easysubway-data/issues/237",
+          "https://github.com/AquilaXk/easysubway-data/issues/281",
+          "https://github.com/AquilaXk/easysubway-data/issues/286",
+          "https://github.com/AquilaXk/easysubway-data/issues/38"
+        ]
+      }
+    },
     {
       "repository": "AquilaXk/easysubway-mobile",
       "status": "ACTIVE",
