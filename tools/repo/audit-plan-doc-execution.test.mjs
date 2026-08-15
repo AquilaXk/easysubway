@@ -16,7 +16,7 @@ function matchingLive(scope = SCOPE) {
   return { records: scope.historical.map(observed), self: { ...observed({ ...scope.self, prNumber: 9999, mergeSha: SHA, relation: "CLOSES" }), mergeSha: SHA } };
 }
 
-test("plan-doc execution audit scope fixes the federated 64-record inventory and self binding", () => {
+test("plan-doc execution audit scope fixes the federated 67-record inventory and self binding", () => {
   assert.equal(SCOPE.schemaVersion, 2);
   assert.equal(SCOPE.historical.length, 67);
   assert.deepEqual(SCOPE.repositories, ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"]);
@@ -48,11 +48,11 @@ test("plan-doc execution audit collects a single-parent commit delta instead of 
     if (endpoint === `repos/${record.repository}/pulls/${record.prNumber}`) return JSON.stringify({ number: record.prNumber, merged: true, merge_commit_sha: record.mergeSha, base: { repo: { full_name: record.repository } }, body: `Closes #${record.issueNumber}` });
     if (endpoint === `repos/${record.repository}/commits/${record.mergeSha}?per_page=100&page=1`) return JSON.stringify({ sha: record.mergeSha, parents: [{ sha: "b".repeat(40) }], files: [{ filename: "contracts/documentation/documentation-fragment.json" }] });
     if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}/pulls`) return JSON.stringify([{ number: 9999 }]);
-    if (endpoint === `repos/AquilaXk/easysubway/pulls/9999`) return JSON.stringify({ number: 9999, merged: true, merge_commit_sha: SHA, base: { repo: { full_name: "AquilaXk/easysubway" } }, body: "Closes #2881" });
+    if (endpoint === `repos/AquilaXk/easysubway/pulls/9999`) return JSON.stringify({ number: 9999, merged: true, merge_commit_sha: SHA, base: { repo: { full_name: "AquilaXk/easysubway" } }, body: "Closes #2886" });
     if (endpoint === `repos/AquilaXk/easysubway/commits/${SHA}?per_page=100&page=1`) return JSON.stringify({ sha: SHA, parents: [{ sha: "b".repeat(40) }], files: SCOPE.self.allowedChangedFiles.map((filename) => ({ filename })) });
     throw new Error(`unexpected ${endpoint}`);
   };
-  const graphql = async (repository, prNumber) => { const value = repository === record.repository ? record : { issueNumber: 2881, mergeSha: SHA }; return JSON.stringify({ data: { repository: { pullRequest: { number: prNumber, merged: true, mergeCommit: { oid: value.mergeSha }, closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [{ number: value.issueNumber, state: "CLOSED", repository: { nameWithOwner: repository } }] } } } } }); };
+  const graphql = async (repository, prNumber) => { const value = repository === record.repository ? record : { issueNumber: 2886, mergeSha: SHA }; return JSON.stringify({ data: { repository: { pullRequest: { number: prNumber, merged: true, mergeCommit: { oid: value.mergeSha }, closingIssuesReferences: { totalCount: 1, pageInfo: { hasNextPage: false }, nodes: [{ number: value.issueNumber, state: "CLOSED", repository: { nameWithOwner: repository } }] } } } } }); };
   const scope = { ...SCOPE, historical: [record] };
   const live = await collectPlanDocExecutionLive({ scope, sourceSha: SHA, execGh: provider, execGraphql: graphql });
   assert.deepEqual(live.records[0].changedFiles, ["contracts/documentation/documentation-fragment.json"]);
@@ -84,7 +84,7 @@ test("plan-doc execution audit preserves duplicate, self, GraphQL, commit-page, 
   invalidScope.historical[2].mergeSha = invalidScope.historical[0].mergeSha;
   const live = matchingLive(invalidScope);
   live.self.mergeSha = "c".repeat(40);
-  live.self.relationText = "Refs #2881";
+  live.self.relationText = "Refs #2886";
   const codes = auditPlanDocExecution({ scope: invalidScope, sourceSha: SHA, live }).map((finding) => finding.code);
   for (const code of ["DUPLICATE_RECORD_IDENTITY", "DUPLICATE_MERGE_IDENTITY", "SELF_SOURCE_SHA_MISMATCH", "SELF_CLOSING_ISSUE_MISMATCH"]) assert.ok(codes.includes(code));
   const drift = matchingLive();
