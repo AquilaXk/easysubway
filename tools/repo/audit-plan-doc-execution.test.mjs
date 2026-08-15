@@ -68,7 +68,7 @@ test("plan-doc execution audit fails closed for malformed closing references and
 
 test("plan-doc execution audit accepts only exact decorated coordinator Refs grammar", () => {
   const coordinator = SCOPE.historical.find((record) => record.repository === "AquilaXk/easysubway" && record.prNumber === 2878);
-  for (const body of ["Refs #2729", "Refs #2729 — coordinator", "Refs #2729 – coordinator", "Refs #2729 - coordinator", "Refs #2729: coordinator"]) {
+  for (const body of ["Refs #2729", "Refs #2729 — coordinator", "Refs #2729 – coordinator", "Refs #2729 - coordinator", "Refs #2729 : coordinator"]) {
     const live = matchingLive(); live.records.find((record) => record.repository === coordinator.repository && record.prNumber === coordinator.prNumber).relationText = body;
     assert.equal(auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }).some((finding) => finding.identity === `${coordinator.repository}:${coordinator.prNumber}`), false, body);
   }
@@ -106,7 +106,8 @@ test("plan-doc execution audit preserves duplicate, self, GraphQL, commit-page, 
   await assert.rejects(() => collectPlanDocExecutionLive({ scope: { ...SCOPE, historical: [record] }, sourceSha: SHA, execGh: renameProvider, execGraphql: async () => "{}" }), (error) => error instanceof AuditIncomplete && error.code === "COMMIT_RENAME_UNSUPPORTED");
 
   const ordered = createPlanDocExecutionReport({ scope: SCOPE, scopeText: JSON.stringify(SCOPE), sourceSha: SHA, observedAt: OBSERVED_AT, live: { records: [...matchingLive().records].reverse(), self: matchingLive().self } });
-  assert.deepEqual(ordered.records.map((value) => `${value.repository}:${value.prNumber}`), [...ordered.records.map((value) => `${value.repository}:${value.prNumber}`)].sort());
+  const orderedAgain = createPlanDocExecutionReport({ scope: SCOPE, scopeText: JSON.stringify(SCOPE), sourceSha: SHA, observedAt: OBSERVED_AT, live: matchingLive() });
+  assert.deepEqual(ordered.records, orderedAgain.records);
 
   const directory = mkdtempSync(join(tmpdir(), "plan-doc-execution-v2-"));
   const argv = ["--scope", "scope", "--scope-schema", "scope-schema", "--report-schema", "report-schema", "--source-sha", SHA, "--observed-at", OBSERVED_AT, "--output", join(directory, "report.json")];
@@ -114,9 +115,11 @@ test("plan-doc execution audit preserves duplicate, self, GraphQL, commit-page, 
   try {
     const success = await runAuditCli({ argv, read, collectLive: async () => matchingLive() });
     assert.equal(success.exitCode, 0); assert.equal(validateSchema(REPORT_SCHEMA, JSON.parse(readFileSync(argv.at(-1), "utf8"))).ok, true);
-    writeFileSync(join(directory, "finding.json"), "existing\n");
     const finding = await runAuditCli({ argv: [...argv.slice(0, -1), join(directory, "finding.json")], read, collectLive: async () => ({ ...matchingLive(), records: matchingLive().records.map((value, index) => index === 0 ? { ...value, changedFiles: ["extra.json"] } : value) }) });
-    assert.equal(finding.exitCode, 2); assert.equal(readFileSync(join(directory, "finding.json"), "utf8"), "existing\n");
+    assert.equal(finding.exitCode, 1); assert.equal(JSON.parse(readFileSync(join(directory, "finding.json"), "utf8")).summary.findings, 1);
+    writeFileSync(join(directory, "exists.json"), "existing\n");
+    const exists = await runAuditCli({ argv: [...argv.slice(0, -1), join(directory, "exists.json")], read, collectLive: async () => matchingLive() });
+    assert.equal(exists.exitCode, 2); assert.equal(readFileSync(join(directory, "exists.json"), "utf8"), "existing\n");
     const failure = await runAuditCli({ argv: [...argv.slice(0, -1), join(directory, "failure.json")], read, collectLive: async () => { throw new Error("provider-secret"); } });
     assert.equal(failure.exitCode, 2); assert.doesNotMatch(readFileSync(join(directory, "failure.json"), "utf8"), /provider-secret/);
   } finally { rmSync(directory, { recursive: true, force: true }); }
