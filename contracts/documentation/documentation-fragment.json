@@ -4,7 +4,7 @@
   "repository": "AquilaXk/easysubway",
   "sourceSha": "813556b82969ef59ac25cda6318b730dc4c79c0b",
   "status": "ACTIVE",
-  "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+  "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
   "verificationEvidence": [
     "https://github.com/AquilaXk/easysubway/issues/2748",
     "https://github.com/AquilaXk/easysubway/issues/2861",
@@ -43,7 +43,7 @@
       "reviewTrigger": [
         "event:governance-decision-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/ADR-HUB-0001.json:ba0ad77cec096e01b88b6bfe585c13b07fe5a71b",
       "verificationMethod": "owner-review",
       "verificationEvidence": [
@@ -94,7 +94,7 @@
       "reviewTrigger": [
         "event:clean-checkout-reproducibility-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/clean-checkout-reproducibility-owner-contract.json:dbb51a1ea7dfa817953dc2377ea1e73d632e0b33",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
@@ -146,7 +146,7 @@
       "reviewTrigger": [
         "event:documentation-fragment-schema-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/documentation-fragment.schema.json:0f36319a220b4e0c85e8ac8dee0667ff9fc3bac5",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
@@ -198,7 +198,7 @@
       "reviewTrigger": [
         "event:documentation-inventory-audit-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/documentation-inventory-audit-report.schema.json:07962de2189967ff302d43994e4a6be9a0d8c102",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
@@ -250,7 +250,7 @@
       "reviewTrigger": [
         "event:resource-schema-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/documentation-resource.schema.json:9799af3e8b3b10dc2d406702c55aa443f9ea2360",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
@@ -301,7 +301,7 @@
       "reviewTrigger": [
         "event:external-terminal-locator-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/external-terminal-locator-audit-scope.json:f5816dbfd44bc964e66ecf05f4ccc889bb642bee",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
@@ -353,7 +353,7 @@
       "reviewTrigger": [
         "event:plan-doc-execution-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/plan-doc-execution-audit-report.schema.json:76f83712d0df68493234c6bb758fcd21e0b370c3",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
@@ -404,7 +404,7 @@
       "reviewTrigger": [
         "event:plan-doc-execution-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/plan-doc-execution-audit-scope.schema.json:571311e1426e139b4ccdd10cb72decfa8d94a624",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
@@ -456,7 +456,7 @@
       "reviewTrigger": [
         "event:post-go-boundary-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/post-go-boundary-audit-scope.json:d4546340f85543d6c1954478f188ed8b2defc74a",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
@@ -508,7 +508,7 @@
       "reviewTrigger": [
         "event:public-claim-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/product-claim-catalog.json:328236058488f878d507423d53d147bc4fb46301",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
@@ -559,7 +559,7 @@
       "reviewTrigger": [
         "event:public-sensitivity-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:00:00.000Z",
+      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
       "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/public-sensitivity-audit-scope.json:2e6f9a532525bc447f90a850d0baddf7a74acfc4",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
