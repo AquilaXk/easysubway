@@ -164,6 +164,10 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
   assert.ok(validatePlanDocExecutionAuditReportSchema(weakened).length > 0);
   for (const [name, mutate] of [
     ["scopeSha256", (schema) => { schema.properties.inputs.properties.scopeSha256.pattern = ".+"; }],
+    ["input repositories type", (schema) => { schema.properties.inputs.properties.repositories.type = "string"; }],
+    ["input repositories count", (schema) => { schema.properties.inputs.properties.repositories.minItems = 4; }],
+    ["input repositories uniqueness", (schema) => { schema.properties.inputs.properties.repositories.uniqueItems = false; }],
+    ["input repositories exact enum", (schema) => { schema.properties.inputs.properties.repositories.items.enum = ["AquilaXk/easysubway"]; }],
     ["record repository", (schema) => { schema.properties.records.items.properties.repository.enum = ["AquilaXk/other"]; }],
     ["mergeSha", (schema) => { schema.properties.records.items.properties.mergeSha.pattern = ".+"; }],
     ["changedFiles uniqueness", (schema) => { schema.properties.records.items.properties.changedFiles.uniqueItems = false; }],

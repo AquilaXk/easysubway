@@ -72,7 +72,7 @@ test("plan-doc execution audit accepts only exact decorated coordinator Refs gra
     const live = matchingLive(); live.records.find((record) => record.repository === coordinator.repository && record.prNumber === coordinator.prNumber).relationText = body;
     assert.equal(auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }).some((finding) => finding.identity === `${coordinator.repository}:${coordinator.prNumber}`), false, body);
   }
-  for (const body of ["Refs #2729—adjacent", "Refs #2729\t—tab", "Refs #2729\n—newline", "Notes Refs #2729 — inline", "Refs #27290 — similar"]) {
+  for (const body of ["Refs #2729—adjacent", "Refs #2729\t—tab", "Refs #2729\n—newline", "Refs #2729\n  — spaced-newline", "Notes Refs #2729 — inline", "Refs #27290 — similar"]) {
     const live = matchingLive(); live.records.find((record) => record.repository === coordinator.repository && record.prNumber === coordinator.prNumber).relationText = body;
     assert.ok(auditPlanDocExecution({ scope: SCOPE, sourceSha: SHA, live }).some((finding) => finding.code === "RELATION_MISMATCH" && finding.identity === `${coordinator.repository}:${coordinator.prNumber}`), body);
   }
@@ -121,6 +121,18 @@ test("plan-doc execution audit preserves duplicate, self, GraphQL, commit-page, 
   const ordered = createPlanDocExecutionReport({ scope: SCOPE, scopeText: JSON.stringify(SCOPE), sourceSha: SHA, observedAt: OBSERVED_AT, live: { records: [...matchingLive().records].reverse(), self: matchingLive().self } });
   const orderedAgain = createPlanDocExecutionReport({ scope: SCOPE, scopeText: JSON.stringify(SCOPE), sourceSha: SHA, observedAt: OBSERVED_AT, live: matchingLive() });
   assert.deepEqual(ordered.records, orderedAgain.records);
+  const incompleteOrdering = createPlanDocExecutionReport({ scope: SCOPE, scopeText: JSON.stringify(SCOPE), sourceSha: SHA, observedAt: OBSERVED_AT, incomplete: [
+    { stage: "github", code: "ZETA", affectedIdentity: "z" },
+    { stage: "github", code: "ALPHA", affectedIdentity: "z" },
+    { stage: "alpha", code: "ZETA", affectedIdentity: "z" },
+    { stage: "github", code: "ALPHA", affectedIdentity: "a" },
+  ] });
+  assert.deepEqual(incompleteOrdering.incomplete, [
+    { stage: "alpha", code: "ZETA", affectedIdentity: "z" },
+    { stage: "github", code: "ALPHA", affectedIdentity: "a" },
+    { stage: "github", code: "ALPHA", affectedIdentity: "z" },
+    { stage: "github", code: "ZETA", affectedIdentity: "z" },
+  ]);
 
   const directory = mkdtempSync(join(tmpdir(), "plan-doc-execution-v2-"));
   const argv = ["--scope", "scope", "--scope-schema", "scope-schema", "--report-schema", "report-schema", "--source-sha", SHA, "--observed-at", OBSERVED_AT, "--output", join(directory, "report.json")];
