@@ -2075,7 +2075,7 @@ test("문서 거버넌스 계약은 ADR-HUB-0001 실물을 허용한다", () => 
   assert.ok(adr.confirmation.some(({ method }) => method.endsWith("--current-only --local-contracts-only")));
 });
 
-test("documentation catalog는 terminal Hub, Data, Backend와 Mobile locator를 ACTIVE로 소비하고 fragment lifecycle을 fail closed한다", () => {
+test("documentation catalog는 terminal Hub, Data, Backend, Mobile과 Platform locator를 ACTIVE로 소비하고 fragment lifecycle을 fail closed한다", () => {
   const resourceSchema = loadJson("contracts/documentation/documentation-resource.schema.json");
   const fragmentSchema = loadJson("contracts/documentation/documentation-fragment.schema.json");
   const catalogSchema = loadJson("contracts/documentation/documentation-system-catalog.schema.json");
@@ -2157,8 +2157,23 @@ test("documentation catalog는 terminal Hub, Data, Backend와 Mobile locator를 
       ],
     },
   });
-  assert.deepEqual(catalog.repositories.filter(({ repository }) => ![hub.repository, backend.repository, data.repository, mobile.repository].includes(repository))
-    .map(({ status, fragment }) => ({ status, fragment })), [{ status: "PROPOSED", fragment: null }]);
+  const platform = catalog.repositories.find(({ repository }) => repository === "AquilaXk/easysubway-platform");
+  assert.deepEqual(platform, {
+    repository: "AquilaXk/easysubway-platform",
+    status: "ACTIVE",
+    fragment: {
+      gitSha: "cd23457fde3bfd734082ce1909ba87a575dde5fd",
+      path: "contracts/documentation/documentation-fragment.json",
+      blobSha: "4f9cb6ceb261586ffcf71c7dd03ab1058801eae1",
+      lastVerifiedAt: "2026-08-14T15:50:40.000Z",
+      verificationEvidence: [
+        "https://github.com/AquilaXk/easysubway-platform/issues/1",
+        "https://github.com/AquilaXk/easysubway-platform/issues/109",
+        "https://github.com/AquilaXk/easysubway-platform/issues/120",
+      ],
+    },
+  });
+  assert.equal(catalog.repositories.every(({ status, fragment }) => status === "ACTIVE" && fragment !== null), true);
   const unresolvedErrors = [];
   validateDocumentationSystemCatalog(catalog, catalogSchema, unresolvedErrors);
   assert.ok(unresolvedErrors.some((error) => error.includes("ACTIVE fragment resolution contract")));
