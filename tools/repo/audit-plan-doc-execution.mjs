@@ -69,7 +69,7 @@ function relationMatches(record, observed) {
   const number = record.issueNumber;
   const body = String(observed.relationText ?? "");
   const closes = new RegExp(`(?:^|\\n)\\s*Closes\\s+#${number}\\s*(?:$|\\n)`, "m").test(body);
-  const refs = new RegExp(`(?:^|\\n)\\s*Refs\\s+#${number}(?=\\s*(?:$|\\n|—|–|-|:))`, "m").test(body);
+  const refs = new RegExp(`(?:^|\\n)Refs #${number}(?: +[—–\\-:][^\\r\\n]*)?(?=$|\\r?\\n(?![—–\\-:]))`).test(body);
   const closingIssues = observed.closingIssues ?? [];
   return record.relation === "CLOSES"
     ? closes && closingIssues.length === 1 && closingIssues[0]?.number === number && closingIssues[0]?.state === "CLOSED"
@@ -100,6 +100,7 @@ async function collectCommitDelta(repository, mergeSha, id, execGh) {
   for (let page = 1; page <= Math.ceil(MAX_ITEMS / PAGE_SIZE) + 1; page += 1) {
     const commit = parseJson(await execGh(["api", `repos/${repository}/commits/${mergeSha}?per_page=${PAGE_SIZE}&page=${page}`]), `${id}:commit`);
     if (commit?.sha !== mergeSha || !Array.isArray(commit?.parents) || commit.parents.length !== 1 || !Array.isArray(commit?.files)) throw new AuditIncomplete("COMMIT_MALFORMED", `${id}:commit`);
+    if (page > 1 && commit.files.length === 0) throw new AuditIncomplete("PROVIDER_PARTIAL", `${id}:commit`);
     for (const file of commit.files) {
       if (typeof file?.filename !== "string" || file.filename === "" || file.previous_filename != null || file.status === "renamed" || seen.has(file.filename)) throw new AuditIncomplete(file?.previous_filename != null || file?.status === "renamed" ? "COMMIT_RENAME_UNSUPPORTED" : "PROVIDER_PARTIAL", `${id}:commit`);
       seen.add(file.filename); files.push(file.filename);
