@@ -10495,6 +10495,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     "kric-subway-timetable",
     "molit-urban-rail-full-route",
     "seoul-metro-accessibility",
+    "seoul-metro-transfer-distance-duration",
     "seoulmetro-station-line-info",
   ]);
   assert.ok(scope.productionSourceSet.excludedFromV1SupportClaims.includes("seoul-realtime-arrival-station-info"));
@@ -10516,6 +10517,19 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   const requiredSourceIds = new Set(scope.productionSourceSet.requiredSourceIds);
   const optionalSourceIds = new Set(scope.productionSourceSet.optionalAccessibilitySourceIds);
   const excludedSourceIds = new Set(scope.productionSourceSet.excludedFromV1SupportClaims);
+  assert.deepEqual(scope.productionSourceSet.externalSourceRegistrations, [
+    {
+      sourceId: "seoul-metro-transfer-distance-duration",
+      registrationRepository: "AquilaXk/easysubway-data",
+      registrationIssue: 350,
+      snapshotId: "seoul-metro-transfer-distance-duration-20260815T094038817Z",
+      decision: "APPROVED",
+      productionUseAllowed: true,
+    },
+  ]);
+  const externallyRegisteredSourceIds = new Set(
+    scope.productionSourceSet.externalSourceRegistrations.map(({ sourceId }) => sourceId),
+  );
   assert.equal(requiredSourceIds.size, scope.productionSourceSet.requiredSourceIds.length);
   assert.equal(optionalSourceIds.size, scope.productionSourceSet.optionalAccessibilitySourceIds.length);
   assert.equal(excludedSourceIds.size, scope.productionSourceSet.excludedFromV1SupportClaims.length);
@@ -10533,6 +10547,10 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   }
   for (const sourceId of scope.productionSourceSet.requiredSourceIds) {
     const source = inventorySources.get(sourceId);
+    if (externallyRegisteredSourceIds.has(sourceId)) {
+      assert.equal(source.requiredForProductionPack, false, `${sourceId} Hub fixture must not impersonate Data registration`);
+      continue;
+    }
     assert.equal(source.requiredForProductionPack, true, `${sourceId} must be production eligible`);
     assert.equal(source.license.redistributionAllowed, true, `${sourceId} must allow redistribution`);
     assert.ok(source.coverageScope.regionIds.includes("capital"), `${sourceId} must cover capital`);

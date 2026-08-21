@@ -31,6 +31,14 @@ const officialOdFareFields = new Set([
   "yungCardFare",
   "yungCashFare",
 ]);
+const EXTERNAL_SOURCE_REGISTRATION_KEYS = [
+  "sourceId",
+  "registrationRepository",
+  "registrationIssue",
+  "snapshotId",
+  "decision",
+  "productionUseAllowed",
+];
 
 try {
   const inventory = JSON.parse(await readFile(inventoryPath, "utf8"));
@@ -240,6 +248,11 @@ function validateProductionScope(inventory, scope) {
     assertStringArray(sourceSet.excludedFromV1SupportClaims, "productionSourceSet.excludedFromV1SupportClaims"),
   );
   const sources = new Map(inventory.sources.map((source) => [source.id, source]));
+  const externalRegistrations = validateExternalSourceRegistrations(
+    sourceSet.externalSourceRegistrations,
+    sources,
+    requiredSourceIds,
+  );
 
   assertDisjoint(requiredSourceIds, optionalSourceIds, "requiredSourceIds", "optionalAccessibilitySourceIds");
   assertDisjoint(requiredSourceIds, excludedSourceIds, "requiredSourceIds", "excludedFromV1SupportClaims");
@@ -247,8 +260,8 @@ function validateProductionScope(inventory, scope) {
 
   for (const sourceId of requiredSourceIds) {
     const source = requireInventorySource(sources, sourceId);
-    if (source.requiredForProductionPack !== true) {
-      throw new Error(`required source ${sourceId} must be requiredForProductionPack`);
+    if (source.requiredForProductionPack !== true && !externalRegistrations.has(sourceId)) {
+      throw new Error(`required source ${sourceId} must be locally required or externally registered`);
     }
   }
   for (const sourceId of optionalSourceIds) {
@@ -269,6 +282,53 @@ function validateProductionScope(inventory, scope) {
       throw new Error(`${source.id}.requiredForProductionPack must match productionSourceSet.requiredSourceIds`);
     }
   }
+}
+
+function validateExternalSourceRegistrations(registrations, sources, requiredSourceIds) {
+  if (!Array.isArray(registrations)) {
+    throw new TypeError("productionSourceSet.externalSourceRegistrations must be an array");
+  }
+  const registrationsBySource = new Map();
+  for (const [index, registration] of registrations.entries()) {
+    const sourceId = validateExternalSourceRegistration(registration, index);
+    if (registrationsBySource.has(sourceId)) {
+      throw new Error(`duplicate external source registration for ${sourceId}`);
+    }
+    const source = requireInventorySource(sources, sourceId);
+    if (!requiredSourceIds.has(sourceId) || source.requiredForProductionPack !== false) {
+      throw new Error(`external source registration ${sourceId} requires a locally non-production required source`);
+    }
+    registrationsBySource.set(sourceId, registration);
+  }
+  return registrationsBySource;
+}
+
+function validateExternalSourceRegistration(registration, index) {
+  const label = `productionSourceSet.externalSourceRegistrations[${index}]`;
+  if (!registration || typeof registration !== "object" || Array.isArray(registration)) {
+    throw new TypeError(`${label} must be an object`);
+  }
+  if (JSON.stringify(Object.keys(registration)) !== JSON.stringify(EXTERNAL_SOURCE_REGISTRATION_KEYS)) {
+    throw new Error(`${label} must declare exactly ${EXTERNAL_SOURCE_REGISTRATION_KEYS.join(", ")}`);
+  }
+  const sourceId = assertString(registration.sourceId, `${label}.sourceId`);
+  const repository = assertString(registration.registrationRepository, `${label}.registrationRepository`);
+  if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+    throw new Error(`${label}.registrationRepository must be owner/repository`);
+  }
+  if (!Number.isInteger(registration.registrationIssue) || registration.registrationIssue <= 0) {
+    throw new Error(`${label}.registrationIssue must be a positive integer`);
+  }
+  if (typeof registration.snapshotId !== "string" || registration.snapshotId.trim() === "") {
+    throw new TypeError(`${label}.snapshotId must be a non-empty string`);
+  }
+  if (registration.decision !== "APPROVED") {
+    throw new Error(`${label}.decision must be APPROVED`);
+  }
+  if (registration.productionUseAllowed !== true) {
+    throw new Error(`${label}.productionUseAllowed must be true`);
+  }
+  return sourceId;
 }
 
 async function validateAdmittedCandidateEvidence(inventory, candidates, officialOdFareAdmissionBytes) {

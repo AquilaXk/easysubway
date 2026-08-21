@@ -7186,6 +7186,58 @@ test("source inventory 검증기는 v1 optional source가 production 필수로 �
   );
 });
 
+test("source inventory 검증기는 required source의 외부 등록 record를 exact 검증한다", async () => {
+  const scope = JSON.parse(
+    await readFile(path.join(root, "release/product-gates/production-datapack-scope.json"), "utf8"),
+  );
+  const outputDir = path.join(tmpdir(), `easysubway-source-inventory-external-authority-${Date.now()}`);
+  const scopePath = path.join(outputDir, "production-datapack-scope.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const validateScope = async (candidateScope) => {
+    await writeFile(scopePath, `${JSON.stringify(candidateScope, null, 2)}\n`);
+    return execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-source-inventory.mjs", "--scope", scopePath],
+      { cwd: root },
+    );
+  };
+
+  await validateScope(scope);
+  const [registration] = scope.productionSourceSet.externalSourceRegistrations;
+
+  const missing = structuredClone(scope);
+  missing.productionSourceSet.externalSourceRegistrations = [];
+  await assert.rejects(validateScope(missing), /required source .* must be locally required or externally registered/);
+
+  const duplicate = structuredClone(scope);
+  duplicate.productionSourceSet.externalSourceRegistrations.push(structuredClone(registration));
+  await assert.rejects(validateScope(duplicate), /duplicate external source registration/);
+
+  const tamperedDecision = structuredClone(scope);
+  tamperedDecision.productionSourceSet.externalSourceRegistrations[0].decision = "REVIEW_REQUIRED";
+  await assert.rejects(validateScope(tamperedDecision), /decision must be APPROVED/);
+
+  const tamperedSnapshot = structuredClone(scope);
+  tamperedSnapshot.productionSourceSet.externalSourceRegistrations[0].snapshotId = "";
+  await assert.rejects(validateScope(tamperedSnapshot), /snapshotId must be a non-empty string/);
+
+  const localRequired = structuredClone(scope);
+  localRequired.productionSourceSet.externalSourceRegistrations[0].sourceId = "molit-urban-rail-full-route";
+  await assert.rejects(
+    validateScope(localRequired),
+    /external source registration .* requires a locally non-production required source/,
+  );
+
+  const optional = structuredClone(scope);
+  optional.productionSourceSet.externalSourceRegistrations[0].sourceId = "kric-disabled-toilet";
+  await assert.rejects(
+    validateScope(optional),
+    /external source registration .* requires a locally non-production required source/,
+  );
+});
+
 test("source candidate sample 검증기는 KRIC live evidence metadata를 허용한다", async () => {
   const outputDir = path.join(tmpdir(), `easysubway-source-candidate-sample-${Date.now()}`);
   const samplePath = path.join(outputDir, "sample.json");
