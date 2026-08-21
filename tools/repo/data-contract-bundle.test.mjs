@@ -21,6 +21,16 @@ const requiredProductionSourceIds = [
   "kric-subway-timetable",
   "seoul-metro-transfer-distance-duration",
 ];
+const transferExternalRegistrationAuthorities = [
+  {
+    sourceId: "seoul-metro-transfer-distance-duration",
+    authorityRepository: "AquilaXk/easysubway-data",
+    authorityIssue: 350,
+    snapshotId: "seoul-metro-transfer-distance-duration-20260815T094038817Z",
+    decision: "APPROVED",
+    productionUseAllowed: true,
+  },
+];
 
 test("data contract bundle은 target producer 입력만 exact bytes로 고정한다", async () => {
   const bundle = JSON.parse(await readFile("contracts/bundles/data-contracts-v1.0.0.json", "utf8"));
@@ -79,6 +89,14 @@ test("production datapack은 retired movement source를 required·selected·cove
 
   assert.deepEqual(scope.productionSourceSet.requiredSourceIds, requiredProductionSourceIds);
   assert.deepEqual(bundledScope.productionSourceSet.requiredSourceIds, requiredProductionSourceIds);
+  assert.deepEqual(
+    scope.productionSourceSet.externalRegistrationAuthorities,
+    transferExternalRegistrationAuthorities,
+  );
+  assert.deepEqual(
+    bundledScope.productionSourceSet.externalRegistrationAuthorities,
+    transferExternalRegistrationAuthorities,
+  );
 
   for (const sourceId of productionForbiddenMovementSourceIds) {
     assert.ok(!scope.productionSourceSet.requiredSourceIds.includes(sourceId), `${sourceId}: required`);

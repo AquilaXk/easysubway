@@ -10517,7 +10517,19 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   const requiredSourceIds = new Set(scope.productionSourceSet.requiredSourceIds);
   const optionalSourceIds = new Set(scope.productionSourceSet.optionalAccessibilitySourceIds);
   const excludedSourceIds = new Set(scope.productionSourceSet.excludedFromV1SupportClaims);
-  const dataRepositoryRegisteredSourceIds = new Set(["seoul-metro-transfer-distance-duration"]);
+  assert.deepEqual(scope.productionSourceSet.externalRegistrationAuthorities, [
+    {
+      sourceId: "seoul-metro-transfer-distance-duration",
+      authorityRepository: "AquilaXk/easysubway-data",
+      authorityIssue: 350,
+      snapshotId: "seoul-metro-transfer-distance-duration-20260815T094038817Z",
+      decision: "APPROVED",
+      productionUseAllowed: true,
+    },
+  ]);
+  const externallyRegisteredSourceIds = new Set(
+    scope.productionSourceSet.externalRegistrationAuthorities.map(({ sourceId }) => sourceId),
+  );
   assert.equal(requiredSourceIds.size, scope.productionSourceSet.requiredSourceIds.length);
   assert.equal(optionalSourceIds.size, scope.productionSourceSet.optionalAccessibilitySourceIds.length);
   assert.equal(excludedSourceIds.size, scope.productionSourceSet.excludedFromV1SupportClaims.length);
@@ -10535,7 +10547,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   }
   for (const sourceId of scope.productionSourceSet.requiredSourceIds) {
     const source = inventorySources.get(sourceId);
-    if (dataRepositoryRegisteredSourceIds.has(sourceId)) {
+    if (externallyRegisteredSourceIds.has(sourceId)) {
       assert.equal(source.requiredForProductionPack, false, `${sourceId} Hub fixture must not impersonate Data registration`);
       continue;
     }

@@ -240,6 +240,11 @@ function validateProductionScope(inventory, scope) {
     assertStringArray(sourceSet.excludedFromV1SupportClaims, "productionSourceSet.excludedFromV1SupportClaims"),
   );
   const sources = new Map(inventory.sources.map((source) => [source.id, source]));
+  const externalAuthorities = validateExternalRegistrationAuthorities(
+    sourceSet.externalRegistrationAuthorities,
+    sources,
+    requiredSourceIds,
+  );
 
   assertDisjoint(requiredSourceIds, optionalSourceIds, "requiredSourceIds", "optionalAccessibilitySourceIds");
   assertDisjoint(requiredSourceIds, excludedSourceIds, "requiredSourceIds", "excludedFromV1SupportClaims");
@@ -247,8 +252,8 @@ function validateProductionScope(inventory, scope) {
 
   for (const sourceId of requiredSourceIds) {
     const source = requireInventorySource(sources, sourceId);
-    if (source.requiredForProductionPack !== true) {
-      throw new Error(`required source ${sourceId} must be requiredForProductionPack`);
+    if (source.requiredForProductionPack !== true && !externalAuthorities.has(sourceId)) {
+      throw new Error(`required source ${sourceId} must be locally required or externally registered`);
     }
   }
   for (const sourceId of optionalSourceIds) {
@@ -269,6 +274,56 @@ function validateProductionScope(inventory, scope) {
       throw new Error(`${source.id}.requiredForProductionPack must match productionSourceSet.requiredSourceIds`);
     }
   }
+}
+
+function validateExternalRegistrationAuthorities(authorities, sources, requiredSourceIds) {
+  if (!Array.isArray(authorities)) {
+    throw new Error("productionSourceSet.externalRegistrationAuthorities must be an array");
+  }
+  const expectedKeys = [
+    "sourceId",
+    "authorityRepository",
+    "authorityIssue",
+    "snapshotId",
+    "decision",
+    "productionUseAllowed",
+  ];
+  const authoritiesBySource = new Map();
+  for (const [index, authority] of authorities.entries()) {
+    const label = `productionSourceSet.externalRegistrationAuthorities[${index}]`;
+    if (!authority || typeof authority !== "object" || Array.isArray(authority)) {
+      throw new Error(`${label} must be an object`);
+    }
+    if (JSON.stringify(Object.keys(authority)) !== JSON.stringify(expectedKeys)) {
+      throw new Error(`${label} must declare exactly ${expectedKeys.join(", ")}`);
+    }
+    const sourceId = assertString(authority.sourceId, `${label}.sourceId`);
+    const repository = assertString(authority.authorityRepository, `${label}.authorityRepository`);
+    if (!/^[A-Za-z0-9_.-]+\/[A-Za-z0-9_.-]+$/.test(repository)) {
+      throw new Error(`${label}.authorityRepository must be owner/repository`);
+    }
+    if (!Number.isInteger(authority.authorityIssue) || authority.authorityIssue <= 0) {
+      throw new Error(`${label}.authorityIssue must be a positive integer`);
+    }
+    if (typeof authority.snapshotId !== "string" || authority.snapshotId.trim() === "") {
+      throw new Error(`${label}.snapshotId must be a non-empty string`);
+    }
+    if (authority.decision !== "APPROVED") {
+      throw new Error(`${label}.decision must be APPROVED`);
+    }
+    if (authority.productionUseAllowed !== true) {
+      throw new Error(`${label}.productionUseAllowed must be true`);
+    }
+    if (authoritiesBySource.has(sourceId)) {
+      throw new Error(`duplicate external registration authority for ${sourceId}`);
+    }
+    const source = requireInventorySource(sources, sourceId);
+    if (!requiredSourceIds.has(sourceId) || source.requiredForProductionPack !== false) {
+      throw new Error(`external registration authority ${sourceId} requires a locally non-production required source`);
+    }
+    authoritiesBySource.set(sourceId, authority);
+  }
+  return authoritiesBySource;
 }
 
 async function validateAdmittedCandidateEvidence(inventory, candidates, officialOdFareAdmissionBytes) {

@@ -7162,9 +7162,6 @@ test("source inventory 검증기는 admitted candidate live sample evidence hash
 test("source inventory 검증기는 v1 optional source가 production 필수로 남는 것을 거부한다", async () => {
   const sourceInventory = JSON.parse(await readFile(path.join(root, "tools/datapack/source-inventory.json"), "utf8"));
   const invalidInventory = structuredClone(sourceInventory);
-  invalidInventory.sources.find(
-    (source) => source.id === "seoul-metro-transfer-distance-duration",
-  ).requiredForProductionPack = true;
   invalidInventory.sources.find((source) => source.id === "kric-disabled-toilet").requiredForProductionPack = true;
 
   const outputDir = path.join(tmpdir(), `easysubway-source-inventory-optional-scope-${Date.now()}`);
@@ -7186,6 +7183,58 @@ test("source inventory 검증기는 v1 optional source가 production 필수로 �
       { cwd: root },
     ),
     /optional source .* must not be requiredForProductionPack/,
+  );
+});
+
+test("source inventory 검증기는 required source의 외부 등록 authority를 exact 검증한다", async () => {
+  const scope = JSON.parse(
+    await readFile(path.join(root, "release/product-gates/production-datapack-scope.json"), "utf8"),
+  );
+  const outputDir = path.join(tmpdir(), `easysubway-source-inventory-external-authority-${Date.now()}`);
+  const scopePath = path.join(outputDir, "production-datapack-scope.json");
+  await rm(outputDir, { recursive: true, force: true });
+  await mkdir(outputDir, { recursive: true });
+
+  const validateScope = async (candidateScope) => {
+    await writeFile(scopePath, `${JSON.stringify(candidateScope, null, 2)}\n`);
+    return execFileAsync(
+      process.execPath,
+      ["tools/datapack/validate-source-inventory.mjs", "--scope", scopePath],
+      { cwd: root },
+    );
+  };
+
+  await validateScope(scope);
+  const [authority] = scope.productionSourceSet.externalRegistrationAuthorities;
+
+  const missing = structuredClone(scope);
+  missing.productionSourceSet.externalRegistrationAuthorities = [];
+  await assert.rejects(validateScope(missing), /required source .* must be locally required or externally registered/);
+
+  const duplicate = structuredClone(scope);
+  duplicate.productionSourceSet.externalRegistrationAuthorities.push(structuredClone(authority));
+  await assert.rejects(validateScope(duplicate), /duplicate external registration authority/);
+
+  const tamperedDecision = structuredClone(scope);
+  tamperedDecision.productionSourceSet.externalRegistrationAuthorities[0].decision = "REVIEW_REQUIRED";
+  await assert.rejects(validateScope(tamperedDecision), /decision must be APPROVED/);
+
+  const tamperedSnapshot = structuredClone(scope);
+  tamperedSnapshot.productionSourceSet.externalRegistrationAuthorities[0].snapshotId = "";
+  await assert.rejects(validateScope(tamperedSnapshot), /snapshotId must be a non-empty string/);
+
+  const localRequired = structuredClone(scope);
+  localRequired.productionSourceSet.externalRegistrationAuthorities[0].sourceId = "molit-urban-rail-full-route";
+  await assert.rejects(
+    validateScope(localRequired),
+    /external registration authority .* requires a locally non-production required source/,
+  );
+
+  const optional = structuredClone(scope);
+  optional.productionSourceSet.externalRegistrationAuthorities[0].sourceId = "kric-disabled-toilet";
+  await assert.rejects(
+    validateScope(optional),
+    /external registration authority .* requires a locally non-production required source/,
   );
 });
 
