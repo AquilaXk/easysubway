@@ -7433,7 +7433,7 @@ test("[gate-ownership] Android release 100 governance gate는 Android-only 범�
   assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-07-15");
   assert.equal(gate.latestGoNoGoStatus.currentDecision, "NO_GO");
   assert.equal(gate.latestGoNoGoStatus.decisionOwner, "release-owner");
-  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414]);
+  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414, 2731]);
   assert.deepEqual(gate.latestGoNoGoStatus.recentlyResolvedEvidence, [
     "production-datapack-release-publish-success",
     "store-distribution-evidence-success",
@@ -7455,7 +7455,7 @@ test("[gate-ownership] Android release 100 governance gate는 Android-only 범�
     "fixed-release-versioncode-build-submit-procedure",
     "route-result-v2-ui-badge-accessibility-copy-evidence",
     "route-release-readiness-tracker-evidence",
-    "datapack-release-readiness-tracker-evidence",
+    "journey-v3-server-only-release-evidence",
   ]);
   assert.deepEqual(gate.latestGoNoGoStatus.remainingApprovalPrerequisites, [
     "release-owner-final-go-approval",
@@ -7660,7 +7660,7 @@ test("[gate-ownership] Android release 100 governance gate는 Android-only 범�
   );
   assert.deepEqual(
     gate.childIssueLinks,
-    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230, 1414],
+    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230, 1414, 2731],
   );
   for (const item of gate.gates.filter((gateItem) => gateItem.priority.startsWith("P0"))) {
     assert.ok(item.owner, `${item.id} must define owner`);
