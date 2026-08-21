@@ -52,6 +52,9 @@ export function validateSystemReleaseManifest({ manifest, componentSchema, syste
     if (journeyV3.owner?.apiContractVersion !== manifest.backend?.artifactIdentity?.apiContractVersion) {
       errors.push("system: Journey V3 API contract must match backend component");
     }
+    if (!/^[a-f0-9]{64}$/.test(journeyV3.evidenceSha256 ?? "")) {
+      errors.push("system: Journey V3 evidence SHA-256 must be lowercase hex digest");
+    }
     for (const counter of journeyFallbackSuccessCounters) {
       if (journeyV3.fallbackSuccessCounters?.[counter] !== 0) {
         errors.push(`system: Journey V3 ${counter} fallback success count must be zero`);

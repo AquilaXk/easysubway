@@ -106,18 +106,20 @@ test("system release GO requires typed Journey V3 server-only evidence while NO_
   assert.deepEqual(validateSystemReleaseManifest({ manifest: missing, ...schemas }), []);
 });
 
-test("system release GO rejects Journey V3 owner drift, cross-RC identity and nonzero fallback success", () => {
+test("system release GO rejects Journey V3 policy, owner, identity and fallback drift", () => {
   for (const [name, mutate, expected] of [
-    ["owner repository", (manifest) => { manifest.journeyV3.owner.repository = "AquilaXk/easysubway"; }, null],
+    ["execution mode", (manifest) => { manifest.journeyV3.executionMode = "CLIENT_FALLBACK"; }, "system: Journey V3 execution mode must be SERVER_ONLY"],
+    ["owner repository", (manifest) => { manifest.journeyV3.owner.repository = "AquilaXk/easysubway"; }, "system: Journey V3 owner repository must be canonical backend"],
     ["owner git SHA", (manifest) => { manifest.journeyV3.owner.gitSha = "c".repeat(40); }, "system: Journey V3 owner git SHA must match backend component"],
     ["API contract", (manifest) => { manifest.journeyV3.owner.apiContractVersion = "api-v2"; }, "system: Journey V3 API contract must match backend component"],
-    ["fallback success", (manifest) => { manifest.journeyV3.fallbackSuccessCounters.local = 1; }, null],
+    ["evidence SHA", (manifest) => { manifest.journeyV3.evidenceSha256 = "invalid"; }, "system: Journey V3 evidence SHA-256 must be lowercase hex digest"],
+    ["fallback success", (manifest) => { manifest.journeyV3.fallbackSuccessCounters.local = 1; }, "system: Journey V3 local fallback success count must be zero"],
   ]) {
     const manifest = validManifest();
     mutate(manifest);
     const errors = validateSystemReleaseManifest({ manifest, ...schemas });
     assert.ok(errors.length > 0, name);
-    if (expected) assert.ok(errors.includes(expected), name);
+    assert.ok(errors.includes(expected), name);
     assert.equal(selectSystemReleaseDecision({ legacyDecision: "GO", manifest, ...schemas }), "NO_GO", name);
   }
 });

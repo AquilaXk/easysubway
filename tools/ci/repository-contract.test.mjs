@@ -578,6 +578,12 @@ test("Journey V3 server-only gate replaces the executable legacy datapack readin
   assert.equal(gate.releaseBlockerPolicy, true);
   assert.equal(gate.currentDecision, "NO_GO");
   assert.deepEqual(gate.canonicalOwner, { component: "backend", repository: "AquilaXk/easysubway-backend" });
+  assert.deepEqual(gate.executionPolicy, {
+    mode: "SERVER_ONLY",
+    missingOrInvalidServerResult: "EXPLICIT_FAILURE",
+    requestTimeFallbackAllowed: false,
+    operatorApprovedExactDeploymentRollbackOnly: true,
+  });
   assert.equal(gate.systemManifestBinding.block, "journeyV3");
   assert.deepEqual(gate.systemManifestBinding.sameRcEquality, [
     "journeyV3.owner.gitSha=backend.gitSha",
@@ -593,6 +599,17 @@ test("Journey V3 server-only gate replaces the executable legacy datapack readin
     previous: 0,
     alternateProvider: 0,
     bestEffort: 0,
+  });
+  assert.deepEqual(gate.failurePolicy, {
+    missingJourneyV3EvidenceKeepsNoGo: true,
+    crossRcIdentityKeepsNoGo: true,
+    nonzeroFallbackSuccessKeepsNoGo: true,
+    previousManifestOrHubSourceSuccessAllowed: false,
+  });
+  assert.deepEqual(gate.supersedes, {
+    releaseGate: "datapack-release-readiness",
+    archivePath,
+    archiveExecutable: false,
   });
   assert.equal(archived.architecturePrinciples.fallbackLadder.includes("STATIC_LOCAL"), true);
   assert.equal(gateIndex.gates.some((item) => item.file === path.basename(legacyPath)), false);
@@ -617,8 +634,8 @@ test("Journey V3 server-only gate replaces the executable legacy datapack readin
     },
   );
   assert.equal(governance.childIssueLinks.includes(2731), true);
-  assert.equal(coverage.claimLedger.find((claim) => claim.claimId === "realtime_eta_accuracy").releaseScopeArtifact, gatePath);
-  assert.equal(coverage.claimLedger.find((claim) => claim.claimId === "strict_accessible_route_guarantee").releaseScopeArtifact, gatePath);
+  assert.equal(coverage.claimLedger.find((claim) => claim.claimId === "realtime_eta_accuracy").releaseScopeArtifact, archivePath);
+  assert.equal(coverage.claimLedger.find((claim) => claim.claimId === "strict_accessible_route_guarantee").releaseScopeArtifact, archivePath);
 });
 
 test("route release readiness tracker keeps issue 1414 as a release blocker", () => {
