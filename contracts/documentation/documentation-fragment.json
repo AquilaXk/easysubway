@@ -2,15 +2,16 @@
   "$schema": "https://raw.githubusercontent.com/AquilaXk/easysubway/32ce139789b97ce1f0c9bb059966cfc19f497480/contracts/documentation/documentation-fragment.schema.json",
   "schemaVersion": 1,
   "repository": "AquilaXk/easysubway",
-  "sourceSha": "813556b82969ef59ac25cda6318b730dc4c79c0b",
+  "sourceSha": "a7743fb3b4eacd34ce2ae478a47214c1f29931cb",
   "status": "ACTIVE",
-  "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
+  "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
   "verificationEvidence": [
     "https://github.com/AquilaXk/easysubway/issues/2748",
     "https://github.com/AquilaXk/easysubway/issues/2861",
     "https://github.com/AquilaXk/easysubway/issues/2863",
     "https://github.com/AquilaXk/easysubway/issues/2876",
-    "https://github.com/AquilaXk/easysubway/issues/2886"
+    "https://github.com/AquilaXk/easysubway/issues/2886",
+    "https://github.com/AquilaXk/easysubway/issues/2902"
   ],
   "resources": [
     {
@@ -19,7 +20,7 @@
       "documentationFamily": "ARCHITECTURE",
       "kindCandidate": "FEDERATED_DOCUMENTATION_GOVERNANCE_ADR",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/ADR-HUB-0001.json:ba0ad77cec096e01b88b6bfe585c13b07fe5a71b",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/ADR-HUB-0001.json:ba0ad77cec096e01b88b6bfe585c13b07fe5a71b",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2748",
@@ -43,8 +44,8 @@
       "reviewTrigger": [
         "event:governance-decision-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/ADR-HUB-0001.json:ba0ad77cec096e01b88b6bfe585c13b07fe5a71b",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/ADR-HUB-0001.json:ba0ad77cec096e01b88b6bfe585c13b07fe5a71b",
       "verificationMethod": "owner-review",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2748"
@@ -69,7 +70,7 @@
       "documentationFamily": "OPERATIONS_RELIABILITY",
       "kindCandidate": "CLEAN_CHECKOUT_REPRODUCIBILITY_OWNER_CONTRACT",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/clean-checkout-reproducibility-owner-contract.json:dbb51a1ea7dfa817953dc2377ea1e73d632e0b33",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/clean-checkout-reproducibility-owner-contract.json:216c9bc6489c3013e5c0edd592ffa4114824341d",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2825",
@@ -94,8 +95,8 @@
       "reviewTrigger": [
         "event:clean-checkout-reproducibility-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/clean-checkout-reproducibility-owner-contract.json:dbb51a1ea7dfa817953dc2377ea1e73d632e0b33",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/clean-checkout-reproducibility-owner-contract.json:216c9bc6489c3013e5c0edd592ffa4114824341d",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2825",
@@ -121,7 +122,7 @@
       "documentationFamily": "API_CONTRACT",
       "kindCandidate": "DOCUMENTATION_FRAGMENT_SCHEMA",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/documentation-fragment.schema.json:0f36319a220b4e0c85e8ac8dee0667ff9fc3bac5",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/documentation-fragment.schema.json:0f36319a220b4e0c85e8ac8dee0667ff9fc3bac5",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2758",
@@ -146,8 +147,8 @@
       "reviewTrigger": [
         "event:documentation-fragment-schema-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/documentation-fragment.schema.json:0f36319a220b4e0c85e8ac8dee0667ff9fc3bac5",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/documentation-fragment.schema.json:0f36319a220b4e0c85e8ac8dee0667ff9fc3bac5",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2758",
@@ -173,7 +174,7 @@
       "documentationFamily": "QUALITY_TEST",
       "kindCandidate": "DOCUMENTATION_INVENTORY_AUDIT_REPORT_SCHEMA",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/documentation-inventory-audit-report.schema.json:07962de2189967ff302d43994e4a6be9a0d8c102",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/documentation-inventory-audit-report.schema.json:07962de2189967ff302d43994e4a6be9a0d8c102",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2833",
@@ -198,8 +199,8 @@
       "reviewTrigger": [
         "event:documentation-inventory-audit-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/documentation-inventory-audit-report.schema.json:07962de2189967ff302d43994e4a6be9a0d8c102",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/documentation-inventory-audit-report.schema.json:07962de2189967ff302d43994e4a6be9a0d8c102",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2833",
@@ -225,7 +226,7 @@
       "documentationFamily": "DATA_KNOWLEDGE",
       "kindCandidate": "DOCUMENTATION_RESOURCE_SCHEMA",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/documentation-resource.schema.json:9799af3e8b3b10dc2d406702c55aa443f9ea2360",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/documentation-resource.schema.json:9799af3e8b3b10dc2d406702c55aa443f9ea2360",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2758",
@@ -250,8 +251,8 @@
       "reviewTrigger": [
         "event:resource-schema-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/documentation-resource.schema.json:9799af3e8b3b10dc2d406702c55aa443f9ea2360",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/documentation-resource.schema.json:9799af3e8b3b10dc2d406702c55aa443f9ea2360",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2758"
@@ -276,7 +277,7 @@
       "documentationFamily": "RELEASE_CHANGE",
       "kindCandidate": "EXTERNAL_TERMINAL_LOCATOR_AUDIT_SCOPE",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/external-terminal-locator-audit-scope.json:f5816dbfd44bc964e66ecf05f4ccc889bb642bee",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/external-terminal-locator-audit-scope.json:f5816dbfd44bc964e66ecf05f4ccc889bb642bee",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2802",
@@ -301,8 +302,8 @@
       "reviewTrigger": [
         "event:external-terminal-locator-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/external-terminal-locator-audit-scope.json:f5816dbfd44bc964e66ecf05f4ccc889bb642bee",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/external-terminal-locator-audit-scope.json:f5816dbfd44bc964e66ecf05f4ccc889bb642bee",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2802",
@@ -328,7 +329,7 @@
       "documentationFamily": "ENGINEERING",
       "kindCandidate": "PLAN_DOC_EXECUTION_AUDIT_REPORT_SCHEMA",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/plan-doc-execution-audit-report.schema.json:76f83712d0df68493234c6bb758fcd21e0b370c3",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/plan-doc-execution-audit-report.schema.json:76f83712d0df68493234c6bb758fcd21e0b370c3",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2797",
@@ -353,8 +354,8 @@
       "reviewTrigger": [
         "event:plan-doc-execution-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/plan-doc-execution-audit-report.schema.json:76f83712d0df68493234c6bb758fcd21e0b370c3",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/plan-doc-execution-audit-report.schema.json:76f83712d0df68493234c6bb758fcd21e0b370c3",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2797",
@@ -380,7 +381,7 @@
       "documentationFamily": "GOVERNANCE_EVIDENCE",
       "kindCandidate": "PLAN_DOC_EXECUTION_AUDIT_SCOPE_SCHEMA",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/plan-doc-execution-audit-scope.schema.json:571311e1426e139b4ccdd10cb72decfa8d94a624",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/plan-doc-execution-audit-scope.schema.json:571311e1426e139b4ccdd10cb72decfa8d94a624",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2884",
@@ -404,8 +405,8 @@
       "reviewTrigger": [
         "event:plan-doc-execution-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/plan-doc-execution-audit-scope.schema.json:571311e1426e139b4ccdd10cb72decfa8d94a624",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/plan-doc-execution-audit-scope.schema.json:571311e1426e139b4ccdd10cb72decfa8d94a624",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2884",
@@ -431,7 +432,7 @@
       "documentationFamily": "USER_SUPPORT_LEGAL_PUBLIC",
       "kindCandidate": "POST_GO_BOUNDARY_AUDIT_SCOPE",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/post-go-boundary-audit-scope.json:d4546340f85543d6c1954478f188ed8b2defc74a",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/post-go-boundary-audit-scope.json:d4546340f85543d6c1954478f188ed8b2defc74a",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2800",
@@ -456,8 +457,8 @@
       "reviewTrigger": [
         "event:post-go-boundary-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/post-go-boundary-audit-scope.json:d4546340f85543d6c1954478f188ed8b2defc74a",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/post-go-boundary-audit-scope.json:d4546340f85543d6c1954478f188ed8b2defc74a",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2800",
@@ -483,7 +484,7 @@
       "documentationFamily": "PRODUCT",
       "kindCandidate": "PRODUCT_CLAIM_CATALOG",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/product-claim-catalog.json:328236058488f878d507423d53d147bc4fb46301",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/product-claim-catalog.json:328236058488f878d507423d53d147bc4fb46301",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2762",
@@ -508,8 +509,8 @@
       "reviewTrigger": [
         "event:public-claim-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/product-claim-catalog.json:328236058488f878d507423d53d147bc4fb46301",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/product-claim-catalog.json:328236058488f878d507423d53d147bc4fb46301",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2762"
@@ -534,7 +535,7 @@
       "documentationFamily": "SECURITY_PRIVACY",
       "kindCandidate": "PUBLIC_SENSITIVITY_AUDIT_SCOPE",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/public-sensitivity-audit-scope.json:2e6f9a532525bc447f90a850d0baddf7a74acfc4",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/public-sensitivity-audit-scope.json:2e6f9a532525bc447f90a850d0baddf7a74acfc4",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2748",
@@ -559,8 +560,8 @@
       "reviewTrigger": [
         "event:public-sensitivity-change"
       ],
-      "lastVerifiedAt": "2026-08-15T06:27:20.000Z",
-      "lastVerifiedIdentity": "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/public-sensitivity-audit-scope.json:2e6f9a532525bc447f90a850d0baddf7a74acfc4",
+      "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/public-sensitivity-audit-scope.json:2e6f9a532525bc447f90a850d0baddf7a74acfc4",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2748",
