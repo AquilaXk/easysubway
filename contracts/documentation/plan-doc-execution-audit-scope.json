@@ -1134,11 +1134,64 @@
       "allowedChangedFiles": [
         "contracts/documentation/documentation-fragment.json"
       ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2896,
+      "prNumber": 2897,
+      "mergeSha": "11b216b6658e9ad8b404180348eb065f96a67484",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/plan-doc-execution-audit-scope.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-plan-doc-execution.mjs",
+        "tools/repo/audit-plan-doc-execution.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2902,
+      "prNumber": 2903,
+      "mergeSha": "edcb9fdf2d8030eb840ed30a9e67410f000c4d62",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json",
+        "tools/ci/check-contracts.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-backend",
+      "issueNumber": 265,
+      "prNumber": 266,
+      "mergeSha": "ece7de500cd005a4f5ea7f130e739b3d1560b1c2",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-data",
+      "issueNumber": 424,
+      "prNumber": 425,
+      "mergeSha": "d7f31131c9e8c003ba813457f744f278fe49ad4a",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
     }
   ],
   "self": {
     "repository": "AquilaXk/easysubway",
-    "issueNumber": 2896,
+    "issueNumber": 2904,
     "planOwner": "PLAN-DOC",
     "changedPathClass": "HUB_GOVERNANCE_ONLY",
     "allowedChangedFiles": [
