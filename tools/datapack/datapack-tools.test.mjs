@@ -7162,6 +7162,9 @@ test("source inventory 검증기는 admitted candidate live sample evidence hash
 test("source inventory 검증기는 v1 optional source가 production 필수로 남는 것을 거부한다", async () => {
   const sourceInventory = JSON.parse(await readFile(path.join(root, "tools/datapack/source-inventory.json"), "utf8"));
   const invalidInventory = structuredClone(sourceInventory);
+  invalidInventory.sources.find(
+    (source) => source.id === "seoul-metro-transfer-distance-duration",
+  ).requiredForProductionPack = true;
   invalidInventory.sources.find((source) => source.id === "kric-disabled-toilet").requiredForProductionPack = true;
 
   const outputDir = path.join(tmpdir(), `easysubway-source-inventory-optional-scope-${Date.now()}`);
