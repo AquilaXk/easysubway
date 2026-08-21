@@ -181,7 +181,7 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
   }
   assert.deepEqual(validatePlanDocExecutionAuditReportSchema(reportSchema), []);
   const fragment = loadJson("contracts/documentation/documentation-fragment.json");
-  assert.equal(fragment.lastVerifiedAt, "2026-08-15T06:27:20.000Z");
+  assert.equal(fragment.lastVerifiedAt, "2026-08-21T14:00:00.000Z");
   assert.ok(Date.parse(fragment.lastVerifiedAt) >= Date.parse("2026-08-15T06:10:38.000Z"));
   assert.ok(fragment.resources.every((record) => record.lastVerifiedAt === fragment.lastVerifiedAt));
   assert.deepEqual(fragment.resources.map(({ resource, documentationFamily }) => [resource, documentationFamily]), [
@@ -198,10 +198,10 @@ test("plan-doc execution audit contracts fix the historical inventory and fail-c
     ["AquilaXk/easysubway:contracts/documentation/public-sensitivity-audit-scope.json", "SECURITY_PRIVACY"],
   ]);
   const report = fragment.resources.find((record) => record.resource.endsWith("plan-doc-execution-audit-report.schema.json"));
-  assert.equal(report?.canonicalIdentity, "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/plan-doc-execution-audit-report.schema.json:76f83712d0df68493234c6bb758fcd21e0b370c3");
+  assert.equal(report?.canonicalIdentity, "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/plan-doc-execution-audit-report.schema.json:76f83712d0df68493234c6bb758fcd21e0b370c3");
   assert.equal(report?.lastVerifiedIdentity, report?.canonicalIdentity);
   const stable = fragment.resources.find((record) => record.resource.endsWith("plan-doc-execution-audit-scope.schema.json"));
-  assert.deepEqual([stable?.kindCandidate, stable?.ownerIssue, stable?.canonicalIdentity, stable?.lastVerifiedIdentity, stable?.verificationEvidence], ["PLAN_DOC_EXECUTION_AUDIT_SCOPE_SCHEMA", "https://github.com/AquilaXk/easysubway/issues/2884", "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/plan-doc-execution-audit-scope.schema.json:571311e1426e139b4ccdd10cb72decfa8d94a624", "git:813556b82969ef59ac25cda6318b730dc4c79c0b:contracts/documentation/plan-doc-execution-audit-scope.schema.json:571311e1426e139b4ccdd10cb72decfa8d94a624", ["https://github.com/AquilaXk/easysubway/issues/2884", "https://github.com/AquilaXk/easysubway/pull/2885"]]);
+  assert.deepEqual([stable?.kindCandidate, stable?.ownerIssue, stable?.canonicalIdentity, stable?.lastVerifiedIdentity, stable?.verificationEvidence], ["PLAN_DOC_EXECUTION_AUDIT_SCOPE_SCHEMA", "https://github.com/AquilaXk/easysubway/issues/2884", "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/plan-doc-execution-audit-scope.schema.json:571311e1426e139b4ccdd10cb72decfa8d94a624", "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/plan-doc-execution-audit-scope.schema.json:571311e1426e139b4ccdd10cb72decfa8d94a624", ["https://github.com/AquilaXk/easysubway/issues/2884", "https://github.com/AquilaXk/easysubway/pull/2885"]]);
   assert.equal(fragment.resources.some((record) => record.resource.endsWith("plan-doc-execution-audit-scope.json")), false);
   const invalid = structuredClone(scope); invalid.historical[0].mergeSha = "a".repeat(40);
   assert.ok(validatePlanDocExecutionAuditScope(invalid).length > 0);
