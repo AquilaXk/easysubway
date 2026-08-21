@@ -555,94 +555,87 @@ test("route commercialization release gate blocks unsupported commercial route c
   assert.match(prTemplate, /route-commercialization-gate\.json/);
 });
 
-test("datapack release readiness gate blocks commercial datapack and realtime ETA claims", () => {
-  const gatePath = "release/product-gates/datapack-release-readiness-gate.json";
-  assert.equal(existsSync(path.join(root, gatePath)), true, "datapack release readiness gate must exist");
+test("Journey V3 server-only gate replaces the executable legacy datapack readiness gate", () => {
+  const gatePath = "release/product-gates/journey-v3-server-only-release-gate.json";
+  const legacyPath = "release/product-gates/datapack-release-readiness-gate.json";
+  const archivePath = "release/product-gates/superseded/datapack-release-readiness-gate.json";
+  assert.equal(existsSync(path.join(root, legacyPath)), false, "legacy datapack readiness gate must not remain executable");
+  assert.equal(existsSync(path.join(root, archivePath)), true, "legacy datapack readiness gate archive must exist");
+  assert.equal(existsSync(path.join(root, gatePath)), true, "Journey V3 server-only gate must exist");
 
   const gate = readJson(gatePath);
+  const archived = readJson(archivePath);
   const governance = readJson("release/product-gates/release-governance-gate.json");
-  const scope = readJson("release/product-gates/production-datapack-scope.json");
+  const gateIndex = readJson("contracts/release/gate-index.json");
+  const coverage = readJson("tools/datapack/nationwide-coverage-targets.json");
 
   assert.equal(gate.schemaVersion, 1);
   assert.equal(gate.applicationId, "easysubway");
   assert.equal(gate.androidApplicationId, "com.easysubway.app");
-  assert.equal(gate.releaseGate, "datapack-release-readiness");
-  assert.equal(gate.issue, 1414);
-  assert.equal(gate.absorbedFromIssue, 1419);
+  assert.equal(gate.releaseGate, "journey-v3-server-only-release");
+  assert.equal(gate.issue, 2731);
   assert.equal(gate.status, "IN_PROGRESS");
   assert.equal(gate.releaseBlockerPolicy, true);
   assert.equal(gate.currentDecision, "NO_GO");
-  assert.equal(gate.scope.platform.android, "RELEASE_REQUIRED");
-  assert.equal(gate.scope.platform.ios, "DEFERRED_OUT_OF_SCOPE");
-  assert.equal(gate.scope.productionClaim, "blocked_until_child_issues_and_evidence_closed");
-  assert.equal(gate.scope.safePublicClaimKo, "상록수·사당 검증 pilot");
-  assert.ok(gate.scope.forbiddenPublicClaimsKo.includes("전국 지하철 완전 지원"));
-  assert.ok(gate.scope.forbiddenPublicClaimsKo.includes("실시간 길찾기 정확 보장"));
-  assert.deepEqual(gate.architecturePrinciples.fallbackLadder, ["REALTIME", "PLANNED", "STATIC_LOCAL"]);
-  assert.ok(gate.offlineDatapackRequiredContents.includes("adjacent-station RIDE graph"));
-  assert.ok(gate.offlineDatapackRequiredContents.includes("trip and stop_times"));
-  assert.ok(gate.offlineDatapackRequiredContents.includes("canonical-to-provider realtime join keys"));
-  assert.equal(gate.realtimePayloadPolicy.allowedInDatapack, false);
-  assert.equal(gate.realtimePayloadPolicy.joinKeysAllowedInDatapack, true);
-  assert.equal(gate.realtimePayloadPolicy.validatorNegativeTestRequired, true);
-  assert.equal(gate.realtimePayloadPolicy.backendOnlyProviderKeyRequired, true);
-  assert.equal(gate.realtimePayloadPolicy.staleAsFreshAllowed, false);
-  assert.equal(gate.realtimePayloadPolicy.silentFallbackAllowed, false);
-  assert.equal(gate.strictAccessibilityPolicy.unknownCanProduceStrictFound, false);
-  assert.equal(gate.strictAccessibilityPolicy.generatedConnectorCanBeVerifiedEvidence, false);
-  assert.deepEqual(gate.childIssueLinks.sourceAdmission, [1397, 1416, 1621, 1399]);
-  assert.deepEqual(gate.childIssueLinks.offlineDatapackCompleteness, [1400, 1394, 1415, 1620]);
-  assert.deepEqual(gate.childIssueLinks.artifactVerificationAccuracy, [1393, 1395, 1417, 1418]);
-  assert.deepEqual(gate.childIssueLinks.userClaimUi, [1392, 1396, 1398]);
-  assert.deepEqual(gate.requiredArtifacts, {
-    routeAccuracyReport: "artifacts/route-accuracy-report.json",
-    realtimeProviderCoverageReport: "artifacts/realtime-provider-coverage-report.json",
-    regionalRealtimeProviderDecisionReport: "tools/realtime/regional-realtime-provider-decision-report.json",
-    routeAccessibilityRegressionReport: "artifacts/route-accessibility-regression-report.json",
-    routeGraphCoverageReport: "artifacts/route-graph-coverage-report.json",
-    routeV2ContractReport: "artifacts/route-v2-contract-report.json",
-    coverageGapReport: "artifacts/datapack-coverage-gaps.json",
-    itxCheongchunCoverageContract: "tools/datapack/itx-cheongchun-coverage-contract.json",
-    qualityMetricReport: "artifacts/datapack-quality-metrics.json",
-    routeGraphTopologyReport: "artifacts/route-graph-topology-report.json",
-    freshnessSlaPolicy: "release/product-gates/datapack-freshness-sla.json",
-    androidOfflineRouteEvidence: ".codex/evidence/datapack-release-readiness/<rc-or-run>/android-offline-route-summary.md",
+  assert.deepEqual(gate.canonicalOwner, { component: "backend", repository: "AquilaXk/easysubway-backend" });
+  assert.deepEqual(gate.executionPolicy, {
+    mode: "SERVER_ONLY",
+    missingOrInvalidServerResult: "EXPLICIT_FAILURE",
+    requestTimeFallbackAllowed: false,
+    operatorApprovedExactDeploymentRollbackOnly: true,
   });
-  assert.ok(
-    gate.completionConditions.includes(
-      "production pack contains zero realtime payload rows and includes a validator negative test",
-    ),
-  );
-  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("validate-datapack.mjs --require-production")));
-  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-coverage-report.mjs")));
-  assert.ok(gate.requiredVerificationCommands.some((command) =>
-    command.includes("build-regional-realtime-provider-decision-report.mjs")
-    && command.includes("--targets tools/datapack/nationwide-coverage-targets.json")
-    && command.includes("--contract tools/realtime/regional-realtime-provider-decisions.json")
-    && command.includes("--output tools/realtime/regional-realtime-provider-decision-report.json")));
-  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("build-route-graph-topology-report.mjs")));
-  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("report-coverage-gaps.mjs")));
-  assert.ok(gate.requiredVerificationCommands.some((command) => command.includes("itx-cheongchun-coverage-contract.test.mjs")));
-  assert.equal(gate.evidencePolicy.githubSummaryOnly, true);
-  assert.ok(gate.evidencePolicy.forbiddenInGithubSummary.includes("backend-only provider key"));
-  assert.ok(governance.latestGoNoGoStatus.blockingOpenIssues.includes(1414));
-  assert.equal(governance.latestGoNoGoStatus.blockingOpenIssues.includes(1419), false);
-  assert.ok(governance.latestGoNoGoStatus.remainingP0Blockers.includes("datapack-release-readiness-tracker-evidence"));
+  assert.equal(gate.systemManifestBinding.block, "journeyV3");
+  assert.deepEqual(gate.systemManifestBinding.sameRcEquality, [
+    "journeyV3.owner.gitSha=backend.gitSha",
+    "journeyV3.owner.apiContractVersion=backend.artifactIdentity.apiContractVersion",
+  ]);
+  assert.deepEqual(gate.systemManifestBinding.fallbackSuccessCounters, {
+    hubSource: 0,
+    legacy: 0,
+    local: 0,
+    routeV1: 0,
+    routeV2: 0,
+    stale: 0,
+    previous: 0,
+    alternateProvider: 0,
+    bestEffort: 0,
+  });
+  assert.deepEqual(gate.failurePolicy, {
+    missingJourneyV3EvidenceKeepsNoGo: true,
+    crossRcIdentityKeepsNoGo: true,
+    nonzeroFallbackSuccessKeepsNoGo: true,
+    previousManifestOrHubSourceSuccessAllowed: false,
+  });
+  assert.deepEqual(gate.supersedes, {
+    releaseGate: "datapack-release-readiness",
+    archivePath,
+    archiveExecutable: false,
+  });
+  assert.equal(archived.architecturePrinciples.fallbackLadder.includes("STATIC_LOCAL"), true);
+  assert.equal(gateIndex.gates.some((item) => item.file === path.basename(legacyPath)), false);
+  assert.deepEqual(gateIndex.gates.find((item) => item.file === path.basename(gatePath)), {
+    file: path.basename(gatePath),
+    scope: "product",
+    ownerComponent: "hub",
+    area: "journey",
+  });
+  assert.equal(governance.latestGoNoGoStatus.blockingOpenIssues.includes(2731), true);
+  assert.ok(governance.latestGoNoGoStatus.remainingP0Blockers.includes("journey-v3-server-only-release-evidence"));
   assert.deepEqual(
-    governance.gates.find((item) => item.id === "G13_DATAPACK_RELEASE_READINESS"),
+    governance.gates.find((item) => item.id === "G13_JOURNEY_V3_SERVER_ONLY"),
     {
-      id: "G13_DATAPACK_RELEASE_READINESS",
-      issue: 1414,
+      id: "G13_JOURNEY_V3_SERVER_ONLY",
+      issue: 2731,
       priority: "P0",
       status: "IN_PROGRESS",
-      owner: "datapack-release",
-      nextAction: "데이터팩·실시간 ETA readiness tracker 하위 이슈와 production artifact evidence 수집",
+      owner: "journey-release",
+      nextAction: "Journey V3 server-only same-RC identity와 no-fallback zero evidence 수집",
       evidenceReference: gatePath,
     },
   );
-  assert.equal(governance.childIssueLinks.includes(1419), false);
-  assert.ok(scope.linkedReleaseBlockers.includes(1414));
-  assert.equal(scope.linkedReleaseBlockers.includes(1419), false);
+  assert.equal(governance.childIssueLinks.includes(2731), true);
+  assert.equal(coverage.claimLedger.find((claim) => claim.claimId === "realtime_eta_accuracy").releaseScopeArtifact, archivePath);
+  assert.equal(coverage.claimLedger.find((claim) => claim.claimId === "strict_accessible_route_guarantee").releaseScopeArtifact, archivePath);
 });
 
 test("route release readiness tracker keeps issue 1414 as a release blocker", () => {
@@ -6257,6 +6250,19 @@ test("[system-release-generator] FINAL은 Hub와 네 target SHA를 결속한 sys
     }
     canonicalGoCandidate.platform.artifactIdentity.environment = "production";
     canonicalGoCandidate.data.artifactIdentity.releaseSequence = Math.max(1, canonicalGoCandidate.data.artifactIdentity.releaseSequence);
+    canonicalGoCandidate.journeyV3 = {
+      executionMode: "SERVER_ONLY",
+      owner: {
+        repository: "AquilaXk/easysubway-backend",
+        gitSha: canonicalGoCandidate.backend.gitSha,
+        apiContractVersion: canonicalGoCandidate.backend.artifactIdentity.apiContractVersion,
+      },
+      evidenceSha256: "a".repeat(64),
+      fallbackSuccessCounters: {
+        hubSource: 0, legacy: 0, local: 0, routeV1: 0, routeV2: 0,
+        stale: 0, previous: 0, alternateProvider: 0, bestEffort: 0,
+      },
+    };
     assert.equal(
       selectSystemReleaseDecision({ legacyDecision: "GO", manifest: canonicalGoCandidate, ...semanticSchemas }),
       "GO",
@@ -7444,7 +7450,7 @@ test("[gate-ownership] Android release 100 governance gate는 Android-only 범�
   assert.equal(gate.latestGoNoGoStatus.qaEvidenceDateKst, "2026-07-15");
   assert.equal(gate.latestGoNoGoStatus.currentDecision, "NO_GO");
   assert.equal(gate.latestGoNoGoStatus.decisionOwner, "release-owner");
-  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414]);
+  assert.deepEqual(gate.latestGoNoGoStatus.blockingOpenIssues, [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414, 2731]);
   assert.deepEqual(gate.latestGoNoGoStatus.recentlyResolvedEvidence, [
     "production-datapack-release-publish-success",
     "store-distribution-evidence-success",
@@ -7466,7 +7472,7 @@ test("[gate-ownership] Android release 100 governance gate는 Android-only 범�
     "fixed-release-versioncode-build-submit-procedure",
     "route-result-v2-ui-badge-accessibility-copy-evidence",
     "route-release-readiness-tracker-evidence",
-    "datapack-release-readiness-tracker-evidence",
+    "journey-v3-server-only-release-evidence",
   ]);
   assert.deepEqual(gate.latestGoNoGoStatus.remainingApprovalPrerequisites, [
     "release-owner-final-go-approval",
@@ -7671,7 +7677,7 @@ test("[gate-ownership] Android release 100 governance gate는 Android-only 범�
   );
   assert.deepEqual(
     gate.childIssueLinks,
-    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230, 1414],
+    [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230, 1414, 2731],
   );
   for (const item of gate.gates.filter((gateItem) => gateItem.priority.startsWith("P0"))) {
     assert.ok(item.owner, `${item.id} must define owner`);

@@ -10,6 +10,9 @@ const slots = ["mobile", "backend", "data", "platform"];
 const canonicalHubRepository = "AquilaXk/easysubway";
 const canonicalRepositories = Object.fromEntries(slots.map((slot) => [slot, `AquilaXk/easysubway-${slot}`]));
 const allowedRepositories = Object.fromEntries(slots.map((slot) => [slot, new Set(["AquilaXk/easysubway", canonicalRepositories[slot]])]));
+const journeyFallbackSuccessCounters = [
+  "hubSource", "legacy", "local", "routeV1", "routeV2", "stale", "previous", "alternateProvider", "bestEffort",
+];
 
 export function validateSystemReleaseManifest({ manifest, componentSchema, systemSchema, issueRefSchema }) {
   const errors = [...validateSchema(systemSchema, manifest).errors];
@@ -41,7 +44,27 @@ export function validateSystemReleaseManifest({ manifest, componentSchema, syste
   if (new Set(components.map((component) => component.component)).size !== components.length) errors.push("system: duplicate component name");
   if (manifest.mobile?.artifactIdentity?.bundledDataManifestSha256 !== manifest.data?.artifactIdentity?.manifestSha256) errors.push("system: mobile/data manifest hash mismatch");
   if (manifest.backend?.artifactIdentity?.imageDigest !== manifest.platform?.artifactIdentity?.deployedImageDigest) errors.push("system: backend/platform image digest mismatch");
+  const journeyV3 = manifest.journeyV3;
+  if (journeyV3 && typeof journeyV3 === "object" && !Array.isArray(journeyV3)) {
+    if (journeyV3.executionMode !== "SERVER_ONLY") errors.push("system: Journey V3 execution mode must be SERVER_ONLY");
+    if (journeyV3.owner?.repository !== canonicalRepositories.backend) errors.push("system: Journey V3 owner repository must be canonical backend");
+    if (journeyV3.owner?.gitSha !== manifest.backend?.gitSha) errors.push("system: Journey V3 owner git SHA must match backend component");
+    if (journeyV3.owner?.apiContractVersion !== manifest.backend?.artifactIdentity?.apiContractVersion) {
+      errors.push("system: Journey V3 API contract must match backend component");
+    }
+    if (!/^[a-f0-9]{64}$/.test(journeyV3.evidenceSha256 ?? "")) {
+      errors.push("system: Journey V3 evidence SHA-256 must be lowercase hex digest");
+    }
+    for (const counter of journeyFallbackSuccessCounters) {
+      if (journeyV3.fallbackSuccessCounters?.[counter] !== 0) {
+        errors.push(`system: Journey V3 ${counter} fallback success count must be zero`);
+      }
+    }
+  }
   if (manifest.decision === "GO") {
+    if (!journeyV3 || typeof journeyV3 !== "object" || Array.isArray(journeyV3)) {
+      errors.push("system: GO requires Journey V3 server-only evidence");
+    }
     if (manifest.phase !== "FINAL") errors.push("system: GO requires FINAL phase");
     if (slots.some((slot) => manifest[slot]?.repository !== canonicalRepositories[slot])) errors.push("system: GO requires canonical target repositories");
     if (manifest.platform?.artifactIdentity?.environment !== "production") errors.push("system: GO requires production platform");
