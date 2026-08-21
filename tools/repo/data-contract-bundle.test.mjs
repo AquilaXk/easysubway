@@ -21,11 +21,11 @@ const requiredProductionSourceIds = [
   "kric-subway-timetable",
   "seoul-metro-transfer-distance-duration",
 ];
-const transferExternalRegistrationAuthorities = [
+const transferExternalSourceRegistrations = [
   {
     sourceId: "seoul-metro-transfer-distance-duration",
-    authorityRepository: "AquilaXk/easysubway-data",
-    authorityIssue: 350,
+    registrationRepository: "AquilaXk/easysubway-data",
+    registrationIssue: 350,
     snapshotId: "seoul-metro-transfer-distance-duration-20260815T094038817Z",
     decision: "APPROVED",
     productionUseAllowed: true,
@@ -90,12 +90,12 @@ test("production datapack은 retired movement source를 required·selected·cove
   assert.deepEqual(scope.productionSourceSet.requiredSourceIds, requiredProductionSourceIds);
   assert.deepEqual(bundledScope.productionSourceSet.requiredSourceIds, requiredProductionSourceIds);
   assert.deepEqual(
-    scope.productionSourceSet.externalRegistrationAuthorities,
-    transferExternalRegistrationAuthorities,
+    scope.productionSourceSet.externalSourceRegistrations,
+    transferExternalSourceRegistrations,
   );
   assert.deepEqual(
-    bundledScope.productionSourceSet.externalRegistrationAuthorities,
-    transferExternalRegistrationAuthorities,
+    bundledScope.productionSourceSet.externalSourceRegistrations,
+    transferExternalSourceRegistrations,
   );
 
   for (const sourceId of productionForbiddenMovementSourceIds) {

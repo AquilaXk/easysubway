@@ -7186,7 +7186,7 @@ test("source inventory 검증기는 v1 optional source가 production 필수로 �
   );
 });
 
-test("source inventory 검증기는 required source의 외부 등록 authority를 exact 검증한다", async () => {
+test("source inventory 검증기는 required source의 외부 등록 record를 exact 검증한다", async () => {
   const scope = JSON.parse(
     await readFile(path.join(root, "release/product-gates/production-datapack-scope.json"), "utf8"),
   );
@@ -7205,36 +7205,36 @@ test("source inventory 검증기는 required source의 외부 등록 authority�
   };
 
   await validateScope(scope);
-  const [authority] = scope.productionSourceSet.externalRegistrationAuthorities;
+  const [registration] = scope.productionSourceSet.externalSourceRegistrations;
 
   const missing = structuredClone(scope);
-  missing.productionSourceSet.externalRegistrationAuthorities = [];
+  missing.productionSourceSet.externalSourceRegistrations = [];
   await assert.rejects(validateScope(missing), /required source .* must be locally required or externally registered/);
 
   const duplicate = structuredClone(scope);
-  duplicate.productionSourceSet.externalRegistrationAuthorities.push(structuredClone(authority));
-  await assert.rejects(validateScope(duplicate), /duplicate external registration authority/);
+  duplicate.productionSourceSet.externalSourceRegistrations.push(structuredClone(registration));
+  await assert.rejects(validateScope(duplicate), /duplicate external source registration/);
 
   const tamperedDecision = structuredClone(scope);
-  tamperedDecision.productionSourceSet.externalRegistrationAuthorities[0].decision = "REVIEW_REQUIRED";
+  tamperedDecision.productionSourceSet.externalSourceRegistrations[0].decision = "REVIEW_REQUIRED";
   await assert.rejects(validateScope(tamperedDecision), /decision must be APPROVED/);
 
   const tamperedSnapshot = structuredClone(scope);
-  tamperedSnapshot.productionSourceSet.externalRegistrationAuthorities[0].snapshotId = "";
+  tamperedSnapshot.productionSourceSet.externalSourceRegistrations[0].snapshotId = "";
   await assert.rejects(validateScope(tamperedSnapshot), /snapshotId must be a non-empty string/);
 
   const localRequired = structuredClone(scope);
-  localRequired.productionSourceSet.externalRegistrationAuthorities[0].sourceId = "molit-urban-rail-full-route";
+  localRequired.productionSourceSet.externalSourceRegistrations[0].sourceId = "molit-urban-rail-full-route";
   await assert.rejects(
     validateScope(localRequired),
-    /external registration authority .* requires a locally non-production required source/,
+    /external source registration .* requires a locally non-production required source/,
   );
 
   const optional = structuredClone(scope);
-  optional.productionSourceSet.externalRegistrationAuthorities[0].sourceId = "kric-disabled-toilet";
+  optional.productionSourceSet.externalSourceRegistrations[0].sourceId = "kric-disabled-toilet";
   await assert.rejects(
     validateScope(optional),
-    /external registration authority .* requires a locally non-production required source/,
+    /external source registration .* requires a locally non-production required source/,
   );
 });
 

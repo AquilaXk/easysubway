@@ -118,11 +118,11 @@
       "kric-subway-timetable",
       "seoul-metro-transfer-distance-duration"
     ],
-    "externalRegistrationAuthorities": [
+    "externalSourceRegistrations": [
       {
         "sourceId": "seoul-metro-transfer-distance-duration",
-        "authorityRepository": "AquilaXk/easysubway-data",
-        "authorityIssue": 350,
+        "registrationRepository": "AquilaXk/easysubway-data",
+        "registrationIssue": 350,
         "snapshotId": "seoul-metro-transfer-distance-duration-20260815T094038817Z",
         "decision": "APPROVED",
         "productionUseAllowed": true
