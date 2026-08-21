@@ -9,6 +9,17 @@ import { selectSystemReleaseDecision, validateSystemReleaseManifest } from "./va
 const sha = "a".repeat(64);
 const gitSha = "b".repeat(40);
 const issue = (repository, number) => `AquilaXk/${repository}#${number}`;
+const zeroFallbackSuccessCounters = () => ({
+  hubSource: 0,
+  legacy: 0,
+  local: 0,
+  routeV1: 0,
+  routeV2: 0,
+  stale: 0,
+  previous: 0,
+  alternateProvider: 0,
+  bestEffort: 0,
+});
 
 function validManifest() {
   return {
@@ -20,6 +31,16 @@ function validManifest() {
     issueRefs: [issue("easysubway", 2693)],
     hub: { repository: "AquilaXk/easysubway", gitSha },
     contracts: { version: "1.2.3", sha256: sha },
+    journeyV3: {
+      executionMode: "SERVER_ONLY",
+      owner: {
+        repository: "AquilaXk/easysubway-backend",
+        gitSha,
+        apiContractVersion: "api-v1",
+      },
+      evidenceSha256: sha,
+      fallbackSuccessCounters: zeroFallbackSuccessCounters(),
+    },
     mobile: {
       schemaVersion: 1, component: "mobile", repository: "AquilaXk/easysubway-mobile", gitSha,
       artifactIdentity: { versionName: "1.0.0", versionCode: 1, aabSha256: sha, bundledDataManifestSha256: sha },
@@ -71,6 +92,33 @@ test("system release decision requires legacy GO and every GO transition conditi
     const manifest = validManifest();
     mutate(manifest);
     assert.equal(selectSystemReleaseDecision({ legacyDecision: "GO", manifest, ...schemas }), "NO_GO");
+  }
+});
+
+test("system release GO requires typed Journey V3 server-only evidence while NO_GO may wait for receipts", () => {
+  const missing = validManifest();
+  delete missing.journeyV3;
+  assert.ok(validateSystemReleaseManifest({ manifest: missing, ...schemas })
+    .includes("system: GO requires Journey V3 server-only evidence"));
+  assert.equal(selectSystemReleaseDecision({ legacyDecision: "GO", manifest: missing, ...schemas }), "NO_GO");
+
+  missing.decision = "NO_GO";
+  assert.deepEqual(validateSystemReleaseManifest({ manifest: missing, ...schemas }), []);
+});
+
+test("system release GO rejects Journey V3 owner drift, cross-RC identity and nonzero fallback success", () => {
+  for (const [name, mutate, expected] of [
+    ["owner repository", (manifest) => { manifest.journeyV3.owner.repository = "AquilaXk/easysubway"; }, null],
+    ["owner git SHA", (manifest) => { manifest.journeyV3.owner.gitSha = "c".repeat(40); }, "system: Journey V3 owner git SHA must match backend component"],
+    ["API contract", (manifest) => { manifest.journeyV3.owner.apiContractVersion = "api-v2"; }, "system: Journey V3 API contract must match backend component"],
+    ["fallback success", (manifest) => { manifest.journeyV3.fallbackSuccessCounters.local = 1; }, null],
+  ]) {
+    const manifest = validManifest();
+    mutate(manifest);
+    const errors = validateSystemReleaseManifest({ manifest, ...schemas });
+    assert.ok(errors.length > 0, name);
+    if (expected) assert.ok(errors.includes(expected), name);
+    assert.equal(selectSystemReleaseDecision({ legacyDecision: "GO", manifest, ...schemas }), "NO_GO", name);
   }
 });
 
