@@ -138,14 +138,14 @@ test("public sensitivity contracts bind the exact scope and corrected owner rece
   assert.ok(validatePublicSensitivityAuditScope(offsetInvalid).some((error) => error.includes("revalidation/expiry")));
 });
 
-test("plan-doc execution audit contracts fix the 81-record historical inventory and fail-closed report", () => {
+test("plan-doc execution audit contracts fix the 83-record historical inventory and fail-closed report", () => {
   const scope = loadJson("contracts/documentation/plan-doc-execution-audit-scope.json");
   const scopeSchema = loadJson("contracts/documentation/plan-doc-execution-audit-scope.schema.json");
   const reportSchema = loadJson("contracts/documentation/plan-doc-execution-audit-report.schema.json");
   assert.equal(scope.schemaVersion, 2);
-  assert.equal(scope.historical.length, 81);
+  assert.equal(scope.historical.length, 83);
   assert.deepEqual(scope.repositories, ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"]);
-  assert.equal(scope.self.issueNumber, 2906);
+  assert.equal(scope.self.issueNumber, 2908);
   assert.equal(scopeSchema.properties.historical.minItems, 1);
   assert.equal(scopeSchema.properties.historical.maxItems, undefined);
   assert.deepEqual(scopeSchema.properties.self.properties.issueNumber, { type: "integer", minimum: 1 });
@@ -166,6 +166,8 @@ test("plan-doc execution audit contracts fix the 81-record historical inventory 
   assert.deepEqual(recordsByIdentity.get("AquilaXk/easysubway-data:425"), { repository: "AquilaXk/easysubway-data", issueNumber: 424, prNumber: 425, mergeSha: "d7f31131c9e8c003ba813457f744f278fe49ad4a", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] });
   assert.deepEqual(recordsByIdentity.get("AquilaXk/easysubway:2905"), { repository: "AquilaXk/easysubway", issueNumber: 2904, prNumber: 2905, mergeSha: "9668ad8cbd74092f9510d7ea284096cb5c2a2d63", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY", allowedChangedFiles: ["contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"] });
   assert.deepEqual(recordsByIdentity.get("AquilaXk/easysubway-data:431"), { repository: "AquilaXk/easysubway-data", issueNumber: 430, prNumber: 431, mergeSha: "24ed8c9d5db76331cc4f8885318f8e0c73572faa", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] });
+  assert.deepEqual(recordsByIdentity.get("AquilaXk/easysubway:2907"), { repository: "AquilaXk/easysubway", issueNumber: 2906, prNumber: 2907, mergeSha: "6e7ebfb33da05c8111964e4e9d3fe3262b86c92a", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY", allowedChangedFiles: ["contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"] });
+  assert.deepEqual(recordsByIdentity.get("AquilaXk/easysubway-mobile:266"), { repository: "AquilaXk/easysubway-mobile", issueNumber: 265, prNumber: 266, mergeSha: "7bb516ba70d88e1d047d673c62bad6f74703fb50", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] });
   assert.equal(scope.historical.some((record) => record.repository === "AquilaXk/easysubway" && record.issueNumber === 2890 && record.prNumber === 2891), false);
   assert.equal(scope.historical.some((record) => record.repository === "AquilaXk/easysubway" && record.issueNumber === 2731 && record.prNumber === 2893), false);
   assert.deepEqual(scope.self.allowedChangedFiles, ["contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"]);

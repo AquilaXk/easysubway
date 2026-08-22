@@ -1215,11 +1215,39 @@
       "allowedChangedFiles": [
         "contracts/documentation/documentation-fragment.json"
       ]
+    },
+    {
+      "repository": "AquilaXk/easysubway",
+      "issueNumber": 2906,
+      "prNumber": 2907,
+      "mergeSha": "6e7ebfb33da05c8111964e4e9d3fe3262b86c92a",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "HUB_GOVERNANCE_ONLY",
+      "allowedChangedFiles": [
+        "contracts/documentation/plan-doc-execution-audit-scope.json",
+        "tools/ci/check-contracts.mjs",
+        "tools/ci/check-contracts.test.mjs",
+        "tools/repo/audit-plan-doc-execution.mjs",
+        "tools/repo/audit-plan-doc-execution.test.mjs"
+      ]
+    },
+    {
+      "repository": "AquilaXk/easysubway-mobile",
+      "issueNumber": 265,
+      "prNumber": 266,
+      "mergeSha": "7bb516ba70d88e1d047d673c62bad6f74703fb50",
+      "relation": "CLOSES",
+      "planOwner": "PLAN-DOC",
+      "changedPathClass": "TARGET_DOCUMENTATION_FRAGMENT",
+      "allowedChangedFiles": [
+        "contracts/documentation/documentation-fragment.json"
+      ]
     }
   ],
   "self": {
     "repository": "AquilaXk/easysubway",
-    "issueNumber": 2906,
+    "issueNumber": 2908,
     "planOwner": "PLAN-DOC",
     "changedPathClass": "HUB_GOVERNANCE_ONLY",
     "allowedChangedFiles": [
