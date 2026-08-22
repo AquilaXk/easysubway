@@ -904,9 +904,9 @@ export function validatePublicSensitivityAuditReportSchema(schema, errors = [], 
 
 export function validatePlanDocExecutionAuditScope(scope, errors = [], path = "plan-doc-execution-audit-scope") {
   const repositories = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
-  if (scope?.schemaVersion !== 2 || scope?.planOwner !== "PLAN-DOC" || scope?.self?.repository !== "AquilaXk/easysubway" || scope?.self?.issueNumber !== 2906 || scope?.self?.planOwner !== "PLAN-DOC" || JSON.stringify(scope?.repositories) !== JSON.stringify(repositories)) errors.push(`${path}: exact federated PLAN-DOC self binding이 필요하다`);
+  if (scope?.schemaVersion !== 2 || scope?.planOwner !== "PLAN-DOC" || scope?.self?.repository !== "AquilaXk/easysubway" || scope?.self?.issueNumber !== 2908 || scope?.self?.planOwner !== "PLAN-DOC" || JSON.stringify(scope?.repositories) !== JSON.stringify(repositories)) errors.push(`${path}: exact federated PLAN-DOC self binding이 필요하다`);
   const records = scope?.historical;
-  if (!Array.isArray(records) || records.length !== 81 || new Set(records.map((record) => `${record?.repository}:${record?.prNumber}`)).size !== 81 || new Set(records.map((record) => `${record?.repository}:${record?.mergeSha}`)).size !== 81 || records.some((record) => record?.planOwner !== "PLAN-DOC" || !Array.isArray(record?.allowedChangedFiles))) errors.push(`${path}: exact federated historical PLAN-DOC inventory가 필요하다`);
+  if (!Array.isArray(records) || records.length !== 83 || new Set(records.map((record) => `${record?.repository}:${record?.prNumber}`)).size !== 83 || new Set(records.map((record) => `${record?.repository}:${record?.mergeSha}`)).size !== 83 || records.some((record) => record?.planOwner !== "PLAN-DOC" || !Array.isArray(record?.allowedChangedFiles))) errors.push(`${path}: exact federated historical PLAN-DOC inventory가 필요하다`);
   errors.push(...validatePlanDocExecutionAuditInventory(scope).map((error) => `${path}: ${error}`));
   return errors;
 }
