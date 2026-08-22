@@ -13,17 +13,17 @@ const MAX_ITEMS = 3000;
 const execFileAsync = promisify(execFile);
 const CLOSING_ISSUES_QUERY = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { number merged mergeCommit { oid } closingIssuesReferences(first: 100) { totalCount pageInfo { hasNextPage } nodes { number state repository { nameWithOwner } } } } } }`;
 const SELF_FILES = ["contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"];
-const EXPECTED_SCOPE_CANONICAL_SHA256 = "203abbe3dee3566e5ab2cf1fdbfa68dbaabdc06050dd1df74de896b0a4455df0";
+const EXPECTED_SCOPE_CANONICAL_SHA256 = "2ba410fc5861bb231c016c5c3eaf27ce025014cf24266c1b7155be37169bae25";
 
 export class AuditIncomplete extends Error { constructor(code, identity) { super(code); this.code = code; this.identity = identity; } }
 
 export function validatePlanDocExecutionScope(scope, errors = []) {
   if (scope?.schemaVersion !== 2 || scope?.planOwner !== "PLAN-DOC" || JSON.stringify(scope?.repositories) !== JSON.stringify(REPOSITORIES)) errors.push("scope header mismatch");
   const records = scope?.historical;
-  if (!Array.isArray(records) || records.length !== 83) return [...errors, "historical inventory count mismatch"];
+  if (!Array.isArray(records) || records.length !== 85) return [...errors, "historical inventory count mismatch"];
   const key = (record, field) => `${record?.repository}:${record?.[field]}`;
-  if (new Set(records.map((record) => key(record, "prNumber"))).size !== 83) errors.push("duplicate historical record identity");
-  if (new Set(records.map((record) => key(record, "mergeSha"))).size !== 83) errors.push("duplicate historical merge identity");
+  if (new Set(records.map((record) => key(record, "prNumber"))).size !== 85) errors.push("duplicate historical record identity");
+  if (new Set(records.map((record) => key(record, "mergeSha"))).size !== 85) errors.push("duplicate historical merge identity");
   for (const record of records) {
     if (!REPOSITORIES.includes(record?.repository) || !Number.isInteger(record?.issueNumber) || !Number.isInteger(record?.prNumber) || !/^[0-9a-f]{40}$/.test(record?.mergeSha) || !["CLOSES", "COORDINATOR_FOLLOWUP"].includes(record?.relation) || record?.planOwner !== "PLAN-DOC" || !["HUB_GOVERNANCE_ONLY", "PLAN_DOC_CI_RECOVERY", "TARGET_DOCUMENTATION_FRAGMENT", "TARGET_PUBLIC_DOCUMENTATION"].includes(record?.changedPathClass) || !sortedUniquePaths(record?.allowedChangedFiles)) errors.push(`historical record malformed:${record?.repository}:${record?.prNumber}`);
   }
@@ -32,7 +32,7 @@ export function validatePlanDocExecutionScope(scope, errors = []) {
   const coordinator = records.find((record) => record.repository === "AquilaXk/easysubway" && record.prNumber === 2878);
   if (coordinator?.issueNumber !== 2729 || coordinator?.relation !== "COORDINATOR_FOLLOWUP") errors.push("coordinator relation binding mismatch");
   const self = scope?.self;
-  if (self?.repository !== "AquilaXk/easysubway" || self?.issueNumber !== 2908 || self?.planOwner !== "PLAN-DOC" || self?.changedPathClass !== "HUB_GOVERNANCE_ONLY" || JSON.stringify(self?.allowedChangedFiles) !== JSON.stringify(SELF_FILES)) errors.push("self binding mismatch");
+  if (self?.repository !== "AquilaXk/easysubway" || self?.issueNumber !== 2910 || self?.planOwner !== "PLAN-DOC" || self?.changedPathClass !== "HUB_GOVERNANCE_ONLY" || JSON.stringify(self?.allowedChangedFiles) !== JSON.stringify(SELF_FILES)) errors.push("self binding mismatch");
   if (sha256(JSON.stringify(scope)) !== EXPECTED_SCOPE_CANONICAL_SHA256) errors.push("historical frozen inventory mismatch");
   return errors;
 }
