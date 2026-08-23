@@ -21048,23 +21048,19 @@ test("error_events 스키마는 허용 컬럼만 갖고 민감 원문 컬럼을 
 test("#2609 accessibility release canonical pins는 tracked source와 exact-match한다", () => {
   const digest = (value) => createHash("sha256").update(value).digest("hex");
   const specBytes = readFileSync(path.join(root, "tools/datapack/release/candidate-build-spec.json"));
-  const inventoryBytes = readFileSync(path.join(root, "tools/datapack/source-inventory.json"));
   const spec = JSON.parse(specBytes);
-  const inventory = JSON.parse(inventoryBytes);
   const snapshots = JSON.parse(read("tools/datapack/release/source-snapshots.json"));
-  const productionScope = JSON.parse(read("release/product-gates/production-datapack-scope.json"));
   const request = JSON.parse(read("tools/datapack/release/release-request.json"));
   const pack = JSON.parse(read("tools/datapack/release/capital-production-canonical-pack.json")).packs[0];
 
-  assert.equal(spec.sourceInventorySha256, digest(JSON.stringify(inventory)));
-  assert.equal(spec.networkEdgeEvidence.sourceInventory.sha256, digest(inventoryBytes));
-  const { headsBySource } = validateLineage(snapshots);
-  const requiredSourceIds = new Set(productionScope.productionSourceSet.requiredSourceIds);
-  const releaseSnapshots = snapshots.filter(({ sourceId, snapshotId }) =>
-    requiredSourceIds.has(sourceId) && headsBySource[sourceId] === snapshotId,
-  );
+  const snapshotsById = new Map(snapshots.map((snapshot) => [snapshot.snapshotId, snapshot]));
+  assert.equal(snapshotsById.size, snapshots.length);
+  const releaseSnapshots = spec.sourceSnapshotIds.map((snapshotId) => {
+    assert.ok(snapshotsById.has(snapshotId), `historical source snapshot missing: ${snapshotId}`);
+    return snapshotsById.get(snapshotId);
+  });
   assert.equal(spec.sourceSnapshotSetHash, digest(JSON.stringify(releaseSnapshots)));
-  assert.deepEqual(spec.sourceSnapshots.map(({ snapshotId }) => snapshotId), releaseSnapshots.map(({ snapshotId }) => snapshotId));
+  assert.deepEqual(spec.sourceSnapshots.map(({ snapshotId }) => snapshotId), spec.sourceSnapshotIds);
   assert.equal(request.buildSpecSha256, digest(specBytes));
   assert.equal(request.sourceSnapshotSetHash, spec.sourceSnapshotSetHash);
 

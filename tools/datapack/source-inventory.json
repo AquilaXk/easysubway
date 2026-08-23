@@ -8261,6 +8261,18 @@
         "gzipSha256": "94e712d32860a7a6e4b4c1f1d9651dc25823305f537e50370142009c1ca66d28",
         "rowCount": 8054,
         "status": "LOCKED"
+      },
+      "admissionEvidence": {
+        "artifactKind": "transfer-topology-source-admission",
+        "candidateId": "capital-pilot-candidate-20260814",
+        "sourceId": "molit-railway-transfer-movement",
+        "snapshotId": "molit-railway-transfer-movement-20250811",
+        "decision": "APPROVED",
+        "approvedAt": "2026-08-14T15:34:07.000Z",
+        "rawSha256": "3a45dc1d82f81666c48eeef81fdc35b0e4a0c59312e4b26907f644c45b518ce3",
+        "sourceSnapshotSetHash": "9de79f88e3c986b7e3eed36b1037f6a1a6bab4084a5371e61667ceac3ca0130b",
+        "licenseEvidenceHash": "f85109fd1d1ea9135bf8655b347080b0b66aea903d2c10b8f0a08c60388ab951",
+        "admissionDigest": "980ff67717804653ef1b352d64354e87fc8b691e91282701ddfaa29e13e88f83"
       }
     }
   ]
