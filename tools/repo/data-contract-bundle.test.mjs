@@ -44,7 +44,7 @@ test("data contract bundle은 target producer 입력만 exact bytes로 고정한
   }
 });
 
-test("datapack freshness SLA는 기존 source class와 연간 공식 환승 파일 정책을 고정한다", async () => {
+test("datapack freshness SLA는 current public route-map position과 연간 공식 환승 파일 정책을 고정한다", async () => {
   const policy = JSON.parse(await readFile("release/product-gates/datapack-freshness-sla.json", "utf8"));
   const classes = new Map(policy.sourceClasses.map((sourceClass) => [sourceClass.id, sourceClass]));
 
@@ -54,11 +54,24 @@ test("datapack freshness SLA는 기존 source class와 연간 공식 환승 파�
       "static_network_metadata",
       "static_accessibility_facility",
       "planned_timetable",
-      "route_map_asset",
+      "route_map_positions",
       "realtime_overlay",
       "annual_official_file",
     ],
   );
+  assert.deepEqual(classes.get("route_map_positions"), {
+    id: "route_map_positions",
+    sourceIds: ["seoul-metro-route-map-positions"],
+    examples: ["official public station coordinates", "route-map position coverage"],
+    basisField: "retrievedAt",
+    reverificationCadence: "P90D",
+    offlinePackEligible: true,
+    eventTriggers: ["official data update", "new station opening", "line extension opening"],
+    changePublishSla: "P14D",
+    freshnessMetric: "routeMapPositionFreshnessRatio",
+  });
+  assert.equal(classes.has("route_map_asset"), false);
+  assert.ok(!policy.sourceClasses.some(({ sourceIds }) => sourceIds.includes("seoulmetro-cyberstation-route-map")));
   assert.deepEqual(classes.get("annual_official_file"), {
     id: "annual_official_file",
     sourceIds: ["molit-railway-transfer-movement", "seoul-metro-transfer-distance-duration"],
