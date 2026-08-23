@@ -57,6 +57,17 @@ test("route-map governance bundle은 current과 historical source를 exact bytes
   assert.equal(sources.get("seoulmetro-cyberstation-route-map").sourceClassId, "route_map_asset_historical");
 });
 
+test("current route-map source admission license evidence는 승인된 governance terms와 일치한다", async () => {
+  const [inventory, governance] = await Promise.all([
+    readFile("apps/mobile/assets/datapacks/source-inventory.json", "utf8").then(JSON.parse),
+    readFile("tools/datapack/source-governance-policy.json", "utf8").then(JSON.parse),
+  ]);
+  const source = inventory.sources.find((candidate) => candidate.id === "seoul-metro-route-map-positions");
+  const policy = governance.sources.find((candidate) => candidate.sourceId === source.id);
+
+  assert.equal(source.admissionEvidence?.licenseEvidenceHash, policy.licenseReview.termsHash);
+});
+
 test("datapack freshness SLA는 current public route-map position과 연간 공식 환승 파일 정책을 고정한다", async () => {
   const policy = JSON.parse(await readFile("release/product-gates/datapack-freshness-sla.json", "utf8"));
   const classes = new Map(policy.sourceClasses.map((sourceClass) => [sourceClass.id, sourceClass]));

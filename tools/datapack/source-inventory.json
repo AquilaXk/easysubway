@@ -7544,6 +7544,9 @@
         "redistributionAllowed": true,
         "evidenceUrl": "https://www.data.go.kr/data/15099316/fileData.do"
       },
+      "admissionEvidence": {
+        "licenseEvidenceHash": "f7c7534e3fbac3b218bd91c55da7259416478cb5eaa259400576cd04e5fef0e7"
+      },
       "fieldsProvided": [
         "route_map_position",
         "route_map_label_polygon"
