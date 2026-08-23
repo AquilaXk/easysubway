@@ -12,6 +12,21 @@ const outputRoot = join(repositoryRoot, "backend/build/stage-contracts-test");
 const mainArtifactUrl = "https://raw.githubusercontent.com/AquilaXk/easysubway/main/contracts/bundles/backend-contracts-v1.0.0.json";
 const immutableArtifactUrl = "https://raw.githubusercontent.com/AquilaXk/easysubway/6c29b55e6cbdb1713522cb4f766d9754728d5fc8/contracts/bundles/backend-contracts-v1.0.0.json";
 
+test("repository backend lock은 함께 배포되는 bundle bytes를 staging한다", () => {
+  const output = join(outputRoot, "repository-bundle");
+  rmSync(output, { recursive: true, force: true });
+  try {
+    execFileSync(process.execPath, [
+      script,
+      "--lock", join(repositoryRoot, "backend/contracts.lock.json"),
+      "--input", join(repositoryRoot, "contracts/bundles/backend-contracts-v1.0.0.json"),
+      "--output", output,
+    ], { encoding: "utf8", stdio: "pipe" });
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
+});
+
 test("stage-contracts는 해시가 고정된 정확한 두 계약을 staging한다", () => {
   const fixture = createFixture();
   try {
