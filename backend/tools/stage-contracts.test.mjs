@@ -72,6 +72,8 @@ test("stage-contracts는 Task 1에 고정되지 않은 artifact URL을 거부한
     "https://raw.githubusercontent.com/AquilaXk/easysubway/feature/contracts/bundles/backend-contracts-v1.0.0.json",
     "https://raw.githubusercontent.com/AquilaXk/easysubway/6c29b55e6cbdb1713522cb4f766d9754728d5fc/contracts/bundles/backend-contracts-v1.0.0.json",
     "https://raw.githubusercontent.com/AquilaXk/easysubway/6c29b55e6cbdb1713522cb4f766d9754728d5fc80/contracts/bundles/backend-contracts-v1.0.0.json",
+    [immutableArtifactUrl],
+    `${immutableArtifactUrl}\n`,
   ]) {
     const fixture = createFixture({ artifactUrl });
     try {
