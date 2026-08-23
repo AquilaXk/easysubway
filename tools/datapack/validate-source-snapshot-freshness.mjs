@@ -131,12 +131,6 @@ export function validateSourceSnapshotFreshness({
     if (!/^[0-9a-f]{64}$/.test(governancePolicySha256 ?? "")) {
       throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: governance policy hash");
     }
-    if (effectiveSnapshots.some((snapshot) => (
-      snapshot.governancePolicyVersion !== governancePolicy.policyVersion
-      || snapshot.governancePolicySha256 !== governancePolicySha256
-    ))) {
-      throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: governance policy binding");
-    }
     const sources = new Map(inventory.sources.map((source) => [source.id, source]));
     governanceResults = effectiveSnapshots.map((snapshot) => {
       const rawState = purgeEvidence.get(`${snapshot.sourceId}\0${snapshot.snapshotId}`) ?? null;

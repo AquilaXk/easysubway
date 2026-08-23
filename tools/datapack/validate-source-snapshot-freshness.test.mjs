@@ -15,6 +15,7 @@ import {
   attachPurgeAttestation,
   purgeReportSha256,
 } from "./source-raw-purge-attestation.mjs";
+import { approvedLegacyGovernanceBinding } from "./legacy-source-governance.mjs";
 
 const evaluationAt = "2026-07-15T00:00:00.000Z";
 const execFileAsync = promisify(execFile);
@@ -615,6 +616,25 @@ test("실제 release build spec은 current source inventory에 결합되어 gove
   ], { cwd: root });
 
   assert.equal(JSON.parse(stdout).governanceDecision, "GO");
+});
+
+test("실제 release build spec은 선택한 snapshot별 governance binding을 보존한다", async () => {
+  const [buildSpec, snapshots] = await Promise.all([
+    readFile(path.join(root, "tools/datapack/release/candidate-build-spec.json"), "utf8").then(JSON.parse),
+    readFile(path.join(root, "tools/datapack/release/source-snapshots.json"), "utf8").then(JSON.parse),
+  ]);
+  const snapshotById = new Map(snapshots.map((snapshot) => [snapshot.snapshotId, snapshot]));
+
+  for (const buildSnapshot of buildSpec.sourceSnapshots) {
+    const snapshot = snapshotById.get(buildSnapshot.snapshotId);
+    assert.ok(snapshot, `missing canonical snapshot: ${buildSnapshot.snapshotId}`);
+    const expectedBinding = snapshot.governancePolicyVersion != null
+      ? snapshot
+      : approvedLegacyGovernanceBinding(snapshot);
+    assert.ok(expectedBinding, `missing approved governance binding: ${buildSnapshot.snapshotId}`);
+    assert.equal(buildSnapshot.governancePolicyVersion, expectedBinding.governancePolicyVersion);
+    assert.equal(buildSnapshot.governancePolicySha256, expectedBinding.governancePolicySha256);
+  }
 });
 
 test("실제 release hash evidence는 current source inventory와 build spec에 결합된다", async () => {

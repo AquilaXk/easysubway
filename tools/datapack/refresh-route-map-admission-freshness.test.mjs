@@ -13,10 +13,16 @@ import {
 
 const paths = ["canonical.json", "mobile.json"];
 const inventory = JSON.stringify({
-  sources: [{
-    id: "route-map-source",
-    routeMapAdmissionEvidence: { capturedAt: "2024-02-29T12:00:00.000Z" },
-  }],
+  sources: [
+    {
+      id: "seoul-metro-route-map-positions",
+      routeMapAdmissionEvidence: { capturedAt: "2024-02-29T12:00:00.000Z" },
+    },
+    {
+      id: "seoulmetro-cyberstation-route-map",
+      routeMapAdmissionEvidence: { capturedAt: "2024-02-29T12:00:00.000Z" },
+    },
+  ],
 });
 
 test("route-map freshness refresh는 mirror 불일치를 parse/write 전에 거부하고 정규화는 멱등이다", () => {
@@ -28,7 +34,8 @@ test("route-map freshness refresh는 mirror 불일치를 parse/write 전에 거�
 
   const normalized = withRouteMapAdmissionFreshness(JSON.parse(inventory));
   assert.deepEqual(withRouteMapAdmissionFreshness(normalized), normalized);
-  assert.equal(normalized.sources[0].routeMapAdmissionEvidence.freshUntil, "2025-03-01T12:00:00.000Z");
+  assert.equal(normalized.sources[0].routeMapAdmissionEvidence.freshUntil, "2024-05-29T12:00:00.000Z");
+  assert.equal(normalized.sources[1].routeMapAdmissionEvidence.freshUntil, "2025-03-01T12:00:00.000Z");
 });
 
 test("inventory 교체는 임시 파일을 남기지 않고 기존 파일 권한을 보존한다", async () => {

@@ -19,7 +19,8 @@ async function main() {
   if (args["remove-source-ids"] != null && args["snapshot-set"] == null) {
     throw new Error("--remove-source-ids requires --snapshot-set");
   }
-  const raw = await readRaw(args);
+  const rawBytes = await readRaw(args);
+  const raw = rawBytes.toString("utf8");
   assertNoCredential(raw);
   const canonicalRaw = canonicalizeRaw(raw);
   const records = rowsFromRaw(canonicalRaw);
@@ -39,7 +40,8 @@ async function main() {
     sourceUpdatedAt: args["source-updated-at"] ?? null,
     rowCount: records.length,
     coverageCount: requiredNonNegativeInteger(args["coverage-count"], "--coverage-count"),
-    rawSha256: sha256(canonicalRaw),
+    rawSha256: sha256(rawBytes),
+    rawSizeBytes: rawBytes.length,
     rawObjectUri: requiredCredentialFreeObjectUri(args["raw-object-uri"], "--raw-object-uri"),
     redactedRequestFingerprint: sha256(redactedRequest(args)),
     schemaFingerprint: sha256(JSON.stringify(schemaFields(records))),
@@ -169,13 +171,13 @@ async function readRaw(args) {
     throw new Error("exactly one of --input or --url is required");
   }
   if (args.input != null) {
-    return readFile(path.resolve(args.input), "utf8");
+    return readFile(path.resolve(args.input));
   }
   const response = await fetch(args.url);
   if (!response.ok) {
     throw new Error(`source fetch failed: ${response.status}`);
   }
-  return response.text();
+  return Buffer.from(await response.arrayBuffer());
 }
 
 function canonicalizeRaw(raw) {
@@ -238,6 +240,9 @@ function assertNoCredential(raw) {
 function validateSnapshot(snapshot) {
   if (!/^[0-9a-f]{64}$/.test(snapshot.rawSha256) || !/^[0-9a-f]{64}$/.test(snapshot.schemaFingerprint)) {
     throw new Error("snapshot hash fields must be sha256");
+  }
+  if (!Number.isSafeInteger(snapshot.rawSizeBytes) || snapshot.rawSizeBytes < 1) {
+    throw new Error("rawSizeBytes must be a positive integer");
   }
   const retrievedAt = requiredDate(snapshot.retrievedAt, "retrievedAt");
   if (requiredDate(snapshot.freshnessExpiresAt, "freshnessExpiresAt") <= retrievedAt) {

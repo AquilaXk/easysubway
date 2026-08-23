@@ -10,6 +10,7 @@ import { gunzipSync, gzipSync, constants as zlibConstants } from "node:zlib";
 import { addCadence } from "./freshness-policy.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { deriveRawRetentionExpiresAt } from "./source-governance-policy.mjs";
+import { approvedLegacyGovernanceBinding } from "./legacy-source-governance.mjs";
 import { validateLineage } from "./source-snapshot-policy.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
@@ -537,6 +538,13 @@ async function syncReleaseEvidence({ check }) {
   );
   spec.sourceSnapshotIds = releaseSnapshots.map(({ snapshotId }) => snapshotId);
   spec.sourceSnapshots = releaseSnapshots.map((snapshot) => {
+    const governanceBinding = snapshot.governancePolicyVersion != null || snapshot.governancePolicySha256 != null
+      ? {
+        governancePolicyVersion: snapshot.governancePolicyVersion,
+        governancePolicySha256: snapshot.governancePolicySha256,
+      }
+      : approvedLegacyGovernanceBinding(snapshot);
+    if (governanceBinding == null) throw new Error(`governance policy binding missing: ${snapshot.snapshotId}`);
     const source = inventoryBySource.get(snapshot.sourceId);
     const adminReviewRecordHash = source?.admissionEvidence?.adminReviewRecordHash;
     if (!/^[0-9a-f]{64}$/.test(adminReviewRecordHash ?? "")) throw new Error(`admin review hash missing: ${snapshot.sourceId}`);
@@ -568,8 +576,7 @@ async function syncReleaseEvidence({ check }) {
         sourceId: snapshot.sourceId,
         retrievedAt: snapshot.retrievedAt,
       }),
-      governancePolicyVersion: governance.policyVersion,
-      governancePolicySha256: sha256(governanceBytes),
+      ...governanceBinding,
     };
   });
   spec.sourceSnapshotSetHash = sha256(JSON.stringify(releaseSnapshots));

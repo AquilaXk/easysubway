@@ -6,7 +6,7 @@ import { pathToFileURL } from "node:url";
 
 import { addCadence } from "./freshness-policy.mjs";
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
-import { ROUTE_MAP_REVERIFICATION_CADENCE } from "./lib/route-map-admission-freshness.mjs";
+import { routeMapReverificationCadence } from "./lib/route-map-admission-freshness.mjs";
 
 const root = path.resolve(import.meta.dirname, "../..");
 const inventoryPaths = [
@@ -20,7 +20,7 @@ export function withRouteMapAdmissionFreshness(inventory) {
     const evidence = source.routeMapAdmissionEvidence;
     if (!evidence) continue;
     const capturedAt = requiredUtcInstant(evidence.capturedAt, `${source.id} route-map capturedAt`);
-    evidence.freshUntil = new Date(addCadence(capturedAt, ROUTE_MAP_REVERIFICATION_CADENCE)).toISOString();
+    evidence.freshUntil = new Date(addCadence(capturedAt, routeMapReverificationCadence(source.id))).toISOString();
   }
   return next;
 }

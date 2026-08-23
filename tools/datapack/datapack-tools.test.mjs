@@ -1683,10 +1683,55 @@ test("source snapshot command는 raw CSV를 LOCKED snapshot metadata로 canonica
     assert.equal(snapshot.snapshotStatus, "LOCKED");
     assert.equal(snapshot.credentialRedacted, true);
     assert.equal(snapshot.rowCount, 2);
-    assert.match(snapshot.rawSha256, /^[0-9a-f]{64}$/);
+    assert.equal(snapshot.rawSha256, createHash("sha256").update(await readFile(rawPath)).digest("hex"));
+    assert.equal(snapshot.rawSizeBytes, (await readFile(rawPath)).byteLength);
     assert.match(snapshot.schemaFingerprint, /^[0-9a-f]{64}$/);
     assert.equal(snapshot.providerRecordHashes.length, 2);
     assert.equal(await readFile(canonicalRawPath, "utf8"), "station,line\nSadang,2\nSangnoksu,4\n");
+  } finally {
+    await rm(workDir, { recursive: true, force: true });
+  }
+});
+
+test("source snapshot command는 non-UTF-8 raw의 physical bytes identity를 보존한다", async () => {
+  const workDir = path.join(tmpdir(), `easysubway-source-snapshot-non-utf8-${process.pid}-${Date.now()}`);
+  const rawPath = path.join(root, "tools/datapack/fixtures/seoul-route-map-positions-raw/data-go-15099316.csv");
+  const outputPath = path.join(workDir, "snapshot.json");
+  const rawBytes = await readFile(rawPath);
+  const rawSha256 = "713d6a7353748f1f29b974cd70df9b7a24b3600b6aeb60a58ed7bfa6975e02ed";
+  await rm(workDir, { recursive: true, force: true });
+  await mkdir(workDir, { recursive: true });
+
+  try {
+    assert.equal(rawBytes.byteLength, 16561);
+    assert.equal(createHash("sha256").update(rawBytes).digest("hex"), rawSha256);
+    const replacementReencoded = Buffer.from(rawBytes.toString("utf8"));
+    assert.equal(replacementReencoded.byteLength, 18848);
+    assert.equal(createHash("sha256").update(replacementReencoded).digest("hex"), "fd37656a43f816c2c188e8dc754b2f4d4eecb809439c88cbe4bf2824a9e443d4");
+    await execFileAsync(
+      process.execPath,
+      [
+        "tools/datapack/build-source-snapshot.mjs",
+        "--input", rawPath,
+        "--output", outputPath,
+        "--snapshot-id", "seoul-metro-route-map-positions-20260724-test",
+        "--source-id", "seoul-metro-route-map-positions",
+        "--coverage-count", "274",
+        "--provider", "서울교통공사",
+        "--source-class-id", "route_map_positions",
+        "--retrieved-at", "2026-07-24T02:00:00.000Z",
+        "--source-updated-at", "2025-08-14T00:00:00.000Z",
+        "--raw-object-uri", `oci://easysubway-datapacks/source-raw/seoul-metro-route-map-positions/20260724/${rawSha256}.csv`,
+        "--freshness-expires-at", "2026-10-22T02:00:00.000Z",
+        "--governance-policy", "tools/datapack/source-governance-policy.json",
+      ],
+      { cwd: root },
+    );
+
+    const snapshot = JSON.parse(await readFile(outputPath, "utf8"));
+    assert.equal(snapshot.rawSha256, rawSha256);
+    assert.equal(snapshot.rawSizeBytes, 16561);
+    assert.ok(snapshot.rawObjectUri.endsWith(`${rawSha256}.csv`));
   } finally {
     await rm(workDir, { recursive: true, force: true });
   }
