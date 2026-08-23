@@ -1,17 +1,19 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "System release manifest v3",
+  "title": "System release manifest v4",
   "type": "object",
   "additionalProperties": false,
-  "required": ["schemaVersion", "productReleaseId", "phase", "decision", "generatedAt", "issueRefs", "hub", "contracts", "mobile", "backend", "data", "platform"],
+  "required": ["schemaVersion", "productReleaseId", "phase", "decision", "generatedAt", "issueRefs", "productIdentitySha256", "governanceRevisionSha256", "hubObservedRevision", "contracts", "mobile", "backend", "data", "platform"],
   "properties": {
-    "schemaVersion": { "const": 3 },
+    "schemaVersion": { "const": 4 },
     "productReleaseId": { "type": "string", "minLength": 1 },
     "phase": { "type": "string", "enum": ["CANDIDATE", "FINAL"] },
     "decision": { "type": "string", "enum": ["GO", "NO_GO"] },
     "generatedAt": { "type": "string", "format": "date-time" },
     "issueRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^AquilaXk/(easysubway|easysubway-data|easysubway-platform|easysubway-backend|easysubway-mobile)#[1-9][0-9]*$" } },
-    "hub": {
+    "productIdentitySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "governanceRevisionSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "hubObservedRevision": {
       "type": "object",
       "additionalProperties": false,
       "required": ["repository", "gitSha"],
