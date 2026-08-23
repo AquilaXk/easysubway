@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
@@ -8,6 +9,7 @@ import {
   calculateGovernanceRevision,
   calculateProductIdentity,
   classifySystemReleaseChange,
+  governanceInventoryPaths,
   selectSystemReleaseDecision,
   validateGovernanceInventory,
   validateSystemReleaseManifest,
@@ -32,6 +34,32 @@ const governanceInventory = JSON.parse(readFileSync(
   "contracts/release/system-release-governance-inventory.json",
   "utf8",
 ));
+
+function sha256File(filePath) {
+  return createHash("sha256").update(readFileSync(filePath)).digest("hex");
+}
+
+function inventoryFor(repoRoot) {
+  return {
+    schemaVersion: 1,
+    artifactKind: "system-release-governance-inventory",
+    files: governanceInventoryPaths.map((entryPath) => ({
+      path: entryPath,
+      sha256: sha256File(path.join(repoRoot, entryPath)),
+    })),
+  };
+}
+
+function writeGovernanceFixture(directory, suffix) {
+  for (const entryPath of governanceInventoryPaths) {
+    const target = path.join(directory, entryPath);
+    mkdirSync(path.dirname(target), { recursive: true });
+    writeFileSync(target, readFileSync(entryPath));
+  }
+  const changedPath = path.join(directory, "tools/release/generate-rc-evidence-manifest.mjs");
+  writeFileSync(changedPath, `${readFileSync(changedPath, "utf8")}\n// ${suffix}\n`);
+  return inventoryFor(directory);
+}
 
 function validManifest() {
   const manifest = {
@@ -91,13 +119,22 @@ const schemas = {
 };
 
 const classifierInputs = {
-  componentSchema: schemas.componentSchema,
-  systemSchema: schemas.systemSchema,
-  issueRefSchema: schemas.issueRefSchema,
-  governanceInventorySchema: schemas.governanceInventorySchema,
-  previousGovernanceInventory: governanceInventory,
-  currentGovernanceInventory: governanceInventory,
-  repoRoot: process.cwd(),
+  previousValidationContext: {
+    componentSchema: schemas.componentSchema,
+    systemSchema: schemas.systemSchema,
+    issueRefSchema: schemas.issueRefSchema,
+    governanceInventorySchema: schemas.governanceInventorySchema,
+    governanceInventory,
+    repoRoot: process.cwd(),
+  },
+  currentValidationContext: {
+    componentSchema: schemas.componentSchema,
+    systemSchema: schemas.systemSchema,
+    issueRefSchema: schemas.issueRefSchema,
+    governanceInventorySchema: schemas.governanceInventorySchema,
+    governanceInventory,
+    repoRoot: process.cwd(),
+  },
 };
 
 test("system release manifest v4 validates the separated product, governance and observation identities", () => {
@@ -220,12 +257,13 @@ test("system release v4 change classification separates product, governance and 
   const changedInventory = structuredClone(governanceInventory);
   changedInventory.files[0].sha256 = "c".repeat(64);
   governance.governanceRevisionSha256 = calculateGovernanceRevision(changedInventory);
-  const { repoRoot: ignoredRepoRoot, ...governanceClassifierInputs } = classifierInputs;
+  const governanceClassifierInputs = structuredClone(classifierInputs);
+  governanceClassifierInputs.currentValidationContext.governanceInventory = changedInventory;
+  delete governanceClassifierInputs.currentValidationContext.repoRoot;
   assert.equal(classifySystemReleaseChange({
     previousManifest: previous,
     currentManifest: governance,
     ...governanceClassifierInputs,
-    currentGovernanceInventory: changedInventory,
   }), "GOVERNANCE_CHANGE");
 
   const observation = structuredClone(previous);
@@ -242,6 +280,44 @@ test("system release v4 change classification separates product, governance and 
       () => classifySystemReleaseChange({ previousManifest: previous, currentManifest: malformed, ...classifierInputs }),
       /current system release manifest is invalid/,
     );
+  }
+});
+
+test("system release v4 classifies distinct previous/current governance contexts and rejects a tampered previous context", () => {
+  const previousRoot = mkdtempSync(path.join(tmpdir(), "previous-system-release-governance-"));
+  const currentRoot = mkdtempSync(path.join(tmpdir(), "current-system-release-governance-"));
+  try {
+    const previousInventory = writeGovernanceFixture(previousRoot, "previous");
+    const currentInventory = writeGovernanceFixture(currentRoot, "current");
+    const previous = validManifest();
+    previous.governanceRevisionSha256 = calculateGovernanceRevision(previousInventory);
+    const current = structuredClone(previous);
+    current.governanceRevisionSha256 = calculateGovernanceRevision(currentInventory);
+    const validationContext = (repoRoot, inventory) => ({
+      componentSchema: schemas.componentSchema,
+      systemSchema: schemas.systemSchema,
+      issueRefSchema: schemas.issueRefSchema,
+      governanceInventorySchema: schemas.governanceInventorySchema,
+      governanceInventory: inventory,
+      repoRoot,
+    });
+    assert.equal(classifySystemReleaseChange({
+      previousManifest: previous,
+      currentManifest: current,
+      previousValidationContext: validationContext(previousRoot, previousInventory),
+      currentValidationContext: validationContext(currentRoot, currentInventory),
+    }), "GOVERNANCE_CHANGE");
+
+    previousInventory.files[0].sha256 = "f".repeat(64);
+    assert.throws(() => classifySystemReleaseChange({
+      previousManifest: previous,
+      currentManifest: current,
+      previousValidationContext: validationContext(previousRoot, previousInventory),
+      currentValidationContext: validationContext(currentRoot, currentInventory),
+    }), /previous system release manifest is invalid/);
+  } finally {
+    rmSync(previousRoot, { recursive: true, force: true });
+    rmSync(currentRoot, { recursive: true, force: true });
   }
 });
 
@@ -268,6 +344,23 @@ test("system release v4 rejects open, duplicated, or mismatched governance inven
     governanceInventory: mismatched,
     repoRoot: process.cwd(),
   }).some((error) => error.includes("SHA-256 mismatch")));
+});
+
+test("system release v4 rejects malformed governance inventory entries without throwing", () => {
+  for (const malformedEntry of [42, null, { path: 42, sha256: sha }, { path: null, sha256: sha }, { path: {}, sha256: sha }]) {
+    const inventory = structuredClone(governanceInventory);
+    inventory.files[0] = malformedEntry;
+    assert.doesNotThrow(() => validateGovernanceInventory({
+      governanceInventory: inventory,
+      governanceInventorySchema: schemas.governanceInventorySchema,
+      repoRoot: process.cwd(),
+    }));
+    assert.ok(validateGovernanceInventory({
+      governanceInventory: inventory,
+      governanceInventorySchema: schemas.governanceInventorySchema,
+      repoRoot: process.cwd(),
+    }).some((error) => error === "governance inventory: entry must be an object" || error === "governance inventory: path must be a non-empty string"));
+  }
 });
 
 test("system release v4 rejects a governance inventory symlink before hashing", () => {

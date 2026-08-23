@@ -9,7 +9,7 @@
     "artifactKind": { "const": "system-release-governance-inventory" },
     "files": {
       "type": "array",
-      "minItems": 5,
+      "minItems": 63,
       "uniqueItems": true,
       "items": {
         "type": "object",

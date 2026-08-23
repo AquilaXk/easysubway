@@ -8,6 +8,7 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
@@ -15,6 +16,8 @@ import { isSemVer } from "./lib/semver.mjs";
 import {
   calculateGovernanceRevision,
   calculateProductIdentity,
+  governedExecutionPaths,
+  governanceInventoryPaths,
   selectSystemReleaseDecision,
   validateGovernanceInventory,
   validateSystemReleaseManifest,
@@ -27,6 +30,12 @@ const SUCCESSFUL_FRESHNESS_REASON_CODES = new Set([
 
 const args = parseArgs(process.argv.slice(2));
 const cwd = process.cwd();
+const executionRepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const trustedGovernanceExecutionPaths = Object.fromEntries(
+  governedExecutionPaths.map((entryPath) => (
+    [entryPath, path.join(executionRepoRoot, entryPath)]
+  )),
+);
 const requestedPhase = arg("phase") ?? "FINAL";
 if (!["CANDIDATE", "FINAL"].includes(requestedPhase)) {
   fail("--phase must be CANDIDATE or FINAL");
@@ -454,9 +463,13 @@ function readSystemReleaseInputs() {
     governanceInventory: schemas.governanceInventory,
     governanceInventorySchema: schemas.governanceInventorySchema,
     repoRoot,
+    trustedExecutionPaths: trustedGovernanceExecutionPaths,
   });
   if (governanceErrors.length > 0) fail(`closed release governance inventory is invalid: ${governanceErrors.join(", ")}`);
-  return { components, contracts, outputPath: systemReleaseOutputPath, productReleaseId, schemas };
+  return {
+    components, contracts, outputPath: systemReleaseOutputPath, productReleaseId, schemas,
+    trustedExecutionPaths: trustedGovernanceExecutionPaths,
+  };
 }
 
 function buildSystemReleaseManifest(legacyManifest, inputs) {
@@ -486,9 +499,18 @@ function buildSystemReleaseManifest(legacyManifest, inputs) {
   };
   const manifest = {
     ...identified,
-    decision: selectSystemReleaseDecision({ legacyDecision: legacyManifest.decision, manifest: identified, ...inputs.schemas }),
+    decision: selectSystemReleaseDecision({
+      legacyDecision: legacyManifest.decision,
+      manifest: identified,
+      ...inputs.schemas,
+      trustedExecutionPaths: inputs.trustedExecutionPaths,
+    }),
   };
-  const errors = validateSystemReleaseManifest({ manifest, ...inputs.schemas });
+  const errors = validateSystemReleaseManifest({
+    manifest,
+    ...inputs.schemas,
+    trustedExecutionPaths: inputs.trustedExecutionPaths,
+  });
   if (errors.length > 0) fail(`system release manifest validation failed: ${errors.join(", ")}`);
   return manifest;
 }
