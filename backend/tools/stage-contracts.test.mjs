@@ -9,6 +9,23 @@ import test from "node:test";
 const repositoryRoot = resolve(import.meta.dirname, "../..");
 const script = join(repositoryRoot, "backend/tools/stage-contracts.mjs");
 const outputRoot = join(repositoryRoot, "backend/build/stage-contracts-test");
+const mainArtifactUrl = "https://raw.githubusercontent.com/AquilaXk/easysubway/main/contracts/bundles/backend-contracts-v1.0.0.json";
+const immutableArtifactUrl = "https://raw.githubusercontent.com/AquilaXk/easysubway/6c29b55e6cbdb1713522cb4f766d9754728d5fc8/contracts/bundles/backend-contracts-v1.0.0.json";
+
+test("repository backend lock은 함께 배포되는 bundle bytes를 staging한다", () => {
+  const output = join(outputRoot, "repository-bundle");
+  rmSync(output, { recursive: true, force: true });
+  try {
+    execFileSync(process.execPath, [
+      script,
+      "--lock", join(repositoryRoot, "backend/contracts.lock.json"),
+      "--input", join(repositoryRoot, "contracts/bundles/backend-contracts-v1.0.0.json"),
+      "--output", output,
+    ], { encoding: "utf8", stdio: "pipe" });
+  } finally {
+    rmSync(output, { recursive: true, force: true });
+  }
+});
 
 test("stage-contracts는 해시가 고정된 정확한 두 계약을 staging한다", () => {
   const fixture = createFixture();
@@ -17,6 +34,15 @@ test("stage-contracts는 해시가 고정된 정확한 두 계약을 staging한�
 
     assert.equal(readFileSync(join(fixture.output, "datapack/source-governance-policy.json"), "utf8"), fixture.bundle.resources["datapack/source-governance-policy.json"]);
     assert.equal(readFileSync(join(fixture.output, "datapack/datapack-freshness-sla.json"), "utf8"), fixture.bundle.resources["datapack/datapack-freshness-sla.json"]);
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("stage-contracts는 공식 main bundle URL도 기존 lock 호환으로 허용한다", () => {
+  const fixture = createFixture({ artifactUrl: mainArtifactUrl });
+  try {
+    run(fixture);
   } finally {
     fixture.cleanup();
   }
@@ -41,11 +67,20 @@ test("stage-contracts는 lock과 다른 bundle version을 거부한다", () => {
 });
 
 test("stage-contracts는 Task 1에 고정되지 않은 artifact URL을 거부한다", () => {
-  const fixture = createFixture({ artifactUrl: "https://example.invalid/backend-contracts-v1.0.0.json" });
-  try {
-    assert.throws(() => run(fixture));
-  } finally {
-    fixture.cleanup();
+  for (const artifactUrl of [
+    "https://example.invalid/backend-contracts-v1.0.0.json",
+    "https://raw.githubusercontent.com/AquilaXk/easysubway/feature/contracts/bundles/backend-contracts-v1.0.0.json",
+    "https://raw.githubusercontent.com/AquilaXk/easysubway/6c29b55e6cbdb1713522cb4f766d9754728d5fc/contracts/bundles/backend-contracts-v1.0.0.json",
+    "https://raw.githubusercontent.com/AquilaXk/easysubway/6c29b55e6cbdb1713522cb4f766d9754728d5fc80/contracts/bundles/backend-contracts-v1.0.0.json",
+    [immutableArtifactUrl],
+    `${immutableArtifactUrl}\n`,
+  ]) {
+    const fixture = createFixture({ artifactUrl });
+    try {
+      assert.throws(() => run(fixture));
+    } finally {
+      fixture.cleanup();
+    }
   }
 });
 
@@ -147,7 +182,7 @@ function createFixture(options = {}) {
   writeFileSync(join(directory, "lock.json"), `${JSON.stringify({
     schemaVersion: 1,
     bundleVersion: "1.0.0",
-    artifactUrl: options.artifactUrl ?? "https://raw.githubusercontent.com/AquilaXk/easysubway/main/contracts/bundles/backend-contracts-v1.0.0.json",
+    artifactUrl: options.artifactUrl ?? immutableArtifactUrl,
     sha256: options.hash ?? createHash("sha256").update(bytes).digest("hex"),
   })}\n`);
   return {

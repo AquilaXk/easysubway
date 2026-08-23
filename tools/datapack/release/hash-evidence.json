@@ -49,7 +49,7 @@
     "reproductionCommand": "node -e \"import('./tools/datapack/source-snapshot-policy.mjs').then(({validateLineage})=>{const c=require('crypto'),s=require('./tools/datapack/release/source-snapshots.json'),h=validateLineage(s).headsBySource,p=require('./release/product-gates/production-datapack-scope.json'),r=s.filter(n=>p.productionSourceSet.requiredSourceIds.includes(n.sourceId)&&h[n.sourceId]===n.snapshotId);console.log(c.createHash('sha256').update(JSON.stringify(r)).digest('hex'))})\""
   },
   "sourceInventorySha256": {
-    "value": "4bb0fc658af01806e627bdc224fe43a149b747c83516f5dda1a3103789607539",
+    "value": "fde034ed0cafb8fedd030947840954231f316d5e86afd7f773028265a00bec93",
     "contract": "run-source-admission-pipeline.mjs의 공식 sha256(JSON.stringify(admittedInventory)) 계약. 현행 브랜치의 tools/datapack/source-inventory.json이 최종 admitted inventory이며 워크플로 빌드가 실제로 소비하는 인벤토리와 동일 파일.",
     "reproductionCommand": "node -e \"const c=require('crypto'),fs=require('fs');console.log(c.createHash('sha256').update(JSON.stringify(JSON.parse(fs.readFileSync('tools/datapack/source-inventory.json','utf8')))).digest('hex'))\""
   },

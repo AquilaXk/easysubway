@@ -258,7 +258,7 @@
         "topologySourceId": "busan-transportation-route-topology",
         "topologySnapshotId": "busan-transportation-route-topology-20260720",
         "topologyContentSha256": "9ec95ebb6d789457060e243f079ad371465d0e5e1a309504b18b9a78e00a24cc",
-        "freshUntil": "2027-07-20T11:13:18.000Z"
+        "freshUntil": "2026-10-18T11:13:18.000Z"
       }
     },
     {
@@ -1360,7 +1360,7 @@
           }
         ],
         "topologyContentSha256": "4e76459d4588f97bd55e767374b81031402c768d8f4805c69484d7c3f8771d1f",
-        "freshUntil": "2027-07-24T03:00:00.000Z"
+        "freshUntil": "2026-10-22T03:00:00.000Z"
       }
     },
     {
@@ -1757,7 +1757,7 @@
             "lineId": "line-7051a9c2525c"
           }
         ],
-        "freshUntil": "2027-07-25T03:00:00.000Z"
+        "freshUntil": "2026-10-23T03:00:00.000Z"
       }
     },
     {
@@ -2050,7 +2050,7 @@
             "lineId": "line-e57a361e8892"
           }
         ],
-        "freshUntil": "2027-07-25T02:00:00.000Z"
+        "freshUntil": "2026-10-23T02:00:00.000Z"
       }
     },
     {
@@ -2599,7 +2599,7 @@
         "topologySourceId": "incheon-transit-station-info",
         "topologySnapshotId": "incheon-transit-station-info-20260724",
         "topologyContentSha256": "710878689282ba967697cd9411940b657a51eee5499106ed884d5bd9111501a8",
-        "freshUntil": "2027-07-24T06:00:00.000Z"
+        "freshUntil": "2026-10-22T06:00:00.000Z"
       }
     },
     {
@@ -2705,7 +2705,7 @@
             "lineId": "line-e9e9a5b520a4"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -2983,7 +2983,7 @@
             "lineId": "line-828f04afc588"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -3108,7 +3108,7 @@
             "lineId": "line-5500c1600f71"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -3235,7 +3235,7 @@
             "lineId": "line-8604048b6430"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -3369,7 +3369,7 @@
           "망우",
           "상봉"
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -3501,7 +3501,7 @@
         "overlayStationNames": [
           "성남"
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -3626,7 +3626,7 @@
             "lineId": "line-6e39be0cb6e2"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -3992,7 +3992,7 @@
             "lineId": "line-051552e50435"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -4117,7 +4117,7 @@
             "lineId": "line-f0e747248a31"
           }
         ],
-        "freshUntil": "2027-07-25T05:00:00.000Z",
+        "freshUntil": "2026-10-23T05:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -4244,7 +4244,7 @@
             "lineId": "shinbundang"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -4369,7 +4369,7 @@
             "lineId": "line-aefa08ccc0a9"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -5661,7 +5661,7 @@
             "lineId": "line-558d0bd8312d"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -5982,7 +5982,7 @@
             "lineId": "line-30886152e4f8"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -6107,7 +6107,7 @@
             "lineId": "line-62096860ab09"
           }
         ],
-        "freshUntil": "2027-07-25T06:00:00.000Z",
+        "freshUntil": "2026-10-23T06:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -7336,7 +7336,7 @@
             "lineId": "line-f0e747248a31"
           }
         ],
-        "freshUntil": "2027-07-25T04:00:00.000Z",
+        "freshUntil": "2026-10-23T04:00:00.000Z",
         "currentTopologyAdmission": {
           "schemaVersion": 1,
           "artifactKind": "capital-route-map-current-topology-admission",
@@ -7544,6 +7544,9 @@
         "redistributionAllowed": true,
         "evidenceUrl": "https://www.data.go.kr/data/15099316/fileData.do"
       },
+      "admissionEvidence": {
+        "licenseEvidenceHash": "f7c7534e3fbac3b218bd91c55da7259416478cb5eaa259400576cd04e5fef0e7"
+      },
       "fieldsProvided": [
         "route_map_position",
         "route_map_label_polygon"
@@ -7607,7 +7610,7 @@
           "8": 18
         },
         "observedDataUpdatedAt": "2025-08-14",
-        "freshUntil": "2027-07-24T02:00:00.000Z"
+        "freshUntil": "2026-10-22T02:00:00.000Z"
       }
     },
     {
@@ -8258,6 +8261,17 @@
         "gzipSha256": "94e712d32860a7a6e4b4c1f1d9651dc25823305f537e50370142009c1ca66d28",
         "rowCount": 8054,
         "status": "LOCKED"
+      },
+      "admissionEvidence": {
+        "artifactKind": "transfer-topology-source-admission",
+        "candidateId": "capital-pilot-candidate-20260814",
+        "sourceId": "molit-railway-transfer-movement",
+        "snapshotId": "molit-railway-transfer-movement-20250811",
+        "decision": "APPROVED",
+        "approvedAt": "2026-08-14T15:34:07.000Z",
+        "rawSha256": "3a45dc1d82f81666c48eeef81fdc35b0e4a0c59312e4b26907f644c45b518ce3",
+        "sourceSnapshotSetHash": "9de79f88e3c986b7e3eed36b1037f6a1a6bab4084a5371e61667ceac3ca0130b",
+        "licenseEvidenceHash": "f85109fd1d1ea9135bf8655b347080b0b66aea903d2c10b8f0a08c60388ab951"
       }
     }
   ]

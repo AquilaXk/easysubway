@@ -5,6 +5,7 @@ import test from "node:test";
 const resources = new Map([
   ["datapack/mobility-profile-policy.json", "release/product-gates/mobility-profile-policy.json"],
   ["datapack/datapack-freshness-sla.json", "release/product-gates/datapack-freshness-sla.json"],
+  ["datapack/source-governance-policy.json", "tools/datapack/source-governance-policy.json"],
   ["datapack/datapack-manifest-acceptance-policy.json", "apps/mobile/release/datapack-manifest-acceptance-policy.json"],
   ["datapack/production-datapack-scope.json", "release/product-gates/production-datapack-scope.json"],
   ["datapack/train-search-itx-exclusion-gate.json", "release/product-gates/train-search-itx-exclusion-gate.json"],
@@ -44,7 +45,49 @@ test("data contract bundle은 target producer 입력만 exact bytes로 고정한
   }
 });
 
-test("datapack freshness SLA는 기존 source class와 연간 공식 환승 파일 정책을 고정한다", async () => {
+test("route-map governance bundle은 current과 historical source를 exact bytes로 분리한다", async () => {
+  const [backendBundle, governance] = await Promise.all([
+    readFile("contracts/bundles/backend-contracts-v1.0.0.json", "utf8").then(JSON.parse),
+    readFile("tools/datapack/source-governance-policy.json", "utf8"),
+  ]);
+
+  assert.equal(backendBundle.resources["datapack/source-governance-policy.json"], governance);
+  const sources = new Map(JSON.parse(governance).sources.map((source) => [source.sourceId, source]));
+  assert.equal(sources.get("seoul-metro-route-map-positions").sourceClassId, "route_map_positions");
+  assert.equal(sources.get("seoulmetro-cyberstation-route-map").sourceClassId, "route_map_asset_historical");
+});
+
+test("current route-map source admission license evidence는 승인된 governance terms와 일치한다", async () => {
+  const [inventory, governance] = await Promise.all([
+    readFile("apps/mobile/assets/datapacks/source-inventory.json", "utf8").then(JSON.parse),
+    readFile("tools/datapack/source-governance-policy.json", "utf8").then(JSON.parse),
+  ]);
+  const source = inventory.sources.find((candidate) => candidate.id === "seoul-metro-route-map-positions");
+  const policy = governance.sources.find((candidate) => candidate.sourceId === source.id);
+
+  assert.equal(source.admissionEvidence?.licenseEvidenceHash, policy.licenseReview.termsHash);
+});
+
+test("staged freshness와 governance는 annual official source binding 및 license evidence를 정확히 공유한다", async () => {
+  const [freshness, governance, inventory, mobileInventory] = await Promise.all([
+    readFile("release/product-gates/datapack-freshness-sla.json", "utf8").then(JSON.parse),
+    readFile("tools/datapack/source-governance-policy.json", "utf8").then(JSON.parse),
+    readFile("tools/datapack/source-inventory.json", "utf8").then(JSON.parse),
+    readFile("apps/mobile/assets/datapacks/source-inventory.json", "utf8").then(JSON.parse),
+  ]);
+  const governanceBySource = new Map(governance.sources.map((source) => [source.sourceId, source]));
+  const freshnessSourceIds = freshness.sourceClasses.flatMap((sourceClass) => sourceClass.sourceIds).sort();
+
+  assert.deepEqual([...governanceBySource.keys()].sort(), freshnessSourceIds);
+  for (const sourceId of ["molit-railway-transfer-movement", "seoul-metro-transfer-distance-duration"]) {
+    const source = inventory.sources.find((candidate) => candidate.id === sourceId);
+    const mobileSource = mobileInventory.sources.find((candidate) => candidate.id === sourceId);
+    assert.equal(source.admissionEvidence?.licenseEvidenceHash, governanceBySource.get(sourceId).licenseReview.termsHash);
+    assert.equal(mobileSource.admissionEvidence?.licenseEvidenceHash, governanceBySource.get(sourceId).licenseReview.termsHash);
+  }
+});
+
+test("datapack freshness SLA는 current public route-map position과 연간 공식 환승 파일 정책을 고정한다", async () => {
   const policy = JSON.parse(await readFile("release/product-gates/datapack-freshness-sla.json", "utf8"));
   const classes = new Map(policy.sourceClasses.map((sourceClass) => [sourceClass.id, sourceClass]));
 
@@ -54,11 +97,35 @@ test("datapack freshness SLA는 기존 source class와 연간 공식 환승 파�
       "static_network_metadata",
       "static_accessibility_facility",
       "planned_timetable",
-      "route_map_asset",
+      "route_map_positions",
+      "route_map_asset_historical",
       "realtime_overlay",
       "annual_official_file",
     ],
   );
+  assert.deepEqual(classes.get("route_map_positions"), {
+    id: "route_map_positions",
+    sourceIds: ["seoul-metro-route-map-positions"],
+    examples: ["official public station code/name/latitude/longitude", "versioned deterministic route-map layout"],
+    basisField: "retrievedAt",
+    reverificationCadence: "P90D",
+    offlinePackEligible: true,
+    eventTriggers: ["official public data revision", "new station opening", "line extension opening"],
+    changePublishSla: "P3D",
+    freshnessMetric: "routeMapPositionFreshnessRatio",
+  });
+  assert.equal(classes.has("route_map_asset"), false);
+  assert.deepEqual(classes.get("route_map_asset_historical"), {
+    id: "route_map_asset_historical",
+    sourceIds: ["seoulmetro-cyberstation-route-map"],
+    examples: ["historical web route-map diagnostic only"],
+    basisField: "retrievedAt",
+    reverificationCadence: "P1Y",
+    offlinePackEligible: false,
+    eventTriggers: ["historical evidence review"],
+    changePublishSla: "not-applicable",
+    freshnessMetric: "routeMapPositionFreshnessRatio",
+  });
   assert.deepEqual(classes.get("annual_official_file"), {
     id: "annual_official_file",
     sourceIds: ["molit-railway-transfer-movement", "seoul-metro-transfer-distance-duration"],

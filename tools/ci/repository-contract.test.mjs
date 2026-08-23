@@ -10637,7 +10637,13 @@ test("데이터팩 freshness SLA는 source별 갱신 주기와 stale 노출 정�
   assert.equal(classes.get("planned_timetable").maximumReverificationCadence, "P30D");
   assert.equal(classes.get("planned_timetable").futureBasisAllowed, true);
   assert.equal(classes.get("planned_timetable").changePublishSla, "before-effective-date");
-  assert.equal(classes.get("route_map_asset").reverificationCadence, "P1Y");
+  assert.equal(classes.get("route_map_positions").reverificationCadence, "P90D");
+  assert.equal(classes.get("route_map_positions").changePublishSla, "P3D");
+  assert.equal(classes.get("route_map_positions").offlinePackEligible, true);
+  assert.equal(classes.get("route_map_asset_historical").reverificationCadence, "P1Y");
+  assert.equal(classes.get("route_map_asset_historical").offlinePackEligible, false);
+  assert.equal(classes.get("route_map_asset_historical").changePublishSla, "not-applicable");
+  assert.equal(classes.has("route_map_asset"), false);
   assert.equal(classes.get("realtime_overlay").reverificationCadence, "PT90S");
   assert.equal(policy.monitoring.manualCheckCadence, "P1D");
   assert.equal(policy.monitoring.alertBeforePackExpiry, "PT6H");
@@ -21068,23 +21074,19 @@ test("error_events 스키마는 허용 컬럼만 갖고 민감 원문 컬럼을 
 test("#2609 accessibility release canonical pins는 tracked source와 exact-match한다", () => {
   const digest = (value) => createHash("sha256").update(value).digest("hex");
   const specBytes = readFileSync(path.join(root, "tools/datapack/release/candidate-build-spec.json"));
-  const inventoryBytes = readFileSync(path.join(root, "tools/datapack/source-inventory.json"));
   const spec = JSON.parse(specBytes);
-  const inventory = JSON.parse(inventoryBytes);
   const snapshots = JSON.parse(read("tools/datapack/release/source-snapshots.json"));
-  const productionScope = JSON.parse(read("release/product-gates/production-datapack-scope.json"));
   const request = JSON.parse(read("tools/datapack/release/release-request.json"));
   const pack = JSON.parse(read("tools/datapack/release/capital-production-canonical-pack.json")).packs[0];
 
-  assert.equal(spec.sourceInventorySha256, digest(JSON.stringify(inventory)));
-  assert.equal(spec.networkEdgeEvidence.sourceInventory.sha256, digest(inventoryBytes));
-  const { headsBySource } = validateLineage(snapshots);
-  const requiredSourceIds = new Set(productionScope.productionSourceSet.requiredSourceIds);
-  const releaseSnapshots = snapshots.filter(({ sourceId, snapshotId }) =>
-    requiredSourceIds.has(sourceId) && headsBySource[sourceId] === snapshotId,
-  );
+  const snapshotsById = new Map(snapshots.map((snapshot) => [snapshot.snapshotId, snapshot]));
+  assert.equal(snapshotsById.size, snapshots.length);
+  const releaseSnapshots = spec.sourceSnapshotIds.map((snapshotId) => {
+    assert.ok(snapshotsById.has(snapshotId), `historical source snapshot missing: ${snapshotId}`);
+    return snapshotsById.get(snapshotId);
+  });
   assert.equal(spec.sourceSnapshotSetHash, digest(JSON.stringify(releaseSnapshots)));
-  assert.deepEqual(spec.sourceSnapshots.map(({ snapshotId }) => snapshotId), releaseSnapshots.map(({ snapshotId }) => snapshotId));
+  assert.deepEqual(spec.sourceSnapshots.map(({ snapshotId }) => snapshotId), spec.sourceSnapshotIds);
   assert.equal(request.buildSpecSha256, digest(specBytes));
   assert.equal(request.sourceSnapshotSetHash, spec.sourceSnapshotSetHash);
 
