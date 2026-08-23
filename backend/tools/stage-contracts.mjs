@@ -7,7 +7,7 @@ const requiredResources = [
   "datapack/source-governance-policy.json",
   "datapack/datapack-freshness-sla.json",
 ];
-const artifactUrl = "https://raw.githubusercontent.com/AquilaXk/easysubway/main/contracts/bundles/backend-contracts-v1.0.0.json";
+const artifactUrlPattern = /^https:\/\/raw\.githubusercontent\.com\/AquilaXk\/easysubway\/(?:main|[a-f0-9]{40})\/contracts\/bundles\/backend-contracts-v1\.0\.0\.json$/;
 const repositoryRoot = resolve(import.meta.dirname, "../..");
 const backendBuild = resolve(repositoryRoot, "backend/build");
 
@@ -19,7 +19,7 @@ try {
 
   const lockDocument = parseJson(readFileSync(lock), "lock");
   assertExactKeys(lockDocument, ["schemaVersion", "bundleVersion", "artifactUrl", "sha256"], "lock");
-  if (lockDocument.schemaVersion !== 1 || lockDocument.bundleVersion !== "1.0.0" || lockDocument.artifactUrl !== artifactUrl || !/^[a-f0-9]{64}$/.test(lockDocument.sha256)) {
+  if (lockDocument.schemaVersion !== 1 || lockDocument.bundleVersion !== "1.0.0" || !artifactUrlPattern.test(lockDocument.artifactUrl) || !/^[a-f0-9]{64}$/.test(lockDocument.sha256)) {
     throw new Error("invalid lock");
   }
 
