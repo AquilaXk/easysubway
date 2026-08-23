@@ -20,7 +20,11 @@ import {
 } from "../release/generate-route-integration-verdict.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { validateLineage } from "../datapack/source-snapshot-policy.mjs";
-import { selectSystemReleaseDecision } from "../release/validate-system-release-manifest.mjs";
+import {
+  calculateProductIdentity,
+  governanceInventoryPaths,
+  selectSystemReleaseDecision,
+} from "../release/validate-system-release-manifest.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -6113,7 +6117,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(corruptManifest.readiness.blockers.some((blocker) => blocker.id === "missing_aabPayloadSha256"));
 });
 
-test("[system-release-generator] FINAL은 Hub와 네 target SHA를 결속한 system release v3를 별도로 생성한다", async () => {
+test("[system-release-generator] FINAL은 product·governance·observation identity를 결속한 system release v4를 별도로 생성한다", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-system-release-"));
   const candidatePath = path.join(tempDir, "candidate.json");
   const outputPath = path.join(tempDir, "legacy-final.json");
@@ -6198,8 +6202,10 @@ test("[system-release-generator] FINAL은 Hub와 네 target SHA를 결속한 sys
     const legacy = JSON.parse(await readFile(outputPath, "utf8"));
     const system = JSON.parse(await readFile(systemOutputPath, "utf8"));
     assert.equal(Object.hasOwn(system, "gitSha"), false);
-    assert.equal(system.schemaVersion, 3);
-    assert.deepEqual(system.hub, { repository: "AquilaXk/easysubway", gitSha: currentGitSha });
+    assert.equal(system.schemaVersion, 4);
+    assert.deepEqual(system.hubObservedRevision, { repository: "AquilaXk/easysubway", gitSha: currentGitSha });
+    assert.match(system.productIdentitySha256, /^[a-f0-9]{64}$/);
+    assert.match(system.governanceRevisionSha256, /^[a-f0-9]{64}$/);
     assert.equal(system.phase, "FINAL");
     assert.equal(system.decision, "NO_GO");
     assert.deepEqual(system.issueRefs, issueRefs);
@@ -6243,6 +6249,8 @@ test("[system-release-generator] FINAL은 Hub와 네 target SHA를 결속한 sys
       componentSchema: JSON.parse(read("contracts/release/component-manifest.schema.json")),
       systemSchema: JSON.parse(read("contracts/release/system-release-manifest.schema.json")),
       issueRefSchema: JSON.parse(read("contracts/release/issue-ref.schema.json")),
+      governanceInventorySchema: JSON.parse(read("contracts/release/system-release-governance-inventory.schema.json")),
+      governanceInventory: JSON.parse(read("contracts/release/system-release-governance-inventory.json")),
     };
     const canonicalGoCandidate = structuredClone(system);
     for (const component of ["mobile", "backend", "data", "platform"]) {
@@ -6263,6 +6271,7 @@ test("[system-release-generator] FINAL은 Hub와 네 target SHA를 결속한 sys
         stale: 0, previous: 0, alternateProvider: 0, bestEffort: 0,
       },
     };
+    canonicalGoCandidate.productIdentitySha256 = calculateProductIdentity(canonicalGoCandidate);
     assert.equal(
       selectSystemReleaseDecision({ legacyDecision: "GO", manifest: canonicalGoCandidate, ...semanticSchemas }),
       "GO",
@@ -6402,24 +6411,13 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
   for (const directory of ["apps/mobile/release", "release/product-gates", "contracts/release", "tools/release", "tools/ops", "tools/security"]) {
     await mkdir(path.join(validationRepo, directory), { recursive: true });
   }
-  await symlink(path.join(root, "release/product-gates/production-datapack-scope.json"), path.join(validationRepo, "release/product-gates/production-datapack-scope.json"));
-  await symlink(path.join(root, "release/product-gates/rc-evidence-manifest-contract.json"), path.join(validationRepo, "release/product-gates/rc-evidence-manifest-contract.json"));
-  for (const schema of ["component-manifest.schema.json", "system-release-manifest.schema.json", "issue-ref.schema.json"]) {
-    await symlink(path.join(root, "contracts/release", schema), path.join(validationRepo, "contracts/release", schema));
+  for (const governedPath of [
+    ...governanceInventoryPaths,
+    "contracts/release/system-release-governance-inventory.json",
+  ]) {
+    await mkdir(path.dirname(path.join(validationRepo, governedPath)), { recursive: true });
+    await writeFile(path.join(validationRepo, governedPath), await readFile(path.join(root, governedPath)));
   }
-  await symlink(path.join(root, "tools/release/hash-android-bundle-payload.mjs"), path.join(validationRepo, "tools/release/hash-android-bundle-payload.mjs"));
-  await symlink(path.join(root, "tools/release/count-gzip-uncompressed-bytes.mjs"), path.join(validationRepo, "tools/release/count-gzip-uncompressed-bytes.mjs"));
-  await writeFile(path.join(validationRepo, "tools/ops/validate-operations-release-summary.mjs"), `import { readFileSync } from "node:fs";
-const value = (name) => process.argv[process.argv.indexOf(name) + 1];
-const summary = JSON.parse(readFileSync(value("--summary"), "utf8"));
-const manifest = JSON.parse(readFileSync(value("--rc-manifest"), "utf8"));
-if (summary.evidenceId !== "post_launch_operations" || summary.status !== "SATISFIED") process.exit(1);
-if (JSON.stringify(summary.rcIdentity) !== JSON.stringify(manifest.rcIdentity)) process.exit(1);
-`);
-  await writeFile(path.join(validationRepo, "tools/security/validate-abuse-penetration-summary.mjs"), `import { existsSync } from "node:fs";
-const value = (name) => process.argv[process.argv.indexOf(name) + 1];
-if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass")) process.exit(1);
-`);
   const gitSha = await initializeFixtureGitRepo(validationRepo);
   const now = "2026-07-16T00:00:00.000Z";
   const snapshotSetIdentity = "a".repeat(64);
@@ -6639,7 +6637,35 @@ if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass"))
   await assert.rejects(execFileAsync(process.execPath, [...args, "--phase", "FINAL",
     "--candidate-context", invalidCandidatePath, "--output", path.join(tempDir, "invalid-final.json")], generatorOptions),
   /without readiness or decision fields/);
-  args.push(...await writeFinalSystemReleaseArgs(baselineOutput, path.join(tempDir, "final-readiness.json")), "--phase", "FINAL", "--candidate-context", baselineOutput);
+  const systemArgs = await writeFinalSystemReleaseArgs(baselineOutput, path.join(tempDir, "final-readiness.json"));
+  const systemFixtureArgs = [...args, ...systemArgs, "--phase", "FINAL", "--candidate-context", baselineOutput];
+  const fixtureValidatorPath = path.join(validationRepo, "tools/release/validate-system-release-manifest.mjs");
+  const fixtureSystemOutput = systemFixtureArgs[systemFixtureArgs.indexOf("--system-release-output") + 1];
+  const candidateBeforeFixtureDrift = await readFile(baselineOutput);
+  const crossRootOutput = path.join(tempDir, "cross-root-final.json");
+  await execFileAsync(process.execPath, [...systemFixtureArgs, "--output", crossRootOutput], generatorOptions);
+  assert.equal(JSON.parse(await readFile(fixtureSystemOutput, "utf8")).schemaVersion, 4);
+  await writeFile(fixtureSystemOutput, "system release sentinel");
+  await writeFile(fixtureValidatorPath, `${await readFile(fixtureValidatorPath, "utf8")}\n// fixture drift\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, [...systemFixtureArgs, "--output", baselineOutput], generatorOptions),
+    /attested repoRoot bytes do not match loaded execution path: tools\/release\/validate-system-release-manifest\.mjs/,
+  );
+  assert.equal(await readFile(fixtureSystemOutput, "utf8"), "system release sentinel");
+  assert.deepEqual(await readFile(baselineOutput), candidateBeforeFixtureDrift);
+  await writeFile(fixtureValidatorPath, await readFile(path.join(root, "tools/release/validate-system-release-manifest.mjs")));
+  await writeFile(path.join(validationRepo, "tools/ops/validate-operations-release-summary.mjs"), `import { readFileSync } from "node:fs";
+const value = (name) => process.argv[process.argv.indexOf(name) + 1];
+const summary = JSON.parse(readFileSync(value("--summary"), "utf8"));
+const manifest = JSON.parse(readFileSync(value("--rc-manifest"), "utf8"));
+if (summary.evidenceId !== "post_launch_operations" || summary.status !== "SATISFIED") process.exit(1);
+if (JSON.stringify(summary.rcIdentity) !== JSON.stringify(manifest.rcIdentity)) process.exit(1);
+`);
+  await writeFile(path.join(validationRepo, "tools/security/validate-abuse-penetration-summary.mjs"), `import { existsSync } from "node:fs";
+const value = (name) => process.argv[process.argv.indexOf(name) + 1];
+if (!existsSync(value("--summary")) || !process.argv.includes("--require-pass")) process.exit(1);
+`);
+  args.push("--phase", "FINAL", "--candidate-context", baselineOutput);
   for (const invalidCount of ["1abc", "1.5", "-0.5"]) {
     await assert.rejects(execFileAsync(process.execPath, [
       ...args, "--open-android-p0-count", invalidCount,

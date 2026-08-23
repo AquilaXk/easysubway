@@ -8,11 +8,20 @@ import {
 } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
 import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.mjs";
 import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isSemVer } from "./lib/semver.mjs";
-import { selectSystemReleaseDecision, validateSystemReleaseManifest } from "./validate-system-release-manifest.mjs";
+import {
+  calculateGovernanceRevision,
+  calculateProductIdentity,
+  governedExecutionPaths,
+  governanceInventoryPaths,
+  selectSystemReleaseDecision,
+  validateGovernanceInventory,
+  validateSystemReleaseManifest,
+} from "./validate-system-release-manifest.mjs";
 
 const SUCCESSFUL_FRESHNESS_REASON_CODES = new Set([
   "PACK_PUBLISH_FRESHNESS_EXPIRED",
@@ -21,6 +30,12 @@ const SUCCESSFUL_FRESHNESS_REASON_CODES = new Set([
 
 const args = parseArgs(process.argv.slice(2));
 const cwd = process.cwd();
+const executionRepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
+const trustedGovernanceExecutionPaths = Object.fromEntries(
+  governedExecutionPaths.map((entryPath) => (
+    [entryPath, path.join(executionRepoRoot, entryPath)]
+  )),
+);
 const requestedPhase = arg("phase") ?? "FINAL";
 if (!["CANDIDATE", "FINAL"].includes(requestedPhase)) {
   fail("--phase must be CANDIDATE or FINAL");
@@ -441,8 +456,20 @@ function readSystemReleaseInputs() {
     ["componentSchema", "component-manifest.schema.json"],
     ["systemSchema", "system-release-manifest.schema.json"],
     ["issueRefSchema", "issue-ref.schema.json"],
+    ["governanceInventorySchema", "system-release-governance-inventory.schema.json"],
+    ["governanceInventory", "system-release-governance-inventory.json"],
   ].map(([key, file]) => [key, readRequiredJson(path.join(repoRoot, "contracts/release", file), `release contract ${file}`)]));
-  return { components, contracts, outputPath: systemReleaseOutputPath, productReleaseId, schemas };
+  const governanceErrors = validateGovernanceInventory({
+    governanceInventory: schemas.governanceInventory,
+    governanceInventorySchema: schemas.governanceInventorySchema,
+    repoRoot,
+    trustedExecutionPaths: trustedGovernanceExecutionPaths,
+  });
+  if (governanceErrors.length > 0) fail(`closed release governance inventory is invalid: ${governanceErrors.join(", ")}`);
+  return {
+    components, contracts, outputPath: systemReleaseOutputPath, productReleaseId, schemas,
+    trustedExecutionPaths: trustedGovernanceExecutionPaths,
+  };
 }
 
 function buildSystemReleaseManifest(legacyManifest, inputs) {
@@ -452,24 +479,38 @@ function buildSystemReleaseManifest(legacyManifest, inputs) {
     for (const issueRef of component.issueRefs ?? []) if (!issueRefs.includes(issueRef)) issueRefs.push(issueRef);
   }
   const base = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     productReleaseId: inputs.productReleaseId,
     phase: "FINAL",
     decision: "NO_GO",
     generatedAt,
     issueRefs,
-    hub: {
+    hubObservedRevision: {
       repository: "AquilaXk/easysubway",
       gitSha: legacyManifest.releaseCandidateIdentity.gitSha,
     },
     contracts: inputs.contracts,
     ...inputs.components,
   };
-  const manifest = {
+  const identified = {
     ...base,
-    decision: selectSystemReleaseDecision({ legacyDecision: legacyManifest.decision, manifest: base, ...inputs.schemas }),
+    productIdentitySha256: calculateProductIdentity(base),
+    governanceRevisionSha256: calculateGovernanceRevision(inputs.schemas.governanceInventory),
   };
-  const errors = validateSystemReleaseManifest({ manifest, ...inputs.schemas });
+  const manifest = {
+    ...identified,
+    decision: selectSystemReleaseDecision({
+      legacyDecision: legacyManifest.decision,
+      manifest: identified,
+      ...inputs.schemas,
+      trustedExecutionPaths: inputs.trustedExecutionPaths,
+    }),
+  };
+  const errors = validateSystemReleaseManifest({
+    manifest,
+    ...inputs.schemas,
+    trustedExecutionPaths: inputs.trustedExecutionPaths,
+  });
   if (errors.length > 0) fail(`system release manifest validation failed: ${errors.join(", ")}`);
   return manifest;
 }
