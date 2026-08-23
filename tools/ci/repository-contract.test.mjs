@@ -6408,9 +6408,18 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
     await mkdir(path.join(validationRepo, directory), { recursive: true });
   }
   await symlink(path.join(root, "release/product-gates/production-datapack-scope.json"), path.join(validationRepo, "release/product-gates/production-datapack-scope.json"));
-  await symlink(path.join(root, "release/product-gates/rc-evidence-manifest-contract.json"), path.join(validationRepo, "release/product-gates/rc-evidence-manifest-contract.json"));
-  for (const schema of ["component-manifest.schema.json", "system-release-manifest.schema.json", "issue-ref.schema.json"]) {
+  for (const schema of ["component-manifest.schema.json", "issue-ref.schema.json"]) {
     await symlink(path.join(root, "contracts/release", schema), path.join(validationRepo, "contracts/release", schema));
+  }
+  for (const governedPath of [
+    "contracts/release/system-release-manifest.schema.json",
+    "contracts/release/system-release-governance-inventory.schema.json",
+    "contracts/release/system-release-governance-inventory.json",
+    "release/product-gates/rc-evidence-manifest-contract.json",
+    "tools/release/generate-rc-evidence-manifest.mjs",
+    "tools/release/validate-system-release-manifest.mjs",
+  ]) {
+    await writeFile(path.join(validationRepo, governedPath), await readFile(path.join(root, governedPath)));
   }
   await symlink(path.join(root, "tools/release/hash-android-bundle-payload.mjs"), path.join(validationRepo, "tools/release/hash-android-bundle-payload.mjs"));
   await symlink(path.join(root, "tools/release/count-gzip-uncompressed-bytes.mjs"), path.join(validationRepo, "tools/release/count-gzip-uncompressed-bytes.mjs"));
