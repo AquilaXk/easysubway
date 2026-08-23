@@ -12,7 +12,13 @@ import { canonicalScopeHash } from "../datapack/build-launch-denominator-report.
 import { selectEffectiveDataPack, selectFallbackDataPack, validateManifest } from "../datapack/lib/manifest-validation.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isSemVer } from "./lib/semver.mjs";
-import { selectSystemReleaseDecision, validateSystemReleaseManifest } from "./validate-system-release-manifest.mjs";
+import {
+  calculateGovernanceRevision,
+  calculateProductIdentity,
+  selectSystemReleaseDecision,
+  validateGovernanceInventory,
+  validateSystemReleaseManifest,
+} from "./validate-system-release-manifest.mjs";
 
 const SUCCESSFUL_FRESHNESS_REASON_CODES = new Set([
   "PACK_PUBLISH_FRESHNESS_EXPIRED",
@@ -441,7 +447,15 @@ function readSystemReleaseInputs() {
     ["componentSchema", "component-manifest.schema.json"],
     ["systemSchema", "system-release-manifest.schema.json"],
     ["issueRefSchema", "issue-ref.schema.json"],
+    ["governanceInventorySchema", "system-release-governance-inventory.schema.json"],
+    ["governanceInventory", "system-release-governance-inventory.json"],
   ].map(([key, file]) => [key, readRequiredJson(path.join(repoRoot, "contracts/release", file), `release contract ${file}`)]));
+  const governanceErrors = validateGovernanceInventory({
+    governanceInventory: schemas.governanceInventory,
+    governanceInventorySchema: schemas.governanceInventorySchema,
+    repoRoot,
+  });
+  if (governanceErrors.length > 0) fail(`closed release governance inventory is invalid: ${governanceErrors.join(", ")}`);
   return { components, contracts, outputPath: systemReleaseOutputPath, productReleaseId, schemas };
 }
 
@@ -452,22 +466,27 @@ function buildSystemReleaseManifest(legacyManifest, inputs) {
     for (const issueRef of component.issueRefs ?? []) if (!issueRefs.includes(issueRef)) issueRefs.push(issueRef);
   }
   const base = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     productReleaseId: inputs.productReleaseId,
     phase: "FINAL",
     decision: "NO_GO",
     generatedAt,
     issueRefs,
-    hub: {
+    hubObservedRevision: {
       repository: "AquilaXk/easysubway",
       gitSha: legacyManifest.releaseCandidateIdentity.gitSha,
     },
     contracts: inputs.contracts,
     ...inputs.components,
   };
-  const manifest = {
+  const identified = {
     ...base,
-    decision: selectSystemReleaseDecision({ legacyDecision: legacyManifest.decision, manifest: base, ...inputs.schemas }),
+    productIdentitySha256: calculateProductIdentity(base),
+    governanceRevisionSha256: calculateGovernanceRevision(inputs.schemas.governanceInventory),
+  };
+  const manifest = {
+    ...identified,
+    decision: selectSystemReleaseDecision({ legacyDecision: legacyManifest.decision, manifest: identified, ...inputs.schemas }),
   };
   const errors = validateSystemReleaseManifest({ manifest, ...inputs.schemas });
   if (errors.length > 0) fail(`system release manifest validation failed: ${errors.join(", ")}`);

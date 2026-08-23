@@ -1,10 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { selectSystemReleaseDecision, validateSystemReleaseManifest } from "./validate-system-release-manifest.mjs";
+import {
+  calculateGovernanceRevision,
+  calculateProductIdentity,
+  classifySystemReleaseChange,
+  selectSystemReleaseDecision,
+  validateGovernanceInventory,
+  validateSystemReleaseManifest,
+} from "./validate-system-release-manifest.mjs";
 
 const sha = "a".repeat(64);
 const gitSha = "b".repeat(40);
@@ -21,15 +28,20 @@ const zeroFallbackSuccessCounters = () => ({
   bestEffort: 0,
 });
 
+const governanceInventory = JSON.parse(readFileSync(
+  "contracts/release/system-release-governance-inventory.json",
+  "utf8",
+));
+
 function validManifest() {
-  return {
-    schemaVersion: 3,
+  const manifest = {
+    schemaVersion: 4,
     productReleaseId: "easysubway-2026.07.30.1",
     phase: "FINAL",
     decision: "GO",
     generatedAt: "2026-07-30T00:00:00Z",
     issueRefs: [issue("easysubway", 2693)],
-    hub: { repository: "AquilaXk/easysubway", gitSha },
+    hubObservedRevision: { repository: "AquilaXk/easysubway", gitSha },
     contracts: { version: "1.2.3", sha256: sha },
     journeyV3: {
       executionMode: "SERVER_ONLY",
@@ -62,19 +74,37 @@ function validManifest() {
       contractVersion: "platform-v1", evidenceSha256: sha, issueRefs: [issue("easysubway-platform", 2693)],
     },
   };
+  manifest.productIdentitySha256 = calculateProductIdentity(manifest);
+  manifest.governanceRevisionSha256 = calculateGovernanceRevision(governanceInventory);
+  return manifest;
 }
 
 const schemas = {
   componentSchema: JSON.parse(readFileSync("contracts/release/component-manifest.schema.json", "utf8")),
   systemSchema: JSON.parse(readFileSync("contracts/release/system-release-manifest.schema.json", "utf8")),
   issueRefSchema: JSON.parse(readFileSync("contracts/release/issue-ref.schema.json", "utf8")),
+  governanceInventorySchema: JSON.parse(readFileSync(
+    "contracts/release/system-release-governance-inventory.schema.json",
+    "utf8",
+  )),
+  governanceInventory,
 };
 
-test("system release manifest v3 validates the locked five-repository release identity", () => {
+const classifierInputs = {
+  componentSchema: schemas.componentSchema,
+  systemSchema: schemas.systemSchema,
+  issueRefSchema: schemas.issueRefSchema,
+  governanceInventorySchema: schemas.governanceInventorySchema,
+  previousGovernanceInventory: governanceInventory,
+  currentGovernanceInventory: governanceInventory,
+  repoRoot: process.cwd(),
+};
+
+test("system release manifest v4 validates the separated product, governance and observation identities", () => {
   assert.deepEqual(validateSystemReleaseManifest({ manifest: validManifest(), ...schemas }), []);
 });
 
-test("system release manifest v3 rejects invalid contracts SemVer", () => {
+test("system release manifest v4 rejects invalid contracts SemVer", () => {
   const manifest = validManifest();
   manifest.contracts.version = `1.2.3-${"a.".repeat(150)}a`;
   assert.ok(validateSystemReleaseManifest({ manifest, ...schemas }).includes("system: contracts version must be SemVer"));
@@ -103,6 +133,7 @@ test("system release GO requires typed Journey V3 server-only evidence while NO_
   assert.equal(selectSystemReleaseDecision({ legacyDecision: "GO", manifest: missing, ...schemas }), "NO_GO");
 
   missing.decision = "NO_GO";
+  missing.productIdentitySha256 = calculateProductIdentity(missing);
   assert.deepEqual(validateSystemReleaseManifest({ manifest: missing, ...schemas }), []);
 });
 
@@ -124,16 +155,21 @@ test("system release GO rejects Journey V3 policy, owner, identity and fallback 
   }
 });
 
-test("system release manifest v3 rejects every locked identity violation", () => {
+test("system release manifest v4 rejects every locked identity violation", () => {
   const cases = [
     ["legacy v2", (manifest) => { manifest.schemaVersion = 2; }],
-    ["missing Hub identity", (manifest) => { delete manifest.hub; }],
-    ["missing Hub SHA", (manifest) => { delete manifest.hub.gitSha; }],
-    ["wrong Hub repository", (manifest) => { manifest.hub.repository = "AquilaXk/easysubway-backend"; }],
-    ["uppercase Hub SHA", (manifest) => { manifest.hub.gitSha = gitSha.toUpperCase(); }],
-    ["short Hub SHA", (manifest) => { manifest.hub.gitSha = "b".repeat(39); }],
-    ["extra Hub identity field", (manifest) => { manifest.hub.ref = "main"; }],
+    ["legacy v3", (manifest) => { manifest.schemaVersion = 3; }],
+    ["missing observed identity", (manifest) => { delete manifest.hubObservedRevision; }],
+    ["missing observed SHA", (manifest) => { delete manifest.hubObservedRevision.gitSha; }],
+    ["wrong observed repository", (manifest) => { manifest.hubObservedRevision.repository = "AquilaXk/easysubway-backend"; }],
+    ["uppercase observed SHA", (manifest) => { manifest.hubObservedRevision.gitSha = gitSha.toUpperCase(); }],
+    ["short observed SHA", (manifest) => { manifest.hubObservedRevision.gitSha = "b".repeat(39); }],
+    ["extra observed identity field", (manifest) => { manifest.hubObservedRevision.ref = "main"; }],
     ["top-level gitSha", (manifest) => { manifest.gitSha = gitSha; }],
+    ["missing product identity", (manifest) => { delete manifest.productIdentitySha256; }],
+    ["stale product identity", (manifest) => { manifest.productIdentitySha256 = "c".repeat(64); }],
+    ["missing governance revision", (manifest) => { delete manifest.governanceRevisionSha256; }],
+    ["stale governance revision", (manifest) => { manifest.governanceRevisionSha256 = "c".repeat(64); }],
     ["bare issue number", (manifest) => { manifest.issueRefs = [2693]; }],
     ["uppercase hash", (manifest) => { manifest.contracts.sha256 = sha.toUpperCase(); }],
     ["malformed hash", (manifest) => { manifest.contracts.sha256 = "invalid"; }],
@@ -153,14 +189,102 @@ test("system release manifest v3 rejects every locked identity violation", () =>
   }
 });
 
-test("system release manifest v3 rejects unsafe identity integers", () => {
+test("system release manifest v4 rejects unsafe identity integers", () => {
   for (const [mutate, expected] of [
     [(manifest) => { manifest.mobile.artifactIdentity.versionCode = Number.MAX_SAFE_INTEGER + 1; }, "mobile: versionCode must be a safe integer"],
     [(manifest) => { manifest.data.artifactIdentity.releaseSequence = Number.MAX_SAFE_INTEGER + 1; }, "data: releaseSequence must be a safe integer"],
   ]) {
     const manifest = validManifest();
     mutate(manifest);
+    manifest.productIdentitySha256 = calculateProductIdentity(manifest);
     assert.deepEqual(validateSystemReleaseManifest({ manifest, ...schemas }), [expected]);
+  }
+});
+
+test("system release v4 change classification separates product, governance and observation changes", () => {
+  const previous = validManifest();
+
+  const issueOnly = structuredClone(previous);
+  issueOnly.issueRefs = [issue("easysubway", 2840)];
+  assert.throws(
+    () => classifySystemReleaseChange({ previousManifest: previous, currentManifest: issueOnly, ...classifierInputs }),
+    /no classified identity difference/,
+  );
+
+  const product = structuredClone(previous);
+  product.mobile.artifactIdentity.aabSha256 = "c".repeat(64);
+  product.productIdentitySha256 = calculateProductIdentity(product);
+  assert.equal(classifySystemReleaseChange({ previousManifest: previous, currentManifest: product, ...classifierInputs }), "PRODUCT_CHANGE");
+
+  const governance = structuredClone(previous);
+  const changedInventory = structuredClone(governanceInventory);
+  changedInventory.files[0].sha256 = "c".repeat(64);
+  governance.governanceRevisionSha256 = calculateGovernanceRevision(changedInventory);
+  const { repoRoot: ignoredRepoRoot, ...governanceClassifierInputs } = classifierInputs;
+  assert.equal(classifySystemReleaseChange({
+    previousManifest: previous,
+    currentManifest: governance,
+    ...governanceClassifierInputs,
+    currentGovernanceInventory: changedInventory,
+  }), "GOVERNANCE_CHANGE");
+
+  const observation = structuredClone(previous);
+  observation.hubObservedRevision.gitSha = "c".repeat(40);
+  assert.equal(classifySystemReleaseChange({ previousManifest: previous, currentManifest: observation, ...classifierInputs }), "OBSERVATION_ONLY_CHANGE");
+
+  for (const mutate of [
+    (manifest) => { manifest.schemaVersion = 3; },
+    (manifest) => { manifest.productIdentitySha256 = "c".repeat(64); },
+  ]) {
+    const malformed = structuredClone(previous);
+    mutate(malformed);
+    assert.throws(
+      () => classifySystemReleaseChange({ previousManifest: previous, currentManifest: malformed, ...classifierInputs }),
+      /current system release manifest is invalid/,
+    );
+  }
+});
+
+test("system release v4 rejects open, duplicated, or mismatched governance inventory", () => {
+  for (const mutate of [
+    (inventory) => { inventory.files.pop(); },
+    (inventory) => { inventory.files[4].path = inventory.files[3].path; },
+  ]) {
+    const inventory = structuredClone(governanceInventory);
+    mutate(inventory);
+    const manifest = validManifest();
+    manifest.governanceRevisionSha256 = calculateGovernanceRevision(inventory);
+    const errors = validateSystemReleaseManifest({
+      manifest,
+      ...schemas,
+      governanceInventory: inventory,
+    });
+    assert.ok(errors.some((error) => error.startsWith("governance inventory:")));
+  }
+
+  const mismatched = structuredClone(governanceInventory);
+  mismatched.files[0].sha256 = "c".repeat(64);
+  assert.ok(validateGovernanceInventory({
+    governanceInventory: mismatched,
+    repoRoot: process.cwd(),
+  }).some((error) => error.includes("SHA-256 mismatch")));
+});
+
+test("system release v4 rejects a governance inventory symlink before hashing", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "release-governance-inventory-"));
+  const entry = governanceInventory.files[0];
+  const inventoryPath = path.join(directory, entry.path);
+  try {
+    mkdirSync(path.dirname(inventoryPath), { recursive: true });
+    writeFileSync(path.join(directory, "target"), "not a release schema");
+    symlinkSync(path.join(directory, "target"), inventoryPath);
+    assert.ok(validateGovernanceInventory({
+      governanceInventory,
+      governanceInventorySchema: schemas.governanceInventorySchema,
+      repoRoot: directory,
+    }).includes(`governance inventory: tracked path must be a regular file: ${entry.path}`));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 

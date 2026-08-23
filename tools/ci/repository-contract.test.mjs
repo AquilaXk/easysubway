@@ -20,7 +20,7 @@ import {
 } from "../release/generate-route-integration-verdict.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { validateLineage } from "../datapack/source-snapshot-policy.mjs";
-import { selectSystemReleaseDecision } from "../release/validate-system-release-manifest.mjs";
+import { calculateProductIdentity, selectSystemReleaseDecision } from "../release/validate-system-release-manifest.mjs";
 
 const root = process.cwd();
 const execFileAsync = promisify(execFile);
@@ -6113,7 +6113,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.ok(corruptManifest.readiness.blockers.some((blocker) => blocker.id === "missing_aabPayloadSha256"));
 });
 
-test("[system-release-generator] FINAL은 Hub와 네 target SHA를 결속한 system release v3를 별도로 생성한다", async () => {
+test("[system-release-generator] FINAL은 product·governance·observation identity를 결속한 system release v4를 별도로 생성한다", async () => {
   const tempDir = await mkdtemp(path.join(tmpdir(), "easysubway-system-release-"));
   const candidatePath = path.join(tempDir, "candidate.json");
   const outputPath = path.join(tempDir, "legacy-final.json");
@@ -6198,8 +6198,10 @@ test("[system-release-generator] FINAL은 Hub와 네 target SHA를 결속한 sys
     const legacy = JSON.parse(await readFile(outputPath, "utf8"));
     const system = JSON.parse(await readFile(systemOutputPath, "utf8"));
     assert.equal(Object.hasOwn(system, "gitSha"), false);
-    assert.equal(system.schemaVersion, 3);
-    assert.deepEqual(system.hub, { repository: "AquilaXk/easysubway", gitSha: currentGitSha });
+    assert.equal(system.schemaVersion, 4);
+    assert.deepEqual(system.hubObservedRevision, { repository: "AquilaXk/easysubway", gitSha: currentGitSha });
+    assert.match(system.productIdentitySha256, /^[a-f0-9]{64}$/);
+    assert.match(system.governanceRevisionSha256, /^[a-f0-9]{64}$/);
     assert.equal(system.phase, "FINAL");
     assert.equal(system.decision, "NO_GO");
     assert.deepEqual(system.issueRefs, issueRefs);
@@ -6243,6 +6245,8 @@ test("[system-release-generator] FINAL은 Hub와 네 target SHA를 결속한 sys
       componentSchema: JSON.parse(read("contracts/release/component-manifest.schema.json")),
       systemSchema: JSON.parse(read("contracts/release/system-release-manifest.schema.json")),
       issueRefSchema: JSON.parse(read("contracts/release/issue-ref.schema.json")),
+      governanceInventorySchema: JSON.parse(read("contracts/release/system-release-governance-inventory.schema.json")),
+      governanceInventory: JSON.parse(read("contracts/release/system-release-governance-inventory.json")),
     };
     const canonicalGoCandidate = structuredClone(system);
     for (const component of ["mobile", "backend", "data", "platform"]) {
@@ -6263,6 +6267,7 @@ test("[system-release-generator] FINAL은 Hub와 네 target SHA를 결속한 sys
         stale: 0, previous: 0, alternateProvider: 0, bestEffort: 0,
       },
     };
+    canonicalGoCandidate.productIdentitySha256 = calculateProductIdentity(canonicalGoCandidate);
     assert.equal(
       selectSystemReleaseDecision({ legacyDecision: "GO", manifest: canonicalGoCandidate, ...semanticSchemas }),
       "GO",

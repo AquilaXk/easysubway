@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "system-release-governance-inventory",
+  "files": [
+    { "path": "contracts/release/system-release-manifest.schema.json", "sha256": "aeb97a3bd43be169c873eb4c0b018b295da557ae3a3d4ac9a81d494bf1a16f68" },
+    { "path": "contracts/release/system-release-governance-inventory.schema.json", "sha256": "b485bb3887a71841ccbcd784c32a3f98f54366a4241c718a52a74682a4655515" },
+    { "path": "release/product-gates/rc-evidence-manifest-contract.json", "sha256": "1cec386bf58112ce84bc8d0817ae63c378d33a4a8dcf69e6155f8bda12236eb1" },
+    { "path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "263148f1b6df75299bfbe130a9be7adf8b21739f11953f6ad4a3d579f2fedf30" },
+    { "path": "tools/release/validate-system-release-manifest.mjs", "sha256": "09bfc02dfb09e1b4db6d72a44fdb5eca104ab0c8c172fc3d569d957988550193" }
+  ]
+}
