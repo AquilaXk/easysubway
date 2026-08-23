@@ -5,6 +5,7 @@ import test from "node:test";
 const resources = new Map([
   ["datapack/mobility-profile-policy.json", "release/product-gates/mobility-profile-policy.json"],
   ["datapack/datapack-freshness-sla.json", "release/product-gates/datapack-freshness-sla.json"],
+  ["datapack/source-governance-policy.json", "tools/datapack/source-governance-policy.json"],
   ["datapack/datapack-manifest-acceptance-policy.json", "apps/mobile/release/datapack-manifest-acceptance-policy.json"],
   ["datapack/production-datapack-scope.json", "release/product-gates/production-datapack-scope.json"],
   ["datapack/train-search-itx-exclusion-gate.json", "release/product-gates/train-search-itx-exclusion-gate.json"],
@@ -44,6 +45,18 @@ test("data contract bundle은 target producer 입력만 exact bytes로 고정한
   }
 });
 
+test("route-map governance bundle은 current과 historical source를 exact bytes로 분리한다", async () => {
+  const [backendBundle, governance] = await Promise.all([
+    readFile("contracts/bundles/backend-contracts-v1.0.0.json", "utf8").then(JSON.parse),
+    readFile("tools/datapack/source-governance-policy.json", "utf8"),
+  ]);
+
+  assert.equal(backendBundle.resources["datapack/source-governance-policy.json"], governance);
+  const sources = new Map(JSON.parse(governance).sources.map((source) => [source.sourceId, source]));
+  assert.equal(sources.get("seoul-metro-route-map-positions").sourceClassId, "route_map_positions");
+  assert.equal(sources.get("seoulmetro-cyberstation-route-map").sourceClassId, "route_map_asset_historical");
+});
+
 test("datapack freshness SLA는 current public route-map position과 연간 공식 환승 파일 정책을 고정한다", async () => {
   const policy = JSON.parse(await readFile("release/product-gates/datapack-freshness-sla.json", "utf8"));
   const classes = new Map(policy.sourceClasses.map((sourceClass) => [sourceClass.id, sourceClass]));
@@ -55,6 +68,7 @@ test("datapack freshness SLA는 current public route-map position과 연간 공�
       "static_accessibility_facility",
       "planned_timetable",
       "route_map_positions",
+      "route_map_asset_historical",
       "realtime_overlay",
       "annual_official_file",
     ],
@@ -62,16 +76,26 @@ test("datapack freshness SLA는 current public route-map position과 연간 공�
   assert.deepEqual(classes.get("route_map_positions"), {
     id: "route_map_positions",
     sourceIds: ["seoul-metro-route-map-positions"],
-    examples: ["official public station coordinates", "route-map position coverage"],
+    examples: ["official public station code/name/latitude/longitude", "versioned deterministic route-map layout"],
     basisField: "retrievedAt",
     reverificationCadence: "P90D",
     offlinePackEligible: true,
-    eventTriggers: ["official data update", "new station opening", "line extension opening"],
-    changePublishSla: "P14D",
+    eventTriggers: ["official public data revision", "new station opening", "line extension opening"],
+    changePublishSla: "P3D",
     freshnessMetric: "routeMapPositionFreshnessRatio",
   });
   assert.equal(classes.has("route_map_asset"), false);
-  assert.ok(!policy.sourceClasses.some(({ sourceIds }) => sourceIds.includes("seoulmetro-cyberstation-route-map")));
+  assert.deepEqual(classes.get("route_map_asset_historical"), {
+    id: "route_map_asset_historical",
+    sourceIds: ["seoulmetro-cyberstation-route-map"],
+    examples: ["historical web route-map diagnostic only"],
+    basisField: "retrievedAt",
+    reverificationCadence: "P1Y",
+    offlinePackEligible: false,
+    eventTriggers: ["historical evidence review"],
+    changePublishSla: "not-applicable",
+    freshnessMetric: "routeMapPositionFreshnessRatio",
+  });
   assert.deepEqual(classes.get("annual_official_file"), {
     id: "annual_official_file",
     sourceIds: ["molit-railway-transfer-movement", "seoul-metro-transfer-distance-duration"],

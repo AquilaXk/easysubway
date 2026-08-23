@@ -10611,7 +10611,13 @@ test("데이터팩 freshness SLA는 source별 갱신 주기와 stale 노출 정�
   assert.equal(classes.get("planned_timetable").maximumReverificationCadence, "P30D");
   assert.equal(classes.get("planned_timetable").futureBasisAllowed, true);
   assert.equal(classes.get("planned_timetable").changePublishSla, "before-effective-date");
-  assert.equal(classes.get("route_map_asset").reverificationCadence, "P1Y");
+  assert.equal(classes.get("route_map_positions").reverificationCadence, "P90D");
+  assert.equal(classes.get("route_map_positions").changePublishSla, "P3D");
+  assert.equal(classes.get("route_map_positions").offlinePackEligible, true);
+  assert.equal(classes.get("route_map_asset_historical").reverificationCadence, "P1Y");
+  assert.equal(classes.get("route_map_asset_historical").offlinePackEligible, false);
+  assert.equal(classes.get("route_map_asset_historical").changePublishSla, "not-applicable");
+  assert.equal(classes.has("route_map_asset"), false);
   assert.equal(classes.get("realtime_overlay").reverificationCadence, "PT90S");
   assert.equal(policy.monitoring.manualCheckCadence, "P1D");
   assert.equal(policy.monitoring.alertBeforePackExpiry, "PT6H");
