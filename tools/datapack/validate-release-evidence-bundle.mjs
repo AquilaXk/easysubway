@@ -255,9 +255,9 @@ function validateLaunchDenominatorReport(
       "launchScopeSha256",
     ],
     [
-      "nationwide roadmap",
-      report.scopes?.nationwideRoadmapScope,
-      scope.nationwideRoadmapScope,
+      "nationwide final",
+      report.scopes?.nationwideFinalLaunchScope,
+      scope.nationwideFinalLaunchScope,
       "nationwideRoadmapScopeId",
       "nationwideRoadmapScopeSha256",
     ],
@@ -284,11 +284,14 @@ function validateLaunchDenominatorReport(
     throw new Error("launch denominator report identity linkage matrix mismatch");
   }
   if (
-    report.nationwideBlocksV1 !== false
-    || report.coverage?.nationwide?.blocksV1 !== false
-    || scope.nationwideRoadmapScope?.blocksRoutingLaunch !== false
+    report.nationwideFinalBlocksLaunch !== true
+    || report.coverage?.nationwide?.blocksRoutingLaunch !== true
+    || scope.nationwideFinalLaunchScope?.blocksRoutingLaunch !== true
   ) {
-    throw new Error("nationwide roadmap must remain nonblocking for v1 launch");
+    throw new Error("nationwide final scope must block routing launch");
+  }
+  if (bundle.nationwideTargetsSha256 !== scope.nationwideFinalLaunchScope?.targetsSha256) {
+    throw new Error("nationwide final targets hash must match canonical scope");
   }
   const canonicalReport = buildLaunchDenominatorReport(scope, report.evaluatorInput);
   if (!isDeepStrictEqual(report, canonicalReport)) {
@@ -435,6 +438,7 @@ async function main() {
     "verifiedAccessibilityScopeSha256",
     "launchScopeSha256",
     "nationwideRoadmapScopeSha256",
+    "nationwideTargetsSha256",
     "identityLinkageMatrixSha256",
     "launchDenominatorReportSha256",
     "buildSpecSha256",

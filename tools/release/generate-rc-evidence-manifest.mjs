@@ -191,9 +191,10 @@ const launchScope = readJsonIfExists(path.join(repoRoot, "release/product-gates/
 if (!launchScope?.routingLaunchScope || !launchScope?.identityMatrix) {
   fail("production routing launch scope and identity matrix are required");
 }
-if (!launchScope?.nationwideRoadmapScope) {
-  fail("production nationwide roadmap scope is required");
+if (!launchScope?.nationwideRoadmapScope || !launchScope?.nationwideFinalLaunchScope) {
+  fail("production nationwide roadmap and final launch scopes are required");
 }
+const nationwideFinalReceipt = readNationwideFinalReceipt(dataPackReleaseDecision);
 
 const identity = {
   gitSha,
@@ -218,8 +219,11 @@ const identity = {
   realtimeContractVersion: arg("realtimeContractVersion", "realtime-contract-version") ?? readRealtimeContractVersion(repoRoot),
   launchScopeId: launchScope.routingLaunchScope.id,
   launchScopeSha256: canonicalScopeHash(launchScope.routingLaunchScope),
-  nationwideRoadmapScopeId: launchScope.nationwideRoadmapScope.id,
-  nationwideRoadmapScopeSha256: canonicalScopeHash(launchScope.nationwideRoadmapScope),
+  nationwideRoadmapScopeId: nationwideFinalReceipt?.nationwideRoadmapScopeId ?? null,
+  nationwideRoadmapScopeSha256: nationwideFinalReceipt?.nationwideRoadmapScopeSha256 ?? null,
+  nationwideTargetsSha256: launchScope.nationwideFinalLaunchScope.targetsSha256 ?? null,
+  launchDenominatorDecision: nationwideFinalReceipt?.launchDenominatorDecision ?? null,
+  launchDenominatorReportSha256: nationwideFinalReceipt?.launchDenominatorReportSha256 ?? null,
   identityLinkageMatrixSha256: canonicalScopeHash(launchScope.identityMatrix),
 };
 if (requirePrePlayUploadReady) {
@@ -301,6 +305,7 @@ const blockers = [
   ...evidenceBlockers(evidenceEntries),
   ...datapackGateBlockers(datapackGates),
   ...identityLinkageBlockers(identityLinkage),
+  ...nationwideFinalReceiptBlockers(nationwideFinalReceipt, launchScope.nationwideFinalLaunchScope),
   ...activeIssueBlockers(rcEvidenceContract.activeBlockerIssues),
 ];
 const summaryArtifactDigest = createHash("sha256")
@@ -772,6 +777,16 @@ function readFinalDataPackReleaseDecision(filePath, required) {
     fail("data pack release decision is not finalized or has invalid sourceSnapshotSetHash");
   }
   return decision;
+}
+
+function readNationwideFinalReceipt(decision) {
+  if (!decision) return null;
+  return {
+    nationwideRoadmapScopeId: decision.nationwideRoadmapScopeId ?? null,
+    nationwideRoadmapScopeSha256: decision.nationwideRoadmapScopeSha256 ?? null,
+    launchDenominatorDecision: decision.launchDenominatorDecision ?? null,
+    launchDenominatorReportSha256: decision.launchDenominatorReportSha256 ?? null,
+  };
 }
 
 function readDataPackRehearsalBinding(filePath, manifestPath, manifest, artifactPath) {
@@ -1842,6 +1857,9 @@ function identityBlockers(values) {
     "launchScopeSha256",
     "nationwideRoadmapScopeId",
     "nationwideRoadmapScopeSha256",
+    "nationwideTargetsSha256",
+    "launchDenominatorDecision",
+    "launchDenominatorReportSha256",
     "identityLinkageMatrixSha256",
   ];
   const blockers = required
@@ -1853,6 +1871,34 @@ function identityBlockers(values) {
       severity: "P0",
       reason: "backendImageDigest or backendArtifactSha256 is required for RC identity",
     });
+  }
+  return blockers;
+}
+
+function nationwideFinalReceiptBlockers(receipt, scope) {
+  if (!receipt) {
+    return [{
+      id: "missing_nationwide_final_data_receipt",
+      severity: "P0",
+      reason: "A finalized Data nationwide launch receipt is required for final GO",
+    }];
+  }
+  const expectedScopeHash = canonicalScopeHash(scope);
+  const blockers = [];
+  if (scope?.blocksRoutingLaunch !== true) {
+    blockers.push({ id: "nationwide_final_scope_not_blocking", severity: "P0", reason: "Nationwide final scope must block routing launch" });
+  }
+  if (receipt.nationwideRoadmapScopeId !== scope?.id) {
+    blockers.push({ id: "nationwide_final_receipt_scope_id_mismatch", severity: "P0", reason: "Data nationwide scope ID does not match the canonical final scope" });
+  }
+  if (receipt.nationwideRoadmapScopeSha256 !== expectedScopeHash) {
+    blockers.push({ id: "nationwide_final_receipt_scope_hash_mismatch", severity: "P0", reason: "Data nationwide scope hash does not match the canonical final scope" });
+  }
+  if (receipt.launchDenominatorDecision !== "GO") {
+    blockers.push({ id: "nationwide_final_receipt_not_go", severity: "P0", reason: "Data launch denominator decision is not GO" });
+  }
+  if (!/^[a-f0-9]{64}$/.test(receipt.launchDenominatorReportSha256 ?? "")) {
+    blockers.push({ id: "nationwide_final_receipt_report_hash_invalid", severity: "P0", reason: "Data launch denominator report hash is invalid" });
   }
   return blockers;
 }

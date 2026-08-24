@@ -84,6 +84,22 @@
     "launchRequiredCount": 270,
     "blocksRoutingLaunch": false
   },
+  "nationwideFinalLaunchScope": {
+    "id": "nationwide_final_launch_v1",
+    "targets": "tools/datapack/nationwide-coverage-targets.json",
+    "targetsSha256": "31e53008da6bbf1060cbfd5ab5f2f10036ee2b44fc16183ecff6ef3a4a1c3fdb",
+    "activeLaunchRequiredDomains": [
+      "station_line_membership",
+      "route_graph_topology",
+      "accessibility_facilities",
+      "realtime_arrivals",
+      "schedule_timetable",
+      "route_map_positions"
+    ],
+    "launchRequiredCount": 270,
+    "requiredMissingCount": 0,
+    "blocksRoutingLaunch": true
+  },
   "identityMatrix": {
     "consumers": ["source", "server", "mobile"],
     "requiredSharedFields": [

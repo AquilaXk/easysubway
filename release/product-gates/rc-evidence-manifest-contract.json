@@ -32,6 +32,9 @@
     "launchScopeSha256",
     "nationwideRoadmapScopeId",
     "nationwideRoadmapScopeSha256",
+    "nationwideTargetsSha256",
+    "launchDenominatorDecision",
+    "launchDenominatorReportSha256",
     "identityLinkageMatrixSha256"
   ],
   "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],

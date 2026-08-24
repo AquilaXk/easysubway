@@ -5072,6 +5072,9 @@ test("모바일 signed release artifact gate와 광고 counter는 CI 산출물�
     "realtimeContractVersion",
     "nationwideRoadmapScopeId",
     "nationwideRoadmapScopeSha256",
+    "nationwideTargetsSha256",
+    "launchDenominatorDecision",
+    "launchDenominatorReportSha256",
   ]) {
     assert.ok(rcEvidenceManifestContract.requiredRcIdentityFields.includes(field), `${field} must be required`);
   }
@@ -5764,13 +5767,14 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
   assert.equal(manifest.rcIdentity.launchScopeId, launchScope.routingLaunchScope.id);
   assert.equal(manifest.launchScopeSha256, canonicalScopeHash(launchScope.routingLaunchScope));
   assert.equal(manifest.rcIdentity.launchScopeSha256, canonicalScopeHash(launchScope.routingLaunchScope));
-  assert.equal(manifest.nationwideRoadmapScopeId, launchScope.nationwideRoadmapScope.id);
-  assert.equal(manifest.rcIdentity.nationwideRoadmapScopeId, launchScope.nationwideRoadmapScope.id);
-  assert.equal(manifest.nationwideRoadmapScopeSha256, canonicalScopeHash(launchScope.nationwideRoadmapScope));
-  assert.equal(manifest.rcIdentity.nationwideRoadmapScopeSha256, canonicalScopeHash(launchScope.nationwideRoadmapScope));
+  assert.equal(manifest.nationwideRoadmapScopeId, null);
+  assert.equal(manifest.rcIdentity.nationwideRoadmapScopeId, null);
+  assert.equal(manifest.nationwideRoadmapScopeSha256, null);
+  assert.equal(manifest.rcIdentity.nationwideRoadmapScopeSha256, null);
   assert.equal(manifest.identityLinkageMatrixSha256, canonicalScopeHash(launchScope.identityMatrix));
   assert.equal(manifest.rcIdentity.identityLinkageMatrixSha256, canonicalScopeHash(launchScope.identityMatrix));
   assert.equal(manifest.readiness.status, "NO_GO");
+  assert.ok(manifest.readiness.blockers.some((blocker) => blocker.id === "missing_nationwide_final_data_receipt"));
   assert.ok(manifest.readiness.blockers.map((blocker) => blocker.id).includes("gate_androidrcevidence_blocked_external"));
   assert.equal(
     manifest.readiness.blockers.some((blocker) => blocker.id === "pending_post_launch_operations"),
@@ -6029,7 +6033,7 @@ test("RC evidence manifest generator는 RC identity와 No-Go blocker를 생성�
       "--output", path.join(tempDir, "incomplete-scope-manifest.json"),
       "--tested-at", "2026-06-26T00:00:00.000Z",
     ], { cwd: root }),
-    /production nationwide roadmap scope is required/,
+    /production nationwide roadmap and final launch scopes are required/,
   );
 
   const localImageInspectPath = path.join(tempDir, "local-image-inspect.json");
@@ -6445,7 +6449,8 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
   const gitSha = await initializeFixtureGitRepo(validationRepo);
   const now = "2026-07-16T00:00:00.000Z";
   const snapshotSetIdentity = "a".repeat(64);
-  const requiredSourceIds = readJson("release/product-gates/production-datapack-scope.json").productionSourceSet.requiredSourceIds;
+  const productionScope = readJson("release/product-gates/production-datapack-scope.json");
+  const requiredSourceIds = productionScope.productionSourceSet.requiredSourceIds;
   const sourceInventoryEntries = requiredSourceIds.map((sourceId, index) => ({
     sourceId, status: "APPROVED", producerVersion: 1, evidenceSha256: `${(index % 9) + 1}`.repeat(64),
     evaluatedAt: now, expiresAt: "2026-07-30T00:00:00.000Z",
@@ -6505,6 +6510,10 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
     remoteValidationPassed: true, sourceSnapshotSetHash: snapshotSetIdentity, reasonCodes: [],
     selectedManifestSha256: createHash("sha256").update(JSON.stringify(productionManifest)).digest("hex"),
     selectedReleaseSequence: productionManifest.releaseSequence,
+    nationwideRoadmapScopeId: productionScope.nationwideFinalLaunchScope.id,
+    nationwideRoadmapScopeSha256: canonicalScopeHash(productionScope.nationwideFinalLaunchScope),
+    launchDenominatorDecision: "GO",
+    launchDenominatorReportSha256: "b".repeat(64),
   }));
   const writeBoundProductionManifest = async (manifest) => {
     const manifestBytes = JSON.stringify(manifest);
@@ -6645,7 +6654,7 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
   assert.equal(Object.hasOwn(candidateManifest, "readiness"), false);
   assert.equal(Object.hasOwn(candidateManifest, "decision"), false);
   assert.equal(Object.hasOwn(candidateManifest, "summaryArtifactDigest"), false);
-  assert.doesNotMatch(JSON.stringify(candidateManifest), /\b(?:GO|NO_GO)\b/);
+  assert.equal(candidateManifest.releaseCandidateIdentity.launchDenominatorDecision, "GO");
   assert.equal(candidateManifest.releaseCandidateIdentity.releaseSequence, 102);
   assert.equal(candidateManifest.releaseCandidateIdentity.sourceSnapshotSetHash, snapshotSetIdentity);
   await assert.rejects(
@@ -10440,6 +10449,22 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   assert.equal(scope.nationwideRoadmapScope.id, "nationwide_roadmap_v1");
   assert.equal(scope.nationwideRoadmapScope.launchRequiredCount, 270);
   assert.equal(scope.nationwideRoadmapScope.blocksRoutingLaunch, false);
+  assert.deepEqual(scope.nationwideFinalLaunchScope, {
+    id: "nationwide_final_launch_v1",
+    targets: "tools/datapack/nationwide-coverage-targets.json",
+    targetsSha256: createHash("sha256").update(readFileSync("tools/datapack/nationwide-coverage-targets.json")).digest("hex"),
+    activeLaunchRequiredDomains: [
+      "station_line_membership",
+      "route_graph_topology",
+      "accessibility_facilities",
+      "realtime_arrivals",
+      "schedule_timetable",
+      "route_map_positions",
+    ],
+    launchRequiredCount: 270,
+    requiredMissingCount: 0,
+    blocksRoutingLaunch: true,
+  });
   assert.deepEqual(scope.routingLaunchScope.serviceIds, ["SUBWAY", "ITX_CHEONGCHUN"]);
   assert.equal(scope.routingLaunchScope.candidateStationIds, undefined);
   assert.equal(scope.routingLaunchScope.admittedStationEvidenceRequired, true);

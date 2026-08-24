@@ -105,6 +105,16 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
       safety: { signatureValid: true, rollbackVerified: true, freshness: "FRESH", lineage: "VERIFIED" },
       forbiddenEvidence: [],
       forbiddenEvidenceStatus: "VERIFIED",
+      nationwide: {
+        scopeId: scope.nationwideFinalLaunchScope.id,
+        scopeSha256: canonicalScopeHash(scope.nationwideFinalLaunchScope),
+        targetsSha256: scope.nationwideFinalLaunchScope.targetsSha256,
+        activeLaunchRequiredDomains: [...scope.nationwideFinalLaunchScope.activeLaunchRequiredDomains],
+        denominator: scope.nationwideFinalLaunchScope.launchRequiredCount,
+        missingCount: 0,
+        status: "COMPLETE",
+        freshness: "FRESH",
+      },
     },
   });
   const serverEvidenceRaw = json({
@@ -184,7 +194,16 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     },
     forbiddenEvidence: [],
     forbiddenEvidenceStatus: "VERIFIED",
-    nationwide: { missingCount: 270 },
+    nationwide: {
+      scopeId: scope.nationwideFinalLaunchScope.id,
+      scopeSha256: canonicalScopeHash(scope.nationwideFinalLaunchScope),
+      targetsSha256: scope.nationwideFinalLaunchScope.targetsSha256,
+      activeLaunchRequiredDomains: [...scope.nationwideFinalLaunchScope.activeLaunchRequiredDomains],
+      denominator: scope.nationwideFinalLaunchScope.launchRequiredCount,
+      missingCount: 0,
+      status: "COMPLETE",
+      freshness: "FRESH",
+    },
     candidateBinding,
   });
   assert.equal(goReport.decision, "GO");
@@ -213,8 +232,9 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     verifiedAccessibilityScopeSha256: report.scopes.verifiedAccessibilityScope.sha256,
     launchScopeId: report.scopes.routingLaunchScope.id,
     launchScopeSha256: report.scopes.routingLaunchScope.sha256,
-    nationwideRoadmapScopeId: report.scopes.nationwideRoadmapScope.id,
-    nationwideRoadmapScopeSha256: report.scopes.nationwideRoadmapScope.sha256,
+    nationwideRoadmapScopeId: report.scopes.nationwideFinalLaunchScope.id,
+    nationwideRoadmapScopeSha256: report.scopes.nationwideFinalLaunchScope.sha256,
+    nationwideTargetsSha256: scope.nationwideFinalLaunchScope.targetsSha256,
     identityLinkageMatrixSha256: report.identityLinkage.matrixSha256,
     launchDenominatorDecision: report.decision,
     launchDenominatorReportSha256: createHash("sha256").update(raw).digest("hex"),
@@ -277,6 +297,21 @@ test("release evidence bundle validator는 publish gate status와 deferred headw
     ],
     { cwd: root },
   );
+  bundle.nationwideTargetsSha256 = "f".repeat(64);
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, [...validatorCommand, ...scopeArgs, "--require-pass"], { cwd: root }),
+    /nationwide final targets hash must match canonical scope/,
+  );
+  bundle.nationwideTargetsSha256 = scope.nationwideFinalLaunchScope.targetsSha256;
+  bundle.nationwideRoadmapScopeId = "capital_routing_android_v1";
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
+  await assert.rejects(
+    execFileAsync(process.execPath, [...validatorCommand, ...scopeArgs, "--require-pass"], { cwd: root }),
+    /launch denominator report nationwide final scope binding mismatch/,
+  );
+  bindLaunchReport(bundle, goReport, goReportRaw);
+  await writeFile(bundlePath, `${JSON.stringify(bundle, null, 2)}\n`);
   await assert.rejects(
     execFileAsync(process.execPath, [
       "tools/datapack/validate-release-evidence-bundle.mjs",

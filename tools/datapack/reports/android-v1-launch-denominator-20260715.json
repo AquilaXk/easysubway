@@ -5,6 +5,14 @@
     "CANDIDATE_EVIDENCE_NOT_FRESH:source",
     "CANDIDATE_EVIDENCE_NOT_FRESH:server",
     "CANDIDATE_EVIDENCE_NOT_FRESH:mobile",
+    "NATIONWIDE_FINAL_IDENTITY_MISMATCH",
+    "NATIONWIDE_FINAL_SCOPE_HASH_MISMATCH",
+    "NATIONWIDE_FINAL_TARGETS_HASH_MISMATCH",
+    "NATIONWIDE_FINAL_ACTIVE_DOMAIN_MISMATCH",
+    "NATIONWIDE_FINAL_DENOMINATOR_MISMATCH",
+    "NATIONWIDE_FINAL_MISSING_COUNT_NONZERO",
+    "NATIONWIDE_FINAL_STATUS_NOT_COMPLETE",
+    "NATIONWIDE_FINAL_FRESHNESS_NOT_FRESH",
     "ROUTING_STATION_ID_GAP",
     "ROUTING_TRANSFER_STATION_ID_GAP",
     "ROUTING_SOURCE_DERIVED_CONNECTION_EDGE_ID_GAP",
@@ -136,7 +144,14 @@
     "forbiddenEvidence": [],
     "forbiddenEvidenceStatus": "VERIFIED",
     "nationwide": {
-      "missingCount": 270
+      "scopeId": null,
+      "scopeSha256": null,
+      "targetsSha256": null,
+      "activeLaunchRequiredDomains": null,
+      "denominator": null,
+      "missingCount": 270,
+      "status": null,
+      "freshness": null
     },
     "candidateBinding": {
       "status": "INCOMPLETE",
@@ -163,6 +178,7 @@
     }
   },
   "nationwideBlocksV1": false,
+  "nationwideFinalBlocksLaunch": true,
   "scopes": {
     "verifiedAccessibilityScope": {
       "id": "capital_pilot_android_v1",
@@ -175,6 +191,10 @@
     "nationwideRoadmapScope": {
       "id": "nationwide_roadmap_v1",
       "sha256": "f93bab74198ed46a708a098201ef53e53c04748a6f18a8a95e01e046d0553442"
+    },
+    "nationwideFinalLaunchScope": {
+      "id": "nationwide_final_launch_v1",
+      "sha256": "ed99fbfe0800c03d19a582f2983382ded75e2bc1ef3d4ba8d902d4754088c899"
     }
   },
   "identityLinkage": {
@@ -202,7 +222,10 @@
     "nationwide": {
       "requiredCount": 270,
       "missingCount": 270,
-      "blocksV1": false
+      "blocksV1": false,
+      "blocksRoutingLaunch": true,
+      "status": null,
+      "freshness": null
     }
   },
   "consumerStates": {

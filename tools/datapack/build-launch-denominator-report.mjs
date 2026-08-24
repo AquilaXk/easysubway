@@ -33,10 +33,12 @@ export function buildLaunchDenominatorReport(scope, evidence) {
     blockers,
     evaluatorInput,
     nationwideBlocksV1: false,
+    nationwideFinalBlocksLaunch: scope?.nationwideFinalLaunchScope?.blocksRoutingLaunch === true,
     scopes: {
       verifiedAccessibilityScope: scopeSummary(scope?.verifiedAccessibilityScope),
       routingLaunchScope: scopeSummary(scope?.routingLaunchScope),
       nationwideRoadmapScope: scopeSummary(scope?.nationwideRoadmapScope),
+      nationwideFinalLaunchScope: scopeSummary(scope?.nationwideFinalLaunchScope),
     },
     identityLinkage: {
       compatible: identityCompatible,
@@ -55,9 +57,12 @@ export function buildLaunchDenominatorReport(scope, evidence) {
         gapCount: requiredAccessibilityRows.length - coveredAccessibilityCount,
       },
       nationwide: {
-        requiredCount: scope?.nationwideRoadmapScope?.launchRequiredCount ?? 0,
+        requiredCount: scope?.nationwideFinalLaunchScope?.launchRequiredCount ?? 0,
         missingCount: evaluatorInput.nationwide.missingCount,
         blocksV1: false,
+        blocksRoutingLaunch: scope?.nationwideFinalLaunchScope?.blocksRoutingLaunch === true,
+        status: evaluatorInput.nationwide.status,
+        freshness: evaluatorInput.nationwide.freshness,
       },
     },
     consumerStates: {
@@ -134,7 +139,16 @@ function sanitizeEvaluatorInput(evidence) {
       ? evidence.forbiddenEvidence.map(({ evidenceClass }) => ({ evidenceClass: evidenceClass ?? null }))
       : null,
     forbiddenEvidenceStatus: evidence?.forbiddenEvidenceStatus ?? null,
-    nationwide: { missingCount: evidence?.nationwide?.missingCount ?? null },
+    nationwide: {
+      scopeId: evidence?.nationwide?.scopeId ?? null,
+      scopeSha256: evidence?.nationwide?.scopeSha256 ?? null,
+      targetsSha256: evidence?.nationwide?.targetsSha256 ?? null,
+      activeLaunchRequiredDomains: arrayOrNull(evidence?.nationwide?.activeLaunchRequiredDomains),
+      denominator: evidence?.nationwide?.denominator ?? null,
+      missingCount: evidence?.nationwide?.missingCount ?? null,
+      status: evidence?.nationwide?.status ?? null,
+      freshness: evidence?.nationwide?.freshness ?? null,
+    },
     candidateBinding: sanitizeCandidateBinding(evidence?.candidateBinding),
   };
 }
@@ -168,6 +182,7 @@ function collectV1Blockers(scope, evidence) {
     "verifiedAccessibilityScope",
     "routingLaunchScope",
     "nationwideRoadmapScope",
+    "nationwideFinalLaunchScope",
     "identityMatrix",
   ]) {
     const value = scope?.[subsection];
@@ -185,6 +200,38 @@ function collectV1Blockers(scope, evidence) {
     } else if (boundEvidence.sha256 !== evidence?.[consumer]?.artifactHash) {
       blockers.push(`CANDIDATE_EVIDENCE_HASH_MISMATCH:${consumer}`);
     }
+  }
+
+  const nationwideFinalScope = scope?.nationwideFinalLaunchScope;
+  if (nationwideFinalScope?.blocksRoutingLaunch !== true) {
+    blockers.push("NATIONWIDE_FINAL_BLOCKING_SCOPE_REQUIRED");
+  }
+  if (evidence?.nationwide?.scopeId !== nationwideFinalScope?.id) {
+    blockers.push("NATIONWIDE_FINAL_IDENTITY_MISMATCH");
+  }
+  if (evidence?.nationwide?.scopeSha256 !== canonicalScopeHash(nationwideFinalScope)) {
+    blockers.push("NATIONWIDE_FINAL_SCOPE_HASH_MISMATCH");
+  }
+  if (evidence?.nationwide?.targetsSha256 !== nationwideFinalScope?.targetsSha256) {
+    blockers.push("NATIONWIDE_FINAL_TARGETS_HASH_MISMATCH");
+  }
+  if (!sameSet(
+    evidence?.nationwide?.activeLaunchRequiredDomains,
+    nationwideFinalScope?.activeLaunchRequiredDomains,
+  )) {
+    blockers.push("NATIONWIDE_FINAL_ACTIVE_DOMAIN_MISMATCH");
+  }
+  if (evidence?.nationwide?.denominator !== nationwideFinalScope?.launchRequiredCount) {
+    blockers.push("NATIONWIDE_FINAL_DENOMINATOR_MISMATCH");
+  }
+  if (evidence?.nationwide?.missingCount !== nationwideFinalScope?.requiredMissingCount) {
+    blockers.push("NATIONWIDE_FINAL_MISSING_COUNT_NONZERO");
+  }
+  if (evidence?.nationwide?.status !== "COMPLETE") {
+    blockers.push("NATIONWIDE_FINAL_STATUS_NOT_COMPLETE");
+  }
+  if (evidence?.nationwide?.freshness !== "FRESH") {
+    blockers.push("NATIONWIDE_FINAL_FRESHNESS_NOT_FRESH");
   }
 
   if (!sameSet(requiredPilotRowIds(accessibilityScope), evidence?.pilot?.coveredRowIds)) {
@@ -317,6 +364,16 @@ function validScopeSubsection(subsection, value) {
     return nonEmptyString(value.id)
       && Number.isSafeInteger(value.launchRequiredCount)
       && value.launchRequiredCount >= 0;
+  }
+  if (subsection === "nationwideFinalLaunchScope") {
+    return nonEmptyString(value.id)
+      && nonEmptyString(value.targets)
+      && /^[a-f0-9]{64}$/.test(value.targetsSha256 ?? "")
+      && nonEmptyStringSet(value.activeLaunchRequiredDomains)
+      && Number.isSafeInteger(value.launchRequiredCount)
+      && value.launchRequiredCount > 0
+      && value.requiredMissingCount === 0
+      && value.blocksRoutingLaunch === true;
   }
   return subsection === "identityMatrix"
     && nonEmptyStringSet(value.requiredSharedFields)

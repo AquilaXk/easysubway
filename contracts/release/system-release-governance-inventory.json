@@ -152,11 +152,11 @@
     },
     {
       "path": "release/product-gates/production-datapack-scope.json",
-      "sha256": "df69559272fec1df7124059ab8cc5b58f956af7cd1cf6153493cc93095b12173"
+      "sha256": "7151cbf5480dd35c635efb75eace6186f532b0857412730411460e0318cb72b4"
     },
     {
       "path": "release/product-gates/rc-evidence-manifest-contract.json",
-      "sha256": "1cec386bf58112ce84bc8d0817ae63c378d33a4a8dcf69e6155f8bda12236eb1"
+      "sha256": "571977ae6cec491579a68e686de35e6f51af68af27e688634a7b4fd4751ccd9a"
     },
     {
       "path": "release/product-gates/route-commercialization-gate.json",
@@ -176,7 +176,7 @@
     },
     {
       "path": "tools/datapack/build-launch-denominator-report.mjs",
-      "sha256": "181e740b8e96371969848d3cd5a3020de94f812dfc2214b010ffb4b44c0d70c6"
+      "sha256": "0cb452a1a5424f191e44cac1037a5389f5a29c48724a9e7b024f1e0306b7664d"
     },
     {
       "path": "tools/datapack/decide-datapack-release.mjs",
@@ -228,7 +228,7 @@
     },
     {
       "path": "tools/release/generate-rc-evidence-manifest.mjs",
-      "sha256": "dafcfd6d253d118d8889f9a7bd8c4bfb5dad74dc6dc1a3459b19f642332a14dc"
+      "sha256": "300f16ab195cb8bf1a58d5c4cd307dd7d8772a59b6693925832946ac7f24192a"
     },
     {
       "path": "tools/release/hash-android-bundle-payload.mjs",
