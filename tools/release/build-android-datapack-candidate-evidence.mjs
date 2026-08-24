@@ -59,7 +59,7 @@ export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentit
   const artifactExpiresAt = timestamp(actionsArtifact.expiresAt, "actionsArtifact.expiresAt");
   if (Date.parse(artifactCreatedAt) > Date.parse(artifactExpiresAt) || new Date(now).getTime() >= Date.parse(artifactExpiresAt)) throw new Error("actions artifact receipt is expired or has invalid time order");
 
-  exactObject(ociReceipt, ["namespace", "bucket", "objectKey", "objectUri", "objectSha256", "byteSize", "putAt", "getAt", "getSha256", "getByteSize", "createOnly"], "ociReceipt");
+  exactObject(ociReceipt, ["namespace", "bucket", "objectKey", "objectUri", "objectSha256", "byteSize", "putAt", "putEtag", "putVersionId", "getAt", "getEtag", "getVersionId", "getSha256", "getByteSize", "createOnly"], "ociReceipt");
   const match = OCI_URI.exec(required(ociReceipt.objectUri, "ociReceipt.objectUri"));
   if (!match || ociReceipt.namespace !== match[1] || ociReceipt.bucket !== match[2] || ociReceipt.objectKey !== match[3]) throw new Error("OCI receipt locator is invalid or mutable");
   if (ociReceipt.createOnly !== true) throw new Error("OCI receipt must prove create-only publication");
@@ -68,6 +68,12 @@ export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentit
   const putAt = timestamp(ociReceipt.putAt, "ociReceipt.putAt");
   const getAt = timestamp(ociReceipt.getAt, "ociReceipt.getAt");
   if (Date.parse(putAt) > Date.parse(getAt)) throw new Error("OCI receipt GET predates PUT");
+  for (const field of ["putEtag", "putVersionId", "getEtag", "getVersionId"]) {
+    if (typeof required(ociReceipt[field], `ociReceipt.${field}`) !== "string") throw new Error(`ociReceipt.${field} must be a string`);
+  }
+  if (ociReceipt.getEtag !== ociReceipt.putEtag || ociReceipt.getVersionId !== ociReceipt.putVersionId) {
+    throw new Error("OCI full GET receipt does not match PUT object identity");
+  }
   if (ociReceipt.getSha256 !== ociReceipt.objectSha256 || ociReceipt.getByteSize !== ociReceipt.byteSize) throw new Error("OCI full GET receipt does not match PUT object bytes");
 
   const body = {
