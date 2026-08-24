@@ -330,6 +330,41 @@ variable "datapack_bucket_name" {
   }
 }
 
+variable "datapack_candidate_bucket_name" {
+  description = "Private Object Storage bucket for immutable data pack candidates. It must differ from datapack_bucket_name."
+  type        = string
+  default     = "easysubway-datapack-candidates"
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[a-z][a-z0-9-]{1,61}[a-z0-9]$", var.datapack_candidate_bucket_name)) && var.datapack_candidate_bucket_name != var.datapack_bucket_name
+    error_message = "datapack_candidate_bucket_name must be lowercase kebab-case and differ from datapack_bucket_name."
+  }
+}
+
+variable "datapack_candidate_object_prefix" {
+  description = "Immutable candidate object prefix. Candidate publication is restricted to this prefix."
+  type        = string
+  default     = "candidates/v1/"
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[a-z0-9][a-z0-9/_-]*/$", var.datapack_candidate_object_prefix))
+    error_message = "datapack_candidate_object_prefix must be a lowercase prefix ending with a slash."
+  }
+}
+
+variable "datapack_candidate_publisher_email" {
+  description = "Email assigned to the dedicated OCI Identity candidate publisher user."
+  type        = string
+  nullable    = false
+
+  validation {
+    condition     = can(regex("^[^@\\s]+@[^@\\s]+\\.[^@\\s]+$", var.datapack_candidate_publisher_email))
+    error_message = "datapack_candidate_publisher_email must be a valid email address."
+  }
+}
+
 variable "datapack_object_prefix" {
   description = "Object prefix used by the app and publisher for data pack files. Empty means bucket root."
   type        = string
