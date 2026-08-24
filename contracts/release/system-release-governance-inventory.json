@@ -8,7 +8,7 @@
     },
     {
       "path": ".github/workflows/release-artifacts.yml",
-      "sha256": "1cd2a8018f4de43c16e38ad12a175ee81d982513028a91847e8f0352c815401f"
+      "sha256": "89ee86d9bccc896ba4da7de532dde17149f33af4863a25cad069349a35cf0c94"
     },
     {
       "path": "apps/mobile/lib/app/accessibility_theme.dart",
@@ -77,6 +77,10 @@
     {
       "path": "backend/build.gradle",
       "sha256": "2684df5a35c4d7952819899810654cfd61d081fe231347e42b37cce05ae9f9bd"
+    },
+    {
+      "path": "contracts/release/android-datapack-candidate-evidence.schema.json",
+      "sha256": "439493f21fcc9b4cb2a2e6ed10d0bf04ccab2db369413c0222c16fb663ae3e79"
     },
     {
       "path": "contracts/release/component-manifest.schema.json",
@@ -215,6 +219,10 @@
       "sha256": "4bd4fd37337ec30833dae3aa0f8ae34f1a08cf06f13dbefad1fe7ccda5a8bc4d"
     },
     {
+      "path": "tools/release/build-android-datapack-candidate-evidence.mjs",
+      "sha256": "0d48a4d72200b6f9ec4bb89d3e434a16dc8d397173c1ea9a846b47e0ef8b8275"
+    },
+    {
       "path": "tools/release/count-gzip-uncompressed-bytes.mjs",
       "sha256": "e44ccdd89af5260c6a8027b6b03fdd660640bc52c99be9ba5d024a629d24dbb9"
     },
@@ -244,7 +252,7 @@
     },
     {
       "path": "tools/release/validate-system-release-manifest.mjs",
-      "sha256": "121c5e3698c5dad97cba27c8eb6e294fe5b68544777fdaba086dbd3a096767ae"
+      "sha256": "d8d01f4f689465dca7e0f90bd27b5d1b175c7382b191bd7b5d63e0eade38a383"
     },
     {
       "path": "tools/security/abuse-penetration-summary-schema.mjs",
