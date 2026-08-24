@@ -63,6 +63,31 @@ output "datapack_namespace" {
   value       = data.oci_objectstorage_namespace.this.namespace
 }
 
+output "datapack_candidate_namespace" {
+  description = "OCI Object Storage namespace for the private candidate bucket."
+  value       = data.oci_objectstorage_namespace.this.namespace
+}
+
+output "datapack_candidate_bucket_name" {
+  description = "Private bucket used only for immutable data pack candidates."
+  value       = oci_objectstorage_bucket.datapack_candidate.name
+}
+
+output "datapack_candidate_object_storage_endpoint" {
+  description = "OCI S3-compatible endpoint. The host is regional and shared; the candidate bucket binding is dedicated."
+  value       = local.datapack_object_storage_endpoint
+}
+
+output "datapack_candidate_object_storage_region" {
+  description = "OCI region for the candidate Object Storage bucket."
+  value       = var.region
+}
+
+output "datapack_candidate_object_prefix" {
+  description = "Object prefix accepted by the private candidate publisher policy."
+  value       = var.datapack_candidate_object_prefix
+}
+
 output "datapack_public_base_url" {
   description = "Public HTTPS base URL for EASYSUBWAY_DATA_PACK_BASE_URL."
   value       = local.datapack_base_url

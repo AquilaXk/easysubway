@@ -1995,6 +1995,45 @@ test("OCI Terraform 기준선은 비밀 파일을 추적하지 않고 데이터�
   assert.match(datapackStorage, /provider\s+= oci\.identity_home/);
   assert.match(datapackStorage, /display_name\s+= "\$\{var\.name_prefix\}-datapack-publisher"/);
   assert.match(datapackStorage, /user_id\s+= var\.user_ocid/);
+  // Candidate artifacts never share the production bucket or publisher identity. The
+  // regional compatibility host may be shared, but every candidate resource/output
+  // binding must remain dedicated.
+  assert.match(variables, /variable "datapack_candidate_bucket_name"[\s\S]*?default\s+= "easysubway-datapack-candidates"/);
+  assert.match(variables, /variable "datapack_candidate_object_prefix"[\s\S]*?default\s+= "candidates\/v1\/"/);
+  assert.match(variables, /variable "datapack_candidate_publisher_email"/);
+  assert.match(tfvarsExample, /datapack_candidate_bucket_name\s+= "easysubway-datapack-candidates"/);
+  assert.match(tfvarsExample, /datapack_candidate_object_prefix\s+= "candidates\/v1\/"/);
+  assert.match(tfvarsExample, /datapack_candidate_publisher_email\s+= "datapack-candidate-publisher@example\.invalid"/);
+  assert.match(datapackStorage, /resource "oci_objectstorage_bucket" "datapack_candidate"/);
+  const candidateBucket = datapackStorage.match(/resource "oci_objectstorage_bucket" "datapack_candidate" \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.match(candidateBucket, /access_type\s+= "NoPublicAccess"/);
+  assert.match(candidateBucket, /name\s+= var\.datapack_candidate_bucket_name/);
+  assert.match(candidateBucket, /versioning\s+= "Disabled"/);
+  assert.doesNotMatch(candidateBucket, /object_lifecycle_policy/);
+  const candidateLifecycle = datapackStorage.match(/resource "oci_objectstorage_object_lifecycle_policy" "datapack_candidate" \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.match(candidateLifecycle, /bucket\s+= oci_objectstorage_bucket\.datapack_candidate\.name/);
+  assert.match(candidateLifecycle, /namespace\s+= data\.oci_objectstorage_namespace\.this\.namespace/);
+  assert.match(candidateLifecycle, /action\s+= "DELETE"[\s\S]*?is_enabled\s+= true[\s\S]*?target\s+= "objects"[\s\S]*?time_amount\s+= 14[\s\S]*?time_unit\s+= "Days"/);
+  assert.match(candidateLifecycle, /object_name_filter[\s\S]*?inclusion_prefixes\s+= \[var\.datapack_candidate_object_prefix\]/);
+  assert.match(datapackStorage, /resource "oci_identity_user" "datapack_candidate_publisher"/);
+  assert.match(datapackStorage, /resource "oci_identity_group" "datapack_candidate_publishers"/);
+  assert.match(datapackStorage, /resource "oci_identity_user_group_membership" "datapack_candidate_publisher"/);
+  assert.match(datapackStorage, /resource "oci_identity_customer_secret_key" "datapack_candidate_publisher"/);
+  assert.match(datapackStorage, /user_id\s+= oci_identity_user\.datapack_candidate_publisher\.id/);
+  const candidatePolicy = datapackStorage.match(/resource "oci_identity_policy" "datapack_candidate_publisher" \{([\s\S]*?)\n\}/)?.[1] ?? "";
+  assert.match(candidatePolicy, /OBJECT_CREATE/);
+  assert.match(candidatePolicy, /OBJECT_READ/);
+  assert.match(candidatePolicy, /target\.bucket\.name\s*=\s*'\$\{var\.datapack_candidate_bucket_name\}'/);
+  assert.match(candidatePolicy, /where all \{target\.bucket\.name\s*=\s*'\$\{var\.datapack_candidate_bucket_name\}', target\.object\.name\s*=\s*'\$\{var\.datapack_candidate_object_prefix\}\*'\}/);
+  assert.doesNotMatch(candidatePolicy, /OBJECT_(?:LIST|INSPECT|DELETE|OVERWRITE)/);
+  assert.doesNotMatch(candidatePolicy, /datapack_bucket_name/);
+  assert.match(outputs, /output "datapack_candidate_namespace"/);
+  assert.match(outputs, /output "datapack_candidate_bucket_name"/);
+  assert.match(outputs, /output "datapack_candidate_object_storage_endpoint"/);
+  assert.match(outputs, /output "datapack_candidate_object_storage_region"/);
+  assert.match(outputs, /output "datapack_candidate_object_prefix"/);
+  assert.doesNotMatch(outputs, /datapack_candidate_publisher\.(?:id|key|secret)/);
+  assert.doesNotMatch(datapackStorage, /preauth|pre-auth|aws|amazon|custom.*endpoint/i);
   assert.match(outputs, /EASYSUBWAY_DATA_PACK_BASE_URL/);
   assert.match(outputs, /EASYSUBWAY_DATAPACK_BUCKET/);
   assert.match(outputs, /EASYSUBWAY_OBJECT_STORAGE_ENDPOINT/);
@@ -3615,6 +3654,15 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 
   assert.match(workflow, /android-release:/);
   assert.match(workflow, /name: Android Release Artifact/);
+  const androidReleaseJob = workflow.slice(
+    workflow.indexOf("  android-release:"),
+    workflow.indexOf("  android-production-rc-release:"),
+  );
+  assert.doesNotMatch(
+    androidReleaseJob,
+    /verify-production-pack-artifact-identity\.mjs/,
+    "generic Android artifact must not rebuild a Data-owned release candidate",
+  );
   assert.match(
     workflow,
     /android-release:[\s\S]*outputs:[\s\S]*artifact_available: \$\{\{ steps\.release-env\.outputs\.artifact_available \}\}/,
