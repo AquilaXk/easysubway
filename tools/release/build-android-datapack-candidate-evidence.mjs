@@ -15,7 +15,7 @@ const sha = (value, name) => {
   return value;
 };
 const timestamp = (value, name) => {
-  if (!Number.isFinite(Date.parse(required(value, name)))) throw new Error(`${name} must be an ISO timestamp`);
+  if (typeof required(value, name) !== "string" || !Number.isFinite(Date.parse(value))) throw new Error(`${name} must be an ISO timestamp`);
   return value;
 };
 const exactObject = (value, fields, name) => {
@@ -36,7 +36,7 @@ export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentit
   exactObject(candidate, ["candidateBinding", "freshnessExpiresAt"], "candidate");
   const binding = candidate.candidateBinding;
   exactObject(binding, ["candidateId", "buildSpecSha256", "manifestSha256"], "candidateBinding");
-  for (const field of ["candidateId", "buildSpecSha256", "manifestSha256"]) required(binding[field], `candidateBinding.${field}`);
+  if (typeof required(binding.candidateId, "candidateBinding.candidateId") !== "string") throw new Error("candidateBinding.candidateId must be a string");
   sha(binding.buildSpecSha256, "candidateBinding.buildSpecSha256");
   sha(binding.manifestSha256, "candidateBinding.manifestSha256");
   const freshnessExpiresAt = timestamp(candidate.freshnessExpiresAt, "freshnessExpiresAt");
@@ -55,7 +55,9 @@ export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentit
   if (typeof actionsArtifact.artifactName !== "string" || actionsArtifact.artifactName.length === 0) throw new Error("actions artifact name is invalid");
   sha(actionsArtifact.archiveDigest?.replace(/^sha256:/, ""), "actionsArtifact.archiveDigest");
   if (!SHA40.test(required(actionsArtifact.headSha, "actionsArtifact.headSha")) || actionsArtifact.headSha !== mobileIdentity.gitSha) throw new Error("actions artifact head must match mobile identity");
-  timestamp(actionsArtifact.createdAt, "actionsArtifact.createdAt"); timestamp(actionsArtifact.expiresAt, "actionsArtifact.expiresAt");
+  const artifactCreatedAt = timestamp(actionsArtifact.createdAt, "actionsArtifact.createdAt");
+  const artifactExpiresAt = timestamp(actionsArtifact.expiresAt, "actionsArtifact.expiresAt");
+  if (Date.parse(artifactCreatedAt) > Date.parse(artifactExpiresAt) || new Date(now).getTime() >= Date.parse(artifactExpiresAt)) throw new Error("actions artifact receipt is expired or has invalid time order");
 
   exactObject(ociReceipt, ["namespace", "bucket", "objectKey", "objectUri", "objectSha256", "byteSize", "putAt", "getAt", "getSha256", "getByteSize", "createOnly"], "ociReceipt");
   const match = OCI_URI.exec(required(ociReceipt.objectUri, "ociReceipt.objectUri"));
@@ -63,7 +65,9 @@ export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentit
   if (ociReceipt.createOnly !== true) throw new Error("OCI receipt must prove create-only publication");
   sha(ociReceipt.objectSha256, "ociReceipt.objectSha256");
   if (!Number.isInteger(ociReceipt.byteSize) || ociReceipt.byteSize < 1) throw new Error("ociReceipt.byteSize must be positive");
-  timestamp(ociReceipt.putAt, "ociReceipt.putAt"); timestamp(ociReceipt.getAt, "ociReceipt.getAt");
+  const putAt = timestamp(ociReceipt.putAt, "ociReceipt.putAt");
+  const getAt = timestamp(ociReceipt.getAt, "ociReceipt.getAt");
+  if (Date.parse(putAt) > Date.parse(getAt)) throw new Error("OCI receipt GET predates PUT");
   if (ociReceipt.getSha256 !== ociReceipt.objectSha256 || ociReceipt.getByteSize !== ociReceipt.byteSize) throw new Error("OCI full GET receipt does not match PUT object bytes");
 
   const body = {
