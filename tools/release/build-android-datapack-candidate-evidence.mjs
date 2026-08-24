@@ -5,6 +5,8 @@ import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const SHA40 = /^[a-f0-9]{40}$/;
+const CANDIDATE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const UTC_MILLISECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
 const OCI_URI = /^oci:\/\/([^/]+)\/([^/]+)\/([A-Za-z0-9][A-Za-z0-9._/-]*)$/;
 
 const required = (value, name) => {
@@ -16,7 +18,10 @@ const sha = (value, name) => {
   return value;
 };
 const timestamp = (value, name) => {
-  if (typeof required(value, name) !== "string" || !Number.isFinite(Date.parse(value))) throw new Error(`${name} must be an ISO timestamp`);
+  if (typeof required(value, name) !== "string" || !UTC_MILLISECONDS.test(value)
+    || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) {
+    throw new Error(`${name} must be a canonical UTC millisecond timestamp`);
+  }
   return value;
 };
 const exactObject = (value, fields, name) => {
@@ -71,7 +76,7 @@ export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentit
   exactObject(candidate, ["candidateBinding", "freshnessExpiresAt"], "candidate");
   const binding = candidate.candidateBinding;
   exactObject(binding, ["candidateId", "buildSpecSha256", "manifestSha256"], "candidateBinding");
-  if (typeof required(binding.candidateId, "candidateBinding.candidateId") !== "string") throw new Error("candidateBinding.candidateId must be a string");
+  if (typeof required(binding.candidateId, "candidateBinding.candidateId") !== "string" || !CANDIDATE_ID.test(binding.candidateId)) throw new Error("candidateBinding.candidateId is invalid");
   sha(binding.buildSpecSha256, "candidateBinding.buildSpecSha256");
   sha(binding.manifestSha256, "candidateBinding.manifestSha256");
   const freshnessExpiresAt = timestamp(candidate.freshnessExpiresAt, "freshnessExpiresAt");
