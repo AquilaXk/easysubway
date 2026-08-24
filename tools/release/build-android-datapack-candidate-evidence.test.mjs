@@ -40,6 +40,7 @@ for (const [name, mutate, expected] of [
   ["secret-shaped extra field", (value) => { value.ociReceipt.authorization = "secret"; }, /invalid field set/],
   ["OCI GET before PUT", (value) => { value.ociReceipt.getAt = "2026-08-23T00:00:00.000Z"; }, /GET predates PUT/],
   ["expired Actions artifact", (value) => { value.actionsArtifact.expiresAt = "2026-08-24T00:00:00.000Z"; }, /artifact receipt is expired/],
+  ["bare Actions archive digest", (value) => { value.actionsArtifact.archiveDigest = hash; }, /archiveDigest/],
   ["reversed Actions artifact timestamps", (value) => { value.actionsArtifact.createdAt = "2026-09-25T00:00:00.000Z"; }, /artifact receipt is expired/],
   ["non-string candidate ID", (value) => { value.candidate.candidateBinding.candidateId = 1; }, /candidateId is invalid/],
   ["invalid candidate ID", (value) => { value.candidate.candidateBinding.candidateId = "nationwide@1"; }, /candidateId is invalid/],

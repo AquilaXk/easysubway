@@ -48,7 +48,9 @@ const validateActionsArtifact = (actionsArtifact, mobileIdentity, now) => {
   if (actionsArtifact.repository !== "AquilaXk/easysubway" || actionsArtifact.workflowPath !== ".github/workflows/release-artifacts.yml") throw new Error("actions artifact source is invalid");
   if (!Number.isInteger(actionsArtifact.runId) || actionsArtifact.runId < 1 || !Number.isInteger(actionsArtifact.artifactId) || actionsArtifact.artifactId < 1) throw new Error("actions artifact identity is invalid");
   if (typeof actionsArtifact.artifactName !== "string" || actionsArtifact.artifactName.length === 0) throw new Error("actions artifact name is invalid");
-  sha(actionsArtifact.archiveDigest?.replace(/^sha256:/, ""), "actionsArtifact.archiveDigest");
+  if (typeof actionsArtifact.archiveDigest !== "string" || !/^sha256:[a-f0-9]{64}$/.test(actionsArtifact.archiveDigest)) {
+    throw new Error("actionsArtifact.archiveDigest must be sha256:<digest>");
+  }
   if (!SHA40.test(required(actionsArtifact.headSha, "actionsArtifact.headSha")) || actionsArtifact.headSha !== mobileIdentity.gitSha) throw new Error("actions artifact head must match mobile identity");
   const artifactCreatedAt = timestamp(actionsArtifact.createdAt, "actionsArtifact.createdAt");
   const artifactExpiresAt = timestamp(actionsArtifact.expiresAt, "actionsArtifact.expiresAt");

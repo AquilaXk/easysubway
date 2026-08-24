@@ -170,7 +170,7 @@ jobs:
     name: Android Data Candidate Evidence
     runs-on: ubuntu-latest
     needs: android-production-rc-release
-    if: ${{ github.event_name == 'workflow_dispatch' && inputs.data_candidate_tuple_oci_uri != '' }}
+    if: ${{ always() && github.event_name == 'workflow_dispatch' && inputs.data_candidate_tuple_oci_uri != '' }}
     permissions:
       contents: read
     steps:

@@ -8,7 +8,7 @@
     },
     {
       "path": ".github/workflows/release-artifacts.yml",
-      "sha256": "6430cb805a263eabf79e48d875745e6f2fa94b2bd6b2889201fb7219077f8bfd"
+      "sha256": "ee316fbf0ae9b0ac4d1ebd3ca24d96b7561d9522e5168bda30a128066e51780e"
     },
     {
       "path": "apps/mobile/lib/app/accessibility_theme.dart",
@@ -77,6 +77,10 @@
     {
       "path": "backend/build.gradle",
       "sha256": "2684df5a35c4d7952819899810654cfd61d081fe231347e42b37cce05ae9f9bd"
+    },
+    {
+      "path": "contracts/release/android-datapack-candidate-evidence.schema.json",
+      "sha256": "795cb67719951b8c0de6bf42ad310f964991a3b29c909b14041ee1246d5c0e8c"
     },
     {
       "path": "contracts/release/component-manifest.schema.json",
@@ -213,6 +217,10 @@
     {
       "path": "tools/realtime/seoul-topis-provider-contract.json",
       "sha256": "4bd4fd37337ec30833dae3aa0f8ae34f1a08cf06f13dbefad1fe7ccda5a8bc4d"
+    },
+    {
+      "path": "tools/release/build-android-datapack-candidate-evidence.mjs",
+      "sha256": "cd8c01abf8650f80f33cc3a85a8d680b4ba1b2a0f7de58217d26fb8eded5f576"
     },
     {
       "path": "tools/release/count-gzip-uncompressed-bytes.mjs",

@@ -3698,11 +3698,16 @@ test("Android Data candidate evidence는 OCI immutable transfer writer 없이는
   assert.match(workflow, /data_candidate_tuple_oci_uri/);
   assert.match(workflow, /data_candidate_receipt_oci_uri/);
   assert.match(workflow, /Android Data Candidate Evidence \/ Reject unverified transfer plan/);
+  assert.match(workflow, /android-datapack-candidate-evidence:[\s\S]*?if: \$\{\{ always\(\) && github\.event_name == 'workflow_dispatch'/);
   assert.match(workflow, /OCI create-only PUT and full-byte GET publisher is required/);
   assert.doesNotMatch(workflow, /aws |s3:\/\//i);
   assert.match(producer, /candidate evidence is expired/);
   assert.match(producer, /OCI full GET receipt does not match PUT object bytes/);
   assert.equal(schema.properties.artifactKind.const, "android-datapack-candidate-evidence");
+  const inventory = JSON.parse(read("contracts/release/system-release-governance-inventory.json"));
+  const governedPaths = new Set(inventory.files.map((entry) => entry.path));
+  assert.equal(governedPaths.has("contracts/release/android-datapack-candidate-evidence.schema.json"), true);
+  assert.equal(governedPaths.has("tools/release/build-android-datapack-candidate-evidence.mjs"), true);
 });
 
 test("backend release artifact는 main에서 immutable arm64 image와 component manifest를 발행한다", () => {
