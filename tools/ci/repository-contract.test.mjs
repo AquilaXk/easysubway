@@ -2008,7 +2008,7 @@ test("OCI Terraform 기준선은 비밀 파일을 추적하지 않고 데이터�
   const candidateBucket = datapackStorage.match(/resource "oci_objectstorage_bucket" "datapack_candidate" \{([\s\S]*?)\n\}/)?.[1] ?? "";
   assert.match(candidateBucket, /access_type\s+= "NoPublicAccess"/);
   assert.match(candidateBucket, /name\s+= var\.datapack_candidate_bucket_name/);
-  assert.match(candidateBucket, /versioning\s+= "Enabled"/);
+  assert.match(candidateBucket, /versioning\s+= "Disabled"/);
   assert.doesNotMatch(candidateBucket, /object_lifecycle_policy/);
   const candidateLifecycle = datapackStorage.match(/resource "oci_objectstorage_object_lifecycle_policy" "datapack_candidate" \{([\s\S]*?)\n\}/)?.[1] ?? "";
   assert.match(candidateLifecycle, /bucket\s+= oci_objectstorage_bucket\.datapack_candidate\.name/);
@@ -2024,6 +2024,7 @@ test("OCI Terraform 기준선은 비밀 파일을 추적하지 않고 데이터�
   assert.match(candidatePolicy, /OBJECT_CREATE/);
   assert.match(candidatePolicy, /OBJECT_READ/);
   assert.match(candidatePolicy, /target\.bucket\.name\s*=\s*'\$\{var\.datapack_candidate_bucket_name\}'/);
+  assert.match(candidatePolicy, /where all \{target\.bucket\.name\s*=\s*'\$\{var\.datapack_candidate_bucket_name\}', target\.object\.name\s*=\s*'\$\{var\.datapack_candidate_object_prefix\}\*'\}/);
   assert.doesNotMatch(candidatePolicy, /OBJECT_(?:LIST|INSPECT|DELETE|OVERWRITE)/);
   assert.doesNotMatch(candidatePolicy, /datapack_bucket_name/);
   assert.match(outputs, /output "datapack_candidate_namespace"/);

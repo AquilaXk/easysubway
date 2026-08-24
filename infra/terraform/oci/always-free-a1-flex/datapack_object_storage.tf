@@ -19,7 +19,7 @@ resource "oci_objectstorage_bucket" "datapack_candidate" {
   name           = var.datapack_candidate_bucket_name
   namespace      = data.oci_objectstorage_namespace.this.namespace
   storage_tier   = "Standard"
-  versioning     = "Enabled"
+  versioning     = "Disabled"
 }
 
 resource "oci_objectstorage_object_lifecycle_policy" "datapack_candidate" {
@@ -78,7 +78,7 @@ resource "oci_identity_policy" "datapack_candidate_publisher" {
   description    = "Candidate publisher may create and read only candidate objects in its dedicated bucket."
   name           = "${var.name_prefix}-datapack-candidate-publisher"
   statements = [
-    "Allow group ${oci_identity_group.datapack_candidate_publishers.name} to {OBJECT_CREATE, OBJECT_READ} in compartment id ${var.compartment_ocid} where target.bucket.name = '${var.datapack_candidate_bucket_name}'",
+    "Allow group ${oci_identity_group.datapack_candidate_publishers.name} to {OBJECT_CREATE, OBJECT_READ} in compartment id ${var.compartment_ocid} where all {target.bucket.name = '${var.datapack_candidate_bucket_name}', target.object.name = '${var.datapack_candidate_object_prefix}*'}",
   ]
 }
 
