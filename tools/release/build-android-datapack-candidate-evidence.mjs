@@ -27,10 +27,44 @@ const exactObject = (value, fields, name) => {
 };
 const canonical = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
-  if (value && typeof value === "object") return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${canonical(value[key])}`).join(",")}}`;
+  if (value && typeof value === "object") {
+    const entries = Object.keys(value)
+      .sort((left, right) => left.localeCompare(right))
+      .map((key) => JSON.stringify(key) + ":" + canonical(value[key]));
+    return `{${entries.join(",")}}`;
+  }
   return JSON.stringify(value);
 };
 const digest = (value) => createHash("sha256").update(canonical(value)).digest("hex");
+
+const validateActionsArtifact = (actionsArtifact, mobileIdentity, now) => {
+  exactObject(actionsArtifact, ["repository", "workflowPath", "runId", "artifactId", "artifactName", "archiveDigest", "headSha", "createdAt", "expiresAt"], "actionsArtifact");
+  if (actionsArtifact.repository !== "AquilaXk/easysubway" || actionsArtifact.workflowPath !== ".github/workflows/release-artifacts.yml") throw new Error("actions artifact source is invalid");
+  if (!Number.isInteger(actionsArtifact.runId) || actionsArtifact.runId < 1 || !Number.isInteger(actionsArtifact.artifactId) || actionsArtifact.artifactId < 1) throw new Error("actions artifact identity is invalid");
+  if (typeof actionsArtifact.artifactName !== "string" || actionsArtifact.artifactName.length === 0) throw new Error("actions artifact name is invalid");
+  sha(actionsArtifact.archiveDigest?.replace(/^sha256:/, ""), "actionsArtifact.archiveDigest");
+  if (!SHA40.test(required(actionsArtifact.headSha, "actionsArtifact.headSha")) || actionsArtifact.headSha !== mobileIdentity.gitSha) throw new Error("actions artifact head must match mobile identity");
+  const artifactCreatedAt = timestamp(actionsArtifact.createdAt, "actionsArtifact.createdAt");
+  const artifactExpiresAt = timestamp(actionsArtifact.expiresAt, "actionsArtifact.expiresAt");
+  if (Date.parse(artifactCreatedAt) > Date.parse(artifactExpiresAt) || new Date(now).getTime() >= Date.parse(artifactExpiresAt)) throw new Error("actions artifact receipt is expired or has invalid time order");
+};
+
+const validateOciReceipt = (ociReceipt) => {
+  exactObject(ociReceipt, ["namespace", "bucket", "objectKey", "objectUri", "objectSha256", "byteSize", "putAt", "putEtag", "putVersionId", "getAt", "getEtag", "getVersionId", "getSha256", "getByteSize", "createOnly"], "ociReceipt");
+  const match = OCI_URI.exec(required(ociReceipt.objectUri, "ociReceipt.objectUri"));
+  if (!match || ociReceipt.namespace !== match[1] || ociReceipt.bucket !== match[2] || ociReceipt.objectKey !== match[3]) throw new Error("OCI receipt locator is invalid or mutable");
+  if (ociReceipt.createOnly !== true) throw new Error("OCI receipt must prove create-only publication");
+  sha(ociReceipt.objectSha256, "ociReceipt.objectSha256");
+  if (!Number.isInteger(ociReceipt.byteSize) || ociReceipt.byteSize < 1) throw new Error("ociReceipt.byteSize must be positive");
+  const putAt = timestamp(ociReceipt.putAt, "ociReceipt.putAt");
+  const getAt = timestamp(ociReceipt.getAt, "ociReceipt.getAt");
+  if (Date.parse(putAt) > Date.parse(getAt)) throw new Error("OCI receipt GET predates PUT");
+  for (const field of ["putEtag", "putVersionId", "getEtag", "getVersionId"]) {
+    if (typeof required(ociReceipt[field], `ociReceipt.${field}`) !== "string") throw new Error(`ociReceipt.${field} must be a string`);
+  }
+  if (ociReceipt.getEtag !== ociReceipt.putEtag || ociReceipt.getVersionId !== ociReceipt.putVersionId) throw new Error("OCI full GET receipt does not match PUT object identity");
+  if (ociReceipt.getSha256 !== ociReceipt.objectSha256 || ociReceipt.getByteSize !== ociReceipt.byteSize) throw new Error("OCI full GET receipt does not match PUT object bytes");
+};
 
 export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentity, actionsArtifact, ociReceipt, now = new Date() }) {
   exactObject(candidate, ["candidateBinding", "freshnessExpiresAt"], "candidate");
@@ -49,32 +83,8 @@ export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentit
   for (const field of ["aabSha256", "aabPayloadSha256", "dataPackManifestSha256"]) sha(mobileIdentity[field], `mobileIdentity.${field}`);
   if (mobileIdentity.dataPackManifestSha256 !== binding.manifestSha256) throw new Error("mobile identity does not bind the candidate manifest");
 
-  exactObject(actionsArtifact, ["repository", "workflowPath", "runId", "artifactId", "artifactName", "archiveDigest", "headSha", "createdAt", "expiresAt"], "actionsArtifact");
-  if (actionsArtifact.repository !== "AquilaXk/easysubway" || actionsArtifact.workflowPath !== ".github/workflows/release-artifacts.yml") throw new Error("actions artifact source is invalid");
-  if (!Number.isInteger(actionsArtifact.runId) || actionsArtifact.runId < 1 || !Number.isInteger(actionsArtifact.artifactId) || actionsArtifact.artifactId < 1) throw new Error("actions artifact identity is invalid");
-  if (typeof actionsArtifact.artifactName !== "string" || actionsArtifact.artifactName.length === 0) throw new Error("actions artifact name is invalid");
-  sha(actionsArtifact.archiveDigest?.replace(/^sha256:/, ""), "actionsArtifact.archiveDigest");
-  if (!SHA40.test(required(actionsArtifact.headSha, "actionsArtifact.headSha")) || actionsArtifact.headSha !== mobileIdentity.gitSha) throw new Error("actions artifact head must match mobile identity");
-  const artifactCreatedAt = timestamp(actionsArtifact.createdAt, "actionsArtifact.createdAt");
-  const artifactExpiresAt = timestamp(actionsArtifact.expiresAt, "actionsArtifact.expiresAt");
-  if (Date.parse(artifactCreatedAt) > Date.parse(artifactExpiresAt) || new Date(now).getTime() >= Date.parse(artifactExpiresAt)) throw new Error("actions artifact receipt is expired or has invalid time order");
-
-  exactObject(ociReceipt, ["namespace", "bucket", "objectKey", "objectUri", "objectSha256", "byteSize", "putAt", "putEtag", "putVersionId", "getAt", "getEtag", "getVersionId", "getSha256", "getByteSize", "createOnly"], "ociReceipt");
-  const match = OCI_URI.exec(required(ociReceipt.objectUri, "ociReceipt.objectUri"));
-  if (!match || ociReceipt.namespace !== match[1] || ociReceipt.bucket !== match[2] || ociReceipt.objectKey !== match[3]) throw new Error("OCI receipt locator is invalid or mutable");
-  if (ociReceipt.createOnly !== true) throw new Error("OCI receipt must prove create-only publication");
-  sha(ociReceipt.objectSha256, "ociReceipt.objectSha256");
-  if (!Number.isInteger(ociReceipt.byteSize) || ociReceipt.byteSize < 1) throw new Error("ociReceipt.byteSize must be positive");
-  const putAt = timestamp(ociReceipt.putAt, "ociReceipt.putAt");
-  const getAt = timestamp(ociReceipt.getAt, "ociReceipt.getAt");
-  if (Date.parse(putAt) > Date.parse(getAt)) throw new Error("OCI receipt GET predates PUT");
-  for (const field of ["putEtag", "putVersionId", "getEtag", "getVersionId"]) {
-    if (typeof required(ociReceipt[field], `ociReceipt.${field}`) !== "string") throw new Error(`ociReceipt.${field} must be a string`);
-  }
-  if (ociReceipt.getEtag !== ociReceipt.putEtag || ociReceipt.getVersionId !== ociReceipt.putVersionId) {
-    throw new Error("OCI full GET receipt does not match PUT object identity");
-  }
-  if (ociReceipt.getSha256 !== ociReceipt.objectSha256 || ociReceipt.getByteSize !== ociReceipt.byteSize) throw new Error("OCI full GET receipt does not match PUT object bytes");
+  validateActionsArtifact(actionsArtifact, mobileIdentity, now);
+  validateOciReceipt(ociReceipt);
 
   const body = {
     schemaVersion: 1,
@@ -95,4 +105,11 @@ async function main(argv) {
   await writeFile(argv[3], `${JSON.stringify(output, null, 2)}\n`, { flag: "wx" });
 }
 
-if (import.meta.url === `file://${process.argv[1]}`) main(process.argv.slice(2)).catch((error) => { console.error(error.message); process.exitCode = 1; });
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    await main(process.argv.slice(2));
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  }
+}
