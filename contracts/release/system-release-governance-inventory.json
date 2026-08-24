@@ -252,7 +252,7 @@
     },
     {
       "path": "tools/release/validate-system-release-manifest.mjs",
-      "sha256": "121c5e3698c5dad97cba27c8eb6e294fe5b68544777fdaba086dbd3a096767ae"
+      "sha256": "d8d01f4f689465dca7e0f90bd27b5d1b175c7382b191bd7b5d63e0eade38a383"
     },
     {
       "path": "tools/security/abuse-penetration-summary-schema.mjs",
