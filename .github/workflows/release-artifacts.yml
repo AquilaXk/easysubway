@@ -37,6 +37,22 @@ on:
         description: Callback reconciliation evidence run ID for the same final RC identity
         type: string
         required: false
+      data_candidate_tuple_oci_uri:
+        description: Immutable OCI locator for the Data candidate tuple (writer boundary required)
+        type: string
+        required: false
+      data_candidate_tuple_sha256:
+        description: SHA-256 of the exact Data candidate tuple bytes
+        type: string
+        required: false
+      data_candidate_receipt_oci_uri:
+        description: Immutable OCI locator for the Data candidate tuple receipt (writer boundary required)
+        type: string
+        required: false
+      data_candidate_receipt_sha256:
+        description: SHA-256 of the exact Data candidate tuple receipt bytes
+        type: string
+        required: false
 
 concurrency:
   group: release-artifacts-${{ github.workflow }}-${{ github.ref }}
@@ -149,6 +165,29 @@ jobs:
           path: ${{ runner.temp }}/compatibility-evidence.json
           if-no-files-found: error
           retention-days: 14
+
+  android-datapack-candidate-evidence:
+    name: Android Data Candidate Evidence
+    runs-on: ubuntu-latest
+    needs: android-production-rc-release
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.data_candidate_tuple_oci_uri != '' }}
+    permissions:
+      contents: read
+    steps:
+      - name: Android Data Candidate Evidence / Reject unverified transfer plan
+        env:
+          DATA_CANDIDATE_TUPLE_OCI_URI: ${{ inputs.data_candidate_tuple_oci_uri }}
+          DATA_CANDIDATE_TUPLE_SHA256: ${{ inputs.data_candidate_tuple_sha256 }}
+          DATA_CANDIDATE_RECEIPT_OCI_URI: ${{ inputs.data_candidate_receipt_oci_uri }}
+          DATA_CANDIDATE_RECEIPT_SHA256: ${{ inputs.data_candidate_receipt_sha256 }}
+        run: |
+          set -euo pipefail
+          test -n "${DATA_CANDIDATE_TUPLE_OCI_URI}"
+          test -n "${DATA_CANDIDATE_TUPLE_SHA256}"
+          test -n "${DATA_CANDIDATE_RECEIPT_OCI_URI}"
+          test -n "${DATA_CANDIDATE_RECEIPT_SHA256}"
+          echo "A tracked OCI create-only PUT and full-byte GET publisher is required before Android candidate evidence can be emitted." >&2
+          exit 1
 
   android-release:
     name: Android Release Artifact

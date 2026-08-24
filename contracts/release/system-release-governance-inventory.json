@@ -8,7 +8,7 @@
     },
     {
       "path": ".github/workflows/release-artifacts.yml",
-      "sha256": "1cd2a8018f4de43c16e38ad12a175ee81d982513028a91847e8f0352c815401f"
+      "sha256": "6430cb805a263eabf79e48d875745e6f2fa94b2bd6b2889201fb7219077f8bfd"
     },
     {
       "path": "apps/mobile/lib/app/accessibility_theme.dart",

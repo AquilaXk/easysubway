@@ -3691,6 +3691,20 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
   assert.match(workflow, /name: easysubway-backend-release-\$\{\{ github\.sha \}\}/);
 });
 
+test("Android Data candidate evidence는 OCI immutable transfer writer 없이는 성공을 주장하지 않는다", () => {
+  const workflow = read(".github/workflows/release-artifacts.yml");
+  const producer = read("tools/release/build-android-datapack-candidate-evidence.mjs");
+  const schema = JSON.parse(read("contracts/release/android-datapack-candidate-evidence.schema.json"));
+  assert.match(workflow, /data_candidate_tuple_oci_uri/);
+  assert.match(workflow, /data_candidate_receipt_oci_uri/);
+  assert.match(workflow, /Android Data Candidate Evidence \/ Reject unverified transfer plan/);
+  assert.match(workflow, /OCI create-only PUT and full-byte GET publisher is required/);
+  assert.doesNotMatch(workflow, /aws |s3:\/\//i);
+  assert.match(producer, /candidate evidence is expired/);
+  assert.match(producer, /OCI full GET receipt does not match PUT object bytes/);
+  assert.equal(schema.properties.artifactKind.const, "android-datapack-candidate-evidence");
+});
+
 test("backend release artifact는 main에서 immutable arm64 image와 component manifest를 발행한다", () => {
   const workflow = read(".github/workflows/release-artifacts.yml");
   const backendJob = jobBlock(workflow, "backend-release", "rc-evidence-manifest");
