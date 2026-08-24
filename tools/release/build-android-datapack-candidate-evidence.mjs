@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { readFile, writeFile } from "node:fs/promises";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const SHA256 = /^[a-f0-9]{64}$/;
 const SHA40 = /^[a-f0-9]{40}$/;
@@ -29,7 +30,7 @@ const canonical = (value) => {
   if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
   if (value && typeof value === "object") {
     const entries = Object.keys(value)
-      .sort((left, right) => left.localeCompare(right))
+      .sort(codepointCompare)
       .map((key) => JSON.stringify(key) + ":" + canonical(value[key]));
     return `{${entries.join(",")}}`;
   }
