@@ -57,7 +57,7 @@ const validateActionsArtifact = (actionsArtifact, mobileIdentity, now) => {
   if (Date.parse(artifactCreatedAt) > Date.parse(artifactExpiresAt) || new Date(now).getTime() >= Date.parse(artifactExpiresAt)) throw new Error("actions artifact receipt is expired or has invalid time order");
 };
 
-const validateOciReceipt = (ociReceipt) => {
+const validateOciReceipt = (ociReceipt, expectedTupleSha256) => {
   exactObject(ociReceipt, ["namespace", "bucket", "objectKey", "objectUri", "objectSha256", "byteSize", "putAt", "putEtag", "putVersionId", "getAt", "getEtag", "getVersionId", "getSha256", "getByteSize", "createOnly"], "ociReceipt");
   const match = OCI_URI.exec(required(ociReceipt.objectUri, "ociReceipt.objectUri"));
   if (!match || ociReceipt.namespace !== match[1] || ociReceipt.bucket !== match[2] || ociReceipt.objectKey !== match[3]) throw new Error("OCI receipt locator is invalid or mutable");
@@ -72,13 +72,15 @@ const validateOciReceipt = (ociReceipt) => {
   }
   if (ociReceipt.getEtag !== ociReceipt.putEtag || ociReceipt.getVersionId !== ociReceipt.putVersionId) throw new Error("OCI full GET receipt does not match PUT object identity");
   if (ociReceipt.getSha256 !== ociReceipt.objectSha256 || ociReceipt.getByteSize !== ociReceipt.byteSize) throw new Error("OCI full GET receipt does not match PUT object bytes");
+  if (ociReceipt.objectSha256 !== expectedTupleSha256 || ociReceipt.getSha256 !== expectedTupleSha256) throw new Error("OCI receipt does not bind candidate tuple bytes");
 };
 
 export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentity, actionsArtifact, ociReceipt, now = new Date() }) {
   exactObject(candidate, ["candidateBinding", "freshnessExpiresAt"], "candidate");
   const binding = candidate.candidateBinding;
-  exactObject(binding, ["candidateId", "buildSpecSha256", "manifestSha256"], "candidateBinding");
+  exactObject(binding, ["candidateId", "tupleSha256", "buildSpecSha256", "manifestSha256"], "candidateBinding");
   if (typeof required(binding.candidateId, "candidateBinding.candidateId") !== "string" || !CANDIDATE_ID.test(binding.candidateId)) throw new Error("candidateBinding.candidateId is invalid");
+  sha(binding.tupleSha256, "candidateBinding.tupleSha256");
   sha(binding.buildSpecSha256, "candidateBinding.buildSpecSha256");
   sha(binding.manifestSha256, "candidateBinding.manifestSha256");
   const freshnessExpiresAt = timestamp(candidate.freshnessExpiresAt, "freshnessExpiresAt");
@@ -92,12 +94,12 @@ export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentit
   if (mobileIdentity.dataPackManifestSha256 !== binding.manifestSha256) throw new Error("mobile identity does not bind the candidate manifest");
 
   validateActionsArtifact(actionsArtifact, mobileIdentity, now);
-  validateOciReceipt(ociReceipt);
+  validateOciReceipt(ociReceipt, binding.tupleSha256);
 
   const body = {
     schemaVersion: 1,
     artifactKind: "android-datapack-candidate-evidence",
-    candidateBinding: { candidateId: binding.candidateId, buildSpecSha256: binding.buildSpecSha256, manifestSha256: binding.manifestSha256 },
+    candidateBinding: { candidateId: binding.candidateId, tupleSha256: binding.tupleSha256, buildSpecSha256: binding.buildSpecSha256, manifestSha256: binding.manifestSha256 },
     freshnessExpiresAt,
     mobileIdentity: { ...mobileIdentity },
     sourceActionsArtifact: { ...actionsArtifact },

@@ -3693,17 +3693,22 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 
 test("Android Data candidate evidence는 OCI immutable transfer writer 없이는 성공을 주장하지 않는다", () => {
   const workflow = read(".github/workflows/release-artifacts.yml");
+  const candidateJob = jobBlock(workflow, "android-datapack-candidate-evidence", "android-release");
   const producer = read("tools/release/build-android-datapack-candidate-evidence.mjs");
   const schema = JSON.parse(read("contracts/release/android-datapack-candidate-evidence.schema.json"));
   assert.match(workflow, /data_candidate_tuple_oci_uri/);
   assert.match(workflow, /data_candidate_receipt_oci_uri/);
   assert.match(workflow, /Android Data Candidate Evidence \/ Reject unverified transfer plan/);
-  assert.match(workflow, /android-datapack-candidate-evidence:[\s\S]*?if: \$\{\{ always\(\) && github\.event_name == 'workflow_dispatch'/);
+  assert.match(candidateJob, /if: \$\{\{ always\(\) && github\.event_name == 'workflow_dispatch' && \(inputs\.data_candidate_tuple_oci_uri != '' \|\| inputs\.data_candidate_tuple_sha256 != '' \|\| inputs\.data_candidate_receipt_oci_uri != '' \|\| inputs\.data_candidate_receipt_sha256 != ''\) \}\}/);
+  for (const input of ["DATA_CANDIDATE_TUPLE_OCI_URI", "DATA_CANDIDATE_TUPLE_SHA256", "DATA_CANDIDATE_RECEIPT_OCI_URI", "DATA_CANDIDATE_RECEIPT_SHA256"]) {
+    assert.match(candidateJob, new RegExp(`test -n "\\$\\{${input}\\}"`));
+  }
   assert.match(workflow, /OCI create-only PUT and full-byte GET publisher is required/);
   assert.doesNotMatch(workflow, /aws |s3:\/\//i);
   assert.match(producer, /candidate evidence is expired/);
   assert.match(producer, /OCI full GET receipt does not match PUT object bytes/);
   assert.equal(schema.properties.artifactKind.const, "android-datapack-candidate-evidence");
+  assert.equal(schema.properties.candidateBinding.required.includes("tupleSha256"), true);
   const inventory = JSON.parse(read("contracts/release/system-release-governance-inventory.json"));
   const governedPaths = new Set(inventory.files.map((entry) => entry.path));
   assert.equal(governedPaths.has("contracts/release/android-datapack-candidate-evidence.schema.json"), true);
