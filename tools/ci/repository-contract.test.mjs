@@ -10570,6 +10570,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     "kric-subway-timetable",
     "molit-urban-rail-full-route",
     "seoul-metro-accessibility",
+    "seoul-metro-route-map-positions",
     "seoul-metro-transfer-distance-duration",
     "seoulmetro-station-line-info",
   ]);

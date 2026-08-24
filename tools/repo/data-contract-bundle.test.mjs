@@ -20,6 +20,7 @@ const requiredProductionSourceIds = [
   "seoul-metro-accessibility",
   "kric-station-convenience-standard",
   "kric-subway-timetable",
+  "seoul-metro-route-map-positions",
   "seoul-metro-transfer-distance-duration",
 ];
 const transferExternalSourceRegistrations = [
