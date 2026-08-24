@@ -3615,6 +3615,15 @@ test("릴리즈 산출물 워크플로우는 모바일 스토어 산출물과 ba
 
   assert.match(workflow, /android-release:/);
   assert.match(workflow, /name: Android Release Artifact/);
+  const androidReleaseJob = workflow.slice(
+    workflow.indexOf("  android-release:"),
+    workflow.indexOf("  android-production-rc-release:"),
+  );
+  assert.doesNotMatch(
+    androidReleaseJob,
+    /verify-production-pack-artifact-identity\.mjs/,
+    "generic Android artifact must not rebuild a Data-owned release candidate",
+  );
   assert.match(
     workflow,
     /android-release:[\s\S]*outputs:[\s\S]*artifact_available: \$\{\{ steps\.release-env\.outputs\.artifact_available \}\}/,
