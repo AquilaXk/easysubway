@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
+import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
 import { buildAndroidDatapackCandidateEvidence } from "./build-android-datapack-candidate-evidence.mjs";
 
 const hash = "a".repeat(64);
@@ -15,6 +17,17 @@ test("exact candidate, AAB and OCI full-readback receipt becomes a deterministic
   assert.equal(output.artifactKind, "android-datapack-candidate-evidence");
   assert.equal(output.candidateBinding.candidateId, "nationwide-1");
   assert.match(output.receiptSha256, /^[a-f0-9]{64}$/);
+});
+
+test("schema and builder reject invalid calendar dates while retaining UTC millisecond syntax", () => {
+  const schema = JSON.parse(readFileSync(new URL("../../contracts/release/android-datapack-candidate-evidence.schema.json", import.meta.url), "utf8"));
+  const timeSchema = schema.$defs.utcMilliseconds;
+  assert.equal(timeSchema.format, "date-time");
+  assert.equal(validateSchema(timeSchema, "2026-08-25T00:00:00.000Z").ok, true);
+  const invalid = "2026-02-31T00:00:00.000Z";
+  assert.equal(validateSchema(timeSchema, invalid).ok, false);
+  assert.equal(validateSchema(timeSchema, "2026-08-25T00:00:00.000Z\n").ok, false);
+  assert.throws(() => buildAndroidDatapackCandidateEvidence({ ...input(), candidate: { ...input().candidate, freshnessExpiresAt: invalid }, now: "2026-08-24T00:00:00.000Z" }), /canonical UTC millisecond timestamp/);
 });
 
 for (const [name, mutate, expected] of [
