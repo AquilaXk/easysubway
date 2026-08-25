@@ -1,7 +1,6 @@
-import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { isSafeRelativePath, readRegularFile } from "../lib/read-regular-file.mjs";
+import { isSafeRelativePath, readRegularFile, replaceRegularFileAtomically } from "../lib/read-regular-file.mjs";
 
 const bundlePath = "contracts/bundles/data-contracts-v1.0.0.json";
 const resources = [
@@ -99,13 +98,12 @@ async function main() {
   }
   const root = process.cwd();
   const generated = await buildDataContractBundle({ repositoryRoot: root });
-  const target = path.resolve(root, bundlePath);
   if (mode === "--check") {
     const existing = await readRegularFile(root, bundlePath, { label: "data contract bundle" });
     if (!generated.equals(existing)) throw new Error("data contract bundle is not generated from current closed inputs");
     return;
   }
-  await writeFile(target, generated);
+  await replaceRegularFileAtomically(root, bundlePath, generated, { label: "data contract bundle output" });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

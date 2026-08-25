@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
-import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
-import { isSafeRelativePath, readRegularFile } from "../lib/read-regular-file.mjs";
+import { isSafeRelativePath, readRegularFile, replaceRegularFileAtomically } from "../lib/read-regular-file.mjs";
 import { governanceInventoryPaths } from "./validate-system-release-manifest.mjs";
 
 const outputPath = "contracts/release/system-release-governance-inventory.json";
@@ -52,7 +51,7 @@ async function main() {
     if (!generated.equals(existing)) throw new Error("release governance inventory is not generated from current closed inputs");
     return;
   }
-  await writeFile(path.resolve(root, outputPath), generated);
+  await replaceRegularFileAtomically(root, outputPath, generated, { label: "release governance inventory output" });
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {

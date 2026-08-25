@@ -1,4 +1,8 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
 import { buildDataContractBundle } from "./build-data-contract-bundle.mjs";
@@ -62,6 +66,33 @@ test("data contract bundle generator는 닫힌 resource set의 현재 바이트�
   ]);
 
   assert.deepEqual(generated, existing);
+});
+
+test("data contract bundle --write는 output symlink와 그 referent를 거부한다", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "data-contract-bundle-output-"));
+  const outputPath = path.join(directory, "contracts/bundles/data-contracts-v1.0.0.json");
+  const referentPath = path.join(directory, "outside-referent.json");
+  try {
+    for (const sourcePath of resources.values()) {
+      const target = path.join(directory, sourcePath);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, readFileSync(sourcePath));
+    }
+    mkdirSync(path.dirname(outputPath), { recursive: true });
+    writeFileSync(referentPath, "outside bytes\n");
+    symlinkSync(referentPath, outputPath);
+
+    const result = spawnSync(process.execPath, [
+      path.resolve("tools/repo/build-data-contract-bundle.mjs"),
+      "--write",
+    ], { cwd: directory, encoding: "utf8" });
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /data contract bundle output must not contain a symlink/);
+    assert.equal(readFileSync(referentPath, "utf8"), "outside bytes\n");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("route-map governance bundle은 current과 historical source를 exact bytes로 분리한다", async () => {
