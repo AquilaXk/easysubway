@@ -109,5 +109,10 @@ async function main() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
+  try {
+    await main();
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 1;
+  }
 }

@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 import { writeFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
 import { isSafeRelativePath, readRegularFile } from "../lib/read-regular-file.mjs";
 import { governanceInventoryPaths } from "./validate-system-release-manifest.mjs";
 
@@ -19,7 +20,7 @@ function validateClosedPathList() {
     }
     seen.add(entryPath);
   }
-  if (governanceInventoryPaths.join("\n") !== [...governanceInventoryPaths].sort().join("\n")) {
+  if (governanceInventoryPaths.join("\n") !== [...governanceInventoryPaths].sort(codepointCompare).join("\n")) {
     throw new Error("closed release governance path list is not canonical");
   }
 }
@@ -55,5 +56,10 @@ async function main() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  main().catch((error) => { process.stderr.write(`${error.message}\n`); process.exitCode = 1; });
+  try {
+    await main();
+  } catch (error) {
+    process.stderr.write(`${error.message}\n`);
+    process.exitCode = 1;
+  }
 }
