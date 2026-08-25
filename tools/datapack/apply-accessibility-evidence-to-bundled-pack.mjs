@@ -531,7 +531,7 @@ async function syncReleaseEvidence({ check }) {
   capitalTopology.sha256 = sha256(await readFile(capitalTopologyPath));
   const inventoryBySource = new Map(inventory.sources.map((entry) => [entry.id, entry]));
   const { headsBySource } = validateLineage(snapshots);
-  const requiredSourceIds = new Set(productionScope.productionSourceSet?.requiredSourceIds ?? []);
+  const requiredSourceIds = new Set(localProductionSourceIds(productionScope));
   if (requiredSourceIds.size === 0) throw new Error("production scope requiredSourceIds is missing");
   const releaseSnapshots = snapshots.filter((snapshot) =>
     requiredSourceIds.has(snapshot.sourceId) && headsBySource[snapshot.sourceId] === snapshot.snapshotId,
@@ -620,6 +620,16 @@ async function syncReleaseEvidence({ check }) {
     writeFile(paths.hashes, nextHashBytes),
   ]);
   return { spec, inventory };
+}
+
+export function localProductionSourceIds(productionScope) {
+  const requiredSourceIds = productionScope?.productionSourceSet?.requiredSourceIds;
+  const externalRegistrations = productionScope?.productionSourceSet?.externalSourceRegistrations;
+  if (!Array.isArray(requiredSourceIds) || !Array.isArray(externalRegistrations)) {
+    throw new Error("production scope source registration contract is missing");
+  }
+  const externalSourceIds = new Set(externalRegistrations.map(({ sourceId }) => sourceId));
+  return requiredSourceIds.filter((sourceId) => !externalSourceIds.has(sourceId));
 }
 
 export function accessibilityIndexMetadata(pack, spec, inventory, currentFreshnessExpiresAt) {
