@@ -406,6 +406,18 @@ test("production publish는 canonical decision의 write 허용 뒤에만 실행�
   assert.match(yml, /decision\.outcome === "PUBLISH_REQUIRED" && decision\.productionWriteAllowed === true/);
 });
 
+test("최종 production decision은 staged candidate와 전국 evidence receipt를 end-to-end 결속한다", () => {
+  const finalStep = yml.match(
+    /- name: Data Pack Release \/ Finalize production decision[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(finalStep, "Finalize production decision 스텝을 찾지 못함");
+  assert.match(finalStep, /candidate_manifest="\$\{EASYSUBWAY_DATAPACK_STAGE\}\/catalog\/current\.json"/);
+  assert.doesNotMatch(finalStep, /candidate_manifest="\$\{EASYSUBWAY_DATAPACK_CURRENT_MANIFEST\}"/);
+  assert.match(finalStep, /--release-evidence-bundle "\$\{EASYSUBWAY_RELEASE_EVIDENCE_BUNDLE\}"/);
+  assert.match(finalStep, /--launch-report "\$\{EASYSUBWAY_LAUNCH_DENOMINATOR_REPORT\}"/);
+  assert.match(finalStep, /--production-scope release\/product-gates\/production-datapack-scope\.json/);
+});
+
 test("scheduled publish는 명시적 opt-in과 승인된 입력 경로 없이는 exploratory로 남는다", () => {
   assert.match(yml, /DATAPACK_SCHEDULED_PUBLISH_ENABLED/);
   assert.match(yml, /github\.event_name == 'schedule' && vars\.DATAPACK_SCHEDULED_PUBLISH_ENABLED == 'true'/);

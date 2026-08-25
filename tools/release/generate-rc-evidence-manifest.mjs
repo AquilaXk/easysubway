@@ -221,9 +221,10 @@ const identity = {
   launchScopeSha256: canonicalScopeHash(launchScope.routingLaunchScope),
   nationwideRoadmapScopeId: nationwideFinalReceipt?.nationwideRoadmapScopeId ?? null,
   nationwideRoadmapScopeSha256: nationwideFinalReceipt?.nationwideRoadmapScopeSha256 ?? null,
-  nationwideTargetsSha256: launchScope.nationwideFinalLaunchScope.targetsSha256 ?? null,
+  nationwideTargetsSha256: nationwideFinalReceipt?.nationwideTargetsSha256 ?? null,
   launchDenominatorDecision: nationwideFinalReceipt?.launchDenominatorDecision ?? null,
   launchDenominatorReportSha256: nationwideFinalReceipt?.launchDenominatorReportSha256 ?? null,
+  nationwideFinalEvidenceBundleSha256: nationwideFinalReceipt?.releaseEvidenceBundleSha256 ?? null,
   identityLinkageMatrixSha256: canonicalScopeHash(launchScope.identityMatrix),
 };
 if (requirePrePlayUploadReady) {
@@ -305,7 +306,11 @@ const blockers = [
   ...evidenceBlockers(evidenceEntries),
   ...datapackGateBlockers(datapackGates),
   ...identityLinkageBlockers(identityLinkage),
-  ...nationwideFinalReceiptBlockers(nationwideFinalReceipt, launchScope.nationwideFinalLaunchScope),
+  ...nationwideFinalReceiptBlockers(
+    nationwideFinalReceipt,
+    launchScope.nationwideFinalLaunchScope,
+    dataPackReleaseDecision,
+  ),
   ...activeIssueBlockers(rcEvidenceContract.activeBlockerIssues),
 ];
 const summaryArtifactDigest = createHash("sha256")
@@ -781,12 +786,7 @@ function readFinalDataPackReleaseDecision(filePath, required) {
 
 function readNationwideFinalReceipt(decision) {
   if (!decision) return null;
-  return {
-    nationwideRoadmapScopeId: decision.nationwideRoadmapScopeId ?? null,
-    nationwideRoadmapScopeSha256: decision.nationwideRoadmapScopeSha256 ?? null,
-    launchDenominatorDecision: decision.launchDenominatorDecision ?? null,
-    launchDenominatorReportSha256: decision.launchDenominatorReportSha256 ?? null,
-  };
+  return decision.nationwideFinalReceipt ?? null;
 }
 
 function readDataPackRehearsalBinding(filePath, manifestPath, manifest, artifactPath) {
@@ -1860,6 +1860,7 @@ function identityBlockers(values) {
     "nationwideTargetsSha256",
     "launchDenominatorDecision",
     "launchDenominatorReportSha256",
+    "nationwideFinalEvidenceBundleSha256",
     "identityLinkageMatrixSha256",
   ];
   const blockers = required
@@ -1875,7 +1876,7 @@ function identityBlockers(values) {
   return blockers;
 }
 
-function nationwideFinalReceiptBlockers(receipt, scope) {
+function nationwideFinalReceiptBlockers(receipt, scope, decision) {
   if (!receipt) {
     return [{
       id: "missing_nationwide_final_data_receipt",
@@ -1885,6 +1886,9 @@ function nationwideFinalReceiptBlockers(receipt, scope) {
   }
   const expectedScopeHash = canonicalScopeHash(scope);
   const blockers = [];
+  if (receipt.schemaVersion !== 1 || receipt.artifactKind !== "nationwide-final-launch-receipt") {
+    blockers.push({ id: "nationwide_final_receipt_identity_invalid", severity: "P0", reason: "Data nationwide receipt identity is invalid" });
+  }
   if (scope?.blocksRoutingLaunch !== true) {
     blockers.push({ id: "nationwide_final_scope_not_blocking", severity: "P0", reason: "Nationwide final scope must block routing launch" });
   }
@@ -1899,6 +1903,24 @@ function nationwideFinalReceiptBlockers(receipt, scope) {
   }
   if (!/^[a-f0-9]{64}$/.test(receipt.launchDenominatorReportSha256 ?? "")) {
     blockers.push({ id: "nationwide_final_receipt_report_hash_invalid", severity: "P0", reason: "Data launch denominator report hash is invalid" });
+  }
+  for (const field of [
+    "releaseEvidenceBundleSha256",
+    "buildSpecSha256",
+    "candidateManifestSha256",
+    "sourceSnapshotSetHash",
+    "sourceEvidenceSha256",
+    "nationwideTargetsSha256",
+  ]) {
+    if (!/^[a-f0-9]{64}$/.test(receipt[field] ?? "")) {
+      blockers.push({ id: `nationwide_final_receipt_${field}_invalid`, severity: "P0", reason: `Data nationwide receipt ${field} is invalid` });
+    }
+  }
+  if (receipt.nationwideTargetsSha256 !== scope?.targetsSha256) {
+    blockers.push({ id: "nationwide_final_receipt_targets_hash_mismatch", severity: "P0", reason: "Data nationwide targets hash does not match the canonical final scope" });
+  }
+  if (receipt.sourceSnapshotSetHash !== decision?.sourceSnapshotSetHash) {
+    blockers.push({ id: "nationwide_final_receipt_source_snapshot_mismatch", severity: "P0", reason: "Data nationwide receipt source snapshot set does not match the final decision" });
   }
   return blockers;
 }

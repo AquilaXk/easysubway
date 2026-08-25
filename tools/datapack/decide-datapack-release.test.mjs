@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import test from "node:test";
 
-import { evaluateReleaseDecision } from "./decide-datapack-release.mjs";
+import { canonicalScopeHash } from "./build-launch-denominator-report.mjs";
+import {
+  evaluateReleaseDecision,
+  verifiedNationwideFinalReceipt,
+} from "./decide-datapack-release.mjs";
 
 const hash = (value) => value.repeat(64);
 const evaluationAt = "2026-07-15T00:00:00.000Z";
@@ -32,8 +37,67 @@ function manifest(overrides = {}) {
 function buildSpec() {
   return {
     candidateId: "candidate-10",
+    builderGitSha: "1".repeat(40),
     sourceSnapshotSetHash: hash("c"),
     approvedAliasLedgerHash: hash("d"),
+  };
+}
+
+function nationwideReceiptFixture() {
+  const candidateManifestRaw = Buffer.from(JSON.stringify(manifest()));
+  const buildSpecRaw = Buffer.from(JSON.stringify(buildSpec()));
+  const productionScope = {
+    nationwideFinalLaunchScope: {
+      id: "nationwide-final-v1",
+      blocksRoutingLaunch: true,
+      targetsSha256: hash("8"),
+    },
+  };
+  const nationwideScopeSha256 = canonicalScopeHash(productionScope.nationwideFinalLaunchScope);
+  const launchReportRaw = Buffer.from(JSON.stringify({
+    decision: "GO",
+    scopes: {
+      nationwideFinalLaunchScope: {
+        id: "nationwide-final-v1",
+        sha256: nationwideScopeSha256,
+      },
+    },
+    evaluatorInput: {
+      candidateBinding: {
+        buildCandidateId: "candidate-10",
+        packCandidateId: "capital@1",
+        candidateBuilderGitSha: "1".repeat(40),
+        buildSpecSha256: createHash("sha256").update(buildSpecRaw).digest("hex"),
+        manifestSha256: createHash("sha256").update(candidateManifestRaw).digest("hex"),
+        sourceEvidence: { sha256: hash("7") },
+      },
+    },
+  }));
+  const launchReport = JSON.parse(launchReportRaw);
+  const releaseEvidenceBundleRaw = Buffer.from(JSON.stringify({
+    schemaVersion: 1,
+    artifactKind: "datapack-release-evidence-bundle",
+    candidateId: "capital@1",
+    buildCandidateId: "candidate-10",
+    candidateBuilderGitSha: "1".repeat(40),
+    buildSpecSha256: createHash("sha256").update(buildSpecRaw).digest("hex"),
+    manifestSha256: createHash("sha256").update(candidateManifestRaw).digest("hex"),
+    normalizedSourceInventorySha256: hash("7"),
+    sourceSnapshotSetHash: hash("c"),
+    nationwideRoadmapScopeId: "nationwide-final-v1",
+    nationwideRoadmapScopeSha256: nationwideScopeSha256,
+    nationwideTargetsSha256: hash("8"),
+    launchDenominatorDecision: "GO",
+    launchDenominatorReportSha256: createHash("sha256").update(launchReportRaw).digest("hex"),
+  }));
+  return {
+    candidateManifestRaw,
+    buildSpecRaw,
+    launchReportRaw,
+    launchReport,
+    releaseEvidenceBundleRaw,
+    releaseEvidenceBundle: JSON.parse(releaseEvidenceBundleRaw),
+    productionScope,
   };
 }
 
@@ -246,6 +310,36 @@ test("strict validation 실패는 승인과 무관하게 FAILED이며 write를 �
   assert.equal(result.productionWriteAllowed, false);
 });
 
+test("전국 FINAL receipt는 bundle·candidate·build spec·source·launch report bytes를 exact-bind한다", () => {
+  const fixture = nationwideReceiptFixture();
+  const receipt = verifiedNationwideFinalReceipt(fixture);
+
+  assert.deepEqual(receipt, {
+    schemaVersion: 1,
+    artifactKind: "nationwide-final-launch-receipt",
+    releaseEvidenceBundleSha256: createHash("sha256").update(fixture.releaseEvidenceBundleRaw).digest("hex"),
+    candidateId: "capital@1",
+    buildCandidateId: "candidate-10",
+    candidateBuilderGitSha: "1".repeat(40),
+    buildSpecSha256: createHash("sha256").update(fixture.buildSpecRaw).digest("hex"),
+    candidateManifestSha256: createHash("sha256").update(fixture.candidateManifestRaw).digest("hex"),
+    sourceSnapshotSetHash: hash("c"),
+    sourceEvidenceSha256: hash("7"),
+    nationwideRoadmapScopeId: "nationwide-final-v1",
+    nationwideRoadmapScopeSha256: canonicalScopeHash(fixture.productionScope.nationwideFinalLaunchScope),
+    nationwideTargetsSha256: hash("8"),
+    launchDenominatorDecision: "GO",
+    launchDenominatorReportSha256: createHash("sha256").update(fixture.launchReportRaw).digest("hex"),
+  });
+
+  const mismatched = structuredClone(fixture.releaseEvidenceBundle);
+  mismatched.manifestSha256 = hash("9");
+  assert.throws(() => verifiedNationwideFinalReceipt({
+    ...fixture,
+    releaseEvidenceBundle: mismatched,
+  }), /manifest sha256 mismatch/);
+});
+
 test("CLI는 secret 없는 JSON과 GitHub outputs를 기록한다", async () => {
   const dir = await mkdtemp(path.join(tmpdir(), "datapack-release-decision-"));
   const candidatePath = path.join(dir, "candidate.json");
@@ -279,6 +373,20 @@ test("CLI는 secret 없는 JSON과 GitHub outputs를 기록한다", async () => 
   assert.equal(JSON.parse(await readFile(outputPath, "utf8")).outcome, "NO_CHANGE_VALID");
   assert.match(await readFile(githubOutputPath, "utf8"), /productionWriteAllowed=false/);
   assert.doesNotMatch(await readFile(outputPath, "utf8"), /release-approver|data-operator/);
+
+  const missingReceipt = spawnSync(process.execPath, [
+    "tools/datapack/decide-datapack-release.mjs",
+    "--candidate-manifest", candidatePath,
+    "--current-manifest", currentPath,
+    "--build-spec", buildSpecPath,
+    "--release-request", requestPath,
+    "--strict-validation-status", "PASS",
+    "--remote-validation-status", "PASS",
+    "--evaluation-at", evaluationAt,
+    "--output", outputPath,
+  ], { encoding: "utf8" });
+  assert.notEqual(missingReceipt.status, 0);
+  assert.match(missingReceipt.stderr, /finalized release decision requires a nationwide FINAL receipt/);
 });
 
 test("CLI는 일반 실행과 alert-only의 manifest 누락을 구분한다", () => {

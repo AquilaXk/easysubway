@@ -4,7 +4,7 @@
   "files": [
     {
       "path": ".github/workflows/datapack-release.yml",
-      "sha256": "a93088a685ec9cac76da2d3acaab89e775dc4d0d9ecaf1d3c513987d1bd825cb"
+      "sha256": "3dd72521068b18db84a4e752d29a24cb8dc8e86a700a8defec82c4fb21e3839f"
     },
     {
       "path": ".github/workflows/release-artifacts.yml",
@@ -180,7 +180,7 @@
     },
     {
       "path": "tools/datapack/decide-datapack-release.mjs",
-      "sha256": "19df0719c5c030db1981bd34622a42b98e610ac35851a4d0219c70c51dda675c"
+      "sha256": "e26ec6aa08137ce5efbfd3ccd91bad3908545d98928471a16e1110a7a7e2a9e6"
     },
     {
       "path": "tools/datapack/lib/manifest-validation.mjs",
@@ -228,7 +228,7 @@
     },
     {
       "path": "tools/release/generate-rc-evidence-manifest.mjs",
-      "sha256": "300f16ab195cb8bf1a58d5c4cd307dd7d8772a59b6693925832946ac7f24192a"
+      "sha256": "ef46d78af3e4d6d121c3b63396dd44938b198b297fecd23e0e3fc20102040a91"
     },
     {
       "path": "tools/release/hash-android-bundle-payload.mjs",

@@ -6558,10 +6558,23 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
     remoteValidationPassed: true, sourceSnapshotSetHash: snapshotSetIdentity, reasonCodes: [],
     selectedManifestSha256: createHash("sha256").update(JSON.stringify(productionManifest)).digest("hex"),
     selectedReleaseSequence: productionManifest.releaseSequence,
-    nationwideRoadmapScopeId: productionScope.nationwideFinalLaunchScope.id,
-    nationwideRoadmapScopeSha256: canonicalScopeHash(productionScope.nationwideFinalLaunchScope),
-    launchDenominatorDecision: "GO",
-    launchDenominatorReportSha256: "b".repeat(64),
+    nationwideFinalReceipt: {
+      schemaVersion: 1,
+      artifactKind: "nationwide-final-launch-receipt",
+      releaseEvidenceBundleSha256: "a".repeat(64),
+      candidateId: "capital@1",
+      buildCandidateId: "candidate-102",
+      candidateBuilderGitSha: gitSha,
+      buildSpecSha256: "b".repeat(64),
+      candidateManifestSha256: createHash("sha256").update(JSON.stringify(productionManifest)).digest("hex"),
+      sourceSnapshotSetHash: snapshotSetIdentity,
+      sourceEvidenceSha256: "c".repeat(64),
+      nationwideRoadmapScopeId: productionScope.nationwideFinalLaunchScope.id,
+      nationwideRoadmapScopeSha256: canonicalScopeHash(productionScope.nationwideFinalLaunchScope),
+      nationwideTargetsSha256: productionScope.nationwideFinalLaunchScope.targetsSha256,
+      launchDenominatorDecision: "GO",
+      launchDenominatorReportSha256: "d".repeat(64),
+    },
   }));
   const writeBoundProductionManifest = async (manifest) => {
     const manifestBytes = JSON.stringify(manifest);
@@ -6569,6 +6582,7 @@ test("datapack readiness producer는 required gate를 동일 final identity로 �
     const decision = JSON.parse(await readFile(dataPackReleaseDecisionPath, "utf8"));
     decision.selectedManifestSha256 = createHash("sha256").update(manifestBytes).digest("hex");
     decision.selectedReleaseSequence = manifest.releaseSequence;
+    decision.nationwideFinalReceipt.candidateManifestSha256 = decision.selectedManifestSha256;
     await writeFile(dataPackReleaseDecisionPath, JSON.stringify(decision));
   };
   const args = [
@@ -10666,7 +10680,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   );
   const externalSourceLocalProductionEligibility = new Map([
     ["seoul-metro-transfer-distance-duration", false],
-    ["seoul-metro-route-map-positions", true],
+    ["seoul-metro-route-map-positions", false],
   ]);
   assert.equal(requiredSourceIds.size, scope.productionSourceSet.requiredSourceIds.length);
   assert.equal(optionalSourceIds.size, scope.productionSourceSet.optionalAccessibilitySourceIds.length);

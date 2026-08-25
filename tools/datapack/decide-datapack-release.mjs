@@ -5,6 +5,7 @@ import path from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { decideScheduledRun } from "./freshness-policy.mjs";
+import { canonicalScopeHash } from "./build-launch-denominator-report.mjs";
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 
 export function evaluateReleaseDecision({
@@ -20,6 +21,7 @@ export function evaluateReleaseDecision({
   remoteValidationPassed,
   evaluationAt,
   refreshBeforeMillis = 0,
+  nationwideFinalReceipt = null,
 }) {
   const evaluatedMillis = requiredUtcInstant(evaluationAt, "evaluationAt");
   const candidateIdentity = stableManifestIdentity(candidateManifest);
@@ -87,6 +89,93 @@ export function evaluateReleaseDecision({
     selectedReleaseSequence: selectedManifest?.releaseSequence ?? null,
     reasonCodes,
     evaluationAt: new Date(evaluatedMillis).toISOString(),
+    ...(nationwideFinalReceipt == null ? {} : { nationwideFinalReceipt }),
+  };
+}
+
+export function verifiedNationwideFinalReceipt({
+  candidateManifestRaw,
+  buildSpecRaw,
+  releaseEvidenceBundleRaw,
+  releaseEvidenceBundle,
+  launchReportRaw,
+  launchReport,
+  productionScope,
+}) {
+  const candidateManifest = parseRawJson(candidateManifestRaw, "candidate manifest");
+  const buildSpec = parseRawJson(buildSpecRaw, "build spec");
+  const bundle = releaseEvidenceBundle
+    ?? parseRawJson(releaseEvidenceBundleRaw, "release evidence bundle");
+  const report = launchReport ?? parseRawJson(launchReportRaw, "launch denominator report");
+  const finalScope = productionScope?.nationwideFinalLaunchScope;
+  if (!finalScope || finalScope.blocksRoutingLaunch !== true) {
+    throw new Error("production scope nationwide final launch scope must block launch");
+  }
+  const pack = candidateManifest?.packs?.[0];
+  const candidateId = `${requiredString(pack?.id, "candidate manifest pack.id")}@${requiredString(String(pack?.version ?? ""), "candidate manifest pack.version")}`;
+  const buildCandidateId = requiredString(buildSpec?.candidateId, "build spec candidateId");
+  const candidateBuilderGitSha = requiredString(buildSpec?.builderGitSha, "build spec builderGitSha");
+  const buildSpecSha256 = sha256(buildSpecRaw);
+  const candidateManifestSha256 = sha256(candidateManifestRaw);
+  const sourceSnapshotSetHash = requiredSha256(buildSpec?.sourceSnapshotSetHash, "build spec sourceSnapshotSetHash");
+  const sourceEvidenceSha256 = requiredSha256(
+    bundle?.normalizedSourceInventorySha256,
+    "release evidence bundle normalizedSourceInventorySha256",
+  );
+  if (bundle?.schemaVersion !== 1 || bundle?.artifactKind !== "datapack-release-evidence-bundle") {
+    throw new Error("release evidence bundle identity mismatch");
+  }
+  for (const [label, actual, expected] of [
+    ["candidate id", bundle.candidateId, candidateId],
+    ["build candidate id", bundle.buildCandidateId, buildCandidateId],
+    ["candidate builder git sha", bundle.candidateBuilderGitSha, candidateBuilderGitSha],
+    ["build spec sha256", bundle.buildSpecSha256, buildSpecSha256],
+    ["manifest sha256", bundle.manifestSha256, candidateManifestSha256],
+    ["source snapshot set hash", bundle.sourceSnapshotSetHash, sourceSnapshotSetHash],
+  ]) {
+    if (actual !== expected) throw new Error(`release evidence bundle ${label} mismatch`);
+  }
+  const expectedScopeSha256 = canonicalScopeHash(finalScope);
+  const reportScope = report?.scopes?.nationwideFinalLaunchScope;
+  for (const [label, actual, expected] of [
+    ["report scope id", reportScope?.id, finalScope.id],
+    ["report scope sha256", reportScope?.sha256, expectedScopeSha256],
+    ["bundle scope id", bundle.nationwideRoadmapScopeId, finalScope.id],
+    ["bundle scope sha256", bundle.nationwideRoadmapScopeSha256, expectedScopeSha256],
+    ["bundle targets sha256", bundle.nationwideTargetsSha256, finalScope.targetsSha256],
+    ["launch denominator decision", bundle.launchDenominatorDecision, report?.decision],
+    ["launch report sha256", bundle.launchDenominatorReportSha256, sha256(launchReportRaw)],
+  ]) {
+    if (actual !== expected) throw new Error(`nationwide final ${label} mismatch`);
+  }
+  if (report.decision !== "GO") throw new Error("nationwide final launch denominator decision must be GO");
+  const reportBinding = report.evaluatorInput?.candidateBinding;
+  for (const [label, actual, expected] of [
+    ["report candidate id", reportBinding?.packCandidateId, candidateId],
+    ["report build candidate id", reportBinding?.buildCandidateId, buildCandidateId],
+    ["report candidate builder git sha", reportBinding?.candidateBuilderGitSha, candidateBuilderGitSha],
+    ["report build spec sha256", reportBinding?.buildSpecSha256, buildSpecSha256],
+    ["report manifest sha256", reportBinding?.manifestSha256, candidateManifestSha256],
+    ["report source evidence sha256", reportBinding?.sourceEvidence?.sha256, sourceEvidenceSha256],
+  ]) {
+    if (actual !== expected) throw new Error(`nationwide final ${label} mismatch`);
+  }
+  return {
+    schemaVersion: 1,
+    artifactKind: "nationwide-final-launch-receipt",
+    releaseEvidenceBundleSha256: sha256(releaseEvidenceBundleRaw),
+    candidateId,
+    buildCandidateId,
+    candidateBuilderGitSha,
+    buildSpecSha256,
+    candidateManifestSha256,
+    sourceSnapshotSetHash,
+    sourceEvidenceSha256,
+    nationwideRoadmapScopeId: finalScope.id,
+    nationwideRoadmapScopeSha256: expectedScopeSha256,
+    nationwideTargetsSha256: finalScope.targetsSha256,
+    launchDenominatorDecision: report.decision,
+    launchDenominatorReportSha256: sha256(launchReportRaw),
   };
 }
 
@@ -200,6 +289,34 @@ async function main(argv) {
   const strictValidationPassed = alertOnly || args.get("strict-validation-status") === "PASS";
   const publishAttempted = args.get("publish-attempted") === "true";
   const remoteValidationPassed = args.get("remote-validation-status") === "PASS";
+  const receiptInputPaths = [
+    "release-evidence-bundle",
+    "launch-report",
+    "production-scope",
+  ];
+  const providedReceiptInputs = receiptInputPaths.filter((name) => args.has(name));
+  if (remoteValidationPassed && providedReceiptInputs.length !== receiptInputPaths.length) {
+    throw new Error("finalized release decision requires a nationwide FINAL receipt");
+  }
+  if (providedReceiptInputs.length !== 0 && providedReceiptInputs.length !== receiptInputPaths.length) {
+    throw new Error("nationwide FINAL receipt requires --release-evidence-bundle, --launch-report, and --production-scope together");
+  }
+  let nationwideFinalReceipt = null;
+  if (providedReceiptInputs.length === receiptInputPaths.length) {
+    if (!buildSpecBytes) throw new Error("nationwide FINAL receipt requires --build-spec");
+    const releaseEvidenceBundleDocument = await requiredJsonDocument(args, "release-evidence-bundle");
+    const launchReportDocument = await requiredJsonDocument(args, "launch-report");
+    const productionScopeDocument = await requiredJsonDocument(args, "production-scope");
+    nationwideFinalReceipt = verifiedNationwideFinalReceipt({
+      candidateManifestRaw: candidateDocument.bytes,
+      buildSpecRaw: buildSpecBytes,
+      releaseEvidenceBundleRaw: releaseEvidenceBundleDocument.bytes,
+      releaseEvidenceBundle: releaseEvidenceBundleDocument.value,
+      launchReportRaw: launchReportDocument.bytes,
+      launchReport: launchReportDocument.value,
+      productionScope: productionScopeDocument.value,
+    });
+  }
   const decision = evaluateReleaseDecision({
     candidateManifest,
     currentManifest,
@@ -211,6 +328,7 @@ async function main(argv) {
     strictValidationPassed,
     publishAttempted,
     remoteValidationPassed,
+    nationwideFinalReceipt,
     evaluationAt,
     refreshBeforeMillis: freshnessPolicy == null
       ? 0
@@ -297,6 +415,17 @@ function requiredFixedDurationMillis(value) {
 function requiredSha256(value, label) {
   if (!isSha256(value)) throw new Error(`${label} must be sha256`);
   return value;
+}
+
+function parseRawJson(raw, label) {
+  if (typeof raw !== "string" && !Buffer.isBuffer(raw)) {
+    throw new Error(`${label} bytes are required`);
+  }
+  try {
+    return JSON.parse(raw.toString("utf8"));
+  } catch {
+    throw new Error(`${label} must be valid JSON`);
+  }
 }
 
 function sha256(bytes) {
