@@ -9,11 +9,21 @@ import {
   accessibilityIndexMetadata,
   applyEvidenceIfStale,
   assertAccessibilityEdges,
+  localProductionSourceIds,
   normalizeUnprovenInternalRouteEdges,
   stripLegacyCoreClaims,
   syncAccessibilityEdges,
   syncCanonicalFixture,
 } from "./apply-accessibility-evidence-to-bundled-pack.mjs";
+
+test("release evidence selects only locally required production sources", () => {
+  assert.deepEqual(localProductionSourceIds({
+    productionSourceSet: {
+      requiredSourceIds: ["local-a", "external-a", "local-b"],
+      externalSourceRegistrations: [{ sourceId: "external-a" }],
+    },
+  }), ["local-a", "local-b"]);
+});
 
 test("unproven internal route availability fails check and normalizes to unknown", () => {
   const database = new DatabaseSync(":memory:");

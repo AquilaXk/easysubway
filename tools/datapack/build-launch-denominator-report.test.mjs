@@ -36,6 +36,15 @@ const scope = {
     id: "nationwide-roadmap-v1",
     launchRequiredCount: 270,
   },
+  nationwideFinalLaunchScope: {
+    id: "nationwide_final_launch_v1",
+    targets: "tools/datapack/nationwide-coverage-targets.json",
+    targetsSha256: "f".repeat(64),
+    activeLaunchRequiredDomains: ["station_line_membership", "route_graph_topology"],
+    launchRequiredCount: 270,
+    requiredMissingCount: 0,
+    blocksRoutingLaunch: true,
+  },
   identityMatrix: {
     requiredSharedFields: [
       "canonicalStationVersion",
@@ -48,7 +57,7 @@ const scope = {
   },
 };
 
-function passingEvidence({ nationwideMissing = 270 } = {}) {
+function passingEvidence({ nationwideMissing = 0 } = {}) {
   const identity = {
     canonicalStationVersion: "station-catalog-v18",
     corridorId: "capital-gyeongchun-v1",
@@ -108,7 +117,16 @@ function passingEvidence({ nationwideMissing = 270 } = {}) {
     },
     forbiddenEvidence: [],
     forbiddenEvidenceStatus: "VERIFIED",
-    nationwide: { missingCount: nationwideMissing },
+    nationwide: {
+      scopeId: scope.nationwideFinalLaunchScope.id,
+      scopeSha256: canonicalScopeHash(scope.nationwideFinalLaunchScope),
+      targetsSha256: scope.nationwideFinalLaunchScope.targetsSha256,
+      activeLaunchRequiredDomains: [...scope.nationwideFinalLaunchScope.activeLaunchRequiredDomains],
+      denominator: scope.nationwideFinalLaunchScope.launchRequiredCount,
+      missingCount: nationwideMissing,
+      status: "COMPLETE",
+      freshness: "FRESH",
+    },
     candidateBinding: {
       status: "BOUND",
       buildCandidateId: "candidate-a",
@@ -129,11 +147,30 @@ function withGap(mutator) {
   return evidence;
 }
 
-test("nationwide 0% does not block a fully satisfied v1 scope", () => {
-  const report = buildLaunchDenominatorReport(scope, passingEvidence({ nationwideMissing: 270 }));
-  assert.equal(report.decision, "GO");
+test("nationwide final scope requires zero missing active launch-required domains", () => {
+  const report = buildLaunchDenominatorReport(scope, passingEvidence({ nationwideMissing: 1 }));
+  assert.equal(report.decision, "NO_GO");
   assert.equal(report.nationwideBlocksV1, false);
-  assert.deepEqual(report.blockers, []);
+  assert.ok(report.blockers.includes("NATIONWIDE_FINAL_MISSING_COUNT_NONZERO"));
+});
+
+test("nationwide final scope fails closed on identity, target, domain, denominator, status, and freshness drift", async (context) => {
+  const gaps = [
+    ["scope ID", (evidence) => { evidence.nationwide.scopeId = "capital_routing_android_v1"; }, "NATIONWIDE_FINAL_IDENTITY_MISMATCH"],
+    ["scope hash", (evidence) => { evidence.nationwide.scopeSha256 = "a".repeat(64); }, "NATIONWIDE_FINAL_SCOPE_HASH_MISMATCH"],
+    ["targets hash", (evidence) => { evidence.nationwide.targetsSha256 = "a".repeat(64); }, "NATIONWIDE_FINAL_TARGETS_HASH_MISMATCH"],
+    ["active domain", (evidence) => { evidence.nationwide.activeLaunchRequiredDomains.push("unknown_domain"); }, "NATIONWIDE_FINAL_ACTIVE_DOMAIN_MISMATCH"],
+    ["denominator", (evidence) => { evidence.nationwide.denominator = 269; }, "NATIONWIDE_FINAL_DENOMINATOR_MISMATCH"],
+    ["status", (evidence) => { evidence.nationwide.status = "PENDING"; }, "NATIONWIDE_FINAL_STATUS_NOT_COMPLETE"],
+    ["freshness", (evidence) => { evidence.nationwide.freshness = "STALE"; }, "NATIONWIDE_FINAL_FRESHNESS_NOT_FRESH"],
+  ];
+  for (const [name, mutate, blocker] of gaps) {
+    await context.test(name, () => {
+      const report = buildLaunchDenominatorReport(scope, withGap(mutate));
+      assert.equal(report.decision, "NO_GO");
+      assert.ok(report.blockers.includes(blocker));
+    });
+  }
 });
 
 test("report는 secret 없는 evaluator input만 포함하고 자체 재계산할 수 있다", () => {
@@ -236,7 +273,16 @@ test("committed current report는 gap과 unavailable consumer를 숨기지 않�
   assert.equal(report.scopes.routingLaunchScope.sha256, canonicalScopeHash(productionScope.routingLaunchScope));
   assert.equal(report.identityLinkage.matrixSha256, canonicalScopeHash(productionScope.identityMatrix));
   assert.deepEqual(report.coverage.accessibility, { requiredCount: 6, coveredCount: 6, gapCount: 0 });
-  assert.deepEqual(report.coverage.nationwide, { requiredCount: 270, missingCount: 270, blocksV1: false });
+  assert.deepEqual(report.coverage.nationwide, {
+    requiredCount: 270,
+    missingCount: 270,
+    blocksV1: false,
+    blocksRoutingLaunch: true,
+    status: null,
+    freshness: null,
+  });
+  assert.equal(report.nationwideFinalBlocksLaunch, true);
+  assert.ok(report.blockers.includes("NATIONWIDE_FINAL_MISSING_COUNT_NONZERO"));
   assert.deepEqual(report.consumerStates, { source: "MISSING", server: "UNAVAILABLE", mobile: "MISSING" });
   assert.deepEqual(report.routing.sourceDerivedConnectionEdgeIds, { status: "MISSING", ids: [] });
   assert.deepEqual(report.routing.admittedStationIds, { status: "MISSING", ids: [] });
@@ -460,6 +506,7 @@ test("malformed scope subsections produce explicit contract blockers without thr
     "verifiedAccessibilityScope",
     "routingLaunchScope",
     "nationwideRoadmapScope",
+    "nationwideFinalLaunchScope",
     "identityMatrix",
   ]) {
     for (const [label, malformed] of [["missing", null], ["empty", {}]]) {

@@ -4,7 +4,7 @@
   "files": [
     {
       "path": ".github/workflows/datapack-release.yml",
-      "sha256": "b15ada47698f88237bec61c5ce902ec55a3f8131cf79c625e2878d2e1cfb8ec7"
+      "sha256": "3dd72521068b18db84a4e752d29a24cb8dc8e86a700a8defec82c4fb21e3839f"
     },
     {
       "path": ".github/workflows/release-artifacts.yml",
@@ -148,15 +148,15 @@
     },
     {
       "path": "release/product-gates/post-launch-operations-review-gate.json",
-      "sha256": "0c05626d56d115e37f320ad8fda2093b4eacff374f0595be42b62a9297474146"
+      "sha256": "7ce5f313d8d042f40473e4cf16b7cb7748830a530dfaa25a8b30629b26e24237"
     },
     {
       "path": "release/product-gates/production-datapack-scope.json",
-      "sha256": "76273e3c96d3f8312d1427f582765d9de16ea2c80667838c43d9af2cd7023038"
+      "sha256": "bcae4176c9a8c78bd9d4017327c7226191c1406e2bfbdd4f3022b56dd9609d99"
     },
     {
       "path": "release/product-gates/rc-evidence-manifest-contract.json",
-      "sha256": "1cec386bf58112ce84bc8d0817ae63c378d33a4a8dcf69e6155f8bda12236eb1"
+      "sha256": "571977ae6cec491579a68e686de35e6f51af68af27e688634a7b4fd4751ccd9a"
     },
     {
       "path": "release/product-gates/route-commercialization-gate.json",
@@ -176,11 +176,11 @@
     },
     {
       "path": "tools/datapack/build-launch-denominator-report.mjs",
-      "sha256": "181e740b8e96371969848d3cd5a3020de94f812dfc2214b010ffb4b44c0d70c6"
+      "sha256": "0cb452a1a5424f191e44cac1037a5389f5a29c48724a9e7b024f1e0306b7664d"
     },
     {
       "path": "tools/datapack/decide-datapack-release.mjs",
-      "sha256": "19df0719c5c030db1981bd34622a42b98e610ac35851a4d0219c70c51dda675c"
+      "sha256": "e26ec6aa08137ce5efbfd3ccd91bad3908545d98928471a16e1110a7a7e2a9e6"
     },
     {
       "path": "tools/datapack/lib/manifest-validation.mjs",
@@ -228,7 +228,7 @@
     },
     {
       "path": "tools/release/generate-rc-evidence-manifest.mjs",
-      "sha256": "dafcfd6d253d118d8889f9a7bd8c4bfb5dad74dc6dc1a3459b19f642332a14dc"
+      "sha256": "ef46d78af3e4d6d121c3b63396dd44938b198b297fecd23e0e3fc20102040a91"
     },
     {
       "path": "tools/release/hash-android-bundle-payload.mjs",

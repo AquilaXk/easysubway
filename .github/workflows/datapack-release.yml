@@ -840,8 +840,9 @@ jobs:
             verifiedAccessibilityScopeSha256: launchReport.scopes.verifiedAccessibilityScope.sha256,
             launchScopeId: launchReport.scopes.routingLaunchScope.id,
             launchScopeSha256: launchReport.scopes.routingLaunchScope.sha256,
-            nationwideRoadmapScopeId: launchReport.scopes.nationwideRoadmapScope.id,
-            nationwideRoadmapScopeSha256: launchReport.scopes.nationwideRoadmapScope.sha256,
+            nationwideRoadmapScopeId: launchReport.scopes.nationwideFinalLaunchScope.id,
+            nationwideRoadmapScopeSha256: launchReport.scopes.nationwideFinalLaunchScope.sha256,
+            nationwideTargetsSha256: productionScope.nationwideFinalLaunchScope.targetsSha256,
             identityLinkageMatrixSha256: launchReport.identityLinkage.matrixSha256,
             launchDenominatorDecision: launchReport.decision,
             launchDenominatorReportSha256: hashBytes(launchDenominatorReportRaw),
@@ -1132,7 +1133,6 @@ jobs:
           publish_attempted=true
           expected_outcome=PUBLISHED_AND_VERIFIED
           if [[ -n "${NO_CHANGE_MANIFEST_SHA256}" ]]; then
-            candidate_manifest="${EASYSUBWAY_DATAPACK_CURRENT_MANIFEST}"
             publish_attempted=false
             expected_outcome=NO_CHANGE_VALID
           elif [[ -z "${PUBLISHED_MANIFEST_SHA256}" ]]; then
@@ -1148,6 +1148,9 @@ jobs:
             --build-spec "${EASYSUBWAY_DATAPACK_BUILD_SPEC_PATH}"
             --freshness-policy release/product-gates/datapack-freshness-sla.json
             --release-request "${release_request_path}"
+            --release-evidence-bundle "${EASYSUBWAY_RELEASE_EVIDENCE_BUNDLE}"
+            --launch-report "${EASYSUBWAY_LAUNCH_DENOMINATOR_REPORT}"
+            --production-scope release/product-gates/production-datapack-scope.json
             --strict-validation-status PASS
             --publish-attempted "${publish_attempted}"
             --remote-validation-status "${remote_validation_status}"
