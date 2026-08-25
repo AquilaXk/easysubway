@@ -152,7 +152,7 @@
     },
     {
       "path": "release/product-gates/production-datapack-scope.json",
-      "sha256": "04d92b8ea2feeb9b9eef6a25d6d963b7b391b5ead85e161b82c64db4f5cd5ddc"
+      "sha256": "bcae4176c9a8c78bd9d4017327c7226191c1406e2bfbdd4f3022b56dd9609d99"
     },
     {
       "path": "release/product-gates/rc-evidence-manifest-contract.json",

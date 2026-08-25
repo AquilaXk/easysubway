@@ -1,6 +1,11 @@
 import assert from "node:assert/strict";
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { buildDataContractBundle } from "./build-data-contract-bundle.mjs";
 
 const resources = new Map([
   ["datapack/mobility-profile-policy.json", "release/product-gates/mobility-profile-policy.json"],
@@ -18,17 +23,25 @@ const requiredProductionSourceIds = [
   "molit-urban-rail-full-route",
   "seoulmetro-station-line-info",
   "seoul-metro-accessibility",
+  "seoul-metro-route-map-positions",
   "kric-station-convenience-standard",
   "kric-subway-timetable",
-  "seoul-metro-route-map-positions",
   "seoul-metro-transfer-distance-duration",
 ];
-const transferExternalSourceRegistrations = [
+const externalSourceRegistrations = [
   {
     sourceId: "seoul-metro-transfer-distance-duration",
     registrationRepository: "AquilaXk/easysubway-data",
     registrationIssue: 350,
     snapshotId: "seoul-metro-transfer-distance-duration-20260815T094038817Z",
+    decision: "APPROVED",
+    productionUseAllowed: true,
+  },
+  {
+    sourceId: "seoul-metro-route-map-positions",
+    registrationRepository: "AquilaXk/easysubway-data",
+    registrationIssue: 447,
+    snapshotId: "seoul-metro-route-map-positions-current-20260824T114822985Z",
     decision: "APPROVED",
     productionUseAllowed: true,
   },
@@ -43,6 +56,42 @@ test("data contract bundle은 target producer 입력만 exact bytes로 고정한
   assert.deepEqual(Object.keys(bundle.resources), [...resources.keys()]);
   for (const [resource, source] of resources) {
     assert.equal(bundle.resources[resource], await readFile(source, "utf8"));
+  }
+});
+
+test("data contract bundle generator는 닫힌 resource set의 현재 바이트만 재생성한다", async () => {
+  const [generated, existing] = await Promise.all([
+    buildDataContractBundle({ repositoryRoot: process.cwd() }),
+    readFile("contracts/bundles/data-contracts-v1.0.0.json"),
+  ]);
+
+  assert.deepEqual(generated, existing);
+});
+
+test("data contract bundle --write는 output symlink와 그 referent를 거부한다", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "data-contract-bundle-output-"));
+  const outputPath = path.join(directory, "contracts/bundles/data-contracts-v1.0.0.json");
+  const referentPath = path.join(directory, "outside-referent.json");
+  try {
+    for (const sourcePath of resources.values()) {
+      const target = path.join(directory, sourcePath);
+      mkdirSync(path.dirname(target), { recursive: true });
+      writeFileSync(target, readFileSync(sourcePath));
+    }
+    mkdirSync(path.dirname(outputPath), { recursive: true });
+    writeFileSync(referentPath, "outside bytes\n");
+    symlinkSync(referentPath, outputPath);
+
+    const result = spawnSync(process.execPath, [
+      path.resolve("tools/repo/build-data-contract-bundle.mjs"),
+      "--write",
+    ], { cwd: directory, encoding: "utf8" });
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /data contract bundle output must not contain a symlink/);
+    assert.equal(readFileSync(referentPath, "utf8"), "outside bytes\n");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
   }
 });
 
@@ -159,11 +208,11 @@ test("production datapack은 retired movement source를 required·selected·cove
   assert.deepEqual(bundledScope.productionSourceSet.requiredSourceIds, requiredProductionSourceIds);
   assert.deepEqual(
     scope.productionSourceSet.externalSourceRegistrations,
-    transferExternalSourceRegistrations,
+    externalSourceRegistrations,
   );
   assert.deepEqual(
     bundledScope.productionSourceSet.externalSourceRegistrations,
-    transferExternalSourceRegistrations,
+    externalSourceRegistrations,
   );
 
   for (const sourceId of productionForbiddenMovementSourceIds) {

@@ -10650,10 +10650,22 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
       decision: "APPROVED",
       productionUseAllowed: true,
     },
+    {
+      sourceId: "seoul-metro-route-map-positions",
+      registrationRepository: "AquilaXk/easysubway-data",
+      registrationIssue: 447,
+      snapshotId: "seoul-metro-route-map-positions-current-20260824T114822985Z",
+      decision: "APPROVED",
+      productionUseAllowed: true,
+    },
   ]);
   const externallyRegisteredSourceIds = new Set(
     scope.productionSourceSet.externalSourceRegistrations.map(({ sourceId }) => sourceId),
   );
+  const externalSourceLocalProductionEligibility = new Map([
+    ["seoul-metro-transfer-distance-duration", false],
+    ["seoul-metro-route-map-positions", true],
+  ]);
   assert.equal(requiredSourceIds.size, scope.productionSourceSet.requiredSourceIds.length);
   assert.equal(optionalSourceIds.size, scope.productionSourceSet.optionalAccessibilitySourceIds.length);
   assert.equal(excludedSourceIds.size, scope.productionSourceSet.excludedFromV1SupportClaims.length);
@@ -10672,8 +10684,13 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   for (const sourceId of scope.productionSourceSet.requiredSourceIds) {
     const source = inventorySources.get(sourceId);
     if (externallyRegisteredSourceIds.has(sourceId)) {
-      assert.equal(source.requiredForProductionPack, false, `${sourceId} Hub fixture must not impersonate Data registration`);
-      continue;
+      const expectedLocalProductionEligibility = externalSourceLocalProductionEligibility.get(sourceId);
+      assert.equal(
+        source.requiredForProductionPack,
+        expectedLocalProductionEligibility,
+        `${sourceId} local production eligibility must match the current external registration contract`,
+      );
+      if (!expectedLocalProductionEligibility) continue;
     }
     assert.equal(source.requiredForProductionPack, true, `${sourceId} must be production eligible`);
     assert.equal(source.license.redistributionAllowed, true, `${sourceId} must allow redistribution`);

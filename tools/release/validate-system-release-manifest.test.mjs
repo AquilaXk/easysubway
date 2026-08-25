@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { buildSystemReleaseGovernanceInventory } from "./build-system-release-governance-inventory.mjs";
 import {
   calculateGovernanceRevision,
   calculateProductIdentity,
@@ -34,6 +35,38 @@ const governanceInventory = JSON.parse(readFileSync(
   "contracts/release/system-release-governance-inventory.json",
   "utf8",
 ));
+
+test("release governance inventory generator는 닫힌 경로 목록의 현재 regular-file 바이트만 재생성한다", async () => {
+  const [generated, existing] = await Promise.all([
+    buildSystemReleaseGovernanceInventory({ repositoryRoot: process.cwd() }),
+    readFileSync("contracts/release/system-release-governance-inventory.json"),
+  ]);
+
+  assert.deepEqual(generated, existing);
+});
+
+test("release governance inventory --write는 output symlink와 그 referent를 거부한다", () => {
+  const directory = mkdtempSync(path.join(tmpdir(), "release-governance-output-"));
+  const outputPath = path.join(directory, "contracts/release/system-release-governance-inventory.json");
+  const referentPath = path.join(directory, "outside-referent.json");
+  try {
+    writeGovernanceFixture(directory, "output symlink");
+    mkdirSync(path.dirname(outputPath), { recursive: true });
+    writeFileSync(referentPath, "outside bytes\n");
+    symlinkSync(referentPath, outputPath);
+
+    const result = spawnSync(process.execPath, [
+      path.resolve("tools/release/build-system-release-governance-inventory.mjs"),
+      "--write",
+    ], { cwd: directory, encoding: "utf8" });
+
+    assert.equal(result.status, 1);
+    assert.match(result.stderr, /release governance inventory output must not contain a symlink/);
+    assert.equal(readFileSync(referentPath, "utf8"), "outside bytes\n");
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 function sha256File(filePath) {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
