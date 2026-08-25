@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import { buildDataContractBundle } from "./build-data-contract-bundle.mjs";
 
 const resources = new Map([
   ["datapack/mobility-profile-policy.json", "release/product-gates/mobility-profile-policy.json"],
@@ -18,16 +19,25 @@ const requiredProductionSourceIds = [
   "molit-urban-rail-full-route",
   "seoulmetro-station-line-info",
   "seoul-metro-accessibility",
+  "seoul-metro-route-map-positions",
   "kric-station-convenience-standard",
   "kric-subway-timetable",
   "seoul-metro-transfer-distance-duration",
 ];
-const transferExternalSourceRegistrations = [
+const externalSourceRegistrations = [
   {
     sourceId: "seoul-metro-transfer-distance-duration",
     registrationRepository: "AquilaXk/easysubway-data",
     registrationIssue: 350,
     snapshotId: "seoul-metro-transfer-distance-duration-20260815T094038817Z",
+    decision: "APPROVED",
+    productionUseAllowed: true,
+  },
+  {
+    sourceId: "seoul-metro-route-map-positions",
+    registrationRepository: "AquilaXk/easysubway-data",
+    registrationIssue: 447,
+    snapshotId: "seoul-metro-route-map-positions-current-20260824T114822985Z",
     decision: "APPROVED",
     productionUseAllowed: true,
   },
@@ -43,6 +53,15 @@ test("data contract bundle은 target producer 입력만 exact bytes로 고정한
   for (const [resource, source] of resources) {
     assert.equal(bundle.resources[resource], await readFile(source, "utf8"));
   }
+});
+
+test("data contract bundle generator는 닫힌 resource set의 현재 바이트만 재생성한다", async () => {
+  const [generated, existing] = await Promise.all([
+    buildDataContractBundle({ repositoryRoot: process.cwd() }),
+    readFile("contracts/bundles/data-contracts-v1.0.0.json"),
+  ]);
+
+  assert.deepEqual(generated, existing);
 });
 
 test("route-map governance bundle은 current과 historical source를 exact bytes로 분리한다", async () => {
@@ -158,11 +177,11 @@ test("production datapack은 retired movement source를 required·selected·cove
   assert.deepEqual(bundledScope.productionSourceSet.requiredSourceIds, requiredProductionSourceIds);
   assert.deepEqual(
     scope.productionSourceSet.externalSourceRegistrations,
-    transferExternalSourceRegistrations,
+    externalSourceRegistrations,
   );
   assert.deepEqual(
     bundledScope.productionSourceSet.externalSourceRegistrations,
-    transferExternalSourceRegistrations,
+    externalSourceRegistrations,
   );
 
   for (const sourceId of productionForbiddenMovementSourceIds) {
