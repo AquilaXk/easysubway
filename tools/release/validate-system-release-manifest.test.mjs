@@ -5,6 +5,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSyn
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { buildSystemReleaseGovernanceInventory } from "./build-system-release-governance-inventory.mjs";
 import {
   calculateGovernanceRevision,
   calculateProductIdentity,
@@ -34,6 +35,15 @@ const governanceInventory = JSON.parse(readFileSync(
   "contracts/release/system-release-governance-inventory.json",
   "utf8",
 ));
+
+test("release governance inventory generator는 닫힌 경로 목록의 현재 regular-file 바이트만 재생성한다", async () => {
+  const [generated, existing] = await Promise.all([
+    buildSystemReleaseGovernanceInventory({ repositoryRoot: process.cwd() }),
+    readFileSync("contracts/release/system-release-governance-inventory.json"),
+  ]);
+
+  assert.deepEqual(generated, existing);
+});
 
 function sha256File(filePath) {
   return createHash("sha256").update(readFileSync(filePath)).digest("hex");
