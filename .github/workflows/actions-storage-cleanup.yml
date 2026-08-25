@@ -27,19 +27,6 @@ jobs:
           set -euo pipefail
           gh cache delete --all --ref "$BRANCH" --succeed-on-no-caches
 
-  cleanup-weekly-caches:
-    name: Delete weekly repository caches
-    if: github.event_name != 'pull_request'
-    runs-on: ubuntu-latest
-    steps:
-      - name: Delete all GitHub Actions caches
-        env:
-          GH_TOKEN: ${{ github.token }}
-          GH_REPO: ${{ github.repository }}
-        run: |
-          set -euo pipefail
-          gh cache delete --all --succeed-on-no-caches
-
   cleanup-ghcr-backend-images:
     name: Prune old GHCR backend images
     if: github.event_name != 'pull_request'

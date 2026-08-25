@@ -1734,11 +1734,24 @@ test("CD 배포는 production-cd environment와 SHA를 유지하고 legacy deplo
   assert.doesNotMatch(cd, /needs\.record-deploy/);
   assert.doesNotMatch(cd, /• tag:/);
 
-  // Cache and GHCR cleanup remain; the tag-only cleanup is dead with its writer.
-  assert.match(cleanup, /cleanup-weekly-caches:/);
+  // GHCR cleanup remains; the tag-only cleanup is dead with its writer.
   assert.match(cleanup, /cleanup-ghcr-backend-images:/);
   assert.doesNotMatch(cleanup, /cleanup-deploy-tags:/);
   assert.doesNotMatch(cleanup, /matching-refs\/tags\/deploy\/backend\//);
+});
+
+test("Actions cleanup은 closed PR cache만 제거하고 weekly all-cache purge를 금지한다", () => {
+  const cleanup = read(".github/workflows/actions-storage-cleanup.yml");
+  const prCacheJob = workflowJobBlock(cleanup, "cleanup-pr-caches");
+  const ghcrJob = workflowJobBlock(cleanup, "cleanup-ghcr-backend-images");
+
+  assert.match(prCacheJob, /if: github\.event_name == 'pull_request'/);
+  assert.match(prCacheJob, /BRANCH: refs\/pull\/\$\{\{ github\.event\.pull_request\.number \}\}\/merge/);
+  assert.match(prCacheJob, /gh cache delete --all --ref "\$BRANCH" --succeed-on-no-caches/);
+  assert.equal((cleanup.match(/gh cache delete --all/g) ?? []).length, 1);
+  assert.doesNotMatch(cleanup, /cleanup-weekly-caches:/);
+  assert.match(ghcrJob, /if: github\.event_name != 'pull_request'/);
+  assert.match(ghcrJob, /if \[ "\$\{index\}" -le 10 \]; then/);
 });
 
 test("full PR 템플릿은 리뷰와 배포 확인 게이트를 포함한다", () => {
