@@ -27,6 +27,15 @@ function read(relativePath) {
   return readFileSync(path.join(root, relativePath), "utf8");
 }
 
+function workflowJobBlock(workflow, jobName) {
+  const pattern = new RegExp(
+    `(^|\\n)  ${jobName}:[\\s\\S]*?(?=\\n  [A-Za-z0-9._-]+:|$)`,
+  );
+  const match = workflow.match(pattern);
+  assert.ok(match, `${jobName} job block not found`);
+  return match[0];
+}
+
 function fixtureEnv() {
   return read("tools/ci/fixtures/deployment-prod-valid.env");
 }
@@ -872,7 +881,9 @@ test("CD 배포 후 검증은 readiness 단일 프로브가 아니라 핵심 API
   assert.match(cd, /if: \$\{\{ needs\.deploy\.outputs\.deploy_ready == 'true' \}\}/);
 
   // Smoke failures must propagate into the CD result Slack notification.
-  assert.match(cd, /needs:\n {6}- plan\n {6}- deploy\n {6}- record-deploy\n {6}- post-deploy-smoke/);
+  const notifySlackJob = workflowJobBlock(cd, "notify-slack-cd-result");
+  assert.match(notifySlackJob, /needs:\n {6}- plan\n {6}- deploy\n {6}- post-deploy-smoke/);
+  assert.doesNotMatch(notifySlackJob, /needs:\n(?: {6}- .+\n)* {6}- record-deploy/);
 });
 
 test("Route V2 host ingress는 두 exact 경로만 gateway로 보내고 실패 시 Nginx 설정을 복원한다", () => {
