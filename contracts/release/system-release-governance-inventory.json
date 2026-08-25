@@ -4,7 +4,7 @@
   "files": [
     {
       "path": ".github/workflows/datapack-release.yml",
-      "sha256": "b15ada47698f88237bec61c5ce902ec55a3f8131cf79c625e2878d2e1cfb8ec7"
+      "sha256": "a93088a685ec9cac76da2d3acaab89e775dc4d0d9ecaf1d3c513987d1bd825cb"
     },
     {
       "path": ".github/workflows/release-artifacts.yml",
