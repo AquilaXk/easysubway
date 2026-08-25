@@ -148,7 +148,7 @@
     },
     {
       "path": "release/product-gates/post-launch-operations-review-gate.json",
-      "sha256": "0c05626d56d115e37f320ad8fda2093b4eacff374f0595be42b62a9297474146"
+      "sha256": "7ce5f313d8d042f40473e4cf16b7cb7748830a530dfaa25a8b30629b26e24237"
     },
     {
       "path": "release/product-gates/production-datapack-scope.json",
