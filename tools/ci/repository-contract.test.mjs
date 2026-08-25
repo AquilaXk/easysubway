@@ -10593,6 +10593,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     "kric-subway-timetable",
     "molit-urban-rail-full-route",
     "seoul-metro-accessibility",
+    "seoul-metro-route-map-positions",
     "seoul-metro-transfer-distance-duration",
     "seoulmetro-station-line-info",
   ]);
@@ -10621,6 +10622,14 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
       registrationRepository: "AquilaXk/easysubway-data",
       registrationIssue: 350,
       snapshotId: "seoul-metro-transfer-distance-duration-20260815T094038817Z",
+      decision: "APPROVED",
+      productionUseAllowed: true,
+    },
+    {
+      sourceId: "seoul-metro-route-map-positions",
+      registrationRepository: "AquilaXk/easysubway-data",
+      registrationIssue: 447,
+      snapshotId: "seoul-metro-route-map-positions-current-20260824T114822985Z",
       decision: "APPROVED",
       productionUseAllowed: true,
     },
