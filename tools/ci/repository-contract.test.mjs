@@ -1761,6 +1761,10 @@ test("Actions cleanup은 완료된 오래된 run만 PR head와 보호 run을 제
   const cleanup = read(".github/workflows/actions-storage-cleanup.yml");
   const completedRunJob = workflowJobBlock(cleanup, "cleanup-completed-actions-runs");
 
+  assert.match(
+    cleanup,
+    /^concurrency:\n  group: \$\{\{ github\.workflow \}\}\n  cancel-in-progress: false\n  queue: max$/m,
+  );
   assert.match(completedRunJob, /if: github\.event_name != 'pull_request'/);
   assert.match(completedRunJob, /needs: cleanup-ghcr-backend-images/);
   assert.match(completedRunJob, /actions:\s*write/);
