@@ -8,15 +8,13 @@ on:
     - cron: "17 3 * * 0"
   workflow_dispatch:
 
-permissions:
-  actions: write
-  contents: read
-
 jobs:
   cleanup-pr-caches:
     name: Delete closed PR caches
     if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    permissions:
+      actions: write
     steps:
       - name: Delete caches for closed pull request
         env:

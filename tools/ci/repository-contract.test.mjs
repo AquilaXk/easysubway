@@ -1745,7 +1745,10 @@ test("Actions cleanup은 closed PR cache만 제거하고 weekly all-cache purge�
   const prCacheJob = workflowJobBlock(cleanup, "cleanup-pr-caches");
   const ghcrJob = workflowJobBlock(cleanup, "cleanup-ghcr-backend-images");
 
+  assert.doesNotMatch(cleanup, /^permissions:/m);
   assert.match(prCacheJob, /if: github\.event_name == 'pull_request'/);
+  assert.match(prCacheJob, /permissions:\s*\n\s*actions: write/);
+  assert.doesNotMatch(prCacheJob, /contents:\s*read/);
   assert.match(prCacheJob, /BRANCH: refs\/pull\/\$\{\{ github\.event\.pull_request\.number \}\}\/merge/);
   assert.match(prCacheJob, /gh cache delete --all --ref "\$BRANCH" --succeed-on-no-caches/);
   assert.equal((cleanup.match(/gh cache delete --all/g) ?? []).length, 1);
