@@ -27,6 +27,32 @@ jobs:
           set -euo pipefail
           gh cache delete --all --ref "$BRANCH" --succeed-on-no-caches
 
+  cleanup-completed-actions-runs:
+    name: Prune old completed Actions runs
+    if: github.event_name != 'pull_request'
+    needs: cleanup-ghcr-backend-images
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: read
+    steps:
+      - name: Checkout cleanup contract
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - name: Delete a quota-bounded completed-run batch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          GITHUB_RUN_ID: ${{ github.run_id }}
+          MIN_AGE_HOURS: 48
+          MAX_DELETE: 999
+          QUOTA_RESERVE: 1000
+          FAILURE_RESOLUTION_HEADROOM: 20
+          # Mobile's current immutable consumer reads this exact run/artifact.
+          # Remove it only with the consumer rebind tracked by the master plan.
+          PROTECTED_RUN_IDS: 31280042807
+        run: node tools/ci/prune-completed-actions-runs.mjs
+
   cleanup-ghcr-backend-images:
     name: Prune old GHCR backend images
     if: github.event_name != 'pull_request'

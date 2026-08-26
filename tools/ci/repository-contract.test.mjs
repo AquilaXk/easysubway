@@ -1754,6 +1754,22 @@ test("Actions cleanup은 closed PR cache만 제거하고 weekly all-cache purge�
   assert.match(ghcrJob, /if \[ "\$\{index\}" -le 10 \]; then/);
 });
 
+test("Actions cleanup은 완료된 오래된 run만 PR head와 보호 run을 제외해 정리한다", () => {
+  const cleanup = read(".github/workflows/actions-storage-cleanup.yml");
+  const completedRunJob = workflowJobBlock(cleanup, "cleanup-completed-actions-runs");
+
+  assert.match(completedRunJob, /if: github\.event_name != 'pull_request'/);
+  assert.match(completedRunJob, /needs: cleanup-ghcr-backend-images/);
+  assert.match(completedRunJob, /actions:\s*write/);
+  assert.match(completedRunJob, /checkout@/);
+  assert.match(completedRunJob, /node tools\/ci\/prune-completed-actions-runs\.mjs/);
+  assert.match(completedRunJob, /PROTECTED_RUN_IDS: 31280042807/);
+  assert.match(completedRunJob, /MAX_DELETE:/);
+  assert.match(completedRunJob, /QUOTA_RESERVE:/);
+  assert.match(completedRunJob, /FAILURE_RESOLUTION_HEADROOM:/);
+  assert.doesNotMatch(completedRunJob, /gh run cancel|gh run rerun|workflow_dispatch/);
+});
+
 test("full PR 템플릿은 리뷰와 배포 확인 게이트를 포함한다", () => {
   const template = read(".github/PULL_REQUEST_TEMPLATE/full.md");
 
