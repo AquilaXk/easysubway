@@ -11,7 +11,9 @@ import {
   positiveDecimal,
   regularBytes,
   regularJson,
+  readCandidateExecutionEvidence,
   reviewerFromApproval,
+  validateCandidateExecutionEvidence,
   validateCompatibilityEvidence,
   validatePromotionCandidate,
   validateInventory,
@@ -19,32 +21,19 @@ import {
 
 async function main() {
   const args = parseArgs(process.argv.slice(2), [
-    "candidate-root-1", "candidate-root-2", "candidate-root-3", "selected-candidate-workflow-run-id",
-    "candidate-workflow-run-id-1", "candidate-workflow-run-id-2", "candidate-workflow-run-id-3",
-    "candidate-head-sha-1", "candidate-head-sha-2", "candidate-head-sha-3",
+    "candidate-root", "candidate-workflow-run-id", "candidate-head-sha",
+    "candidate-execution-evidence-root",
     "compatibility-evidence", "requested-by", "approval-evidence", "workflow-run-id", "issue-ref",
-    "rebuild-parity-evidence-output", "output",
+    "output",
   ]);
-  const candidates = await Promise.all(["candidate-root-1", "candidate-root-2", "candidate-root-3"]
-    .map((name, index) => verifyPromotionCandidateRoot(
-      args.get(name), `--${name}`,
-      args.get(`candidate-workflow-run-id-${index + 1}`),
-      args.get(`candidate-head-sha-${index + 1}`),
-    )));
-  const inventoryBytes = candidates[0].inventoryBytes;
-  if (!candidates.every((candidate) => Buffer.compare(candidate.inventoryBytes, inventoryBytes) === 0)) {
-    throw new Error("candidate inventories differ");
-  }
-  const components = candidates.map((candidate) => candidate.component)
-    .sort((left, right) => BigInt(left.workflowRunId) < BigInt(right.workflowRunId) ? -1 : 1);
-  const selectedCandidateWorkflowRunId = args.get("selected-candidate-workflow-run-id");
-  if (!positiveDecimal(selectedCandidateWorkflowRunId)
-    || new Set(components.map((component) => component.workflowRunId)).size !== 3
-    || !components.some((component) => component.workflowRunId === selectedCandidateWorkflowRunId)
-    || !sameIdentityExceptRun(components)) {
-    throw new Error("candidate parity is invalid");
-  }
-  const component = components.find((candidate) => candidate.workflowRunId === selectedCandidateWorkflowRunId);
+  const { component, inventoryBytes } = await verifyPromotionCandidateRoot(
+    args.get("candidate-root"), "--candidate-root",
+    args.get("candidate-workflow-run-id"), args.get("candidate-head-sha"),
+  );
+  const executionEvidence = await readCandidateExecutionEvidence(
+    args.get("candidate-execution-evidence-root"),
+  );
+  validateCandidateExecutionEvidence({ ...executionEvidence, component });
 
   const [compatibility, compatibilityBytes] = await regularJson(
     args.get("compatibility-evidence"),
@@ -60,22 +49,15 @@ async function main() {
     throw new Error("request arguments are invalid");
   }
 
-  const rebuildParityEvidence = {
-    schemaVersion: 1,
-    artifactKind: "datapack-rebuild-parity-evidence",
-    selectedCandidateWorkflowRunId,
-    candidates: components,
-    artifactInventorySha256: hash(inventoryBytes),
-    contractVersion: "datapack-rebuild-parity-v1",
-    issueRef: args.get("issue-ref"),
-  };
-  const rebuildParityEvidenceBytes = jsonBytes(rebuildParityEvidence);
   const request = {
     schemaVersion: 1,
     artifactKind: "datapack-promotion-request",
     candidate: component,
     compatibilityEvidenceSha256: hash(compatibilityBytes),
-    rebuildParityEvidenceSha256: hash(rebuildParityEvidenceBytes),
+    candidateExecutionEvidence: {
+      releaseEvidenceBundleSha256: hash(executionEvidence.releaseEvidenceBundleBytes),
+      releaseDecisionSha256: hash(executionEvidence.releaseDecisionBytes),
+    },
     requestedBy,
     approval: {
       workflowRunId,
@@ -83,14 +65,11 @@ async function main() {
       reviewer,
       approvalEvidenceSha256: hash(approvalBytes),
     },
-    contractVersion: "datapack-promotion-v1",
+    contractVersion: "datapack-promotion-v2",
     issueRef: args.get("issue-ref"),
   };
   const requestBytes = jsonBytes(request);
-  await writeExclusiveJsonPair(
-    args.get("rebuild-parity-evidence-output"), rebuildParityEvidenceBytes,
-    args.get("output"), requestBytes,
-  );
+  await writeExclusiveJson(args.get("output"), requestBytes);
 }
 
 export async function verifyPromotionCandidateRoot(root, label, expectedWorkflowRunId, expectedGitSha) {
@@ -159,37 +138,16 @@ function isSameInventory(left, right) {
   return isDeepStrictEqual(left, right);
 }
 
-function sameIdentityExceptRun(components) {
-  const baseline = { ...components[0] };
-  delete baseline.workflowRunId;
-  return components.every((component) => {
-    const identity = { ...component };
-    delete identity.workflowRunId;
-    return isDeepStrictEqual(identity, baseline);
-  });
-}
-
 const jsonBytes = (value) => Buffer.from(`${JSON.stringify(value, null, 2)}\n`);
 
-async function writeExclusiveJsonPair(evidenceFile, evidenceBytes, requestFile, requestBytes) {
-  const evidenceOutput = path.resolve(evidenceFile);
+async function writeExclusiveJson(requestFile, requestBytes) {
   const requestOutput = path.resolve(requestFile);
-  await Promise.all([evidenceOutput, requestOutput].map(assertMissing));
+  await assertMissing(requestOutput);
   const temporaryDirectory = await mkdtemp(path.join(path.dirname(requestOutput), ".promotion-request-"));
-  let evidencePublished = false;
   try {
-    const temporaryEvidence = path.join(temporaryDirectory, "evidence.json");
     const temporaryRequest = path.join(temporaryDirectory, "request.json");
-    await writeFile(temporaryEvidence, evidenceBytes, { flag: "wx" });
     await writeFile(temporaryRequest, requestBytes, { flag: "wx" });
-    try {
-      await link(temporaryEvidence, evidenceOutput);
-      evidencePublished = true;
-      await link(temporaryRequest, requestOutput);
-    } catch (error) {
-      if (evidencePublished) await unlink(evidenceOutput).catch(() => {});
-      throw error;
-    }
+    await link(temporaryRequest, requestOutput);
   } finally {
     await rm(temporaryDirectory, { recursive: true, force: true });
   }

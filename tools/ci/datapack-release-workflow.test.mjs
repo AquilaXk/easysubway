@@ -549,7 +549,7 @@ test("expiry alert는 publish 없이 같은 decision engine을 소비한다", ()
   assert.doesNotMatch(expiryWorkflow, /productionWriteAllowed == 'true'/);
 });
 
-test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 검증하고 request만 attest한다", () => {
+test("candidate promotion은 정확한 단일 성공 후보와 compatibility 증거를 검증하고 v2 request만 attest한다", () => {
   const promotion = readFileSync(path.join(root, ".github/workflows/datapack-promotion.yml"), "utf8");
   const releaseArtifacts = readFileSync(path.join(root, ".github/workflows/release-artifacts.yml"), "utf8");
   const promotionBuilder = readFileSync(path.join(root, "tools/release/build-promotion-request.mjs"), "utf8");
@@ -559,7 +559,6 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
 
   assert.deepEqual([...workflowDispatchInputNames(promotion)].sort(), [
     "candidateRunId", "compatibilityEvidenceArtifactName", "compatibilityEvidenceRunId", "issueRef",
-    "rebuildCandidateRunId2", "rebuildCandidateRunId3",
   ]);
   const permissionBlock = promotion.match(/permissions:\n([\s\S]*?)\n {4}environment:/)?.[1];
   assert.ok(permissionBlock, "promotion permissions 블록을 찾지 못함");
@@ -570,7 +569,7 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
     contents: "read", actions: "read", "id-token": "write", attestations: "write",
   });
   assert.match(promotion, /data_repository="AquilaXk\/easysubway-data"/);
-  assert.match(promotion, /repos\/\$\{data_repository\}\/actions\/runs\/\$\{candidate_run_id\}/);
+  assert.match(promotion, /repos\/\$\{data_repository\}\/actions\/runs\/\$\{CANDIDATE_RUN_ID\}/);
   assert.match(promotion, /repository}" != "\$\{data_repository\}"/);
   assert.match(promotion, /head_repository}" != "\$\{data_repository\}"/);
   assert.match(promotion, /\.github\/workflows\/datapack-release\.yml/);
@@ -597,16 +596,10 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
   assert.match(promotion, /data-artifact-inventory\.json/);
   assert.match(promotion, /EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN/);
   assert.match(promotion, /repository: AquilaXk\/easysubway-data/);
-  for (const candidate of ["candidateRunId", "rebuildCandidateRunId2", "rebuildCandidateRunId3"]) {
-    assert.match(promotion, new RegExp(`run-id: \\$\\{\\{ inputs\\.${candidate} \\}\\}`));
-  }
-  assert.match(promotion, /candidate-1/);
-  assert.match(promotion, /candidate-2/);
-  assert.match(promotion, /candidate-3/);
-  assert.match(promotion, /rebuild-parity-evidence\.json/);
-  assert.match(promotion, /--rebuild-parity-evidence-output/);
-  assert.match(promotion, /--rebuild-parity-evidence\s/);
-  assert.match(promotionBuilder, /rebuildParityEvidenceSha256/);
+  assert.match(promotion, /run-id: \$\{\{ inputs\.candidateRunId \}\}/);
+  assert.match(promotion, /candidate/);
+  assert.doesNotMatch(promotion, /rebuildCandidateRunId|candidate-[123]|rebuild-parity-evidence/);
+  assert.doesNotMatch(promotionBuilder, /rebuildParityEvidenceSha256|rebuild-parity/);
   assert.doesNotMatch(promotion, /repository: \$\{\{ github\.repository \}\}/);
   assert.doesNotMatch(promotion, /repos\/\$\{GITHUB_REPOSITORY\}\/actions\/runs\/\$\{candidate_run_id\}/);
   assert.match(promotion, /shopt -s dotglob nullglob/);
@@ -627,20 +620,16 @@ test("candidate promotion은 정확한 성공 후보와 compatibility 증거를 
     /- name: Data Pack Promotion \/ Build and validate promotion request[\s\S]*?\n\s+- name:/,
   )?.[0];
   assert.ok(candidateBinding, "candidate bytes 결속 스텝을 찾지 못함");
-  for (const index of [1, 2, 3]) {
-    assert.match(candidateBinding, new RegExp(`--candidate-root-${index}`));
-    assert.match(candidateBinding, new RegExp(`--candidate-workflow-run-id-${index}`));
-    assert.match(candidateBinding, new RegExp(`--candidate-head-sha-${index}`));
-  }
-  assert.match(candidateBinding, /--selected-candidate-workflow-run-id/);
+  assert.match(candidateBinding, /--candidate-root "\$\{RUNNER_TEMP\}\/candidate"/);
+  assert.match(candidateBinding, /--candidate-workflow-run-id "\$\{CANDIDATE_RUN_ID\}"/);
+  assert.match(candidateBinding, /--candidate-head-sha "\$\{CANDIDATE_HEAD_SHA\}"/);
+  assert.equal((candidateBinding.match(/--candidate-execution-evidence-root "\$\{RUNNER_TEMP\}\/candidate-execution-evidence"/g) ?? []).length, 2);
+  assert.match(promotion, /easysubway-datapack-candidate-execution-evidence-\$\{\{ inputs\.candidateRunId \}\}/);
   assert.match(candidateBinding, /EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM: \$\{\{ secrets\.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM \}\}/);
   assert.match(candidateBinding, /EASYSUBWAY_DATAPACK_SIGNING_KEY_ID: \$\{\{ secrets\.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID \}\}/);
   assert.equal((promotion.match(/secrets\.EASYSUBWAY_DATAPACK_SIGNING_PUBLIC_KEY_PEM/g) ?? []).length, 1);
   assert.equal((promotion.match(/secrets\.EASYSUBWAY_DATAPACK_SIGNING_KEY_ID/g) ?? []).length, 1);
-  assert.match(candidateBinding, /--rebuild-parity-evidence-output/);
-  assert.match(candidateBinding, /--rebuild-parity-evidence\s/);
-  assert.match(candidateBinding, /promotion-artifact\/rebuild-parity-evidence\.json/);
-  assert.match(promotion, /candidate run IDs must be distinct/);
+  assert.doesNotMatch(candidateBinding, /rebuild-parity|candidate-root-[123]|candidate-workflow-run-id-[123]|candidate-head-sha-[123]/);
   assert.match(promotion, /compatibility evidence must contain exactly one regular non-empty file/);
   assert.doesNotMatch(candidateBinding.split("run: |", 2)[1], /\$\{\{ inputs\./);
   assert.doesNotMatch(candidateBinding, /build-data-component-manifest\.mjs/);
@@ -726,6 +715,7 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
   assert.match(promotionMetadata, /"\$\{artifact_name\}" "\$\{EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID\}" "\$\{PROMOTION_HEAD_SHA\}"/);
   for (const [name, runId, artifactName] of [
     ["Data Pack Release / Download exact production artifacts", "candidate_run_id", "easysubway-datapack-candidate"],
+    ["Data Pack Release / Download exact candidate execution evidence", "candidate_run_id", "easysubway-datapack-candidate-execution-evidence"],
     ["Data Pack Release / Download exact promotion artifact", "promotion_run_id", "easysubway-datapack-promotion"],
   ]) {
     const download = step(name);
@@ -743,12 +733,13 @@ test("production-publish는 data-repo attested candidate를 재생성 없이 소
   assert.match(verify, /gh attestation verify[\s\S]*?--repo "\$\{GITHUB_REPOSITORY\}"[\s\S]*?--signer-workflow "AquilaXk\/easysubway\/\.github\/workflows\/datapack-promotion\.yml"[\s\S]*?--source-ref refs\/heads\/main[\s\S]*?--deny-self-hosted-runners/);
   assert.match(verify, /validate-promotion-request\.mjs/);
   assert.match(verify, /--workflow-run-id "\$\{EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID\}"/);
-  assert.match(verify, /--rebuild-parity-evidence "\$\{promotion_root\}\/rebuild-parity-evidence\.json"/);
+  assert.match(verify, /--candidate-execution-evidence-root "\$\{RUNNER_TEMP\}\/downloaded-candidate-execution-evidence"/);
+  assert.doesNotMatch(verify, /rebuild-parity-evidence/);
   assert.match(
     verify,
-    /if \[\[ "\$\{#promotion_entries\[@\]\}" -ne 4 \]\]; then\s+echo "production promotion artifact must contain exactly four files" >&2\s+exit 1\s+fi/,
+    /if \[\[ "\$\{#promotion_entries\[@\]\}" -ne 3 \]\]; then\s+echo "production promotion artifact must contain exactly three files" >&2\s+exit 1\s+fi/,
   );
-  assert.match(verify, /for name in promotion-request\.json promotion-approvals\.json compatibility-evidence\.json rebuild-parity-evidence\.json; do/);
+  assert.match(verify, /for name in promotion-request\.json promotion-approvals\.json compatibility-evidence\.json; do/);
   assert.match(
     verify,
     /if ! \[\[ -f "\$\{promotion_root\}\/\$\{name\}" && ! -L "\$\{promotion_root\}\/\$\{name\}" && -s "\$\{promotion_root\}\/\$\{name\}" \]\]; then\s+echo "production promotion artifact has an invalid required file: \$\{name\}" >&2\s+exit 1\s+fi/,

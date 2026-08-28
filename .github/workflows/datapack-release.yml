@@ -493,9 +493,12 @@ jobs:
         run: |
           set -euo pipefail
           data_repository="AquilaXk/easysubway-data"
-          artifact_name="easysubway-datapack-candidate-${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}"
-          gh api "repos/${data_repository}/actions/runs/${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}/artifacts?name=${artifact_name}&per_page=100" > "${RUNNER_TEMP}/${artifact_name}.json"
-          node tools/ci/require-workflow-artifact.mjs "${RUNNER_TEMP}/${artifact_name}.json" "${artifact_name}" "${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}" "${CANDIDATE_HEAD_SHA}"
+          for artifact_name in \
+            "easysubway-datapack-candidate-${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}" \
+            "easysubway-datapack-candidate-execution-evidence-${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}"; do
+            gh api "repos/${data_repository}/actions/runs/${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}/artifacts?name=${artifact_name}&per_page=100" > "${RUNNER_TEMP}/${artifact_name}.json"
+            node tools/ci/require-workflow-artifact.mjs "${RUNNER_TEMP}/${artifact_name}.json" "${artifact_name}" "${EASYSUBWAY_DATAPACK_CANDIDATE_RUN_ID}" "${CANDIDATE_HEAD_SHA}"
+          done
 
       - name: Data Pack Release / Validate production promotion artifact metadata
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
@@ -524,6 +527,16 @@ jobs:
           run-id: ${{ steps.release-mode.outputs.promotion_run_id }}
           github-token: ${{ github.token }}
 
+      - name: Data Pack Release / Download exact candidate execution evidence
+        if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
+        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: easysubway-datapack-candidate-execution-evidence-${{ steps.release-mode.outputs.candidate_run_id }}
+          path: ${{ runner.temp }}/downloaded-candidate-execution-evidence
+          run-id: ${{ steps.release-mode.outputs.candidate_run_id }}
+          repository: AquilaXk/easysubway-data
+          github-token: ${{ secrets.EASYSUBWAY_DATA_ARTIFACT_READ_TOKEN }}
+
       - name: Data Pack Release / Verify attested promotion and candidate bytes
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
         run: |
@@ -532,18 +545,18 @@ jobs:
           promotion_root="${RUNNER_TEMP}/downloaded-promotion"
           shopt -s dotglob nullglob
           promotion_entries=("${promotion_root}"/*)
-          if [[ "${#promotion_entries[@]}" -ne 4 ]]; then
-            echo "production promotion artifact must contain exactly four files" >&2
+          if [[ "${#promotion_entries[@]}" -ne 3 ]]; then
+            echo "production promotion artifact must contain exactly three files" >&2
             exit 1
           fi
-          for name in promotion-request.json promotion-approvals.json compatibility-evidence.json rebuild-parity-evidence.json; do
+          for name in promotion-request.json promotion-approvals.json compatibility-evidence.json; do
             if ! [[ -f "${promotion_root}/${name}" && ! -L "${promotion_root}/${name}" && -s "${promotion_root}/${name}" ]]; then
               echo "production promotion artifact has an invalid required file: ${name}" >&2
               exit 1
             fi
           done
           gh attestation verify "${promotion_root}/promotion-request.json" --repo "${GITHUB_REPOSITORY}" --signer-workflow "AquilaXk/easysubway/.github/workflows/datapack-promotion.yml" --source-ref refs/heads/main --deny-self-hosted-runners
-          node tools/release/validate-promotion-request.mjs --request "${promotion_root}/promotion-request.json" --component "${candidate_root}/data-component-manifest.json" --inventory "${candidate_root}/data-artifact-inventory.json" --compatibility-evidence "${promotion_root}/compatibility-evidence.json" --approval-evidence "${promotion_root}/promotion-approvals.json" --rebuild-parity-evidence "${promotion_root}/rebuild-parity-evidence.json" --workflow-run-id "${EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID}"
+          node tools/release/validate-promotion-request.mjs --request "${promotion_root}/promotion-request.json" --component "${candidate_root}/data-component-manifest.json" --inventory "${candidate_root}/data-artifact-inventory.json" --compatibility-evidence "${promotion_root}/compatibility-evidence.json" --approval-evidence "${promotion_root}/promotion-approvals.json" --candidate-execution-evidence-root "${RUNNER_TEMP}/downloaded-candidate-execution-evidence" --workflow-run-id "${EASYSUBWAY_DATAPACK_PROMOTION_RUN_ID}"
 
       - name: Data Pack Release / Stage verified candidate artifact
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
