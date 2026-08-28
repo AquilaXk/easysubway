@@ -54,6 +54,35 @@ test("validator는 execution evidence를 candidate run/head/manifest/source iden
   }
 });
 
+test("validator는 선택되지 않은 release decision의 부분 selection identity를 거부한다", () => {
+  for (const outcome of [
+    { name: "CHANGE_BLOCKED", values: {} },
+    {
+      name: "PUBLISH_REQUIRED",
+      values: {
+        outcome: "PUBLISH_REQUIRED",
+        productionWriteAllowed: true,
+        materialChange: false,
+        approvalValid: true,
+      },
+    },
+    { name: "FAILED", values: { outcome: "FAILED", strictValidationPassed: false } },
+  ]) {
+    for (const partialSelection of [
+      { selectedManifestSha256: "f".repeat(64), selectedReleaseSequence: null },
+      { selectedManifestSha256: null, selectedReleaseSequence: 1 },
+    ]) {
+      const fixture = createFixture();
+      try {
+        const decision = JSON.parse(readFileSync(path.join(fixture.executionEvidenceRoot, "release-decision.json")));
+        Object.assign(decision, outcome.values, partialSelection);
+        writeReleaseDecision(fixture, decision);
+        assert.notEqual(run(fixture).status, 0, `${outcome.name} accepted partial selection identity`);
+      } finally { fixture.cleanup(); }
+    }
+  }
+});
+
 test("validator는 request/approval/compatibility와 candidate의 불일치를 거부한다", () => {
   for (const mutate of [
     (fixture) => { fixture.request.extra = true; writeRequest(fixture); },
@@ -128,6 +157,12 @@ function createFixture() {
 
 function writeComponent(fixture) { writeFileSync(fixture.componentPath, JSON.stringify(fixture.component)); }
 function writeRequest(fixture) { writeFileSync(fixture.requestPath, JSON.stringify(fixture.request)); }
+function writeReleaseDecision(fixture, value) {
+  const bytes = Buffer.from(JSON.stringify(value));
+  writeFileSync(path.join(fixture.executionEvidenceRoot, "release-decision.json"), bytes);
+  fixture.request.candidateExecutionEvidence.releaseDecisionSha256 = sha256(bytes);
+  writeRequest(fixture);
+}
 function replaceCompatibility(fixture, value) {
   const bytes = Buffer.from(JSON.stringify(value));
   writeFileSync(fixture.compatibilityPath, bytes);

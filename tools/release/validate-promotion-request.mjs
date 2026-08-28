@@ -186,9 +186,12 @@ export function validateCandidateExecutionEvidence({ releaseEvidenceBundle, rele
     throw new Error("candidate release decision outcome is invalid");
   }
   const selected = releaseDecision.outcome === "NO_CHANGE_VALID";
-  if (selected !== (sha64(releaseDecision.selectedManifestSha256)
+  const hasSelection = sha64(releaseDecision.selectedManifestSha256)
     && Number.isSafeInteger(releaseDecision.selectedReleaseSequence)
-    && releaseDecision.selectedReleaseSequence > 0)) {
+    && releaseDecision.selectedReleaseSequence > 0;
+  if ((selected && !hasSelection)
+    || (!selected && (releaseDecision.selectedManifestSha256 !== null
+      || releaseDecision.selectedReleaseSequence !== null))) {
     throw new Error("candidate release decision selection is invalid");
   }
 }
