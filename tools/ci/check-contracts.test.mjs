@@ -138,24 +138,24 @@ test("public sensitivity contracts bind the exact scope and corrected owner rece
   assert.ok(validatePublicSensitivityAuditScope(offsetInvalid).some((error) => error.includes("revalidation/expiry")));
 });
 
-test("plan-doc execution audit contracts fix the 117-record historical inventory and fail-closed report", () => {
+test("plan-doc execution audit contracts fix the 120-record historical inventory and fail-closed report", () => {
   const scope = loadJson("contracts/documentation/plan-doc-execution-audit-scope.json");
   const scopeSchema = loadJson("contracts/documentation/plan-doc-execution-audit-scope.schema.json");
   const reportSchema = loadJson("contracts/documentation/plan-doc-execution-audit-report.schema.json");
   assert.equal(scope.schemaVersion, 2);
-  assert.equal(scope.historical.length, 117);
+  assert.equal(scope.historical.length, 120);
   assert.deepEqual(scope.repositories, ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"]);
-  assert.equal(scope.self.issueNumber, 2961);
+  assert.equal(scope.self.issueNumber, 2964);
   assert.equal(scopeSchema.properties.historical.minItems, 1);
   assert.equal(scopeSchema.properties.historical.maxItems, undefined);
   assert.deepEqual(scopeSchema.properties.self.properties.issueNumber, { type: "integer", minimum: 1 });
   assert.equal(scopeSchema.properties.self.properties.allowedChangedFiles.minItems, 1);
   assert.equal(scopeSchema.properties.self.properties.allowedChangedFiles.maxItems, undefined);
   const recordsByIdentity = new Map(scope.historical.map((record) => [`${record.repository}:${record.prNumber}`, record]));
-  assert.equal(recordsByIdentity.size, 117);
-  assert.equal(new Set(scope.historical.map((record) => `${record.repository}:${record.mergeSha}`)).size, 117);
-  assert.equal(createHash("sha256").update(JSON.stringify(scope.historical.slice(0, 115))).digest("hex"), "577c87f3ba6c80dfbc3830d7d28638fc8ba27a176bd71aeca33a5e591eb40930");
-  assert.deepEqual(scope.historical.slice(-13), [
+  assert.equal(recordsByIdentity.size, 120);
+  assert.equal(new Set(scope.historical.map((record) => `${record.repository}:${record.mergeSha}`)).size, 120);
+  assert.equal(createHash("sha256").update(JSON.stringify(scope.historical.slice(0, 117))).digest("hex"), "ac563c420601bf55f908c6adceb9de5990f54c0ced725a29bcd83661cb523f0d");
+  assert.deepEqual(scope.historical.slice(-16), [
     { repository: "AquilaXk/easysubway-mobile", issueNumber: 304, prNumber: 305, mergeSha: "69f556e3f0632d1242b24a47c5d9c28657dbd44c", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] },
     { repository: "AquilaXk/easysubway", issueNumber: 2947, prNumber: 2948, mergeSha: "360b27d22ca28103dcd7791e9ee8fd4ca3590e9c", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY", allowedChangedFiles: ["contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"] },
     { repository: "AquilaXk/easysubway-data", issueNumber: 565, prNumber: 566, mergeSha: "6d3c5bd8bff60488642c82eb15be25273ea82707", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] },
@@ -169,6 +169,9 @@ test("plan-doc execution audit contracts fix the 117-record historical inventory
     { repository: "AquilaXk/easysubway-backend", issueNumber: 295, prNumber: 296, mergeSha: "fcb81ee14b1badf2f4a107fe1a33c2b232ac3889", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] },
     { repository: "AquilaXk/easysubway", issueNumber: 2959, prNumber: 2960, mergeSha: "71bfead4f3db0d9d6dbccb10714620d43daea2e7", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY", allowedChangedFiles: ["contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"] },
     { repository: "AquilaXk/easysubway-data", issueNumber: 587, prNumber: 588, mergeSha: "80979e1646049d6d50ecf422643b3e6c30bd36ab", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] },
+    { repository: "AquilaXk/easysubway", issueNumber: 2961, prNumber: 2962, mergeSha: "7752b147dd23c79fc437fa59281a486b43d5eba9", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY", allowedChangedFiles: ["contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"] },
+    { repository: "AquilaXk/easysubway-data", issueNumber: 595, prNumber: 596, mergeSha: "3be6fd7262b54901b6577bd48820160a1ce78241", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] },
+    { repository: "AquilaXk/easysubway-mobile", issueNumber: 310, prNumber: 311, mergeSha: "9ec5c62d3d10591a5d22b3ff2fd07178a6d8df12", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] },
   ]);
   assert.deepEqual(recordsByIdentity.get("AquilaXk/easysubway:2887"), { repository: "AquilaXk/easysubway", issueNumber: 2886, prNumber: 2887, mergeSha: "995b4ae9913d1256e3933afe401d2a6c559588a3", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json", "contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"] });
   assert.deepEqual(recordsByIdentity.get("AquilaXk/easysubway-data:317"), { repository: "AquilaXk/easysubway-data", issueNumber: 316, prNumber: 317, mergeSha: "4f41584328518046d91312c3bcc78cd4ba40308c", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] });
