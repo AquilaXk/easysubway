@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
-import { lstat, readFile } from "node:fs/promises";
+import { lstat, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { isDeepStrictEqual } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -12,11 +12,16 @@ const componentKeys = [
 ];
 const requestKeys = [
   "schemaVersion", "artifactKind", "candidate", "compatibilityEvidenceSha256", "requestedBy",
-  "rebuildParityEvidenceSha256", "approval", "contractVersion", "issueRef",
+  "candidateExecutionEvidence", "approval", "contractVersion", "issueRef",
 ];
-const rebuildParityEvidenceKeys = [
-  "schemaVersion", "artifactKind", "selectedCandidateWorkflowRunId", "candidates",
-  "artifactInventorySha256", "contractVersion", "issueRef",
+const releaseDecisionKeys = [
+  "schemaVersion", "artifactKind", "outcome", "productionWriteAllowed", "materialChange",
+  "approvalValid", "strictValidationPassed", "publishRequired", "publishAttempted",
+  "remoteValidationPassed", "sourceSnapshotSetHash", "selectedManifestSha256",
+  "selectedReleaseSequence", "reasonCodes", "evaluationAt",
+];
+const candidateServerRouteEvidenceKeys = [
+  "candidateId", "sourceSnapshotSetHash", "buildSpecSha256", "manifestSha256", "eligibility", "final",
 ];
 
 export const hash = (bytes) => createHash("sha256").update(bytes).digest("hex");
@@ -120,37 +125,105 @@ export function reviewerFromApproval(bytes) {
   return selected[0].user.login;
 }
 
-export function validateRebuildParityEvidence(value) {
-  exactKeys(value, rebuildParityEvidenceKeys, "rebuild parity evidence");
-  if (value.schemaVersion !== 1 || value.artifactKind !== "datapack-rebuild-parity-evidence"
-    || !positiveDecimal(value.selectedCandidateWorkflowRunId)
-    || !Array.isArray(value.candidates) || value.candidates.length !== 3
-    || !sha64(value.artifactInventorySha256)
-    || value.contractVersion !== "datapack-rebuild-parity-v1"
-    || value.issueRef !== "AquilaXk/easysubway#2705") {
-    throw new Error("rebuild parity evidence is invalid");
+export function validateCandidateExecutionEvidence({ releaseEvidenceBundle, releaseDecision, component }) {
+  const serverRoute = releaseEvidenceBundle?.candidateServerRouteEvidence;
+  if (releaseEvidenceBundle?.schemaVersion !== 1
+    || releaseEvidenceBundle?.artifactKind !== "datapack-release-evidence-bundle"
+    || releaseEvidenceBundle?.releaseMode !== "release-candidate"
+    || !text(releaseEvidenceBundle.candidateId)
+    || !text(releaseEvidenceBundle.buildCandidateId)
+    || !/^[a-f0-9]{7,40}$/u.test(releaseEvidenceBundle.candidateBuilderGitSha ?? "")
+    || releaseEvidenceBundle.builderGitSha !== component.gitSha
+    || !sha64(releaseEvidenceBundle.buildSpecSha256)
+    || releaseEvidenceBundle.manifestSha256 !== component.manifestSha256
+    || releaseEvidenceBundle.releaseSequence !== component.releaseSequence
+    || releaseEvidenceBundle.sourceSnapshotSetHash !== component.provenance.sourceSnapshotSetHash
+    || releaseEvidenceBundle.validatorStatus !== "PASS"
+    || releaseEvidenceBundle.manifestSignatureStatus !== "PASS"
+    || !utcInstant(releaseEvidenceBundle.createdAt)
+    || releaseEvidenceBundle.workflowRunUrl
+      !== `https://github.com/AquilaXk/easysubway-data/actions/runs/${component.workflowRunId}`) {
+    throw new Error("candidate release evidence identity is invalid");
   }
 
-  let previousRunId = null;
-  let baseline = null;
-  let selected = null;
-  for (const candidate of value.candidates) {
-    validatePromotionCandidate(candidate);
-    if (candidate.artifactInventorySha256 !== value.artifactInventorySha256
-      || (previousRunId != null && BigInt(previousRunId) >= BigInt(candidate.workflowRunId))) {
-      throw new Error("rebuild parity evidence is invalid");
-    }
-    const identity = { ...candidate };
-    delete identity.workflowRunId;
-    if (baseline != null && !isDeepStrictEqual(identity, baseline)) {
-      throw new Error("rebuild parity evidence is invalid");
-    }
-    baseline ??= identity;
-    if (candidate.workflowRunId === value.selectedCandidateWorkflowRunId) selected = candidate;
-    previousRunId = candidate.workflowRunId;
+  exactKeys(serverRoute, candidateServerRouteEvidenceKeys, "candidate server route evidence");
+  if (serverRoute.candidateId !== releaseEvidenceBundle.buildCandidateId
+    || serverRoute.sourceSnapshotSetHash !== releaseEvidenceBundle.sourceSnapshotSetHash
+    || serverRoute.buildSpecSha256 !== releaseEvidenceBundle.buildSpecSha256
+    || serverRoute.manifestSha256 !== releaseEvidenceBundle.manifestSha256) {
+    throw new Error("candidate server route evidence identity is invalid");
   }
-  if (!selected) throw new Error("rebuild parity evidence is invalid");
-  return selected;
+  for (const [name, expectedPath] of [
+    ["eligibility", "server-route-bundle-evidence/route-accessibility-eligibility.json"],
+    ["final", "server-route-bundle-evidence/server-route-bundle-final.json"],
+  ]) {
+    exactKeys(serverRoute[name], ["path", "sha256"], `candidate server route ${name}`);
+    if (serverRoute[name].path !== expectedPath || !sha64(serverRoute[name].sha256)) {
+      throw new Error("candidate server route evidence file is invalid");
+    }
+  }
+
+  exactKeys(releaseDecision, releaseDecisionKeys, "release decision");
+  const booleans = [
+    "productionWriteAllowed", "materialChange", "approvalValid", "strictValidationPassed",
+    "publishRequired", "publishAttempted", "remoteValidationPassed",
+  ];
+  if (releaseDecision.schemaVersion !== 1
+    || releaseDecision.artifactKind !== "datapack-release-decision"
+    || booleans.some((field) => typeof releaseDecision[field] !== "boolean")
+    || releaseDecision.strictValidationPassed !== true
+    || releaseDecision.publishAttempted !== false
+    || releaseDecision.remoteValidationPassed !== false
+    || releaseDecision.sourceSnapshotSetHash !== component.provenance.sourceSnapshotSetHash
+    || !Array.isArray(releaseDecision.reasonCodes)
+    || releaseDecision.reasonCodes.some((reason) => !text(reason))
+    || !utcInstant(releaseDecision.evaluationAt)) {
+    throw new Error("candidate release decision is invalid");
+  }
+  const expectedOutcome = scheduledOutcome(releaseDecision);
+  if (releaseDecision.outcome !== expectedOutcome.outcome
+    || releaseDecision.productionWriteAllowed !== expectedOutcome.productionWriteAllowed) {
+    throw new Error("candidate release decision outcome is invalid");
+  }
+  const selected = releaseDecision.outcome === "NO_CHANGE_VALID";
+  const hasSelection = sha64(releaseDecision.selectedManifestSha256)
+    && Number.isSafeInteger(releaseDecision.selectedReleaseSequence)
+    && releaseDecision.selectedReleaseSequence > 0;
+  if ((selected && !hasSelection)
+    || (!selected && (releaseDecision.selectedManifestSha256 !== null
+      || releaseDecision.selectedReleaseSequence !== null))) {
+    throw new Error("candidate release decision selection is invalid");
+  }
+}
+
+function scheduledOutcome(value) {
+  if (!value.strictValidationPassed) return { outcome: "FAILED", productionWriteAllowed: false };
+  if (value.materialChange && !value.approvalValid) {
+    return { outcome: "CHANGE_BLOCKED", productionWriteAllowed: false };
+  }
+  if (value.publishRequired && !value.publishAttempted) {
+    return { outcome: "PUBLISH_REQUIRED", productionWriteAllowed: value.approvalValid };
+  }
+  return { outcome: "NO_CHANGE_VALID", productionWriteAllowed: false };
+}
+
+export async function readCandidateExecutionEvidence(root) {
+  const stats = await lstat(root);
+  if (!stats.isDirectory() || stats.isSymbolicLink()) {
+    throw new Error("candidate execution evidence must be a regular non-symlink directory");
+  }
+  const names = (await readdir(root)).sort();
+  const expected = ["release-decision.json", "release-evidence-bundle.json"];
+  if (!isDeepStrictEqual(names, expected)) {
+    throw new Error("candidate execution evidence must contain exactly two files");
+  }
+  const [releaseDecision, releaseDecisionBytes] = await regularJson(
+    path.join(root, expected[0]), `candidate execution evidence/${expected[0]}`,
+  );
+  const [releaseEvidenceBundle, releaseEvidenceBundleBytes] = await regularJson(
+    path.join(root, expected[1]), `candidate execution evidence/${expected[1]}`,
+  );
+  return { releaseDecision, releaseDecisionBytes, releaseEvidenceBundle, releaseEvidenceBundleBytes };
 }
 
 export function validateRequest({
@@ -160,23 +233,27 @@ export function validateRequest({
   inventoryBytes,
   compatibility,
   compatibilityBytes,
-  rebuildParityEvidence,
-  rebuildParityEvidenceBytes,
+  releaseEvidenceBundle,
+  releaseEvidenceBundleBytes,
+  releaseDecision,
+  releaseDecisionBytes,
   approvalBytes,
   workflowRunId,
 }) {
   validatePromotionCandidate(component);
   validateInventory(inventory);
   validateCompatibilityEvidence(compatibility, component);
-  const selectedCandidate = validateRebuildParityEvidence(rebuildParityEvidence);
+  validateCandidateExecutionEvidence({ releaseEvidenceBundle, releaseDecision, component });
   exactKeys(request, requestKeys, "request");
   if (request.schemaVersion !== 1 || request.artifactKind !== "datapack-promotion-request"
     || !isDeepStrictEqual(request.candidate, component)
     || request.compatibilityEvidenceSha256 !== hash(compatibilityBytes)
-    || request.rebuildParityEvidenceSha256 !== hash(rebuildParityEvidenceBytes)
-    || !text(request.requestedBy) || request.contractVersion !== "datapack-promotion-v1"
-    || request.issueRef !== "AquilaXk/easysubway#2705"
-    || !isDeepStrictEqual(component, selectedCandidate)) {
+    || !isDeepStrictEqual(request.candidateExecutionEvidence, {
+      releaseEvidenceBundleSha256: hash(releaseEvidenceBundleBytes),
+      releaseDecisionSha256: hash(releaseDecisionBytes),
+    })
+    || !text(request.requestedBy) || request.contractVersion !== "datapack-promotion-v2"
+    || request.issueRef !== "AquilaXk/easysubway#2705") {
     throw new Error("request is invalid");
   }
 
@@ -223,6 +300,11 @@ function text(value) {
   return typeof value === "string" && value.trim() !== "";
 }
 
+function utcInstant(value) {
+  return typeof value === "string" && !Number.isNaN(Date.parse(value))
+    && new Date(value).toISOString() === value;
+}
+
 function sha64(value) {
   return typeof value === "string" && /^[a-f0-9]{64}$/.test(value);
 }
@@ -234,7 +316,7 @@ function sha40(value) {
 async function main() {
   const args = parseArgs(process.argv.slice(2), [
     "request", "component", "inventory", "compatibility-evidence", "approval-evidence",
-    "rebuild-parity-evidence", "workflow-run-id",
+    "candidate-execution-evidence-root", "workflow-run-id",
   ]);
   const [request] = await regularJson(args.get("request"), "--request");
   const [component] = await regularJson(args.get("component"), "--component");
@@ -243,9 +325,8 @@ async function main() {
     args.get("compatibility-evidence"),
     "--compatibility-evidence",
   );
-  const [rebuildParityEvidence, rebuildParityEvidenceBytes] = await regularJson(
-    args.get("rebuild-parity-evidence"),
-    "--rebuild-parity-evidence",
+  const executionEvidence = await readCandidateExecutionEvidence(
+    args.get("candidate-execution-evidence-root"),
   );
   const approvalBytes = await regularBytes(args.get("approval-evidence"), "--approval-evidence");
   validateRequest({
@@ -255,8 +336,7 @@ async function main() {
     inventoryBytes,
     compatibility,
     compatibilityBytes,
-    rebuildParityEvidence,
-    rebuildParityEvidenceBytes,
+    ...executionEvidence,
     approvalBytes,
     workflowRunId: args.get("workflow-run-id"),
   });
