@@ -47,7 +47,10 @@ import {
   runNationwideCandidateCoverageGate,
   validateNationwideCandidateCoverageSpec,
 } from "./run-nationwide-candidate-coverage-gate.mjs";
-import { assertNationwideCoveragePublicationReady } from "./require-nationwide-coverage-publication-ready.mjs";
+import {
+  assertNationwideCoveragePublicationReady,
+  verifyNationwideCoveragePublicationReady,
+} from "./require-nationwide-coverage-publication-ready.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -1663,6 +1666,67 @@ test("production publication은 full current nationwide coverage evidence만 허
     }),
     /requires complete nationwide coverage evidence/,
   );
+});
+
+test("production publication은 evidence에 결속된 deployed build spec의 만료 freshness를 다시 거부한다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-publication-freshness-"));
+  try {
+    const inputs = {};
+    for (const [name, relativePath] of Object.entries(INPUT_PATHS)) {
+      const bytes = await readFile(path.join(root, relativePath));
+      const destination = path.join(workspace, relativePath);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await writeFile(destination, bytes);
+      inputs[name] = {
+        path: relativePath,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+      };
+    }
+    const assetBytes = await readFile(path.join(root, DEPLOYED_ASSET_PATH));
+    const assetPath = path.join(workspace, DEPLOYED_ASSET_PATH);
+    await mkdir(path.dirname(assetPath), { recursive: true });
+    await writeFile(assetPath, assetBytes);
+    const buildSpec = {
+      artifactKind: "datapack-candidate-build-spec",
+      sourceSnapshotIds: ["expired-snapshot"],
+      sourceSnapshots: [{
+        sourceId: "expired-source",
+        snapshotId: "expired-snapshot",
+        rawSha256: "1".repeat(64),
+        freshnessExpiresAt: "2026-08-30T00:00:00.000Z",
+      }],
+    };
+    const buildSpecBytes = Buffer.from(`${JSON.stringify(buildSpec)}\n`);
+    const buildSpecPath = path.join(workspace, DEPLOYED_BUILD_SPEC_PATH);
+    await mkdir(path.dirname(buildSpecPath), { recursive: true });
+    await writeFile(buildSpecPath, buildSpecBytes);
+
+    const evidence = {
+      artifactKind: "nationwide-candidate-coverage-gate-evidence",
+      regeneration: { evidencePath: EVIDENCE_PATH },
+      inputs,
+      variants: { baseline: {}, lineScoped: {} },
+      transitions: [],
+      deployedArtifact: {
+        packId: "capital",
+        verifierPath: "tools/datapack/verify-production-pack-artifact-identity.mjs",
+        inputs: {
+          buildSpec: {
+            path: DEPLOYED_BUILD_SPEC_PATH,
+            sha256: createHash("sha256").update(buildSpecBytes).digest("hex"),
+          },
+        },
+      },
+    };
+    await assert.rejects(
+      verifyNationwideCoveragePublicationReady(evidence, workspace, {
+        currentTime: new Date("2026-08-31T00:00:00.000Z"),
+      }),
+      /production publication nationwide coverage deployed source snapshot expired: expired-snapshot/,
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
 });
 
 test("declared transition seam은 실제 SUPPORTED non-transition을 거부한다", async (context) => {

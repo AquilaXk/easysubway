@@ -4,10 +4,11 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-import { deriveFreshness } from "./freshness-policy.mjs";
+import { addCadence, deriveFreshness } from "./freshness-policy.mjs";
 import { approvedLegacyGovernanceBinding } from "./legacy-source-governance.mjs";
 import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 import {
+  deriveRawRetentionExpiresAt,
   evaluateSourceGovernance,
   validateSourceGovernancePolicy,
 } from "./source-governance-policy.mjs";
@@ -60,7 +61,15 @@ export function validateSourceSnapshotFreshness({
       throw new Error("SOURCE_LINEAGE_BROKEN: selected snapshot is not source head");
     }
   }
-  if (inventory != null) validateRequiredProductionSources(selectedSnapshots, inventory, productionScope);
+  const externalGovernanceSnapshots = inventory == null
+    ? []
+    : validateRequiredProductionSources({
+      snapshots: selectedSnapshots,
+      inventory,
+      productionScope,
+      policy,
+      evaluationAt,
+    });
   const includeGovernance = governancePolicy != null;
   const evidenceProvenance = canonicalBuildProvenance(selectedSnapshots, "snapshots");
   const buildProvenance = canonicalBuildProvenance(
@@ -133,7 +142,18 @@ export function validateSourceSnapshotFreshness({
       throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: governance policy hash");
     }
     const sources = new Map(inventory.sources.map((source) => [source.id, source]));
-    governanceResults = effectiveSnapshots.map((snapshot) => {
+    const governanceSnapshots = [
+      ...effectiveSnapshots,
+      ...externalGovernanceSnapshots.map((snapshot) => ({
+        ...snapshot,
+        rawRetentionExpiresAt: deriveRawRetentionExpiresAt({
+          policy: governancePolicy,
+          sourceId: snapshot.sourceId,
+          retrievedAt: snapshot.retrievedAt,
+        }),
+      })),
+    ];
+    governanceResults = governanceSnapshots.map((snapshot) => {
       const rawState = purgeEvidence.get(`${snapshot.sourceId}\0${snapshot.snapshotId}`) ?? null;
       if (rawState?.protectedBy != null && rawState.rawSha256 !== snapshot.rawSha256) {
         throw new Error("SOURCE_FRESHNESS_DERIVATION_MISMATCH: purge report protection raw hash");
@@ -423,7 +443,7 @@ function selectSnapshots(snapshots, selectedIds) {
   return snapshots.filter((snapshot) => selectedIdsSet.has(snapshot.snapshotId));
 }
 
-function validateRequiredProductionSources(snapshots, inventory, productionScope) {
+function validateRequiredProductionSources({ snapshots, inventory, productionScope, policy, evaluationAt }) {
   const counts = new Map();
   for (const snapshot of snapshots) {
     counts.set(snapshot.sourceId, (counts.get(snapshot.sourceId) ?? 0) + 1);
@@ -432,26 +452,37 @@ function validateRequiredProductionSources(snapshots, inventory, productionScope
     (productionScope?.productionSourceSet?.externalSourceRegistrations ?? [])
       .map((registration) => [registration?.sourceId, registration]),
   );
+  const externalGovernanceSnapshots = [];
   for (const source of inventory?.sources ?? []) {
     if (source.requiredForProductionPack !== true) continue;
     const snapshotCount = counts.get(source.id) ?? 0;
     const registration = externalRegistrations.get(source.id);
     if (registration != null) {
-      if (snapshotCount !== 0 || !matchesRequiredExternalSource(source, registration)) {
+      const externalSnapshot = matchingRequiredExternalSourceSnapshot({
+        source,
+        registration,
+        policy,
+        evaluationAt,
+      });
+      if (snapshotCount !== 0 || externalSnapshot == null) {
         throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: required external source ${source.id}`);
       }
+      externalGovernanceSnapshots.push(externalSnapshot);
       continue;
     }
     if (snapshotCount !== 1) {
       throw new Error(`SOURCE_FRESHNESS_POLICY_MISSING: required production source ${source.id}`);
     }
   }
+  return externalGovernanceSnapshots;
 }
 
-function matchesRequiredExternalSource(source, registration) {
+function matchingRequiredExternalSourceSnapshot({ source, registration, policy, evaluationAt }) {
   const admission = source?.admissionEvidence;
   const receipt = source?.registrationEvidence;
-  return registration?.sourceId === source?.id
+  const sourceClasses = policy?.sourceClasses?.filter((entry) => entry.sourceIds?.includes(source?.id)) ?? [];
+  if (sourceClasses.length !== 1) return null;
+  if (!(registration?.sourceId === source?.id
     && Number.isInteger(registration.registrationIssue)
     && registration.registrationIssue === admission?.issue
     && registration.snapshotId === admission?.snapshotId
@@ -465,7 +496,47 @@ function matchesRequiredExternalSource(source, registration) {
     && receipt.rawObjectUri.startsWith("oci://")
     && receipt.snapshotRawSha256 === admission?.rawSha256
     && receipt.contentSha256 === admission?.sampleEvidenceHash
-    && receipt.adminReviewRecordHash === admission?.adminReviewRecordHash;
+    && receipt.adminReviewRecordHash === admission?.adminReviewRecordHash)) {
+    return null;
+  }
+  try {
+    const capturedAt = requiredUtcInstant(receipt?.capturedAt, "registrationEvidence.capturedAt");
+    const registeredAt = requiredUtcInstant(receipt?.registeredAt, "registrationEvidence.registeredAt");
+    const evaluatedAt = requiredUtcInstant(evaluationAt, "evaluationAt");
+    if (capturedAt > evaluatedAt || registeredAt > evaluatedAt || registeredAt < capturedAt) return null;
+    const sourceClass = sourceClasses[0];
+    const providerValidUntil = sourceClass.providerValidityEndField
+      ? receipt[sourceClass.providerValidityEndField]
+      : undefined;
+    if (sourceClass.providerValidityEndField && providerValidUntil == null) return null;
+    const freshnessExpiresAt = new Date(addCadence(
+      capturedAt,
+      sourceClass.reverificationCadence ?? sourceClass.maximumReverificationCadence,
+    )).toISOString();
+    const snapshot = {
+      sourceId: source.id,
+      snapshotId: receipt.snapshotId,
+      rawSha256: receipt.snapshotRawSha256,
+      retrievedAt: new Date(capturedAt).toISOString(),
+      freshnessExpiresAt,
+      redistributionAllowed: source.license?.redistributionAllowed === true,
+      [sourceClass.basisField]: new Date(capturedAt).toISOString(),
+      ...(sourceClass.providerValidityEndField
+        ? { [sourceClass.providerValidityEndField]: providerValidUntil }
+        : {}),
+    };
+    const freshness = deriveFreshness({
+      policy,
+      sourceClassId: sourceClass.id,
+      basisAt: snapshot[sourceClass.basisField],
+      providerValidUntil,
+      storedExpiresAt: freshnessExpiresAt,
+      evaluationAt,
+    });
+    return freshness.status === "FRESH" ? snapshot : null;
+  } catch {
+    return null;
+  }
 }
 
 function bindGovernanceProvenance(snapshots, buildSnapshots) {
