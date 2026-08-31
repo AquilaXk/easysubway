@@ -59,6 +59,8 @@ const RESOLUTION_PLAN_PATH =
 const RESOLUTIONS_PATH =
   "tools/datapack/release/nationwide-public-api-coverage-resolutions-20260725.json";
 const REVIEWED_PACK_PATH = "tools/datapack/release/capital-production-reviewed-pack.json";
+const INCHEON_HISTORICAL_ADMISSION_PATH =
+  "tools/datapack/release/historical-incheon-transit-accessibility-admission-20260724.json";
 const PILOT_REQUIREMENT_KEY = "capital:seoul-metro:seoul-4:route_map_positions";
 const PILOT_SOURCE_ID = "seoul-metro-route-map-positions";
 const INHERITED_PILOT_SOURCE_ID = "seoulmetro-cyberstation-route-map";
@@ -467,9 +469,7 @@ const INCHEON_INCLUSION_BINDINGS = [
     slug: "accessibility",
     offset: 2,
     sourceId: "incheon-transit-accessibility",
-    evidenceKey: "accessibilityAdmissionEvidence",
-    windowSourceId: "incheon-transit-accessibility",
-    windowEvidenceKey: "accessibilityAdmissionEvidence",
+    historicalAdmission: true,
     outsideWindowPattern: /incheon-transit-accessibility evidence freshness is invalid/,
   },
 ];
@@ -1536,6 +1536,26 @@ test("declared transition seam은 실제 SUPPORTED non-transition을 거부한�
   );
 });
 
+test("인천 historical admission identity는 spec과 tracked bytes에 결속된다", async () => {
+  const spec = await readJson(SPEC_PATH);
+  const inventory = await readJson(INVENTORY_PATH);
+  const inherited = await readJson(REVIEWED_PACK_PATH);
+  const missingDigest = structuredClone(spec);
+  delete missingDigest.packDataInclusions[INCHEON_INDEX + 2].historicalAdmissionSha256;
+  assert.throws(
+    () => validateNationwideCandidateCoverageSpec(missingDigest, inventory),
+    /historicalAdmissionSha256 must be a lowercase SHA-256/,
+  );
+
+  const mismatchedDigest = structuredClone(spec);
+  mismatchedDigest.packDataInclusions = [mismatchedDigest.packDataInclusions[INCHEON_INDEX + 2]];
+  mismatchedDigest.packDataInclusions[0].historicalAdmissionSha256 = "0".repeat(64);
+  await assert.rejects(
+    () => applyPackDataInclusions(mismatchedDigest, inherited, inventory),
+    /historical admission fixture SHA-256 does not match the candidate spec/,
+  );
+});
+
 test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async (context) => {
   const spec = await readJson(SPEC_PATH);
   const inventory = await readJson(INVENTORY_PATH);
@@ -1545,6 +1565,7 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   const inheritedWithCandidateTables = structuredClone(inherited);
   inheritedWithCandidateTables.packs[0].routeMapLineTracks = [];
   const evidence = await readJson(EVIDENCE_PATH);
+  const historicalIncheonAdmission = await readJson(INCHEON_HISTORICAL_ADMISSION_PATH);
 
   function rejectsValidationWith(mutate, expected) {
     const mutated = structuredClone(spec);
@@ -2075,7 +2096,9 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
           sourcePath: admissionEvidenceOf(inventory, sourceId, evidenceKey).snapshotPath,
           copyName: `${regionKo}-${slug}-copy.json`,
           serialize: (bytes) => bytes,
-          expected: new RegExp(`snapshotPath must match the ${sourceId} admission evidence snapshotPath`),
+          expected: binding.historicalAdmission
+            ? /snapshotPath must match the historical Incheon admission fixture snapshotPath/
+            : new RegExp(`snapshotPath must match the ${sourceId} admission evidence snapshotPath`),
         });
       });
       await context.test(`${regionKo} ${labelKo} 편입 topologySnapshotPath가 정본 밖 사본이면 거부된다`, async () => {
@@ -2226,12 +2249,17 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   // 창 길이 24시간까지 함께 검사하므로 하한 미만·상한 이상을 모두 때린다.
   for (const binding of INCHEON_INCLUSION_BINDINGS) {
     const { labelKo, slug, offset, sourceId, evidenceKey, lineSourceIds } = binding;
+    const bindingEvidence = binding.historicalAdmission
+      ? historicalIncheonAdmission.source.accessibilityAdmissionEvidence
+      : sourceId === undefined
+        ? null
+        : admissionEvidenceOf(inventory, sourceId, evidenceKey);
     if (sourceId !== undefined) {
       await context.test(`인천 ${labelKo} 편입 snapshotPath가 정본 밖 사본이면 거부된다`, async () => {
         await rejectsSnapshotCopy({
           index: INCHEON_INDEX + offset,
           solo: INCHEON_INDEX + offset,
-          sourcePath: admissionEvidenceOf(inventory, sourceId, evidenceKey).snapshotPath,
+          sourcePath: bindingEvidence.snapshotPath,
           copyName: `incheon-${slug}-copy.json`,
           // 역사정보 정본에는 바이트 축(snapshotSha256)이 있고 편의시설 정본에는 없다 — 어느 쪽이든
           // 바이트 동일 사본은 그 축을 그대로 지나므로 경로 결속만이 정본 하나를 못박는다.
@@ -2277,11 +2305,9 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
       });
     }
 
-    const { capturedAt, freshUntil } = admissionEvidenceOf(
-      inventory,
-      binding.windowSourceId,
-      binding.windowEvidenceKey,
-    );
+    const { capturedAt, freshUntil } = binding.historicalAdmission
+      ? bindingEvidence
+      : admissionEvidenceOf(inventory, binding.windowSourceId, binding.windowEvidenceKey);
     await context.test(`인천 ${labelKo} 편입 소스의 창은 24시간 반개구간이다`, () => {
       assert.equal(Date.parse(freshUntil) - Date.parse(capturedAt), 24 * 60 * 60 * 1_000);
     });

@@ -246,7 +246,10 @@ const PACK_DATA_MATERIALIZERS = new Map([
   }],
   ["tools/datapack/materialize-incheon-accessibility.mjs", {
     materialize: materializeIncheonAccessibilityInclusion,
-    inputs: { paths: ["snapshotPath", "topologySnapshotPath"], linePaths: [] },
+    inputs: {
+      paths: ["snapshotPath", "topologySnapshotPath", "historicalAdmissionPath"],
+      linePaths: [],
+    },
   }],
 ]);
 // 부산 편입이 admission 정본을 찾을 때 쓰는 소스 id. 네 편입 모두 상수로 두어 문자열이 어댑터마다
@@ -1116,12 +1119,32 @@ async function materializeIncheonAccessibilityInclusion(fixture, inclusion, { re
   // 노선 번호 정본은 이 지역의 노선을 세우는 역사정보 materializer가 갖는다 — 두 편입의 admission
   // coverageScope.lineIds가 같은 세 노선이라(위 대조가 그것을 강제한다) 같은 표를 대조 상대로 쓴다.
   assertDeclaredLineNumbers(inclusion, INCHEON_STATION_LINES);
-  assertAdmissionSnapshotPath(
-    inventory,
-    INCHEON_ACCESSIBILITY_SOURCE_ID,
-    "accessibilityAdmissionEvidence",
-    inclusion.snapshotPath,
+  const currentSource = inventory?.sources?.find(({ id }) => id === INCHEON_ACCESSIBILITY_SOURCE_ID);
+  if (currentSource?.requiredForProductionPack !== true
+    || currentSource.admissionEvidence?.decision !== "APPROVED"
+    || currentSource.registrationEvidence?.sourceId !== INCHEON_ACCESSIBILITY_SOURCE_ID
+    || currentSource.accessibilityAdmissionEvidence !== undefined) {
+    throw new Error("current Incheon accessibility inventory must use receipt-bound registration evidence only");
+  }
+  const historicalAdmissionBytes = await readTracked(
+    inclusion.historicalAdmissionPath,
+    "historicalAdmissionPath",
   );
+  if (sha256Hex(historicalAdmissionBytes) !== inclusion.historicalAdmissionSha256) {
+    throw new Error("Incheon historical admission fixture SHA-256 does not match the candidate spec");
+  }
+  const historicalAdmission = parseJsonBytes(
+    historicalAdmissionBytes,
+    inclusion.historicalAdmissionPath,
+  );
+  const historicalSnapshotPath = historicalAdmission?.source
+    ?.accessibilityAdmissionEvidence?.snapshotPath;
+  if (historicalSnapshotPath !== inclusion.snapshotPath) {
+    throw new Error(
+      "pack data inclusion snapshotPath must match the historical Incheon admission fixture snapshotPath: "
+        + `expected ${historicalSnapshotPath}, got ${inclusion.snapshotPath}`,
+    );
+  }
   const topologySnapshot = await incheonTopologySnapshot(
     inclusion,
     readTracked,
@@ -1135,7 +1158,11 @@ async function materializeIncheonAccessibilityInclusion(fixture, inclusion, { re
       inclusion.snapshotPath,
     ),
     topologySnapshot,
-    inventory,
+    historicalAdmission,
+    inventory: {
+      ...inventory,
+      sources: inventory.sources.filter(({ id }) => id !== INCHEON_ACCESSIBILITY_SOURCE_ID),
+    },
     now: new Date(inclusion.materializedAt),
   });
 }
@@ -2362,9 +2389,24 @@ function validateInclusionInputs(inclusion, inputs, label) {
   for (const key of paths) {
     requiredString(inclusion[key], `${label}.${key}`);
   }
+  const historicalIdentityKeys = inclusion.materializer
+    === "tools/datapack/materialize-incheon-accessibility.mjs"
+    ? ["historicalAdmissionSha256"]
+    : [];
+  for (const key of historicalIdentityKeys) {
+    if (!/^[a-f0-9]{64}$/.test(inclusion[key] ?? "")) {
+      throw new Error(`${label}.${key} must be a lowercase SHA-256`);
+    }
+  }
   assertKnownKeys(
     inclusion,
-    [...INCLUSION_BASE_KEYS, ...INCLUSION_OPTIONAL_KEYS, ...INCLUSION_NARRATIVE_KEYS, ...paths],
+    [
+      ...INCLUSION_BASE_KEYS,
+      ...INCLUSION_OPTIONAL_KEYS,
+      ...INCLUSION_NARRATIVE_KEYS,
+      ...paths,
+      ...historicalIdentityKeys,
+    ],
     label,
   );
   if (!Array.isArray(inclusion.lines) || inclusion.lines.length === 0) {
