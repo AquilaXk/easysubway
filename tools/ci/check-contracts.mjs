@@ -2027,6 +2027,30 @@ export function validateSourceInventory(inventory, valuePath, errors) {
     const requiresMembership = sourceDomains.has("station_line_membership");
     const requiresRouteMap = sourceDomains.has("route_map_positions");
     const requiresAccessibility = sourceDomains.has("accessibility_facilities");
+    const legacyAccessibilityEvidence = source.accessibilityAdmissionEvidence != null;
+    const registeredAccessibilityEvidence = source.registrationEvidence != null;
+    if (registeredAccessibilityEvidence) {
+      const admission = source.admissionEvidence;
+      const registration = source.registrationEvidence;
+      if (source.id !== "incheon-transit-accessibility"
+        || admission?.artifactKind !== "source-admission-pipeline-evidence-summary"
+        || admission.issue !== 622
+        || admission.candidateId !== source.id
+        || admission.sourceId !== source.id
+        || admission.snapshotId !== registration.snapshotId
+        || admission.decision !== "APPROVED"
+        || admission.approvedBy !== "AquilaXk"
+        || admission.sampleEvidenceHash !== registration.contentSha256
+        || admission.rawSha256 !== registration.snapshotRawSha256
+        || admission.adminReviewRecordHash !== registration.adminReviewRecordHash
+        || registration.sourceId !== source.id
+        || !registration.rawObjectUri?.startsWith("oci://")) {
+        errors.push(`${path}.registrationEvidence: receipt-bound accessibility identity가 admission과 일치해야 한다`);
+      }
+      if (legacyAccessibilityEvidence) {
+        errors.push(`${path}.accessibilityAdmissionEvidence: receipt-bound registration과 legacy evidence는 공존할 수 없다`);
+      }
+    }
     if (source.productionUseAllowed === true && requiresTopology && source.topologyAdmissionEvidence == null) {
       errors.push(`${path}.topologyAdmissionEvidence: route_graph_topology production 승인은 topologyAdmissionEvidence가 필요하다`);
     }
@@ -2040,14 +2064,14 @@ export function validateSourceInventory(inventory, valuePath, errors) {
       errors.push(`${path}.routeMapAdmissionEvidence: route_map_positions production 승인은 routeMapAdmissionEvidence가 필요하다`);
     }
     if (source.productionUseAllowed === true && requiresAccessibility
-      && source.accessibilityAdmissionEvidence == null) {
-      errors.push(`${path}.accessibilityAdmissionEvidence: accessibility_facilities production 승인은 accessibilityAdmissionEvidence가 필요하다`);
+      && !legacyAccessibilityEvidence && !registeredAccessibilityEvidence) {
+      errors.push(`${path}.accessibilityAdmissionEvidence: accessibility_facilities production 승인은 admission evidence가 필요하다`);
     }
     if (source.productionUseAllowed === true && !requiresTopology && !requiresSchedule && !requiresMembership
       && !requiresRouteMap && !requiresAccessibility
       && source.topologyAdmissionEvidence == null && source.scheduleAdmissionEvidence == null
       && source.membershipAdmissionEvidence == null && source.routeMapAdmissionEvidence == null
-      && source.accessibilityAdmissionEvidence == null) {
+      && !legacyAccessibilityEvidence && !registeredAccessibilityEvidence) {
       errors.push(`${path}.productionUseAllowed: true는 production admission evidence가 필요하다`);
     }
     if (source.topologyAdmissionEvidence != null && !requiresTopology) {
@@ -2065,6 +2089,9 @@ export function validateSourceInventory(inventory, valuePath, errors) {
     if (source.accessibilityAdmissionEvidence != null && !requiresAccessibility) {
       errors.push(`${path}.accessibilityAdmissionEvidence: accessibility_facilities source domain이 필요하다`);
     }
+    if (registeredAccessibilityEvidence && !requiresAccessibility) {
+      errors.push(`${path}.registrationEvidence: accessibility_facilities source domain이 필요하다`);
+    }
     if (source.topologyAdmissionEvidence != null && source.productionUseAllowed !== true) {
       errors.push(`${path}.topologyAdmissionEvidence: productionUseAllowed true가 필요하다`);
     }
@@ -2079,6 +2106,9 @@ export function validateSourceInventory(inventory, valuePath, errors) {
     }
     if (source.accessibilityAdmissionEvidence != null && source.productionUseAllowed !== true) {
       errors.push(`${path}.accessibilityAdmissionEvidence: productionUseAllowed true가 필요하다`);
+    }
+    if (registeredAccessibilityEvidence && source.productionUseAllowed !== true) {
+      errors.push(`${path}.registrationEvidence: productionUseAllowed true가 필요하다`);
     }
   }
 }

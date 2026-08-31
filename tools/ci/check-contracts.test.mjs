@@ -3250,6 +3250,55 @@ test("accessibility admission evidence는 기존형과 source-governance형 필�
   )));
 });
 
+test("receipt-bound accessibility registration schema는 exact OCI evidence를 요구한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const source = inventory.sources.find(({ id }) => id === "incheon-transit-accessibility");
+  assert.ok(source?.registrationEvidence);
+  assert.deepEqual(validateSchema(schema, inventory).errors, []);
+
+  delete source.registrationEvidence.rawObjectSha256;
+  assert.ok(validateSchema(schema, inventory).errors.some((error) => (
+    error.includes("registrationEvidence.rawObjectSha256")
+  )));
+});
+
+test("receipt-bound accessibility admission은 Data identity를 결속하고 legacy 공존을 거부한다", () => {
+  const current = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const currentErrors = [];
+  validateSourceInventory(current, "source-inventory.json", currentErrors);
+  assert.deepEqual(currentErrors, []);
+
+  const mismatched = structuredClone(current);
+  const mismatchedSource = mismatched.sources.find(({ id }) => id === "incheon-transit-accessibility");
+  mismatchedSource.admissionEvidence.sampleEvidenceHash = "0".repeat(64);
+  const mismatchedErrors = [];
+  validateSourceInventory(mismatched, "source-inventory.json", mismatchedErrors);
+  assert.ok(mismatchedErrors.some((error) => error.includes(
+    "registrationEvidence: receipt-bound accessibility identity가 admission과 일치해야 한다",
+  )));
+
+  const missing = structuredClone(current);
+  delete missing.sources.find(({ id }) => id === "incheon-transit-accessibility").registrationEvidence;
+  const missingErrors = [];
+  validateSourceInventory(missing, "source-inventory.json", missingErrors);
+  assert.ok(missingErrors.some((error) => error.includes(
+    "accessibility_facilities production 승인은 admission evidence가 필요하다",
+  )));
+
+  const dual = structuredClone(current);
+  const dualSource = dual.sources.find(({ id }) => id === "incheon-transit-accessibility");
+  dualSource.accessibilityAdmissionEvidence = structuredClone(
+    current.sources.find((source) => source.accessibilityAdmissionEvidence != null)
+      .accessibilityAdmissionEvidence,
+  );
+  const dualErrors = [];
+  validateSourceInventory(dual, "source-inventory.json", dualErrors);
+  assert.ok(dualErrors.some((error) => error.includes(
+    "receipt-bound registration과 legacy evidence는 공존할 수 없다",
+  )));
+});
+
 test("source quota defaultDailyLimit는 허용된 scalar만 받는다", () => {
   const schema = loadJson("contracts/datapack/source-inventory.schema.json");
   const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
@@ -3395,7 +3444,7 @@ test("accessibility production admission evidence는 domain과 production 승인
   const missingErrors = [];
   validateSourceInventory(inventory, "source-inventory.json", missingErrors);
   assert.ok(missingErrors.some((error) => error.includes(
-    "accessibility_facilities production 승인은 accessibilityAdmissionEvidence가 필요하다",
+    "accessibility_facilities production 승인은 admission evidence가 필요하다",
   )));
 
   const freshInventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
