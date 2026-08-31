@@ -13,6 +13,7 @@ import {
   deleteExpiredItems,
   recordPurgeFailure,
 } from "./purge-expired-source-raw.mjs";
+import { approvedLegacyGovernanceBinding } from "./legacy-source-governance.mjs";
 import { verifyPurgeAttestation } from "./source-raw-purge-attestation.mjs";
 
 const execFileAsync = promisify(execFile);
@@ -550,18 +551,21 @@ test("legacy snapshot은 저장된 retention expiry가 ledger와 같은 경우�
   });
 });
 
-test("current immutable-policy snapshot은 현행 retention expiry를 적용한다", async () => {
-  const snapshot = JSON.parse(await readFile(path.join(root, "tools/datapack/release/source-snapshots.json"), "utf8"))
-    .find(({ sourceId }) => sourceId === "seoul-metro-route-map-positions");
-  assert.ok(snapshot, "current route-map snapshot is required");
-  const policyText = await readFile(path.join(root, "tools/datapack/source-governance-policy.json"), "utf8");
-  const policy = JSON.parse(policyText);
-  const rawRetentionExpiresAt = "2026-10-22T02:00:00.000Z";
+test("exact-hash 승인 legacy snapshot은 결속된 policy로 파생한 retention expiry를 적용한다", async () => {
+  const [snapshot] = JSON.parse(await readFile(path.join(root, "tools/datapack/release/source-snapshots.json"), "utf8"));
+  const legacyBinding = approvedLegacyGovernanceBinding(snapshot);
+  const legacyPolicyText = await readFile(
+    path.join(root, "tools/datapack/test-fixtures/source-governance-policy-2026-07-15.json"),
+    "utf8",
+  );
+  assert.equal(createHash("sha256").update(legacyPolicyText).digest("hex"), legacyBinding.governancePolicySha256);
+  const legacyPolicy = JSON.parse(legacyPolicyText);
+  const rawRetentionExpiresAt = "2026-10-10T00:00:00.000Z";
   const objectKey = new URL(snapshot.rawObjectUri).pathname.slice(1);
   const ledger = {
     schemaVersion: 1,
     artifactKind: "source-raw-retention-ledger",
-    evaluatedAt: "2026-10-23T00:00:00.000Z",
+    evaluatedAt: "2026-10-11T00:00:00.000Z",
     entries: [{
       sourceId: snapshot.sourceId,
       snapshotId: snapshot.snapshotId,
@@ -571,39 +575,39 @@ test("current immutable-policy snapshot은 현행 retention expiry를 적용한�
       objectKey,
       protectedBy: [],
       legalHold: null,
-      governancePolicyVersion: policy.policyVersion,
-      governancePolicySha256: sha256(policyText),
+      governancePolicyVersion: legacyBinding.governancePolicyVersion,
+      governancePolicySha256: legacyBinding.governancePolicySha256,
     }],
   };
 
   const plan = buildPurgePlan({
     ledger,
     snapshots: [snapshot],
-    policyFiles: [{ policy, sha256: sha256(policyText) }],
+    policyFiles: [{ policy: legacyPolicy, sha256: legacyBinding.governancePolicySha256 }],
     evaluationAt: ledger.evaluatedAt,
     evaluatedMillis: Date.parse(ledger.evaluatedAt),
     baseUrl: new URL("https://objects.example.invalid/authorized/"),
-    sourceAuthority: "oci://easysubway-datapacks",
+    sourceAuthority: "s3://easysubway-datapack-sources",
   });
 
-  assert.equal(snapshot.rawRetentionExpiresAt, rawRetentionExpiresAt);
+  assert.equal(snapshot.rawRetentionExpiresAt, "2099-10-01T00:00:00Z");
   assert.deepEqual(plan.map(({ snapshotId, disposition }) => ({ snapshotId, disposition })), [{
     snapshotId: snapshot.snapshotId,
     disposition: "DELETE",
   }]);
 
-  const tamperedSnapshot = { ...snapshot, rawSha256: "0".repeat(64) };
+  const tamperedSnapshot = { ...snapshot, provider: `${snapshot.provider}-tampered` };
   assert.throws(() => buildPurgePlan({
     ledger,
     snapshots: [tamperedSnapshot],
-    policyFiles: [{ policy, sha256: sha256(policyText) }],
+    policyFiles: [{ policy: legacyPolicy, sha256: legacyBinding.governancePolicySha256 }],
     evaluationAt: ledger.evaluatedAt,
     evaluatedMillis: Date.parse(ledger.evaluatedAt),
     baseUrl: new URL("https://objects.example.invalid/authorized/"),
-    sourceAuthority: "oci://easysubway-datapacks",
+    sourceAuthority: "s3://easysubway-datapack-sources",
   }), /snapshot evidence mismatch/);
 
-  const unapprovedPolicy = { ...policy, policyVersion: "2026-07-16" };
+  const unapprovedPolicy = { ...legacyPolicy, policyVersion: "2026-07-16" };
   const unapprovedPolicyText = `${JSON.stringify(unapprovedPolicy, null, 2)}\n`;
   const unapprovedLedger = structuredClone(ledger);
   unapprovedLedger.entries[0].governancePolicyVersion = unapprovedPolicy.policyVersion;
@@ -615,7 +619,7 @@ test("current immutable-policy snapshot은 현행 retention expiry를 적용한�
     evaluationAt: ledger.evaluatedAt,
     evaluatedMillis: Date.parse(ledger.evaluatedAt),
     baseUrl: new URL("https://objects.example.invalid/authorized/"),
-    sourceAuthority: "oci://easysubway-datapacks",
+    sourceAuthority: "s3://easysubway-datapack-sources",
   }), /snapshot evidence mismatch/);
 });
 
