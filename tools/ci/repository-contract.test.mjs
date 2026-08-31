@@ -10653,6 +10653,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   );
 
   assert.deepEqual(scope.productionSourceSet.requiredSourceIds.sort(), [
+    "incheon-transit-accessibility",
     "kric-station-convenience-standard",
     "kric-subway-timetable",
     "molit-urban-rail-full-route",
@@ -10682,6 +10683,14 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   const excludedSourceIds = new Set(scope.productionSourceSet.excludedFromV1SupportClaims);
   assert.deepEqual(scope.productionSourceSet.externalSourceRegistrations, [
     {
+      sourceId: "incheon-transit-accessibility",
+      registrationRepository: "AquilaXk/easysubway-data",
+      registrationIssue: 622,
+      snapshotId: "incheon-transit-accessibility-20260828T043356000Z",
+      decision: "APPROVED",
+      productionUseAllowed: true,
+    },
+    {
       sourceId: "seoul-metro-transfer-distance-duration",
       registrationRepository: "AquilaXk/easysubway-data",
       registrationIssue: 350,
@@ -10702,6 +10711,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
     scope.productionSourceSet.externalSourceRegistrations.map(({ sourceId }) => sourceId),
   );
   const externalSourceLocalProductionEligibility = new Map([
+    ["incheon-transit-accessibility", true],
     ["seoul-metro-transfer-distance-duration", false],
     ["seoul-metro-route-map-positions", false],
   ]);

@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "historical-source-admission",
+  "historicalOnly": true,
+  "source": {
+    "id": "incheon-transit-accessibility",
+    "displayName": "인천교통공사 역사별 엘리베이터·에스컬레이터·휠체어리프트 현황",
+    "owner": "인천교통공사",
+    "provider": "인천교통공사",
+    "providerDepartment": "인천교통공사",
+    "sourceSystem": "공공데이터포털 파일데이터",
+    "datasetUrl": "https://www.data.go.kr/data/15083478/fileData.do",
+    "datasetKind": "official-file-data",
+    "coverage": "인천교통공사 1·2호선·7호선(인천·부천) 71 membership 엘리베이터·에스컬레이터·휠체어리프트 설치 대수(환기구·대피 행 skip, CSV 미게재 시설은 count=0)",
+    "coverageScope": {
+      "regionIds": [
+        "capital"
+      ],
+      "operatorIds": [
+        "incheon-transit"
+      ],
+      "lineIds": [
+        "line-42b5805f3b5a",
+        "line-98718184f016",
+        "line-15b3b8a93259"
+      ],
+      "sourceDomains": [
+        "accessibility_facilities"
+      ]
+    },
+    "requiredForProductionPack": false,
+    "productionUseAllowed": true,
+    "updateFrequency": "daily admission refresh",
+    "observedDataUpdatedAt": "2026-07-24",
+    "retrievedAt": "2026-07-24",
+    "license": {
+      "type": "PUBLIC_DATA_FREE_USE",
+      "name": "공공데이터포털 이용허락범위 제한 없음",
+      "attribution": "인천교통공사, 공공데이터포털 이용허락범위 제한 없음",
+      "commercialUseAllowed": true,
+      "derivativeWorkAllowed": true,
+      "redistributionAllowed": true,
+      "evidenceUrl": "https://www.data.go.kr/data/15083478/fileData.do"
+    },
+    "fieldsProvided": [
+      "elevator",
+      "escalator",
+      "wheelchair_lift",
+      "status",
+      "verified_at"
+    ],
+    "capabilities": {
+      "schedule": {
+        "status": "UNSUPPORTED",
+        "productionUseAllowed": false,
+        "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+        "updateFrequency": "daily admission refresh",
+        "unsupportedNotes": "source does not provide scheduled timetable data"
+      },
+      "realtime": {
+        "status": "UNSUPPORTED",
+        "productionUseAllowed": false,
+        "liveEtaEligible": false,
+        "rateLimitStatus": "NOT_APPLICABLE",
+        "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+        "updateFrequency": "daily admission refresh",
+        "unsupportedNotes": "source does not provide realtime arrivals"
+      },
+      "facility": {
+        "status": "SUPPORTED",
+        "productionUseAllowed": true,
+        "coverageStatus": "INCHEON_LINES_1_2_7_OFFICIAL_FACILITY_COUNTS",
+        "updateFrequency": "daily admission refresh",
+        "unsupportedNotes": "설치 대수 정적 정보이며 실시간 운행 상태가 아니다. 비역사 시설(환기구·대피) 행은 skip한다. CSV에 없는 시설은 공식 미게재로 count=0이다. 7호선(line-15) wheelchair CSV 행은 0건이다"
+      }
+    },
+    "accessibilityAdmissionEvidence": {
+      "issue": 2492,
+      "materializer": "tools/datapack/materialize-incheon-accessibility.mjs",
+      "verificationTest": "tools/datapack/materialize-incheon-accessibility.test.mjs",
+      "snapshotId": "incheon-transit-accessibility-20260724",
+      "snapshotPath": "tools/datapack/sources/incheon-transit-accessibility-20260724.json",
+      "capturedAt": "2026-07-24T07:00:00.000Z",
+      "freshUntil": "2026-07-25T07:00:00.000Z",
+      "stationCount": 71,
+      "rowCount": 71,
+      "facilityCount": 213,
+      "rawSha256": "3f29b437f2c6f4145dea67535839684223f8458d610b241580ed0a6a499ba67c",
+      "rowsSha256": "97c4ba0c32b51b5ed5d17c1e5f6ab8fff3520b9b35ffe1a05de960a5743ceec2",
+      "datasetIds": [
+        "15083478",
+        "15010199",
+        "15146049"
+      ],
+      "topologySourceId": "incheon-transit-station-info",
+      "topologySnapshotId": "incheon-transit-station-info-20260724",
+      "topologyContentSha256": "710878689282ba967697cd9411940b657a51eee5499106ed884d5bd9111501a8",
+      "topologyLineages": [
+        {
+          "sourceId": "incheon-transit-station-info",
+          "snapshotId": "incheon-transit-station-info-20260724",
+          "contentSha256": "710878689282ba967697cd9411940b657a51eee5499106ed884d5bd9111501a8",
+          "lineId": "line-42b5805f3b5a"
+        },
+        {
+          "sourceId": "incheon-transit-station-info",
+          "snapshotId": "incheon-transit-station-info-20260724",
+          "contentSha256": "710878689282ba967697cd9411940b657a51eee5499106ed884d5bd9111501a8",
+          "lineId": "line-98718184f016"
+        }
+      ],
+      "membershipLineages": [
+        {
+          "sourceId": "incheon-transit-station-info",
+          "snapshotId": "incheon-transit-station-info-20260724",
+          "contentSha256": "710878689282ba967697cd9411940b657a51eee5499106ed884d5bd9111501a8",
+          "lineId": "line-15b3b8a93259"
+        }
+      ]
+    }
+  }
+}

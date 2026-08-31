@@ -351,6 +351,12 @@ jobs:
             fi
           } >> "${GITHUB_OUTPUT}"
 
+      - name: Data Pack Release / Require current nationwide coverage GO
+        if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
+        run: >-
+          node tools/datapack/require-nationwide-coverage-publication-ready.mjs
+          --evidence tools/datapack/reports/nationwide-candidate-coverage-gate.json
+
       - name: Data Pack Release / Validate source snapshot freshness
         if: ${{ steps.release-mode.outputs.mode == 'production-publish' }}
         env:
@@ -362,6 +368,7 @@ jobs:
             --policy release/product-gates/datapack-freshness-sla.json \
             --governance-policy tools/datapack/source-governance-policy.json \
             --inventory tools/datapack/source-inventory.json \
+            --scope release/product-gates/production-datapack-scope.json \
           )
           if [[ -n "${EASYSUBWAY_SOURCE_GOVERNANCE_EVALUATION_AT:-}" ]]; then
             freshness_args+=(--purge-evaluation-at "${EASYSUBWAY_SOURCE_GOVERNANCE_EVALUATION_AT}")

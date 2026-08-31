@@ -7252,9 +7252,21 @@ test("source inventory 검증기는 required source의 외부 등록 record를 e
   await validateScope(scope);
   const [registration] = scope.productionSourceSet.externalSourceRegistrations;
 
+  const missingCurrentReceipt = structuredClone(scope);
+  missingCurrentReceipt.productionSourceSet.externalSourceRegistrations = missingCurrentReceipt
+    .productionSourceSet.externalSourceRegistrations
+    .filter(({ sourceId }) => sourceId !== "incheon-transit-accessibility");
+  await assert.rejects(validateScope(missingCurrentReceipt), /receipt must be externally registered/);
+
+  const mismatchedCurrentReceipt = structuredClone(scope);
+  mismatchedCurrentReceipt.productionSourceSet.externalSourceRegistrations
+    .find(({ sourceId }) => sourceId === "incheon-transit-accessibility")
+    .snapshotId = "wrong-snapshot";
+  await assert.rejects(validateScope(mismatchedCurrentReceipt), /must match current receipt-bound admission/);
+
   const missing = structuredClone(scope);
   missing.productionSourceSet.externalSourceRegistrations = [];
-  await assert.rejects(validateScope(missing), /required source .* must be locally required or externally registered/);
+  await assert.rejects(validateScope(missing), /required source .* receipt must be externally registered/);
 
   const duplicate = structuredClone(scope);
   duplicate.productionSourceSet.externalSourceRegistrations.push(structuredClone(registration));
@@ -7272,14 +7284,14 @@ test("source inventory 검증기는 required source의 외부 등록 record를 e
   localRequired.productionSourceSet.externalSourceRegistrations[0].sourceId = "molit-urban-rail-full-route";
   await assert.rejects(
     validateScope(localRequired),
-    /external source registration .* requires a locally non-production required source/,
+    /external source registration .* must match current receipt-bound admission/,
   );
 
   const optional = structuredClone(scope);
   optional.productionSourceSet.externalSourceRegistrations[0].sourceId = "kric-disabled-toilet";
   await assert.rejects(
     validateScope(optional),
-    /external source registration .* requires a locally non-production required source/,
+    /external source registration .* requires a production source/,
   );
 });
 

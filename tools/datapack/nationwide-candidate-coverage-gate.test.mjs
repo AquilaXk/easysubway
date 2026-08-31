@@ -41,11 +41,16 @@ import {
   assertLineScopeRedescriptionsMatchActualRequiredSet,
   assertInheritedRowsUnchanged,
   assertNonTransitionReasons,
+  buildBlockedStaleDeployedArtifactEvidence,
   classifyLineScopeTransition,
   inheritedRowSnapshot,
   runNationwideCandidateCoverageGate,
   validateNationwideCandidateCoverageSpec,
 } from "./run-nationwide-candidate-coverage-gate.mjs";
+import {
+  assertNationwideCoveragePublicationReady,
+  verifyNationwideCoveragePublicationReady,
+} from "./require-nationwide-coverage-publication-ready.mjs";
 
 const execFileAsync = promisify(execFile);
 const root = path.resolve(import.meta.dirname, "../..");
@@ -59,6 +64,11 @@ const RESOLUTION_PLAN_PATH =
 const RESOLUTIONS_PATH =
   "tools/datapack/release/nationwide-public-api-coverage-resolutions-20260725.json";
 const REVIEWED_PACK_PATH = "tools/datapack/release/capital-production-reviewed-pack.json";
+const DEPLOYED_BUILD_SPEC_PATH = "tools/datapack/release/candidate-build-spec.json";
+const DEPLOYED_INDEX_PATH = "apps/mobile/assets/datapacks/index.json";
+const DEPLOYED_ASSET_PATH = "apps/mobile/assets/datapacks/capital.sqlite.gz";
+const INCHEON_HISTORICAL_ADMISSION_PATH =
+  "tools/datapack/release/historical-incheon-transit-accessibility-admission-20260724.json";
 const PILOT_REQUIREMENT_KEY = "capital:seoul-metro:seoul-4:route_map_positions";
 const PILOT_SOURCE_ID = "seoul-metro-route-map-positions";
 const INHERITED_PILOT_SOURCE_ID = "seoulmetro-cyberstation-route-map";
@@ -467,9 +477,7 @@ const INCHEON_INCLUSION_BINDINGS = [
     slug: "accessibility",
     offset: 2,
     sourceId: "incheon-transit-accessibility",
-    evidenceKey: "accessibilityAdmissionEvidence",
-    windowSourceId: "incheon-transit-accessibility",
-    windowEvidenceKey: "accessibilityAdmissionEvidence",
+    historicalAdmission: true,
     outsideWindowPattern: /incheon-transit-accessibility evidence freshness is invalid/,
   },
 ];
@@ -503,6 +511,16 @@ async function readJson(relativePath) {
   return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
 }
 
+async function readFullEvidenceOrSkip(context) {
+  const evidence = await readJson(EVIDENCE_PATH);
+  if (evidence.artifactKind === "nationwide-candidate-coverage-gate-blocked-evidence") {
+    context.skip("current deployed artifact is stale; full coverage evidence must follow promotion");
+    return null;
+  }
+  assert.equal(evidence.artifactKind, "nationwide-candidate-coverage-gate-evidence");
+  return evidence;
+}
+
 async function sha256Of(relativePath) {
   return createHash("sha256").update(await readFile(path.join(root, relativePath))).digest("hex");
 }
@@ -521,8 +539,9 @@ function forbiddenKeyPaths(node, nodePath = "$") {
   ]);
 }
 
-test("candidate evidence는 배포 artifact row count와 transition을 함께 기록한다", async () => {
-  const evidence = await readJson(EVIDENCE_PATH);
+test("candidate evidence는 배포 artifact row count와 transition을 함께 기록한다", async (context) => {
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
 
   assert.deepEqual(evidence.deployedArtifact, {
     verifierPath: "tools/datapack/verify-production-pack-artifact-identity.mjs",
@@ -595,7 +614,48 @@ test("candidate evidence는 배포 artifact row count와 transition을 함께 �
   });
 });
 
-test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 단위로 재생성된다", async () => {
+test("커밋된 candidate 게이트 evidence는 현행 입력과 결속된다", async () => {
+  const tracked = await readFile(path.join(root, EVIDENCE_PATH), "utf8");
+  const evidence = JSON.parse(tracked);
+  if (evidence.artifactKind === "nationwide-candidate-coverage-gate-blocked-evidence") {
+    const [spec, buildSpec, index, assetBytes] = await Promise.all([
+      readJson(SPEC_PATH),
+      readJson(DEPLOYED_BUILD_SPEC_PATH),
+      readJson(DEPLOYED_INDEX_PATH),
+      readFile(path.join(root, DEPLOYED_ASSET_PATH)),
+    ]);
+    const inputPaths = {
+      spec: SPEC_PATH,
+      targets: TARGETS_PATH,
+      inventory: INVENTORY_PATH,
+      resolutionPlan: RESOLUTION_PLAN_PATH,
+      resolutions: RESOLUTIONS_PATH,
+    };
+    const inputs = Object.fromEntries(await Promise.all(Object.entries(inputPaths).map(async ([name, inputPath]) => [
+      name,
+      { path: inputPath, sha256: await sha256Of(inputPath) },
+    ])));
+    const expected = buildBlockedStaleDeployedArtifactEvidence({
+      spec,
+      inputs,
+      buildSpec,
+      buildSpecInput: { path: DEPLOYED_BUILD_SPEC_PATH, sha256: await sha256Of(DEPLOYED_BUILD_SPEC_PATH) },
+      index,
+      indexInput: { path: DEPLOYED_INDEX_PATH, sha256: await sha256Of(DEPLOYED_INDEX_PATH) },
+      assetInput: {
+        path: DEPLOYED_ASSET_PATH,
+        sha256: createHash("sha256").update(assetBytes).digest("hex"),
+        byteSize: assetBytes.length,
+      },
+    });
+    assert.deepEqual(evidence, expected);
+    assert.deepEqual(forbiddenKeyPaths(evidence), []);
+    for (const forbidden of ["candidatePack", "declaredNonTransitions", "transitions", "variants", "go"]) {
+      assert.equal(Object.hasOwn(evidence, forbidden), false);
+    }
+    return;
+  }
+
   const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-candidate-gate-"));
   try {
     const output = path.join(workspace, "evidence.json");
@@ -614,10 +674,8 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
     });
 
     const regenerated = await readFile(output, "utf8");
-    const tracked = await readFile(path.join(root, EVIDENCE_PATH), "utf8");
     assert.equal(regenerated, tracked, "evidence는 재생성 결과와 바이트 단위로 같아야 한다");
 
-    const evidence = JSON.parse(tracked);
     assert.equal(evidence.artifactKind, "nationwide-candidate-coverage-gate-evidence");
     assert.equal(evidence.issue, 2595);
     assert.deepEqual(evidence.parentIssues, [2510, 2138]);
@@ -659,8 +717,9 @@ test("커밋된 candidate 게이트 evidence는 현행 입력에서 바이트 �
   }
 });
 
-test("Seoul-4는 inherited SUPPORTED를 유지하며 current official source를 추가한다", async () => {
-  const evidence = await readJson(EVIDENCE_PATH);
+test("Seoul-4는 inherited SUPPORTED를 유지하며 current official source를 추가한다", async (context) => {
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
 
   // candidate는 root가 되는 단일 pack이어야 게이트가 단독 계약으로 판정한다.
   assert.equal(evidence.candidatePack.id, "nationwide-candidate");
@@ -721,8 +780,9 @@ test("Seoul-4는 inherited SUPPORTED를 유지하며 current official source를 
 });
 
 // #2549 B1: 대구 3노선 × membership/topology/timetable 9 requirement가 한 실행에서 함께 전이한다.
-test("대구 9 requirement는 candidate 편입으로 MISSING에서 SUPPORTED로 전이한다", async () => {
-  const evidence = await readJson(EVIDENCE_PATH);
+test("대구 9 requirement는 candidate 편입으로 MISSING에서 SUPPORTED로 전이한다", async (context) => {
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
   const byKey = new Map(evidence.variants.lineScoped.pilotRequirements.map((entry) => [entry.requirementKey, entry]));
   const baselineByKey = new Map(
     evidence.variants.baseline.pilotRequirements.map((entry) => [entry.requirementKey, entry]),
@@ -765,8 +825,9 @@ test("대구 9 requirement는 candidate 편입으로 MISSING에서 SUPPORTED로 
 
 // #2580 B2-a: 같은 지역의 route_map_positions·accessibility_facilities 6 requirement가 B1 편입 뒤에
 // 체인으로 실린 행으로 전이한다. 두 도메인의 필수 필드 수가 다르므로 분모도 도메인별로 못박는다.
-test("대구 route_map/accessibility 6 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전이한다", async () => {
-  const evidence = await readJson(EVIDENCE_PATH);
+test("대구 route_map/accessibility 6 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전이한다", async (context) => {
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
   const byKey = new Map(evidence.variants.lineScoped.pilotRequirements.map((entry) => [entry.requirementKey, entry]));
   const baselineByKey = new Map(
     evidence.variants.baseline.pilotRequirements.map((entry) => [entry.requirementKey, entry]),
@@ -859,8 +920,9 @@ test("대구 route_map/accessibility 6 requirement는 체인 편입으로 MISSIN
 
 // #2587 B2-b: 부산 4노선 × 5도메인 20 requirement가 같은 실행에서 전이한다. 대구와 달리 승계 원본에
 // 지역 자체가 없어 topology 편입이 운영기관·노선·역까지 함께 싣는다.
-test("부산 20 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전이한다", async () => {
-  const evidence = await readJson(EVIDENCE_PATH);
+test("부산 20 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전이한다", async (context) => {
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
   const byKey = new Map(evidence.variants.lineScoped.pilotRequirements.map((entry) => [entry.requirementKey, entry]));
   const baselineByKey = new Map(
     evidence.variants.baseline.pilotRequirements.map((entry) => [entry.requirementKey, entry]),
@@ -987,8 +1049,9 @@ const SINGLE_LINE_DOMAIN_FIELDS = {
   accessibility_facilities: ["elevator", "escalator", "wheelchair_lift", "status", "verified_at"],
 };
 
-async function assertSingleLineRegionTransition({ requirementKeys, sourceIdsByDomain }) {
-  const evidence = await readJson(EVIDENCE_PATH);
+async function assertSingleLineRegionTransition(context, { requirementKeys, sourceIdsByDomain }) {
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return null;
   const byKey = new Map(evidence.variants.lineScoped.pilotRequirements.map((entry) => [entry.requirementKey, entry]));
   const baselineByKey = new Map(
     evidence.variants.baseline.pilotRequirements.map((entry) => [entry.requirementKey, entry]),
@@ -1017,8 +1080,8 @@ async function assertSingleLineRegionTransition({ requirementKeys, sourceIdsByDo
   return evidence;
 }
 
-test("대전 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전이한다", async () => {
-  const evidence = await assertSingleLineRegionTransition({
+test("대전 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전이한다", async (context) => {
+  const evidence = await assertSingleLineRegionTransition(context, {
     requirementKeys: DAEJEON_REQUIREMENT_KEYS,
     sourceIdsByDomain: {
       // membership 필수 필드 3개는 두 소스의 합산이다 — MOLIT 소속 소스가 line·station_name을,
@@ -1033,6 +1096,7 @@ test("대전 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전
       accessibility_facilities: ["daejeon-transportation-accessibility"],
     },
   });
+  if (!evidence) return;
 
   // 편입이 실제로 실은 행수. 시각표 편입 하나가 소스 3건을 등재하고 운영기관·노선·역·구간까지 함께 싣는다.
   const [timetable, routeMap, accessibility] = evidence.packDataInclusions.entries.slice(DAEJEON_INDEX);
@@ -1097,8 +1161,8 @@ function assertPinsInsideWindows(inventory, evidence, regionIndex, bindings) {
   }
 }
 
-test("광주 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전이한다", async () => {
-  const evidence = await assertSingleLineRegionTransition({
+test("광주 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전이한다", async (context) => {
+  const evidence = await assertSingleLineRegionTransition(context, {
     requirementKeys: GWANGJU_REQUIREMENT_KEYS,
     sourceIdsByDomain: {
       station_line_membership: [
@@ -1111,6 +1175,7 @@ test("광주 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전
       accessibility_facilities: ["gwangju-transportation-accessibility"],
     },
   });
+  if (!evidence) return;
 
   const [timetable, routeMap, accessibility] = evidence.packDataInclusions.entries.slice(GWANGJU_INDEX);
   assert.equal(timetable.addedRows.sourceInventory, 3);
@@ -1173,8 +1238,9 @@ test("광주 5 requirement는 체인 편입으로 MISSING에서 SUPPORTED로 전
 // 3건이며(광역철도 6소스 체인 / 경전철 4소스 체인 / 서울 1소스), 수도권 노선도 편입 전체는 9호선 두 건을
 // 더해 5건이다. 앞의 두 편입은 승계 pack에 의존하지 않고 서울 1~8호선 편입만 승계 원본의 운영기관·
 // cyberstation 소스 등재와 좌표 PK 집합에 의존한다(그 셋은 승계 원본이 이미 갖고 있다).
-test("수도권 노선도 17 requirement는 편입 3건으로 MISSING에서 SUPPORTED로 전이한다", async () => {
-  const evidence = await readJson(EVIDENCE_PATH);
+test("수도권 노선도 17 requirement는 편입 3건으로 MISSING에서 SUPPORTED로 전이한다", async (context) => {
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
   const byKey = new Map(evidence.variants.lineScoped.pilotRequirements.map((entry) => [entry.requirementKey, entry]));
   const baselineByKey = new Map(
     evidence.variants.baseline.pilotRequirements.map((entry) => [entry.requirementKey, entry]),
@@ -1237,8 +1303,9 @@ test("수도권 노선도 17 requirement는 편입 3건으로 MISSING에서 SUPP
 // #2595 B3 두 번째 배치. 노선 하나를 두 사업자가 나눠 운영하는 소스는 admission 정본이 두 운영기관 scope를
 // dual coverage로 등재하는데, materializer 정본 대조가 단일 운영기관만 허용해 그동안 조립이 막혀 있었다.
 // 카탈로그가 두 번째 운영기관을 등재하고 materializer가 그 집합 전체를 정본과 대조하도록 바뀌면서 열린다.
-test("수도권 dual-operator 노선 6 requirement는 편입으로 MISSING에서 SUPPORTED로 전이한다", async () => {
-  const evidence = await readJson(EVIDENCE_PATH);
+test("수도권 dual-operator 노선 6 requirement는 편입으로 MISSING에서 SUPPORTED로 전이한다", async (context) => {
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
   const byKey = new Map(evidence.variants.lineScoped.pilotRequirements.map((entry) => [entry.requirementKey, entry]));
   const baselineByKey = new Map(
     evidence.variants.baseline.pilotRequirements.map((entry) => [entry.requirementKey, entry]),
@@ -1297,8 +1364,9 @@ test("수도권 dual-operator 노선 6 requirement는 편입으로 MISSING에서
 // AquilaXk/easysubway-data#3 증거 모델 축. 감사자가 evidence만 보고 "어느 건이 어느 근거 성격으로 섰는지" 알 수 있어야 한다.
 // 값은 하네스가 지어내지 않고 판정 경로(report-coverage-gaps.mjs)가 requirement마다 실어 준 domain 선언
 // 그대로이며, 범주별 합이 SUPPORTED 총계와 같아야 한다.
-test("게이트 evidence는 SUPPORTED를 근거 성격별로 나눠 기록하고 합이 총계와 같다", async () => {
-  const evidence = await readJson(EVIDENCE_PATH);
+test("게이트 evidence는 SUPPORTED를 근거 성격별로 나눠 기록하고 합이 총계와 같다", async (context) => {
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
   const targets = await readJson(TARGETS_PATH);
   const modelByDomain = new Map(
     targets.requiredSourceDomains.map(({ id, evidenceModel }) => [id, evidenceModel ?? "official-source"]),
@@ -1345,8 +1413,9 @@ test("게이트 evidence는 SUPPORTED를 근거 성격별로 나눠 기록하고
 
 // #2595 B3 두 번째 배치. 인천은 부산과 같은 모양(역사정보 편입이 지역 자체를 세운다)이지만, 소스가 덮는
 // 세 노선 중 7호선의 route_graph_topology 하나만 열리지 않는다 — 그 사실이 선언과 실측으로 함께 남는다.
-test("인천 13 requirement는 체인 편입으로 전이하고 7호선 구간만 선언대로 열리지 않는다", async () => {
-  const evidence = await readJson(EVIDENCE_PATH);
+test("인천 13 requirement는 체인 편입으로 전이하고 7호선 구간만 선언대로 열리지 않는다", async (context) => {
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
   const byKey = new Map(evidence.variants.lineScoped.pilotRequirements.map((entry) => [entry.requirementKey, entry]));
   const baselineByKey = new Map(
     evidence.variants.baseline.pilotRequirements.map((entry) => [entry.requirementKey, entry]),
@@ -1517,9 +1586,153 @@ test("배포 artifact identity는 SUPPORTED 판정 전에 검증한다", async (
   );
 });
 
-test("declared transition seam은 실제 SUPPORTED non-transition을 거부한다", async () => {
+test("stale 배포 artifact는 exact identity에 결속된 blocked evidence만 만든다", () => {
+  const blocked = buildBlockedStaleDeployedArtifactEvidence({
+    spec: { issue: 2595, parentIssues: [2510, 2138] },
+    inputs: {
+      spec: { path: SPEC_PATH, sha256: "a".repeat(64) },
+      targets: { path: TARGETS_PATH, sha256: "b".repeat(64) },
+      inventory: { path: INVENTORY_PATH, sha256: "c".repeat(64) },
+      resolutionPlan: { path: RESOLUTION_PLAN_PATH, sha256: "d".repeat(64) },
+      resolutions: { path: RESOLUTIONS_PATH, sha256: "e".repeat(64) },
+    },
+    buildSpec: {
+      artifactKind: "datapack-candidate-build-spec",
+      sourceSnapshotIds: ["fresh-snapshot", "expired-snapshot"],
+      sourceSnapshots: [
+        {
+          sourceId: "fresh-source",
+          snapshotId: "fresh-snapshot",
+          rawSha256: "1".repeat(64),
+          freshnessExpiresAt: "2026-09-02T00:00:00.000Z",
+        },
+        {
+          sourceId: "expired-source",
+          snapshotId: "expired-snapshot",
+          rawSha256: "2".repeat(64),
+          freshnessExpiresAt: "2026-08-30T00:00:00.000Z",
+        },
+      ],
+    },
+    buildSpecInput: { path: "build-spec.json", sha256: "f".repeat(64) },
+    index: {
+      packs: [{
+        id: "capital",
+        asset: "assets/datapacks/capital.sqlite.gz",
+        sha256: "3".repeat(64),
+        byteSize: 123,
+      }],
+    },
+    indexInput: { path: "index.json", sha256: "4".repeat(64) },
+    assetInput: { path: "apps/mobile/assets/datapacks/capital.sqlite.gz", sha256: "3".repeat(64), byteSize: 123 },
+    currentTime: new Date("2026-08-31T00:00:00.000Z"),
+  });
+
+  assert.equal(blocked.artifactKind, "nationwide-candidate-coverage-gate-blocked-evidence");
+  assert.equal(blocked.decision, "BLOCKED_STALE_DEPLOYED_ARTIFACT");
+  assert.equal(blocked.currentFreshnessAsserted, false);
+  assert.deepEqual(blocked.deployedArtifact.inputs, {
+    asset: {
+      byteSize: 123,
+      path: "apps/mobile/assets/datapacks/capital.sqlite.gz",
+      sha256: "3".repeat(64),
+    },
+    buildSpec: { path: "build-spec.json", sha256: "f".repeat(64) },
+    index: { path: "index.json", sha256: "4".repeat(64) },
+    inventory: { path: INVENTORY_PATH, sha256: "c".repeat(64) },
+  });
+  assert.deepEqual(blocked.deployedArtifact.expiredSourceSnapshots, [{
+    freshnessExpiresAt: "2026-08-30T00:00:00.000Z",
+    rawSha256: "2".repeat(64),
+    snapshotId: "expired-snapshot",
+    sourceId: "expired-source",
+  }]);
+  for (const forbidden of ["candidatePack", "declaredNonTransitions", "transitions", "variants", "go"]) {
+    assert.equal(Object.hasOwn(blocked, forbidden), false);
+  }
+});
+
+test("production publication은 full current nationwide coverage evidence만 허용한다", () => {
+  assert.throws(
+    () => assertNationwideCoveragePublicationReady({
+      artifactKind: "nationwide-candidate-coverage-gate-blocked-evidence",
+      decision: "BLOCKED_STALE_DEPLOYED_ARTIFACT",
+    }),
+    /production publication requires nationwide-candidate-coverage-gate-evidence/,
+  );
+  assert.throws(
+    () => assertNationwideCoveragePublicationReady({
+      artifactKind: "nationwide-candidate-coverage-gate-evidence",
+    }),
+    /requires complete nationwide coverage evidence/,
+  );
+});
+
+test("production publication은 evidence에 결속된 deployed build spec의 만료 freshness를 다시 거부한다", async () => {
+  const workspace = await mkdtemp(path.join(tmpdir(), "nationwide-publication-freshness-"));
+  try {
+    const inputs = {};
+    for (const [name, relativePath] of Object.entries(INPUT_PATHS)) {
+      const bytes = await readFile(path.join(root, relativePath));
+      const destination = path.join(workspace, relativePath);
+      await mkdir(path.dirname(destination), { recursive: true });
+      await writeFile(destination, bytes);
+      inputs[name] = {
+        path: relativePath,
+        sha256: createHash("sha256").update(bytes).digest("hex"),
+      };
+    }
+    const assetBytes = await readFile(path.join(root, DEPLOYED_ASSET_PATH));
+    const assetPath = path.join(workspace, DEPLOYED_ASSET_PATH);
+    await mkdir(path.dirname(assetPath), { recursive: true });
+    await writeFile(assetPath, assetBytes);
+    const buildSpec = {
+      artifactKind: "datapack-candidate-build-spec",
+      sourceSnapshotIds: ["expired-snapshot"],
+      sourceSnapshots: [{
+        sourceId: "expired-source",
+        snapshotId: "expired-snapshot",
+        rawSha256: "1".repeat(64),
+        freshnessExpiresAt: "2026-08-30T00:00:00.000Z",
+      }],
+    };
+    const buildSpecBytes = Buffer.from(`${JSON.stringify(buildSpec)}\n`);
+    const buildSpecPath = path.join(workspace, DEPLOYED_BUILD_SPEC_PATH);
+    await mkdir(path.dirname(buildSpecPath), { recursive: true });
+    await writeFile(buildSpecPath, buildSpecBytes);
+
+    const evidence = {
+      artifactKind: "nationwide-candidate-coverage-gate-evidence",
+      regeneration: { evidencePath: EVIDENCE_PATH },
+      inputs,
+      variants: { baseline: {}, lineScoped: {} },
+      transitions: [],
+      deployedArtifact: {
+        packId: "capital",
+        verifierPath: "tools/datapack/verify-production-pack-artifact-identity.mjs",
+        inputs: {
+          buildSpec: {
+            path: DEPLOYED_BUILD_SPEC_PATH,
+            sha256: createHash("sha256").update(buildSpecBytes).digest("hex"),
+          },
+        },
+      },
+    };
+    await assert.rejects(
+      verifyNationwideCoveragePublicationReady(evidence, workspace, {
+        currentTime: new Date("2026-08-31T00:00:00.000Z"),
+      }),
+      /production publication nationwide coverage deployed source snapshot expired: expired-snapshot/,
+    );
+  } finally {
+    await rm(workspace, { recursive: true, force: true });
+  }
+});
+
+test("declared transition seam은 실제 SUPPORTED non-transition을 거부한다", async (context) => {
   const spec = await readJson(SPEC_PATH);
-  const evidence = await readJson(EVIDENCE_PATH);
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
   const redescription = spec.lineScopeRedescriptions.find(
     ({ sourceId, sourceDomain }) =>
       sourceId === INCHEON_STATION_INFO_SOURCE_ID && sourceDomain === "route_graph_topology",
@@ -1536,6 +1749,26 @@ test("declared transition seam은 실제 SUPPORTED non-transition을 거부한�
   );
 });
 
+test("인천 historical admission identity는 spec과 tracked bytes에 결속된다", async () => {
+  const spec = await readJson(SPEC_PATH);
+  const inventory = await readJson(INVENTORY_PATH);
+  const inherited = await readJson(REVIEWED_PACK_PATH);
+  const missingDigest = structuredClone(spec);
+  delete missingDigest.packDataInclusions[INCHEON_INDEX + 2].historicalAdmissionSha256;
+  assert.throws(
+    () => validateNationwideCandidateCoverageSpec(missingDigest, inventory),
+    /historicalAdmissionSha256 must be a lowercase SHA-256/,
+  );
+
+  const mismatchedDigest = structuredClone(spec);
+  mismatchedDigest.packDataInclusions = [mismatchedDigest.packDataInclusions[INCHEON_INDEX + 2]];
+  mismatchedDigest.packDataInclusions[0].historicalAdmissionSha256 = "0".repeat(64);
+  await assert.rejects(
+    () => applyPackDataInclusions(mismatchedDigest, inherited, inventory),
+    /historical admission fixture SHA-256 does not match the candidate spec/,
+  );
+});
+
 test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async (context) => {
   const spec = await readJson(SPEC_PATH);
   const inventory = await readJson(INVENTORY_PATH);
@@ -1544,7 +1777,9 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   // 공유 materialization 결과 대신 빈 표를 둬 각 literal slice가 독립적으로 돈다.
   const inheritedWithCandidateTables = structuredClone(inherited);
   inheritedWithCandidateTables.packs[0].routeMapLineTracks = [];
-  const evidence = await readJson(EVIDENCE_PATH);
+  const evidence = await readFullEvidenceOrSkip(context);
+  if (!evidence) return;
+  const historicalIncheonAdmission = await readJson(INCHEON_HISTORICAL_ADMISSION_PATH);
 
   function rejectsValidationWith(mutate, expected) {
     const mutated = structuredClone(spec);
@@ -2075,7 +2310,9 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
           sourcePath: admissionEvidenceOf(inventory, sourceId, evidenceKey).snapshotPath,
           copyName: `${regionKo}-${slug}-copy.json`,
           serialize: (bytes) => bytes,
-          expected: new RegExp(`snapshotPath must match the ${sourceId} admission evidence snapshotPath`),
+          expected: binding.historicalAdmission
+            ? /snapshotPath must match the historical Incheon admission fixture snapshotPath/
+            : new RegExp(`snapshotPath must match the ${sourceId} admission evidence snapshotPath`),
         });
       });
       await context.test(`${regionKo} ${labelKo} 편입 topologySnapshotPath가 정본 밖 사본이면 거부된다`, async () => {
@@ -2226,12 +2463,17 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
   // 창 길이 24시간까지 함께 검사하므로 하한 미만·상한 이상을 모두 때린다.
   for (const binding of INCHEON_INCLUSION_BINDINGS) {
     const { labelKo, slug, offset, sourceId, evidenceKey, lineSourceIds } = binding;
+    const bindingEvidence = binding.historicalAdmission
+      ? historicalIncheonAdmission.source.accessibilityAdmissionEvidence
+      : sourceId === undefined
+        ? null
+        : admissionEvidenceOf(inventory, sourceId, evidenceKey);
     if (sourceId !== undefined) {
       await context.test(`인천 ${labelKo} 편입 snapshotPath가 정본 밖 사본이면 거부된다`, async () => {
         await rejectsSnapshotCopy({
           index: INCHEON_INDEX + offset,
           solo: INCHEON_INDEX + offset,
-          sourcePath: admissionEvidenceOf(inventory, sourceId, evidenceKey).snapshotPath,
+          sourcePath: bindingEvidence.snapshotPath,
           copyName: `incheon-${slug}-copy.json`,
           // 역사정보 정본에는 바이트 축(snapshotSha256)이 있고 편의시설 정본에는 없다 — 어느 쪽이든
           // 바이트 동일 사본은 그 축을 그대로 지나므로 경로 결속만이 정본 하나를 못박는다.
@@ -2277,11 +2519,9 @@ test("candidate 안전 경계는 spec 편집만으로 넓힐 수 없다", async 
       });
     }
 
-    const { capturedAt, freshUntil } = admissionEvidenceOf(
-      inventory,
-      binding.windowSourceId,
-      binding.windowEvidenceKey,
-    );
+    const { capturedAt, freshUntil } = binding.historicalAdmission
+      ? bindingEvidence
+      : admissionEvidenceOf(inventory, binding.windowSourceId, binding.windowEvidenceKey);
     await context.test(`인천 ${labelKo} 편입 소스의 창은 24시간 반개구간이다`, () => {
       assert.equal(Date.parse(freshUntil) - Date.parse(capturedAt), 24 * 60 * 60 * 1_000);
     });

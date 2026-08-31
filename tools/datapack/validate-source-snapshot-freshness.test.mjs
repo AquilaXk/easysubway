@@ -211,6 +211,52 @@ function bindInventory(value) {
     .digest("hex");
 }
 
+function governancePolicyFor(sourceIds) {
+  return {
+    schemaVersion: 1,
+    artifactKind: "datapack-source-governance-policy",
+    policyVersion: "2026-07-15",
+    retentionClasses: [{ id: "standard-90d", retentionDays: 90 }],
+    reasonCodeEscalations: [{
+      reasonCodes: [
+        "SOURCE_LINEAGE_BROKEN",
+        "SOURCE_DIFF_MISSING",
+        "SOURCE_FRESHNESS_POLICY_MISSING",
+        "SOURCE_SNAPSHOT_EXPIRED",
+        "RAW_RETENTION_OVERDUE",
+        "LEGAL_HOLD_INVALID",
+        "LICENSE_REVIEW_REQUIRED",
+        "REDISTRIBUTION_NOT_APPROVED",
+        "SOURCE_GOVERNANCE_OWNER_MISSING",
+      ],
+      responsibleRole: "datapack-source-owner",
+      alertRoute: "github:area-datapack",
+      escalationHours: 4,
+    }],
+    sources: sourceIds.map((sourceId) => ({
+      sourceId,
+      sourceClassId: "static_network_metadata",
+      retentionClassId: "standard-90d",
+      ownerRole: "datapack-source-owner",
+      stewardRole: "datapack-data-steward",
+      approvalRole: "datapack-release-approver",
+      escalationHours: 4,
+      alertRoute: "github:area-datapack",
+      licenseReview: {
+        status: "APPROVED",
+        termsHash: "e".repeat(64),
+        reviewedAt: "2026-07-01T00:00:00Z",
+        nextReviewAt: "2027-07-01T00:00:00Z",
+        termsUrl: `https://example.invalid/${sourceId}`,
+        reviewedProvider: `provider-${sourceId}`,
+        reviewedDatasetUrl: `https://example.invalid/${sourceId}`,
+        redistributionScopes: ["DERIVED_DATAPACK"],
+        approvedByRole: "datapack-release-approver",
+      },
+    })),
+  };
+}
+
 test("source snapshot ID·hash·policy 파생 freshness가 맞으면 통과한다", () => {
   const result = validateSourceSnapshotFreshness(input());
 
@@ -605,17 +651,118 @@ test("production 필수 source가 build snapshot에서 빠지면 governance GO�
   );
 });
 
-test("실제 release build spec은 current source inventory에 결합되어 governance를 통과한다", async () => {
-  const { stdout } = await execFileAsync(process.execPath, [
+test("production 필수 external source는 exact OCI registration에 결속될 때만 통과한다", () => {
+  const value = input();
+  value.inventory = {
+    sources: [
+      { id: "source-a", requiredForProductionPack: true },
+      {
+        id: "source-b",
+        provider: "provider-source-b",
+        datasetUrl: "https://example.invalid/source-b",
+        license: { redistributionAllowed: true },
+        requiredForProductionPack: true,
+        admissionEvidence: {
+          issue: 622,
+          snapshotId: "source-b-snapshot",
+          decision: "APPROVED",
+          sampleEvidenceHash: "1".repeat(64),
+          rawSha256: "2".repeat(64),
+          adminReviewRecordHash: "3".repeat(64),
+          licenseEvidenceHash: "e".repeat(64),
+          quotaEvidence: { productionUseAllowed: true },
+        },
+        registrationEvidence: {
+          sourceId: "source-b",
+          snapshotId: "source-b-snapshot",
+          capturedAt: "2026-07-12T00:00:00.000Z",
+          registeredAt: "2026-07-12T00:01:00.000Z",
+          snapshotRawSha256: "2".repeat(64),
+          contentSha256: "1".repeat(64),
+          rawObjectUri: "oci://namespace/bucket/source-b.json",
+          adminReviewRecordHash: "3".repeat(64),
+        },
+      },
+    ],
+  };
+  Object.assign(value.inventory.sources[0], {
+    provider: "provider-source-a",
+    datasetUrl: "https://example.invalid/source-a",
+    license: { redistributionAllowed: true },
+    admissionEvidence: { licenseEvidenceHash: "e".repeat(64) },
+  });
+  value.policy.sourceClasses[0].id = "static_accessibility_facility";
+  value.policy.sourceClasses[0].sourceIds.push("source-b");
+  value.productionScope = {
+    productionSourceSet: {
+      externalSourceRegistrations: [{
+        sourceId: "source-b",
+        registrationRepository: "AquilaXk/easysubway-data",
+        registrationIssue: 622,
+        snapshotId: "source-b-snapshot",
+        decision: "APPROVED",
+        productionUseAllowed: true,
+      }],
+    },
+  };
+  bindInventory(value);
+  value.governancePolicy = governancePolicyFor(["source-a", "source-b"]);
+  for (const source of value.governancePolicy.sources) {
+    source.sourceClassId = "static_accessibility_facility";
+  }
+  value.governancePolicySha256 = "d".repeat(64);
+
+  const result = validateSourceSnapshotFreshness(value);
+  assert.deepEqual(
+    result.governanceResults.map(({ sourceId, decision }) => ({ sourceId, decision })),
+    [
+      { sourceId: "source-a", decision: "GO" },
+      { sourceId: "source-b", decision: "GO" },
+    ],
+  );
+
+  value.inventory.sources[1].registrationEvidence.contentSha256 = "4".repeat(64);
+  bindInventory(value);
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /SOURCE_FRESHNESS_POLICY_MISSING: required external source source-b/,
+  );
+
+  value.inventory.sources[1].registrationEvidence.contentSha256 = "1".repeat(64);
+  value.inventory.sources[1].registrationEvidence.registeredAt = "2026-07-15T00:05:00.001Z";
+  bindInventory(value);
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /SOURCE_FRESHNESS_POLICY_MISSING: required external source source-b/,
+  );
+
+  value.inventory.sources[1].registrationEvidence.registeredAt = "2026-07-12T00:01:00.000Z";
+  value.inventory.sources[1].registrationEvidence.capturedAt = "2026-04-15T00:00:00.000Z";
+  bindInventory(value);
+  assert.throws(
+    () => validateSourceSnapshotFreshness(value),
+    /SOURCE_FRESHNESS_POLICY_MISSING: required external source source-b/,
+  );
+});
+
+test("실제 release build spec은 stale local snapshot을 current external receipt로 우회하지 않는다", async () => {
+  const inventory = JSON.parse(await readFile(
+    path.join(root, "tools/datapack/source-inventory.json"),
+    "utf8",
+  ));
+  const evaluationAt = inventory.sources.find(
+    ({ id }) => id === "incheon-transit-accessibility",
+  ).registrationEvidence.registeredAt;
+
+  await assert.rejects(execFileAsync(process.execPath, [
     "tools/datapack/validate-source-snapshot-freshness.mjs",
     "--build-spec", "tools/datapack/release/candidate-build-spec.json",
     "--policy", "release/product-gates/datapack-freshness-sla.json",
     "--governance-policy", "tools/datapack/source-governance-policy.json",
     "--inventory", "tools/datapack/source-inventory.json",
-    "--evaluation-at", "2026-07-28T19:00:00.000Z",
-  ], { cwd: root });
-
-  assert.equal(JSON.parse(stdout).governanceDecision, "GO");
+    "--scope", "release/product-gates/production-datapack-scope.json",
+    "--evaluation-at", evaluationAt,
+  ], { cwd: root }), /SOURCE_SNAPSHOT_EXPIRED/);
 });
 
 test("실제 release build spec은 선택한 snapshot별 governance binding을 보존한다", async () => {

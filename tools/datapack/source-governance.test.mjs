@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
@@ -224,13 +225,20 @@ test("snapshot producer는 previous snapshot에서 diff를 직접 생성한다",
     ]);
 
     const produced = JSON.parse(await readFile(secondOutput, "utf8"));
+    const governancePolicyBytes = await readFile(
+      path.join(root, "tools/datapack/source-governance-policy.json"),
+    );
+    const governancePolicy = JSON.parse(governancePolicyBytes.toString("utf8"));
     assert.equal(produced.previousSnapshotId, "snapshot-a-1");
     assert.equal(produced.diffSummary.status, "CHANGED");
     assert.equal(produced.diffSummary.rowDelta, 1);
     assert.equal(produced.diffSummary.coverageDelta, 1);
     assert.equal(produced.rawRetentionExpiresAt, "2026-09-29T03:00:00.000Z");
-    assert.equal(produced.governancePolicyVersion, "2026-07-15");
-    assert.match(produced.governancePolicySha256, /^[0-9a-f]{64}$/);
+    assert.equal(produced.governancePolicyVersion, governancePolicy.policyVersion);
+    assert.equal(
+      produced.governancePolicySha256,
+      createHash("sha256").update(governancePolicyBytes).digest("hex"),
+    );
 
     await assert.rejects(
       buildSnapshot([

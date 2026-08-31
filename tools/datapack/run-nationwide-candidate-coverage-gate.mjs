@@ -55,7 +55,7 @@
 //   --emit-fixture   조립된 lineScoped candidate fixture를 이 경로에 남긴다(수동 재현·검수용).
 import { execFile } from "node:child_process";
 import { createHash, generateKeyPairSync } from "node:crypto";
-import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, mkdtemp, readFile, realpath, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { promisify } from "node:util";
@@ -136,6 +136,8 @@ const DEPLOYED_ARTIFACT_BUILD_SPEC_PATH = "tools/datapack/release/candidate-buil
 const DEPLOYED_ARTIFACT_ASSET_PATH = "apps/mobile/assets/datapacks/capital.sqlite.gz";
 const DEPLOYED_ARTIFACT_INDEX_PATH = "apps/mobile/assets/datapacks/index.json";
 const DEPLOYED_ARTIFACT_PACK_ID = "capital";
+const BLOCKED_EVIDENCE_KIND = "nationwide-candidate-coverage-gate-blocked-evidence";
+const BLOCKED_STALE_DECISION = "BLOCKED_STALE_DEPLOYED_ARTIFACT";
 // 예약 TLD(.invalid, RFC 2606)라 어떤 게시 경로에서도 해석되지 않는다.
 const NON_PUBLISHABLE_HOST = "easysubway-datapack-candidate.invalid";
 const SIGNING_MODE = "EPHEMERAL_RSA_2048";
@@ -246,7 +248,10 @@ const PACK_DATA_MATERIALIZERS = new Map([
   }],
   ["tools/datapack/materialize-incheon-accessibility.mjs", {
     materialize: materializeIncheonAccessibilityInclusion,
-    inputs: { paths: ["snapshotPath", "topologySnapshotPath"], linePaths: [] },
+    inputs: {
+      paths: ["snapshotPath", "topologySnapshotPath", "historicalAdmissionPath"],
+      linePaths: [],
+    },
   }],
 ]);
 // 부산 편입이 admission 정본을 찾을 때 쓰는 소스 id. 네 편입 모두 상수로 두어 문자열이 어댑터마다
@@ -310,6 +315,119 @@ export function validateNationwideCandidateCoverageSpec(
 ) {
   validateSpec(spec, materializers);
   assertInventoryLineScopeSync(spec, inventory);
+}
+
+function assertSha256(value, label) {
+  if (typeof value !== "string" || !/^[0-9a-f]{64}$/u.test(value)) {
+    throw new Error(`${label} must be a lowercase sha256`);
+  }
+}
+
+function assertCanonicalUtcTimestamp(value, label) {
+  if (typeof value !== "string"
+    || !Number.isFinite(Date.parse(value))
+    || new Date(value).toISOString() !== value) {
+    throw new Error(`${label} must be a canonical UTC timestamp`);
+  }
+}
+
+function expiredDeployedSourceSnapshots(buildSpec, currentTime) {
+  if (buildSpec?.artifactKind !== "datapack-candidate-build-spec") {
+    throw new Error("deployed build spec artifactKind must be datapack-candidate-build-spec");
+  }
+  if (!Array.isArray(buildSpec.sourceSnapshots) || buildSpec.sourceSnapshots.length === 0) {
+    throw new Error("deployed build spec sourceSnapshots must be a non-empty array");
+  }
+  const snapshotIds = [];
+  const identities = buildSpec.sourceSnapshots.map((snapshot, index) => {
+    const prefix = `deployed build spec sourceSnapshots[${index}]`;
+    const sourceId = requiredString(snapshot?.sourceId, `${prefix}.sourceId`);
+    const snapshotId = requiredString(snapshot?.snapshotId, `${prefix}.snapshotId`);
+    assertSha256(snapshot?.rawSha256, `${prefix}.rawSha256`);
+    assertCanonicalUtcTimestamp(snapshot?.freshnessExpiresAt, `${prefix}.freshnessExpiresAt`);
+    snapshotIds.push(snapshotId);
+    return {
+      sourceId,
+      snapshotId,
+      rawSha256: snapshot.rawSha256,
+      freshnessExpiresAt: snapshot.freshnessExpiresAt,
+    };
+  });
+  if (new Set(snapshotIds).size !== snapshotIds.length) {
+    throw new Error("deployed build spec sourceSnapshots must have unique snapshotId values");
+  }
+  if (JSON.stringify(buildSpec.sourceSnapshotIds) !== JSON.stringify(snapshotIds)) {
+    throw new Error("deployed build spec sourceSnapshotIds must exactly match sourceSnapshots");
+  }
+  if (!(currentTime instanceof Date) || !Number.isFinite(currentTime.getTime())) {
+    throw new Error("currentTime must be a valid Date");
+  }
+  return identities
+    .filter(({ freshnessExpiresAt }) => Date.parse(freshnessExpiresAt) <= currentTime.getTime())
+    .sort((left, right) => codepointCompare(left.snapshotId, right.snapshotId));
+}
+
+export function buildBlockedStaleDeployedArtifactEvidence({
+  spec,
+  inputs,
+  buildSpec,
+  buildSpecInput,
+  index,
+  indexInput,
+  assetInput,
+  currentTime = new Date(),
+}) {
+  const expiredSourceSnapshots = expiredDeployedSourceSnapshots(buildSpec, currentTime);
+  if (expiredSourceSnapshots.length === 0) return null;
+
+  const indexPacks = index?.packs?.filter(({ id }) => id === DEPLOYED_ARTIFACT_PACK_ID) ?? [];
+  if (indexPacks.length !== 1) {
+    throw new Error(`deployed index must contain exactly one pack: ${DEPLOYED_ARTIFACT_PACK_ID}`);
+  }
+  const [indexPack] = indexPacks;
+  const expectedAsset = path.relative(path.join(root, "apps/mobile"), path.join(root, DEPLOYED_ARTIFACT_ASSET_PATH))
+    .split(path.sep).join("/");
+  if (indexPack.asset !== expectedAsset) throw new Error(`deployed index asset must be ${expectedAsset}`);
+  assertSha256(indexPack.sha256, "deployed index pack sha256");
+  if (assetInput?.path !== DEPLOYED_ARTIFACT_ASSET_PATH) {
+    throw new Error(`deployed asset path must be ${DEPLOYED_ARTIFACT_ASSET_PATH}`);
+  }
+  assertSha256(assetInput?.sha256, "deployed asset sha256");
+  if (indexPack.sha256 !== assetInput.sha256) throw new Error("deployed index and asset sha256 must match");
+  if (!Number.isInteger(assetInput.byteSize) || assetInput.byteSize <= 0) {
+    throw new Error("deployed asset byteSize must be a positive integer");
+  }
+  if (indexPack.byteSize !== assetInput.byteSize) throw new Error("deployed index and asset byteSize must match");
+  for (const [label, input] of Object.entries({ buildSpec: buildSpecInput, index: indexInput, inventory: inputs?.inventory })) {
+    requiredString(input?.path, `${label} input path`);
+    assertSha256(input?.sha256, `${label} input sha256`);
+  }
+
+  return {
+    schemaVersion: 1,
+    artifactKind: BLOCKED_EVIDENCE_KIND,
+    decision: BLOCKED_STALE_DECISION,
+    evidenceUse: "REPOSITORY_CONTRACT_PROJECTION_ONLY",
+    issue: spec.issue,
+    parentIssues: [...spec.parentIssues],
+    currentFreshnessAsserted: false,
+    deployedArtifact: {
+      packId: DEPLOYED_ARTIFACT_PACK_ID,
+      inputs: {
+        buildSpec: { ...buildSpecInput },
+        index: { ...indexInput },
+        asset: { ...assetInput },
+        inventory: { ...inputs.inventory },
+      },
+      expiredSourceSnapshots,
+    },
+    regeneration: {
+      command: regenerationCommand(inputs),
+      evidencePath: EVIDENCE_PATH,
+      replacementRequiredBeforePublication: true,
+      replacementArtifactKind: "nationwide-candidate-coverage-gate-evidence",
+    },
+  };
 }
 
 export async function runNationwideCandidateCoverageGate({
@@ -1116,12 +1234,32 @@ async function materializeIncheonAccessibilityInclusion(fixture, inclusion, { re
   // 노선 번호 정본은 이 지역의 노선을 세우는 역사정보 materializer가 갖는다 — 두 편입의 admission
   // coverageScope.lineIds가 같은 세 노선이라(위 대조가 그것을 강제한다) 같은 표를 대조 상대로 쓴다.
   assertDeclaredLineNumbers(inclusion, INCHEON_STATION_LINES);
-  assertAdmissionSnapshotPath(
-    inventory,
-    INCHEON_ACCESSIBILITY_SOURCE_ID,
-    "accessibilityAdmissionEvidence",
-    inclusion.snapshotPath,
+  const currentSource = inventory?.sources?.find(({ id }) => id === INCHEON_ACCESSIBILITY_SOURCE_ID);
+  if (currentSource?.requiredForProductionPack !== true
+    || currentSource.admissionEvidence?.decision !== "APPROVED"
+    || currentSource.registrationEvidence?.sourceId !== INCHEON_ACCESSIBILITY_SOURCE_ID
+    || currentSource.accessibilityAdmissionEvidence !== undefined) {
+    throw new Error("current Incheon accessibility inventory must use receipt-bound registration evidence only");
+  }
+  const historicalAdmissionBytes = await readTracked(
+    inclusion.historicalAdmissionPath,
+    "historicalAdmissionPath",
   );
+  if (sha256Hex(historicalAdmissionBytes) !== inclusion.historicalAdmissionSha256) {
+    throw new Error("Incheon historical admission fixture SHA-256 does not match the candidate spec");
+  }
+  const historicalAdmission = parseJsonBytes(
+    historicalAdmissionBytes,
+    inclusion.historicalAdmissionPath,
+  );
+  const historicalSnapshotPath = historicalAdmission?.source
+    ?.accessibilityAdmissionEvidence?.snapshotPath;
+  if (historicalSnapshotPath !== inclusion.snapshotPath) {
+    throw new Error(
+      "pack data inclusion snapshotPath must match the historical Incheon admission fixture snapshotPath: "
+        + `expected ${historicalSnapshotPath}, got ${inclusion.snapshotPath}`,
+    );
+  }
   const topologySnapshot = await incheonTopologySnapshot(
     inclusion,
     readTracked,
@@ -1135,7 +1273,11 @@ async function materializeIncheonAccessibilityInclusion(fixture, inclusion, { re
       inclusion.snapshotPath,
     ),
     topologySnapshot,
-    inventory,
+    historicalAdmission,
+    inventory: {
+      ...inventory,
+      sources: inventory.sources.filter(({ id }) => id !== INCHEON_ACCESSIBILITY_SOURCE_ID),
+    },
     now: new Date(inclusion.materializedAt),
   });
 }
@@ -2362,9 +2504,24 @@ function validateInclusionInputs(inclusion, inputs, label) {
   for (const key of paths) {
     requiredString(inclusion[key], `${label}.${key}`);
   }
+  const historicalIdentityKeys = inclusion.materializer
+    === "tools/datapack/materialize-incheon-accessibility.mjs"
+    ? ["historicalAdmissionSha256"]
+    : [];
+  for (const key of historicalIdentityKeys) {
+    if (!/^[a-f0-9]{64}$/.test(inclusion[key] ?? "")) {
+      throw new Error(`${label}.${key} must be a lowercase SHA-256`);
+    }
+  }
   assertKnownKeys(
     inclusion,
-    [...INCLUSION_BASE_KEYS, ...INCLUSION_OPTIONAL_KEYS, ...INCLUSION_NARRATIVE_KEYS, ...paths],
+    [
+      ...INCLUSION_BASE_KEYS,
+      ...INCLUSION_OPTIONAL_KEYS,
+      ...INCLUSION_NARRATIVE_KEYS,
+      ...paths,
+      ...historicalIdentityKeys,
+    ],
     label,
   );
   if (!Array.isArray(inclusion.lines) || inclusion.lines.length === 0) {
@@ -2469,6 +2626,16 @@ async function readJsonInput(filePath) {
   };
 }
 
+async function readRegularFileInput(filePath) {
+  const resolved = path.resolve(root, filePath);
+  const metadata = await lstat(resolved);
+  if (!metadata.isFile() || metadata.isSymbolicLink()) {
+    throw new Error(`${filePath} must be a regular non-symlink file`);
+  }
+  const bytes = await readFile(resolved);
+  return { path: filePath, sha256: createHash("sha256").update(bytes).digest("hex"), byteSize: bytes.length };
+}
+
 async function main(argv) {
   const args = parseArgs(argv);
   for (const flag of Object.keys(args)) {
@@ -2480,6 +2647,30 @@ async function main(argv) {
   const inventory = await readJsonInput(requireArg(args, "inventory"));
   const resolutionPlan = await readJsonInput(requireArg(args, "resolution-plan"));
   const resolutions = await readJsonInput(requireArg(args, "resolutions"));
+  const deployedBuildSpec = await readJsonInput(DEPLOYED_ARTIFACT_BUILD_SPEC_PATH);
+  const deployedIndex = await readJsonInput(DEPLOYED_ARTIFACT_INDEX_PATH);
+  const deployedAsset = await readRegularFileInput(DEPLOYED_ARTIFACT_ASSET_PATH);
+  const inputs = {
+    spec: spec.input,
+    targets: targets.input,
+    inventory: inventory.input,
+    resolutionPlan: resolutionPlan.input,
+    resolutions: resolutions.input,
+  };
+  const blockedEvidence = buildBlockedStaleDeployedArtifactEvidence({
+    spec: spec.document,
+    inputs,
+    buildSpec: deployedBuildSpec.document,
+    buildSpecInput: deployedBuildSpec.input,
+    index: deployedIndex.document,
+    indexInput: deployedIndex.input,
+    assetInput: deployedAsset,
+  });
+  if (blockedEvidence) {
+    await mkdir(path.dirname(path.resolve(root, outputPath)), { recursive: true });
+    await writeFile(path.resolve(root, outputPath), `${JSON.stringify(sortJson(blockedEvidence), null, 2)}\n`);
+    return;
+  }
 
   const requestedWorkDir = args["work-dir"];
   const workDir = requestedWorkDir

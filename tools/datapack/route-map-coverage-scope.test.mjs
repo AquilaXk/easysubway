@@ -76,6 +76,10 @@ async function readJson(relativePath) {
   return JSON.parse(await readFile(path.join(root, relativePath), "utf8"));
 }
 
+const trackedCandidateEvidence = await readJson(CANDIDATE_EVIDENCE_PATH);
+const fullCandidateEvidenceTest = trackedCandidateEvidence.artifactKind
+  === "nationwide-candidate-coverage-gate-blocked-evidence" ? test.skip : test;
+
 async function loadAuditInputs() {
   const [inventory, targets, exemptions, molitCsvBytes, candidateSpecBytes, candidateEvidence] = await Promise.all([
     readJson("tools/datapack/source-inventory.json"),
@@ -105,6 +109,13 @@ async function loadAuditInputs() {
     .map((alias) => alias.evidence?.officialRawPath).filter(Boolean);
   for (const rawPath of new Set(rawPaths)) {
     rawSourcesByPath.set(rawPath, await readFile(path.join(root, rawPath)));
+  }
+  const blockedCandidateEvidence = candidateEvidence.artifactKind
+    === "nationwide-candidate-coverage-gate-blocked-evidence";
+  if (blockedCandidateEvidence) {
+    // blocked projection은 candidate line-scope support를 주장하지 않는다. admitted snapshot 기반의 나머지
+    // containment 회귀는 계속 실행하고, 이 claim 자체는 아래 blocked 전용 회귀에서 따로 fail closed를 본다.
+    inventory.sources.find(({ id }) => id === CANDIDATE_REDESCRIBED_SOURCE_ID).coverageScope.lineIds = [];
   }
   return {
     inventory,
@@ -785,7 +796,7 @@ test("MOLIT roster가 없는 scope는 감사에서 제외되고 위반으로 남
 // 이 분기를 덮지 못한다(#2595에서 대전 소스가 재기술 대상이 되면서 실제로 그렇게 갈렸다). #2595 B3에서
 // lineIds를 claim한 route_map_positions 소스가 전부 재기술 대상이 됐으므로 이제는 inventory와 spec 두
 // 정본에서 함께 지운다 — 어느 한쪽만 지우면 다른 축으로 갈린다는 사실 자체가 이 회귀의 전제다.
-test("lineIds를 claim한 route_map_positions 소스는 admitted snapshot 경로가 있어야 한다 (#2516)", async () => {
+fullCandidateEvidenceTest("lineIds를 claim한 route_map_positions 소스는 admitted snapshot 경로가 있어야 한다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const sourceId = "kric-seohae-route-map-positions";
   const inventory = structuredClone(inputs.inventory);
@@ -811,7 +822,7 @@ test("lineIds를 claim한 route_map_positions 소스는 admitted snapshot 경로
 // #2514(#2510 B0)의 candidate 게이트 line-scope 재기술은 admitted snapshot 파일 없이 lineIds를 claim한다.
 // 이 claim은 containment 근거가 아니므로 감사 대상 scope를 만들지 못하고, 근거 결속이 하나라도
 // 깨지면 위반으로 남아야 한다.
-test("admitted snapshot 없는 재기술 claim은 근거가 전부 결속되면 위반이 아니다 (#2516)", async () => {
+fullCandidateEvidenceTest("admitted snapshot 없는 재기술 claim은 근거가 전부 결속되면 위반이 아니다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
 
   const result = auditRouteMapCoverageScopes(inputs);
@@ -827,7 +838,7 @@ test("admitted snapshot 없는 재기술 claim은 근거가 전부 결속되면 
   assert.ok(result.auditedScopeKeys.includes(CANDIDATE_REDESCRIBED_SCOPE_KEY));
 });
 
-test("admitted snapshot 없는 inherited claim은 exact baseline·current source 증분이 깨지면 거부된다 (#2516)", async () => {
+fullCandidateEvidenceTest("admitted snapshot 없는 inherited claim은 exact baseline·current source 증분이 깨지면 거부된다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const evidence = structuredClone(inputs.candidateLineScopeAdmission.evidence);
   const declaration = evidence.declaredNonTransitions.entries.find(
@@ -841,7 +852,7 @@ test("admitted snapshot 없는 inherited claim은 exact baseline·current source
   assert.deepEqual(violationKinds(result), ["SOURCE_INHERITED_CANDIDATE_BINDING_MISMATCH"]);
 });
 
-test("admitted snapshot 없는 inherited claim은 자기 자신을 current source로 재기술할 수 없다 (#2516)", async () => {
+fullCandidateEvidenceTest("admitted snapshot 없는 inherited claim은 자기 자신을 current source로 재기술할 수 없다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const spec = JSON.parse(inputs.candidateLineScopeAdmission.specBytes.toString("utf8"));
   const redescription = spec.lineScopeRedescriptions.find(
@@ -872,7 +883,7 @@ test("admitted snapshot 없는 inherited claim은 자기 자신을 current sourc
   assert.deepEqual(violationKinds(result), ["SOURCE_INHERITED_CANDIDATE_BINDING_MISMATCH"]);
 });
 
-test("candidate 재기술 근거가 없으면 snapshot 없는 lineIds claim은 위반이다 (#2516)", async () => {
+fullCandidateEvidenceTest("candidate 재기술 근거가 없으면 snapshot 없는 lineIds claim은 위반이다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
 
   const result = auditRouteMapCoverageScopes({ ...inputs, candidateLineScopeAdmission: {} });
@@ -880,7 +891,7 @@ test("candidate 재기술 근거가 없으면 snapshot 없는 lineIds claim은 �
   assert.deepEqual(violationKinds(result), ["SOURCE_SNAPSHOT_PATH_MISSING"]);
 });
 
-test("candidate spec 재기술 lineIds가 claim과 다르면 거부된다 (#2516)", async () => {
+fullCandidateEvidenceTest("candidate spec 재기술 lineIds가 claim과 다르면 거부된다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const inventory = structuredClone(inputs.inventory);
   const source = inventory.sources.find(({ id }) => id === CANDIDATE_REDESCRIBED_SOURCE_ID);
@@ -891,7 +902,7 @@ test("candidate spec 재기술 lineIds가 claim과 다르면 거부된다 (#2516
   assert.deepEqual(violationKinds(result), ["SOURCE_CANDIDATE_LINE_SCOPE_MISMATCH"]);
 });
 
-test("게이트 evidence에 결속되지 않은 candidate spec은 근거가 되지 못한다 (#2516)", async () => {
+fullCandidateEvidenceTest("게이트 evidence에 결속되지 않은 candidate spec은 근거가 되지 못한다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   // JSON 의미는 그대로 두고 바이트만 바꾼다 — evidence가 기록한 spec 해시와 어긋난다.
   const specBytes = Buffer.concat([inputs.candidateLineScopeAdmission.specBytes, Buffer.from("\n")]);
@@ -902,7 +913,18 @@ test("게이트 evidence에 결속되지 않은 candidate spec은 근거가 되�
   assert.deepEqual(violationKinds(result), ["SOURCE_CANDIDATE_EVIDENCE_SPEC_UNBOUND"]);
 });
 
-test("게이트가 SUPPORTED로 실증하지 않은 재기술 scope는 거부된다 (#2516)", async () => {
+test("stale deployed artifact blocked evidence는 candidate SUPPORTED 근거가 아니다 (#2970)", async () => {
+  const inputs = await loadAuditInputs();
+  inputs.inventory.sources
+    .find(({ id }) => id === CANDIDATE_REDESCRIBED_SOURCE_ID).coverageScope.lineIds = ["seoul-4"];
+
+  const result = auditRouteMapCoverageScopes(inputs);
+
+  assert.equal(inputs.candidateLineScopeAdmission.evidence.decision, "BLOCKED_STALE_DEPLOYED_ARTIFACT");
+  assert.deepEqual(violationKinds(result), ["SOURCE_SNAPSHOT_PATH_MISSING"]);
+});
+
+fullCandidateEvidenceTest("게이트가 SUPPORTED로 실증하지 않은 재기술 scope는 거부된다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const evidence = structuredClone(inputs.candidateLineScopeAdmission.evidence);
   evidence.variants.lineScoped.supportedRequirementKeys = evidence.variants.lineScoped.supportedRequirementKeys
@@ -914,7 +936,7 @@ test("게이트가 SUPPORTED로 실증하지 않은 재기술 scope는 거부된
   assert.deepEqual(violationKinds(result), ["SOURCE_CANDIDATE_SCOPE_NOT_SUPPORTED"]);
 });
 
-test("재기술만으로는 containment 감사가 사라진 scope를 통과시킬 수 없다 (#2516)", async () => {
+fullCandidateEvidenceTest("재기술만으로는 containment 감사가 사라진 scope를 통과시킬 수 없다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const inventory = structuredClone(inputs.inventory);
   // 이 scope를 실측하던 admitted snapshot 소스의 claim을 지우면 containment를 판정할 근거가 없어진다.
@@ -927,7 +949,7 @@ test("재기술만으로는 containment 감사가 사라진 scope를 통과시�
   assert.equal(result.auditedScopeKeys.includes(CANDIDATE_REDESCRIBED_SCOPE_KEY), false);
 });
 
-test("activeLineScopes에서 빠진 scope는 재기술 claim으로 통과시킬 수 없다 (#2516)", async () => {
+fullCandidateEvidenceTest("activeLineScopes에서 빠진 scope는 재기술 claim으로 통과시킬 수 없다 (#2516)", async () => {
   const inputs = await loadAuditInputs();
   const targets = structuredClone(inputs.targets);
   // snapshot이 그대로 커버해도 AquilaXk/easysubway-data#3 requirement에서 빠지면 containment 감사 자체가 사라진다.

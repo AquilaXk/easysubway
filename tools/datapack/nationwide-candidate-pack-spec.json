@@ -918,6 +918,8 @@
       "materializedAt": "2026-07-24T07:00:00.000Z",
       "snapshotPath": "tools/datapack/sources/incheon-transit-accessibility-20260724.json",
       "topologySnapshotPath": "tools/datapack/sources/incheon-transit-station-info-20260724.json",
+      "historicalAdmissionPath": "tools/datapack/release/historical-incheon-transit-accessibility-admission-20260724.json",
+      "historicalAdmissionSha256": "3c51ee467f0bc4a3b84ecd979db30415955939ca4573908951985bf493594675",
       "lines": [
         { "lineNumber": 2, "lineId": "line-42b5805f3b5a" },
         { "lineNumber": 1, "lineId": "line-98718184f016" },

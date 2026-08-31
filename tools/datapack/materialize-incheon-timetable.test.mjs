@@ -58,6 +58,7 @@ async function inputs() {
     gwangjuAccessibilitySnapshot,
     incheonBytes,
     accessibilitySnapshot,
+    historicalAdmission,
     line1Timetable,
     line2Timetable,
     inventory,
@@ -75,6 +76,7 @@ async function inputs() {
     readJson("tools/datapack/sources/gwangju-transportation-accessibility-20260724.json"),
     readFile(path.join(root, "tools/datapack/sources/incheon-transit-station-info-20260724.json")),
     readJson("tools/datapack/sources/incheon-transit-accessibility-20260724.json"),
+    readJson("tools/datapack/release/historical-incheon-transit-accessibility-admission-20260724.json"),
     readJson("tools/datapack/sources/incheon-line1-train-timetable-20260724.json"),
     readJson("tools/datapack/sources/incheon-line2-train-timetable-20260724.json"),
     readJson("tools/datapack/source-inventory.json"),
@@ -138,7 +140,11 @@ async function inputs() {
     baseFixture: incheonFixture,
     accessibilitySnapshot,
     topologySnapshot: { ...incheonSnapshot, snapshotId: "incheon-transit-station-info-20260724" },
-    inventory,
+    historicalAdmission,
+    inventory: {
+      ...inventory,
+      sources: inventory.sources.filter(({ id }) => id !== "incheon-transit-accessibility"),
+    },
     now: accessibilityNow,
   });
   return {

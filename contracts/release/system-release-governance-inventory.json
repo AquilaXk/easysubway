@@ -4,7 +4,7 @@
   "files": [
     {
       "path": ".github/workflows/datapack-release.yml",
-      "sha256": "fab243b1195ad872b45b2a6bad368474c8dd4f4130810a862f5c068831c68738"
+      "sha256": "edc90472628f236099ba47976f9aa2acf361406ccc27b562db3562cad5764bc3"
     },
     {
       "path": ".github/workflows/release-artifacts.yml",
@@ -152,7 +152,7 @@
     },
     {
       "path": "release/product-gates/production-datapack-scope.json",
-      "sha256": "bcae4176c9a8c78bd9d4017327c7226191c1406e2bfbdd4f3022b56dd9609d99"
+      "sha256": "c16530af6d3f41cf22407948dcf912c909eb0f52cf44b4cc32124fa48112d005"
     },
     {
       "path": "release/product-gates/rc-evidence-manifest-contract.json",

@@ -20,6 +20,7 @@ const productionForbiddenMovementSourceIds = [
   "kric-wheelchair-lift-movement",
 ];
 const requiredProductionSourceIds = [
+  "incheon-transit-accessibility",
   "molit-urban-rail-full-route",
   "seoulmetro-station-line-info",
   "seoul-metro-accessibility",
@@ -29,6 +30,14 @@ const requiredProductionSourceIds = [
   "seoul-metro-transfer-distance-duration",
 ];
 const externalSourceRegistrations = [
+  {
+    sourceId: "incheon-transit-accessibility",
+    registrationRepository: "AquilaXk/easysubway-data",
+    registrationIssue: 622,
+    snapshotId: "incheon-transit-accessibility-20260828T043356000Z",
+    decision: "APPROVED",
+    productionUseAllowed: true,
+  },
   {
     sourceId: "seoul-metro-transfer-distance-duration",
     registrationRepository: "AquilaXk/easysubway-data",
@@ -95,16 +104,24 @@ test("data contract bundle --write는 output symlink와 그 referent를 거부�
   }
 });
 
-test("route-map governance bundle은 current과 historical source를 exact bytes로 분리한다", async () => {
-  const [backendBundle, governance] = await Promise.all([
+test("data bundle은 current governance를 고정하고 backend bundle은 historical bytes를 보존한다", async () => {
+  const [dataBundle, backendBundle, governance] = await Promise.all([
+    readFile("contracts/bundles/data-contracts-v1.0.0.json", "utf8").then(JSON.parse),
     readFile("contracts/bundles/backend-contracts-v1.0.0.json", "utf8").then(JSON.parse),
     readFile("tools/datapack/source-governance-policy.json", "utf8"),
   ]);
 
-  assert.equal(backendBundle.resources["datapack/source-governance-policy.json"], governance);
+  assert.equal(dataBundle.resources["datapack/source-governance-policy.json"], governance);
+  const historicalGovernance = backendBundle.resources["datapack/source-governance-policy.json"];
+  assert.notEqual(historicalGovernance, governance);
   const sources = new Map(JSON.parse(governance).sources.map((source) => [source.sourceId, source]));
+  const historicalSources = new Map(JSON.parse(historicalGovernance).sources.map((source) => [source.sourceId, source]));
   assert.equal(sources.get("seoul-metro-route-map-positions").sourceClassId, "route_map_positions");
   assert.equal(sources.get("seoulmetro-cyberstation-route-map").sourceClassId, "route_map_asset_historical");
+  assert.equal(historicalSources.get("seoul-metro-route-map-positions").sourceClassId, "route_map_positions");
+  assert.equal(historicalSources.get("seoulmetro-cyberstation-route-map").sourceClassId, "route_map_asset_historical");
+  assert.equal(sources.has("incheon-transit-accessibility"), true);
+  assert.equal(historicalSources.has("incheon-transit-accessibility"), false);
 });
 
 test("current route-map source admission license evidence는 승인된 governance terms와 일치한다", async () => {
@@ -129,7 +146,7 @@ test("staged freshness와 governance는 annual official source binding 및 licen
   const freshnessSourceIds = freshness.sourceClasses.flatMap((sourceClass) => sourceClass.sourceIds).sort();
 
   assert.deepEqual([...governanceBySource.keys()].sort(), freshnessSourceIds);
-  for (const sourceId of ["molit-railway-transfer-movement", "seoul-metro-transfer-distance-duration"]) {
+  for (const sourceId of ["incheon-transit-accessibility", "molit-railway-transfer-movement", "seoul-metro-transfer-distance-duration"]) {
     const source = inventory.sources.find((candidate) => candidate.id === sourceId);
     const mobileSource = mobileInventory.sources.find((candidate) => candidate.id === sourceId);
     assert.equal(source.admissionEvidence?.licenseEvidenceHash, governanceBySource.get(sourceId).licenseReview.termsHash);

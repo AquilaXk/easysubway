@@ -57,11 +57,18 @@ export function materializeIncheonAccessibility({
   baseFixture,
   accessibilitySnapshot,
   topologySnapshot,
+  historicalAdmission,
   inventory,
   now = new Date(),
 } = {}) {
   const rows = validateSnapshot(accessibilitySnapshot);
-  const source = requiredSource(inventory, accessibilitySnapshot, topologySnapshot, now);
+  const source = requiredHistoricalSource(
+    inventory,
+    historicalAdmission,
+    accessibilitySnapshot,
+    topologySnapshot,
+    now,
+  );
   const fixture = structuredClone(baseFixture);
   const pack = fixture.packs?.[0];
   if (!pack || fixture.packs.length !== 1 || pack.artifactKind !== "production") {
@@ -236,16 +243,28 @@ function validateSnapshot(snapshot) {
   return snapshot.rows;
 }
 
-function requiredSource(inventory, snapshot, topologySnapshot, now) {
-  const source = inventory?.sources?.find(({ id }) => id === SOURCE_ID);
+function requiredHistoricalSource(inventory, historicalAdmission, snapshot, topologySnapshot, now) {
+  if (inventory?.sources?.some(({ id }) => id === SOURCE_ID)) {
+    throw new Error(`${SOURCE_ID} historical materializer rejects current Incheon inventory`);
+  }
+  if (historicalAdmission?.schemaVersion !== 1
+    || historicalAdmission.artifactKind !== "historical-source-admission"
+    || historicalAdmission.historicalOnly !== true
+    || historicalAdmission.source?.id !== SOURCE_ID) {
+    throw new Error(`${SOURCE_ID} historical admission fixture is required`);
+  }
+  const source = historicalAdmission.source;
   const evidence = source?.accessibilityAdmissionEvidence;
-  if (source?.productionUseAllowed !== true || source.license?.redistributionAllowed !== true
+  if (source.requiredForProductionPack !== false
+    || source.admissionEvidence !== undefined
+    || source.registrationEvidence !== undefined
+    || source.productionUseAllowed !== true || source.license?.redistributionAllowed !== true
     || source.license?.type !== "PUBLIC_DATA_FREE_USE"
     || source.capabilities?.facility?.productionUseAllowed !== true
     || source.capabilities?.facility?.status !== "SUPPORTED"
     || evidence?.issue !== 2492
-    || evidence.materializer !== "tools/datapack/materialize-incheon-accessibility.mjs"
-    || evidence.verificationTest !== "tools/datapack/materialize-incheon-accessibility.test.mjs"
+    || evidence?.materializer !== "tools/datapack/materialize-incheon-accessibility.mjs"
+    || evidence?.verificationTest !== "tools/datapack/materialize-incheon-accessibility.test.mjs"
     || !/^incheon-transit-accessibility-\d{8}$/.test(evidence.snapshotId ?? "")
     || evidence.snapshotPath !== `tools/datapack/sources/${evidence.snapshotId}.json`
     || evidence.capturedAt !== snapshot.capturedAt || evidence.freshUntil !== snapshot.freshUntil
@@ -388,28 +407,31 @@ function parseArgs(argv) {
     "--base-fixture",
     "--accessibility-snapshot",
     "--topology-snapshot",
+    "--historical-admission",
     "--inventory",
     "--output",
   ];
   if (argv.length !== expected.length * 2 || expected.some((flag, index) => argv[index * 2] !== flag)
     || !path.isAbsolute(argv.at(-1))) {
-    throw new Error("usage: materialize-incheon-accessibility.mjs --base-fixture <json> --accessibility-snapshot <json> --topology-snapshot <json> --inventory <json> --output <absolute.json>");
+    throw new Error("usage: materialize-incheon-accessibility.mjs --base-fixture <json> --accessibility-snapshot <json> --topology-snapshot <json> --historical-admission <json> --inventory <json> --output <absolute.json>");
   }
   return Object.fromEntries(expected.map((flag, index) => [flag.slice(2), argv[index * 2 + 1]]));
 }
 
 export async function runIncheonAccessibilityMaterializer(argv, { now = new Date() } = {}) {
   const args = parseArgs(argv);
-  const [baseFixture, accessibilitySnapshot, topologySnapshot, inventory] = await Promise.all([
+  const [baseFixture, accessibilitySnapshot, topologySnapshot, historicalAdmission, inventory] = await Promise.all([
     readFile(args["base-fixture"], "utf8").then(JSON.parse),
     readFile(args["accessibility-snapshot"], "utf8").then(JSON.parse),
     readFile(args["topology-snapshot"], "utf8").then(JSON.parse),
+    readFile(args["historical-admission"], "utf8").then(JSON.parse),
     readFile(args.inventory, "utf8").then(JSON.parse),
   ]);
   const fixture = materializeIncheonAccessibility({
     baseFixture,
     accessibilitySnapshot,
     topologySnapshot,
+    historicalAdmission,
     inventory,
     now,
   });
