@@ -20,6 +20,7 @@ const productionForbiddenMovementSourceIds = [
   "kric-wheelchair-lift-movement",
 ];
 const requiredProductionSourceIds = [
+  "incheon-transit-accessibility",
   "molit-urban-rail-full-route",
   "seoulmetro-station-line-info",
   "seoul-metro-accessibility",

@@ -10653,6 +10653,7 @@ test("Android v1 production 데이터팩 scope는 수도권 pilot 승인 기준�
   );
 
   assert.deepEqual(scope.productionSourceSet.requiredSourceIds.sort(), [
+    "incheon-transit-accessibility",
     "kric-station-convenience-standard",
     "kric-subway-timetable",
     "molit-urban-rail-full-route",

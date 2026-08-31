@@ -12,6 +12,7 @@ const resources = [
   ["datapack/train-search-itx-exclusion-gate.json", "release/product-gates/train-search-itx-exclusion-gate.json"],
 ];
 const requiredProductionSourceIds = [
+  "incheon-transit-accessibility",
   "molit-urban-rail-full-route",
   "seoulmetro-station-line-info",
   "seoul-metro-accessibility",

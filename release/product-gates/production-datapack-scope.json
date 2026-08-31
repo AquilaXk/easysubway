@@ -127,6 +127,7 @@
   "productionSourceSet": {
     "sourceInventory": "tools/datapack/source-inventory.json",
     "requiredSourceIds": [
+      "incheon-transit-accessibility",
       "molit-urban-rail-full-route",
       "seoulmetro-station-line-info",
       "seoul-metro-accessibility",
