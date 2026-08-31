@@ -31,6 +31,14 @@ const requiredProductionSourceIds = [
 ];
 const externalSourceRegistrations = [
   {
+    sourceId: "incheon-transit-accessibility",
+    registrationRepository: "AquilaXk/easysubway-data",
+    registrationIssue: 622,
+    snapshotId: "incheon-transit-accessibility-20260828T043356000Z",
+    decision: "APPROVED",
+    productionUseAllowed: true,
+  },
+  {
     sourceId: "seoul-metro-transfer-distance-duration",
     registrationRepository: "AquilaXk/easysubway-data",
     registrationIssue: 350,

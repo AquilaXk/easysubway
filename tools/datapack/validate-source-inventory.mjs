@@ -263,6 +263,9 @@ function validateProductionScope(inventory, scope) {
     if (source.requiredForProductionPack !== true && !externalRegistrations.has(sourceId)) {
       throw new Error(`required source ${sourceId} must be locally required or externally registered`);
     }
+    if (source.registrationEvidence != null && !externalRegistrations.has(sourceId)) {
+      throw new Error(`required source ${sourceId} receipt must be externally registered`);
+    }
   }
   for (const sourceId of optionalSourceIds) {
     const source = requireInventorySource(sources, sourceId);
@@ -295,8 +298,13 @@ function validateExternalSourceRegistrations(registrations, sources, requiredSou
       throw new Error(`duplicate external source registration for ${sourceId}`);
     }
     const source = requireInventorySource(sources, sourceId);
-    if (!requiredSourceIds.has(sourceId) || source.requiredForProductionPack !== false) {
-      throw new Error(`external source registration ${sourceId} requires a locally non-production required source`);
+    if (!requiredSourceIds.has(sourceId)) {
+      throw new Error(`external source registration ${sourceId} requires a production source`);
+    }
+    if (source.requiredForProductionPack === true) {
+      validateCurrentExternalSourceRegistration(source, registration);
+    } else if (source.requiredForProductionPack !== false) {
+      throw new Error(`external source registration ${sourceId} requires an explicit production decision`);
     }
     registrationsBySource.set(sourceId, registration);
   }
@@ -329,6 +337,25 @@ function validateExternalSourceRegistration(registration, index) {
     throw new Error(`${label}.productionUseAllowed must be true`);
   }
   return sourceId;
+}
+
+function validateCurrentExternalSourceRegistration(source, registration) {
+  const admission = source.admissionEvidence;
+  const receipt = source.registrationEvidence;
+  const matches = registration.registrationIssue === admission?.issue
+    && registration.snapshotId === admission?.snapshotId
+    && registration.snapshotId === receipt?.snapshotId
+    && registration.decision === admission?.decision
+    && registration.productionUseAllowed === admission?.quotaEvidence?.productionUseAllowed
+    && receipt?.sourceId === source.id
+    && typeof receipt.rawObjectUri === "string"
+    && receipt.rawObjectUri.startsWith("oci://")
+    && receipt.snapshotRawSha256 === admission?.rawSha256
+    && receipt.contentSha256 === admission?.sampleEvidenceHash
+    && receipt.adminReviewRecordHash === admission?.adminReviewRecordHash;
+  if (!matches) {
+    throw new Error(`external source registration ${source.id} must match current receipt-bound admission`);
+  }
 }
 
 async function validateAdmittedCandidateEvidence(inventory, candidates, officialOdFareAdmissionBytes) {

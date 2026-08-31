@@ -16,6 +16,20 @@ test("product datapack 정책 변경은 release workflow를 실행한다", () =>
   assert.match(yml, /paths:[\s\S]*release\/product-gates\/production-datapack-scope\.json/);
 });
 
+test("production-publish는 current nationwide coverage GO를 요구한다", () => {
+  const gate = yml.match(
+    /- name: Data Pack Release \/ Require current nationwide coverage GO[\s\S]*?\n\s+- name:/,
+  )?.[0];
+  assert.ok(gate, "nationwide coverage publication gate를 찾지 못함");
+  assert.match(gate, /if:\s*\$\{\{ steps\.release-mode\.outputs\.mode == 'production-publish' \}\}/);
+  assert.match(gate, /require-nationwide-coverage-publication-ready\.mjs/);
+  assert.match(gate, /nationwide-candidate-coverage-gate\.json/);
+  assert.ok(
+    yml.indexOf("Require current nationwide coverage GO") < yml.indexOf("Validate source snapshot freshness"),
+    "nationwide coverage GO gate must run before production freshness and publication",
+  );
+});
+
 // 외부 yaml 의존성 없이(리포는 node 내장 --test만 사용) workflow_dispatch 입력 이름을
 // 들여쓰기로 추출한다: "    inputs:" 다음, 4칸 이하 들여쓰기로 블록이 끝나기 전까지의 6칸 키.
 function workflowDispatchInputNames(source) {

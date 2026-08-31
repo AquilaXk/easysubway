@@ -270,7 +270,6 @@ test("production build와 bundled asset/index의 artifact identity를 exact-matc
 
     const syncedIndex = JSON.parse(await readFile(indexPath, "utf8"));
     assert.equal(syncedIndex.freshnessExpiresAt, manifest.expiresAt);
-
     const index = JSON.parse(await readFile(indexPath, "utf8"));
     const capitalIndex = index.packs.find(({ id }) => id === "capital");
     capitalIndex.asset = "assets/datapacks/core.sqlite.gz";
