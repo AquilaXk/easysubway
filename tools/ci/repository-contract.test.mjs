@@ -10279,10 +10279,10 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
   assert.deepEqual(sourceIds, [
     "busan-transportation-accessibility",
     "busan-transportation-official-od-fares",
-    "busan-transportation-route-map-positions",
     "busan-transportation-route-topology",
     "busan-transportation-timetable",
     "busan-transportation-urban-rail-station-info",
+    "capital-route-topology",
     "daegu-line1-route-topology",
     "daegu-line1-train-timetable",
     "daegu-line2-route-topology",
@@ -10296,13 +10296,14 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "daejeon-transportation-accessibility",
     "daejeon-transportation-route-map-positions",
     "gwangju-transportation-accessibility",
-    "gwangju-transportation-cyberstation-timetable",
     "gwangju-transportation-route-map-positions",
     "gwangju-transportation-route-topology",
     "incheon-line1-train-timetable",
     "incheon-line2-train-timetable",
     "incheon-transit-accessibility",
     "incheon-transit-station-info",
+    "korail-metropolitan-planned-timetable",
+    "korail-metropolitan-timetable-file",
     "kric-airport-railroad-route-map-positions",
     "kric-disabled-toilet",
     "kric-elevator-car-number",
@@ -10313,6 +10314,7 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     "kric-gyeonggang-route-map-positions",
     "kric-gyeongui-jungang-route-map-positions",
     "kric-metropolitan-rail-station-info",
+    "kric-nationwide-timetable-file",
     "kric-platform-train-distance",
     "kric-safety-platform",
     "kric-seohae-route-map-positions",
@@ -10373,10 +10375,10 @@ test("운영 데이터팩 공식 출처 inventory는 라이선스와 갱신 기�
     assert.equal(source.license.commercialUseAllowed, true, `${source.id} must allow commercial use`);
     assert.equal(source.license.derivativeWorkAllowed, true, `${source.id} must allow derivative work`);
     assert.equal(source.license.redistributionAllowed, true, `${source.id} must allow redistribution`);
-    assert.match(source.license.attribution, /공공누리 제1유형|공공데이터포털 이용허락범위 제한 없음/);
+    assert.match(source.license.attribution, /공공누리 제1유형|공공데이터포털 이용허락범위 제한 없음|국가철도공단|한국철도공사/);
     assert.match(
       source.datasetUrl,
-      /^https:\/\/(?:data\.seoul\.go\.kr\/dataList\/OA-[0-9]+\/[AFS]\/1\/datasetView\.do|www\.data\.go\.kr\/data\/[0-9]+\/(?:openapi|fileData)\.do|www\.seoulmetro\.co\.kr\/kr\/cyberStation\.do|www\.grtc\.co\.kr\/subway\/(?:contents\/apiRunInfo|menu\/trainTimetableSubMenu)|data\.kric\.go\.kr\/rips\/M_01_01\/detail\.do\?id=[0-9]+|data\.kric\.go\.kr\/rips\/M_01_02\/detail\.do\?id=[0-9]+&service=[A-Za-z0-9]+&operation=[A-Za-z0-9]+&page=[0-9]+)$/,
+      /^https:\/\/(?:data\.seoul\.go\.kr\/dataList\/OA-[0-9]+\/[AFS]\/1\/datasetView\.do|www\.data\.go\.kr\/(?:data\/[0-9]+\/(?:openapi|fileData)\.do)?|www\.seoulmetro\.co\.kr\/kr\/cyberStation\.do|www\.grtc\.co\.kr\/subway\/(?:contents\/apiRunInfo|menu\/trainTimetableSubMenu)|data\.kric\.go\.kr\/rips\/M_01_01\/detail\.do\?id=[0-9]+|data\.kric\.go\.kr\/rips\/M_01_02\/detail\.do\?id=[0-9]+&service=[A-Za-z0-9]+&operation=[A-Za-z0-9]+&page=[0-9]+)$/,
     );
     assert.match(source.observedDataUpdatedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
     assert.match(source.retrievedAt, /^[0-9]{4}-[0-9]{2}-[0-9]{2}$/);
