@@ -5,6 +5,12 @@
   "deployedArtifact": {
     "expiredSourceSnapshots": [
       {
+        "freshnessExpiresAt": "2026-09-08T12:04:20.479Z",
+        "rawSha256": "d8ee1a9351ade3465a955ffabeade294eaccf65449fc1fc1998240fdba87e064",
+        "snapshotId": "kric-subway-timetable-line4-pilot-20260809",
+        "sourceId": "kric-subway-timetable"
+      },
+      {
         "freshnessExpiresAt": "2026-08-11T00:00:00.000Z",
         "rawSha256": "3ad2a676f45d23c1f39a90dc13f3a040c92ac05a01c43b9e6bbb82bf07172268",
         "snapshotId": "molit-urban-rail-full-route-capital-admission-20260712",
@@ -25,7 +31,7 @@
       },
       "buildSpec": {
         "path": "tools/datapack/release/candidate-build-spec.json",
-        "sha256": "d4f372328e33c650c5e0e980f5d4dd61d0ff3309f11fbe65d4fcf499135042f5"
+        "sha256": "daf4158fd90a942347de0111ab36ae923025e07fee3457d37612d26b02ad7a09"
       },
       "index": {
         "path": "apps/mobile/assets/datapacks/index.json",
@@ -33,7 +39,7 @@
       },
       "inventory": {
         "path": "tools/datapack/source-inventory.json",
-        "sha256": "3c27fd14c028afb3ae8b4b87ab738b5e42d751d3f3f61b90c41415b77158a27d"
+        "sha256": "49fc88b9a66becb569d7c3c62bb7d1eb32364e768b2c5c520906d5c4c199acaa"
       }
     },
     "packId": "capital"
