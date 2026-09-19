@@ -137,6 +137,12 @@
             }
           },
           "fieldsProvided": { "type": "array", "minItems": 1, "items": { "type": "string" } },
+          "productDerivedFields": {
+            "type": "array",
+            "minItems": 1,
+            "items": { "type": "string" },
+            "description": "정본 raw field와 분리해 제품의 결정론적 materializer가 산출하는 필드다."
+          },
           "capabilities": {
             "type": "object",
             "additionalProperties": false,
@@ -144,7 +150,8 @@
             "properties": {
               "schedule": { "type": "object" },
               "realtime": { "type": "object" },
-              "facility": { "type": "object" }
+              "facility": { "type": "object" },
+              "transfer": { "type": "object" }
             }
           },
           "registrationEvidence": {
@@ -241,7 +248,23 @@
                   "sharedQuotaStore": { "type": "string" }
                 }
               },
-              "productionUseNoteKo": { "type": "string" }
+              "productionUseNoteKo": { "type": "string" },
+              "revalidationEvidenceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "revalidationResponseSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "revalidatedAt": { "type": "string" },
+              "rawObjectUri": { "type": "string" },
+              "retainedReceiptSourceId": { "type": "string" }
+            }
+          },
+          "transferAdmissionEvidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["artifactKind", "approvalIssue", "decision", "approvedBy", "approvedAt", "productionUseAllowed", "snapshotId", "snapshotPath", "snapshotFileSha256", "capturedAt", "observedAt", "freshUntil", "sourceEffectiveDate", "rawSha256", "contentSha256", "schemaFingerprint", "metricsPath", "metricsArtifactSha256", "applicabilityPath", "applicabilityArtifactSha256", "rowCount", "physicalPairCount", "directedMetricCount", "officialMetricCount", "derivedReciprocalMetricCount", "stationLineCount", "applicableStationLineCount", "notApplicableStationLineCount", "durationRole", "licenseEvidenceHash"],
+            "properties": {
+              "artifactKind": { "const": "transfer-source-admission-evidence" }, "approvalIssue": { "const": 350 }, "decision": { "const": "APPROVED" }, "approvedBy": { "const": "AquilaXk" }, "approvedAt": { "type": "string", "format": "date-time" }, "productionUseAllowed": { "const": true },
+              "snapshotId": { "type": "string" }, "snapshotPath": { "type": "string", "pattern": "^tools/datapack/sources/seoul-metro-transfer-distance-duration-[0-9TZ]+\\.json$" }, "snapshotFileSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "capturedAt": { "type": "string", "format": "date-time" }, "observedAt": { "type": "string", "format": "date-time" }, "freshUntil": { "type": "string", "format": "date-time" }, "sourceEffectiveDate": { "const": "2025-12-31" },
+              "rawSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "contentSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "schemaFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "metricsPath": { "const": "tools/datapack/release/current-transfer-topology-metrics.json" }, "metricsArtifactSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "applicabilityPath": { "const": "tools/datapack/release/current-capital-transfer-topology-applicability.json" }, "applicabilityArtifactSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "rowCount": { "const": 145 }, "physicalPairCount": { "const": 15 }, "directedMetricCount": { "const": 30 }, "officialMetricCount": { "const": 28 }, "derivedReciprocalMetricCount": { "const": 2 }, "stationLineCount": { "const": 213 }, "applicableStationLineCount": { "const": 27 }, "notApplicableStationLineCount": { "const": 186 }, "durationRole": { "const": "REFERENCE_ONLY" }, "licenseEvidenceHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
             }
           },
           "membershipAdmissionEvidence": {
@@ -326,19 +349,6 @@
             "type": "object",
             "description": "공식 노선도 좌표 snapshot의 production materialization 승인 근거다. 사이버스테이션 HTML/CSS(부산)와 FILE 위경도(서울) 두 형태를 공통 필드로 수용한다.",
             "additionalProperties": false,
-            "required": [
-              "issue",
-              "materializer",
-              "verificationTest",
-              "snapshotId",
-              "snapshotPath",
-              "snapshotSha256",
-              "capturedAt",
-              "freshUntil",
-              "stationCount",
-              "rawSha256",
-              "positionsSha256"
-            ],
             "oneOf": [
               {
                 "type": "object",
@@ -357,6 +367,19 @@
                   }
                 }
               }
+            ],
+            "required": [
+              "issue",
+              "materializer",
+              "verificationTest",
+              "snapshotId",
+              "snapshotPath",
+              "snapshotSha256",
+              "capturedAt",
+              "freshUntil",
+              "stationCount",
+              "rawSha256",
+              "positionsSha256"
             ],
             "properties": {
               "issue": { "type": "integer", "minimum": 1 },
@@ -421,6 +444,47 @@
                   }
                 }
               },
+              "freshnessExtension": {
+                "type": "object",
+                "description": "동일 source/snapshot을 reviewed positive observation으로 재검증한 closed freshness extension receipt다.",
+                "additionalProperties": false,
+                "required": [
+                  "schemaVersion",
+                  "artifactKind",
+                  "decision",
+                  "reasonCode",
+                  "sourceId",
+                  "snapshotId",
+                  "snapshotSha256",
+                  "rawEvidenceSha256",
+                  "sourceClassId",
+                  "policySha256",
+                  "observationEvidenceSha256",
+                  "currentFreshUntil",
+                  "extendedFreshUntil",
+                  "evaluatedAt",
+                  "observedAt",
+                  "resultSha256"
+                ],
+                "properties": {
+                  "schemaVersion": { "const": 1 },
+                  "artifactKind": { "const": "source-freshness-extension-result" },
+                  "decision": { "const": "EXTENDED" },
+                  "reasonCode": { "const": "POSITIVE_OBSERVATION_EXTENDED" },
+                  "sourceId": { "type": "string", "minLength": 1 },
+                  "snapshotId": { "type": "string", "minLength": 1 },
+                  "snapshotSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                  "rawEvidenceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                  "sourceClassId": { "type": "string", "minLength": 1 },
+                  "policySha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                  "observationEvidenceSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+                  "currentFreshUntil": { "type": "string", "format": "date-time" },
+                  "extendedFreshUntil": { "type": "string", "format": "date-time" },
+                  "evaluatedAt": { "type": "string", "format": "date-time" },
+                  "observedAt": { "type": "string", "format": "date-time" },
+                  "resultSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                }
+              },
               "currentTopologyAdmission": {
                 "type": "object",
                 "description": "historical route-map position snapshot을 current capital topology에 다시 결속한 admission이다.",
@@ -465,6 +529,17 @@
                   }
                 }
               },
+              "currentLayoutAdmission": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["schemaVersion", "artifactKind", "status", "positionSnapshotId", "snapshotPath", "snapshotSha256", "rawSha256", "contentSha256", "layoutAlgorithmVersion", "topologySnapshotId", "topologySnapshotSha256", "topologySnapshotIdentity", "lineOrderSha256", "aliasLedgerVersion", "aliasLedgerSha256", "rawPositionsSha256", "layoutPositionsSha256", "layoutTracksSha256", "semanticInputSha256", "semanticOutputSha256", "outputSchemaSha256", "layoutArtifactSha256"],
+                "properties": {
+                  "schemaVersion": { "const": 2 }, "artifactKind": { "const": "seoul-public-route-map-layout-admission" }, "status": { "const": "ADMITTED" },
+                  "positionSnapshotId": { "type": "string", "minLength": 1 }, "snapshotPath": { "type": "string", "pattern": "^tools/datapack/sources/[^/]+\\.json$" },
+                  "layoutAlgorithmVersion": { "type": "string", "minLength": 1 }, "topologySnapshotId": { "type": "string", "minLength": 1 }, "topologySnapshotIdentity": { "type": "string", "minLength": 1 }, "aliasLedgerVersion": { "type": "string", "minLength": 1 },
+                  "snapshotSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "rawSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "contentSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "topologySnapshotSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "lineOrderSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "aliasLedgerSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "rawPositionsSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "layoutPositionsSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "layoutTracksSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "semanticInputSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "semanticOutputSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "outputSchemaSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }, "layoutArtifactSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                }
+              },
               "overlayDatasetId": {
                 "type": "string",
                 "minLength": 1,
@@ -490,7 +565,48 @@
                 "type": "integer",
                 "minimum": 0,
                 "description": "공식 FILE 위경도 컬럼 스왑을 결정론 정규화한 행 수."
+              },
+              "layoutAlgorithmVersion": {
+                "type": "string",
+                "minLength": 1,
+                "description": "공개 raw 위치와 공개 노선 순서를 제품 노선도 배치로 바꾸는 결정론적 알고리즘 버전."
+              },
+              "layoutInput": {
+                "const": "rawPositions"
+              },
+              "lineOrderSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "rawPositionsSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "semanticInputSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "semanticOutputSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "schematicGeometrySha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "officialRenameEvidence": {
+                "type": "array",
+                "items": { "type": "object" }
               }
+            }
+          },
+          "capitalTopologyAdmissionEvidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["schemaVersion", "artifactKind", "status", "issue", "sourceId", "snapshotId", "snapshotPath", "snapshotFileSha256", "snapshotRawSha256", "contentSha256", "lineIds", "orderedScopeSha256", "operationSetSha256", "rawReceiptSha256", "rawObjectUri", "rawObjectSha256", "byteSize", "licenseSha256", "governanceRecordSha256", "freshnessClassSha256", "evaluatedAt", "predecessorSnapshotIds"],
+            "properties": {
+              "schemaVersion": { "const": 1 }, "artifactKind": { "const": "capital-topology-admission-evidence" }, "status": { "const": "APPROVED" }, "issue": { "const": 456 }, "sourceId": { "const": "capital-route-topology" }, "snapshotId": { "type": "string", "pattern": "^capital-route-topology-[0-9]{8}$" }, "snapshotPath": { "type": "string", "pattern": "^tools/datapack/sources/capital-route-topology-[0-9]{8}\\.json$" }, "snapshotFileSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "snapshotRawSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "contentSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "lineIds": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }, "orderedScopeSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "operationSetSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "rawReceiptSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "rawObjectUri": { "type": "string", "pattern": "^oci://axvym6vk8g7i/easysubway-datapacks/source-raw/capital-route-topology/" }, "rawObjectSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "byteSize": { "type": "integer", "minimum": 1 }, "licenseSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "governanceRecordSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "freshnessClassSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" }, "evaluatedAt": { "type": "string", "format": "date-time" }, "predecessorSnapshotIds": { "type": "array", "maxItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^capital-route-topology-[0-9]{8}$" } } }
+          },
+          "retainedScheduleAdmissionEvidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["snapshotId", "rawSha256", "recordsSha256", "observationIdentitySha256", "receiptSha256", "observedAt", "retainedContractSha256", "topologySourceId", "topologySnapshotId", "topologyContentSha256"],
+            "properties": {
+              "snapshotId": { "type": "string", "minLength": 1 },
+              "rawSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "recordsSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "observationIdentitySha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "receiptSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "observedAt": { "type": "string", "format": "date-time" },
+              "retainedContractSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "topologySourceId": { "type": "string", "minLength": 1 },
+              "topologySnapshotId": { "type": "string", "minLength": 1 },
+              "topologyContentSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
             }
           },
           "scheduleAdmissionEvidence": {
@@ -601,7 +717,7 @@
               "contentSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
               "schemaFingerprint": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
               "snapshotFileSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
-              "absenceEvidenceMode": { "enum": ["EXHAUSTIVE_LIST", "EXPLICIT_ZERO"] },
+              "absenceEvidenceMode": { "enum": ["EXHAUSTIVE_LIST", "EXPLICIT_ZERO", "EXHAUSTIVE_LIST_WITH_UNVERIFIED_EVIDENCE_BLOCKED"] },
               "rowsSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
               "datasetIds": {
                 "type": "array",
@@ -648,6 +764,30 @@
           },
           "officialOdFareAdmissionHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
           "fareStationLineMappingLedgerHash": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "membershipCoverageEvidence": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["snapshotId", "rawSha256", "normalizedObservationSha256", "lineOperatorScopes"],
+            "properties": {
+              "snapshotId": { "type": "string", "minLength": 1 },
+              "rawSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "normalizedObservationSha256": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+              "lineOperatorScopes": {
+                "type": "array",
+                "minItems": 1,
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "required": ["regionId", "operatorId", "lineId"],
+                  "properties": {
+                    "regionId": { "type": "string", "minLength": 1 },
+                    "operatorId": { "type": "string", "minLength": 1 },
+                    "lineId": { "type": "string", "minLength": 1 }
+                  }
+                }
+              }
+            }
+          },
           "rawSnapshotAdmission": {
             "type": "object",
             "additionalProperties": false,

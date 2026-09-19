@@ -2051,13 +2051,16 @@ export function validateSourceInventory(inventory, valuePath, errors) {
         errors.push(`${path}.accessibilityAdmissionEvidence: receipt-bound registration과 legacy evidence는 공존할 수 없다`);
       }
     }
-    if (source.productionUseAllowed === true && requiresTopology && source.topologyAdmissionEvidence == null) {
+    if (source.productionUseAllowed === true && requiresTopology
+      && source.topologyAdmissionEvidence == null && source.capitalTopologyAdmissionEvidence == null) {
       errors.push(`${path}.topologyAdmissionEvidence: route_graph_topology production 승인은 topologyAdmissionEvidence가 필요하다`);
     }
-    if (source.productionUseAllowed === true && requiresSchedule && source.scheduleAdmissionEvidence == null) {
+    if (source.productionUseAllowed === true && requiresSchedule
+      && source.scheduleAdmissionEvidence == null && source.retainedScheduleAdmissionEvidence == null) {
       errors.push(`${path}.scheduleAdmissionEvidence: schedule_timetable production 승인은 scheduleAdmissionEvidence가 필요하다`);
     }
-    if (source.productionUseAllowed === true && requiresMembership && source.membershipAdmissionEvidence == null) {
+    if (source.productionUseAllowed === true && requiresMembership
+      && source.membershipAdmissionEvidence == null && source.membershipCoverageEvidence == null) {
       errors.push(`${path}.membershipAdmissionEvidence: station_line_membership production 승인은 membershipAdmissionEvidence가 필요하다`);
     }
     if (source.productionUseAllowed === true && requiresRouteMap && source.routeMapAdmissionEvidence == null) {
@@ -2071,7 +2074,11 @@ export function validateSourceInventory(inventory, valuePath, errors) {
       && !requiresRouteMap && !requiresAccessibility
       && source.topologyAdmissionEvidence == null && source.scheduleAdmissionEvidence == null
       && source.membershipAdmissionEvidence == null && source.routeMapAdmissionEvidence == null
-      && !legacyAccessibilityEvidence && !registeredAccessibilityEvidence) {
+      && !legacyAccessibilityEvidence && !registeredAccessibilityEvidence
+      && source.capitalTopologyAdmissionEvidence == null
+      && source.retainedScheduleAdmissionEvidence == null
+      && source.membershipCoverageEvidence == null
+      && source.transferAdmissionEvidence == null) {
       errors.push(`${path}.productionUseAllowed: true는 production admission evidence가 필요하다`);
     }
     if (source.topologyAdmissionEvidence != null && !requiresTopology) {
