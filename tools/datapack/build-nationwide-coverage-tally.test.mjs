@@ -182,14 +182,14 @@ test("커밋된 전국 coverage tally ledger는 현행 입력에서 바이트 �
     // 후속 AquilaXk/easysubway-data#3 admission PR은 (1) ledger.regeneration.command로 ledger를 재생성하고 (2) 이 상수를
     // 같은 커밋에서 함께 갱신해야 한다. 둘 중 하나만 하면 이 테스트가 fail closed 된다.
     assert.equal(ledger.launchRequired.totalCount, 270);
-    assert.equal(ledger.launchRequired.inventoryAdmittedCount, 83);
+    assert.equal(ledger.launchRequired.inventoryAdmittedCount, 84);
     assert.equal(ledger.launchRequired.explicitlyUnsupportedWithEvidenceCount, 4);
-    assert.equal(ledger.launchRequired.missingCount, 183);
+    assert.equal(ledger.launchRequired.missingCount, 182);
     assert.deepEqual(ledger.launchRequired.missingByKind, {
       DUAL_OPERATOR_UNMATCHED: 9,
-      NO_ADMITTED_SOURCE: 174,
+      NO_ADMITTED_SOURCE: 173,
     });
-    assert.equal(ledger.launchRequired.terminalCount, 87);
+    assert.equal(ledger.launchRequired.terminalCount, 88);
     assert.equal(ledger.launchRequired.supportStartedResolutionCount, 0);
     assert.equal(ledger.launchRequired.earliestResolutionNextReviewAt, "2026-10-23T09:12:39.105Z");
     assert.equal(ledger.launchRequired.requirements.length, 270);

@@ -102,6 +102,10 @@
           }
         }
       }
+    },
+    "registrationLineage": {
+      "type": "object",
+      "description": "승인된 선행 거버넌스 정책과 추가된 소스 목록의 계통 증거다."
     }
   }
 }

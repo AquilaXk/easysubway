@@ -166,8 +166,13 @@ test("datapack freshness SLA는 current public route-map position과 연간 공�
       "planned_timetable",
       "route_map_positions",
       "route_map_asset_historical",
-      "realtime_overlay",
       "annual_official_file",
+      "realtime_overlay",
+      "route_graph_topology",
+      "official_static_timetable_confirmation",
+      "daejeon_timetable_observation",
+      "busan_timetable_observation",
+      "daegu_timetable_observation",
     ],
   );
   assert.deepEqual(classes.get("route_map_positions"), {
