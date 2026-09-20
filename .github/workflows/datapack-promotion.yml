@@ -122,10 +122,11 @@ jobs:
             exit 1
           fi
           echo "COMPATIBILITY_HEAD_SHA=${compatibility_head_sha}" >> "${GITHUB_ENV}"
+          COMPATIBILITY_HEAD_SHA="${compatibility_head_sha}"
           compatibility_artifacts="${RUNNER_TEMP}/compatibility-artifacts.json"
           gh api "repos/${GITHUB_REPOSITORY}/actions/runs/${COMPATIBILITY_RUN_ID}/artifacts?name=${COMPATIBILITY_ARTIFACT_NAME}&per_page=100" > "${compatibility_artifacts}"
           node tools/ci/require-workflow-artifact.mjs \
-            "${compatibility_artifacts}" "${COMPATIBILITY_ARTIFACT_NAME}" "${COMPATIBILITY_RUN_ID}" "${COMPATIBILITY_HEAD_SHA}"
+            "${compatibility_artifacts}" "${COMPATIBILITY_ARTIFACT_NAME}" "${COMPATIBILITY_RUN_ID}" "${compatibility_head_sha}"
 
       - name: Data Pack Promotion / Download and validate compatibility evidence
         uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093

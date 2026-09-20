@@ -590,6 +590,8 @@ test("candidate promotion은 정확한 단일 성공 후보와 compatibility 증
   assert.match(promotion, /head_sha/);
   assert.match(promotion, /workflow_path="\$\{workflow_path_raw%@\*\}"/);
   assert.match(promotion, /require-workflow-artifact\.mjs/);
+  assert.match(promotion, /require-workflow-artifact\.mjs[\s\S]*?"\$\{compatibility_head_sha\}"/);
+  assert.doesNotMatch(promotion, /require-workflow-artifact\.mjs[\s\S]*?"\$\{COMPATIBILITY_HEAD_SHA\}"/);
   assert.match(promotion, /compatibility-evidence\.json/);
   assert.match(promotion, /compatibility_event\}" != "workflow_dispatch"/);
   assert.match(promotion, /compatibility_head_sha\}" != "\$\{GITHUB_SHA\}"/);
