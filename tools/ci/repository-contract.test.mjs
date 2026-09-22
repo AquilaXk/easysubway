@@ -1769,6 +1769,7 @@ test("full PR 템플릿은 리뷰와 배포 확인 게이트를 포함한다", (
   assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
   assert.match(template, /CodeRabbit status check만으로는 리뷰 완료로 보지 않는다/);
   assert.match(template, /CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다/);
+  assert.match(template, /CodeRabbit 봇과의 추가 질의응답을 포함하여 모든 Review thread가 해결\(Resolve conversation\)되었는지 확인했다/);
   assert.match(template, /CD 상태를 확인했다/);
 });
 
@@ -1808,6 +1809,7 @@ test("short PR 템플릿은 B/C등급 5개 섹션과 리뷰 게이트를 유지�
   assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
   assert.match(template, /CodeRabbit status check만으로는 리뷰 완료로 보지 않는다/);
   assert.match(template, /폴백 리뷰를 단일 PR review로 게시했다/);
+  assert.match(template, /CodeRabbit 봇과의 추가 질의응답을 포함하여 모든 Review thread가 해결\(Resolve conversation\)되었는지 확인했다/);
   assert.doesNotMatch(template, /Not run — reason: None/);
   assert.match(template, /Rerun owner \/ condition/);
 });
@@ -1829,6 +1831,7 @@ test("기본 PR 템플릿은 등급 안내와 최소 섹션을 포함한다", ()
   assert.match(template, /CodeRabbit 리뷰를 확인했다/);
   assert.match(template, /GitHub PR Review 객체가 있는지 확인했다/);
   assert.match(template, /CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다/);
+  assert.match(template, /CodeRabbit 봇과의 추가 질의응답을 포함하여 모든 Review thread가 해결\(Resolve conversation\)되었는지 확인했다/);
 });
 
 test("작업 이슈 템플릿은 일반 작업 prefix와 기존 분류 label을 유지한다", () => {
@@ -1877,13 +1880,15 @@ test("이슈 템플릿은 에이전트 서술 없이 개발자 판단 정보를 
   assert.doesNotMatch(templates, /AI 에이전트|자동 생성|제가 작업/);
 });
 
-test("한국어 저장소 리뷰 기준으로 CodeRabbit이 설정된다", () => {
+test("저장소 리뷰 기준과 영문 prose 규약에 따라 CodeRabbit이 설정된다", () => {
   const config = read(".coderabbit.yaml");
 
-  assert.match(config, /language: "ko-KR"/);
+  assert.match(config, /language: "en-US"/);
   assert.match(config, /path: "backend\/\*\*"/);
   assert.match(config, /path: "apps\/mobile\/lib\/\*\*"/);
   assert.match(config, /path: "\.github\/workflows\/\*\*"/);
+  assert.match(config, /path: "contracts\/\*\*"/);
+  assert.match(config, /path: "tools\/datapack\/\*\*"/);
   assert.match(config, /auto_review:/);
 });
 
