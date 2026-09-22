@@ -1,6 +1,6 @@
 # yaml-language-server: $schema=https://coderabbit.ai/integrations/schema.v2.json
-language: "ko-KR"
-tone_instructions: "간결하고 구체적으로 문제, 영향, 수정 제안만 작성한다. 과장된 표현과 농담은 피한다."
+language: "en-US"
+tone_instructions: "Write concise, specific English review comments focusing on problem, impact, and actionable suggestions without exaggeration or humor. Avoid second-person pronouns ('you') and frame feedback collaboratively."
 early_access: false
 
 reviews:
@@ -13,11 +13,15 @@ reviews:
   in_progress_fortune: false
   path_instructions:
     - path: "backend/**"
-      instructions: "인증, 보안, 트랜잭션, 입력 검증, 데이터 일관성, 전자정부프레임워크 경계 위반을 우선 확인한다."
+      instructions: "Check authentication, security, transaction management, input validation, data consistency, and violations of eGovFrame architectural boundaries."
     - path: "apps/mobile/lib/**"
-      instructions: "모바일 UX 상태 전환, 접근성, 비활성 컨트롤 동작, Android/iOS 플랫폼별 분기 문제를 확인한다."
+      instructions: "Check mobile UX state transitions, accessibility compliance, disabled control behavior, and Android/iOS platform-specific branch issues."
     - path: ".github/workflows/**"
-      instructions: "시크릿 노출, 권한 범위, 조건 분기, 실패 시 중단 동작, 배포 게이트 누락을 확인한다."
+      instructions: "Check secret exposure, permission scoping, conditional branch logic, fail-closed behavior, and missing deployment gates."
+    - path: "contracts/**"
+      instructions: "Verify API and data contract schema compatibility, missing required fields, and breaking changes to version compatibility."
+    - path: "tools/datapack/**"
+      instructions: "Verify accessibility data integrity for transport-vulnerable passengers, compliance with official KRIC data specifications, and strict prohibition of arbitrary fallback or heuristic estimates."
   auto_review:
     enabled: true
     drafts: false
