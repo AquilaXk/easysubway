@@ -217,7 +217,7 @@ fi
 if [[ ! -d "apps/mobile/android" ]]; then
   android=false
 fi
-if [[ ! -f "apps/mobile/pubspec.yaml" ]]; then
+if [[ ! -f "apps/mobile/pubspec.yaml" || ! -d "apps/mobile/lib" ]]; then
   mobile=false
   ios=false
 fi
