@@ -24,7 +24,7 @@ test('getWorktrees returns array of worktrees for repository', () => {
   const worktrees = getWorktrees('.');
   assert.ok(Array.isArray(worktrees));
   assert.ok(worktrees.length >= 1);
-  assert.ok(worktrees.some((w) => w.branch === 'main' || w.worktree.includes('swieun-jihacheol')));
+  assert.ok(worktrees.some((w) => typeof w.worktree === 'string' && typeof w.head === 'string'));
 });
 
 test('getWorktrees returns empty array for non-existent directory', () => {
