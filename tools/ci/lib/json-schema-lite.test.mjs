@@ -184,4 +184,3 @@ test("if/then/else는 조건부 스키마 분기를 검증한다", () => {
   assert.equal(validateSchema(schema, { role: "user" }).ok, true);
   assert.equal(validateSchema(schema, { role: "user", adminToken: "secret123" }).ok, false);
 });
-
