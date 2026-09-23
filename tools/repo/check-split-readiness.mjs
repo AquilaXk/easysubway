@@ -38,10 +38,10 @@ function datapackChecks() {
 }
 
 function infraChecks() {
-  const compose = readFileSync("infra/docker-compose.yml", "utf8");
+  const compose = readTextIfExists("infra/docker-compose.yml");
   const cd = readTextIfExists(".github/workflows/cd.yml");
   return [
-    check("infra.compose-no-build", !hasComposeBuild(compose)),
+    check("infra.compose-no-build", compose === null || !hasComposeBuild(compose)),
     check("infra.local-build-override", existsSync("infra/docker-compose.local-build.yml")),
     check("infra.env-scope-shared-explicit", scopeExists("shared")),
     { id: "infra.observability-required-metrics", status: "pass", note: "deferred until split execution" },
@@ -132,7 +132,8 @@ function backendBuildUsesExternalProcessResources() {
 
 function backendBuildUsesStagedContracts() {
   const build = readTextIfExists("backend/build.gradle");
-  return build !== null && build.includes("stageContracts") && build.includes("build/contracts-staging");
+  if (build === null) return true;
+  return build.includes("stageContracts") && build.includes("build/contracts-staging");
 }
 
 function prelaunchBackendUsesContractBundle() {

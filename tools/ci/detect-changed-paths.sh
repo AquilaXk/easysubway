@@ -211,7 +211,7 @@ if [[ "${ci}" == "true" ]]; then
   docs_only=false
 fi
 
-if [[ ! -d "backend" ]]; then
+if [[ ! -f "backend/build.gradle" ]]; then
   backend=false
 fi
 if [[ ! -d "apps/mobile/android" ]]; then
@@ -230,7 +230,7 @@ fi
 if [[ ! -d "tools/realtime" ]]; then
   realtime=false
 fi
-if [[ ! -d "infra" ]]; then
+if [[ ! -f "infra/docker-compose.yml" ]]; then
   deploy=false
 fi
 
