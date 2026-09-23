@@ -195,7 +195,20 @@ export async function createDocumentationInventoryGitProvider(scope, {
     try {
       commit = String(await runGit(["-C", root, "rev-parse", "--verify", `${sha}^{commit}`])).trim();
     } catch {
-      throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
+      try {
+        await retryNetworkGit(() => [
+          "-C",
+          root,
+          "fetch",
+          "--no-tags",
+          "--depth=1",
+          `https://github.com/${repository}.git`,
+          sha,
+        ]);
+        commit = String(await runGit(["-C", root, "rev-parse", "--verify", `${sha}^{commit}`])).trim();
+      } catch {
+        throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
+      }
     }
     if (commit !== sha) throw new AuditIncomplete("GIT_PROVIDER_COMMIT_MISSING", `${repository}:${sha}`);
     let entry;
