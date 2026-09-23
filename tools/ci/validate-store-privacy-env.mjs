@@ -138,8 +138,19 @@ function requireSingleLineValue(values, key) {
   return value;
 }
 
-function validateTokenValue(key, value) {
+function validateTokenValue(key, value, options = {}) {
   assertNoPlaceholder(key, value);
+  if (options.requireAndroidRcProduction) {
+    const normalized = value.toLowerCase();
+    const forbiddenPatterns = /\b(ci-preflight|dummy|test|mock|fake|sample)\b/;
+    if (
+      forbiddenPatterns.test(normalized) ||
+      normalized.includes("ci-preflight") ||
+      normalized.includes("dummy")
+    ) {
+      throw new Error(`${key} must not use CI preflight or dummy values in production RC`);
+    }
+  }
 }
 
 function decodeBase64Url(key, value) {
@@ -203,6 +214,12 @@ function validateAndroidRcProduction(values, selected) {
   validateTokenValue(
     "EASYSUBWAY_DATAPACK_SIGNING_KEY_ID",
     selected.get("EASYSUBWAY_DATAPACK_SIGNING_KEY_ID"),
+    { requireAndroidRcProduction: true },
+  );
+  validateTokenValue(
+    "EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY",
+    selected.get("EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY"),
+    { requireAndroidRcProduction: true },
   );
   if (selected.get("EASYSUBWAY_DATAPACK_CHANNEL") !== "production") {
     throw new Error("EASYSUBWAY_DATAPACK_CHANNEL must be production");

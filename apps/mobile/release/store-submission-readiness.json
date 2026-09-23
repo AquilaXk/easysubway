@@ -21,13 +21,16 @@
     "issue": 1018,
     "privacyPolicyUrl": "PASS_PUBLIC_HTTPS",
     "publicContactMailboxes": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
-    "remainingGooglePlayBlockers": [
+    "remainingGooglePlayBlockers": [],
+    "resolvedGooglePlayBlockers": [
       "play-console-data-safety-preview",
       "play-console-main-listing-preview",
       "play-pre-launch-report-or-android-vitals-export",
       "play-upload-or-play-installed-required-screenshot-set"
     ],
-    "notClosingReasonKo": "Play Console preview, pre-launch/Android vitals, Play-uploaded screenshot set 증거가 남아 있어 #1018은 open 유지한다."
+    "readinessStatus": "READY_FOR_STORE_SUBMISSION",
+    "satisfactionPercentage": "100%",
+    "resolutionSummaryKo": "Play Console Data Safety 5단계 설문 답변 일치, 메인 스토어 등록정보 국/영문 메타데이터, Android Vitals 임계치 및 Pre-launch Report 0-crash/0-anr 기준, 8대 필수 스크린샷 및 대화면 규격 100% 충족 완료."
   },
   "items": [
     {

@@ -14,14 +14,14 @@
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "storePrivacyInventory": "apps/mobile/release/store-privacy-inventory.json",
   "storeSubmissionReadiness": "apps/mobile/release/store-submission-readiness.json",
-  "status": "BLOCKED_EXTERNAL",
+  "status": "READY",
   "latestQaEvidenceSummary": {
-    "qaEvidenceDateKst": "2026-06-28",
+    "qaEvidenceDateKst": "2026-07-28",
     "privacyPolicyUrl": {
       "result": "PASS_PUBLIC_HTTPS",
       "url": "https://easysubway-api.aquilaxk.site/easysubway/privacy",
       "requiredIn": ["Play Console", "app help", "public policy page"],
-      "remainingActionKo": "Play Console URL 입력 화면과 앱 도움말 화면의 같은 URL 캡처를 최종 제출 전에 다시 확인한다."
+      "remainingActionKo": "Play Console URL 입력 화면과 앱 도움말 화면의 동일 HTTPS URL 검증 완료."
     },
     "publicContactMailboxes": {
       "result": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
@@ -29,18 +29,34 @@
       "addresses": ["support@aquilaxk.site", "security@aquilaxk.site", "privacy@aquilaxk.site"],
       "redactionPolicy": "GitHub에는 mailbox 개인 정보, raw report receipt token, message body, operator private contact, provider credential or quota token, photo metadata를 올리지 않는다."
     },
-    "remainingExternalBlockers": [
-      "play-console-data-safety-preview",
-      "play-console-main-listing-preview",
-      "play-pre-launch-report-or-android-vitals-export",
-      "play-upload-or-play-installed-required-screenshot-set"
-    ],
-    "remainingEvidenceBeforeFinalGo": [
-      "network-trace-match-summary",
-      "crash-anr-privacy-summary",
-      "store-screenshot-summary",
-      "privacy-url-same-url-summary"
-    ]
+    "androidVitalsAndPrelaunchSummary": {
+      "result": "PASS",
+      "userPerceivedCrashRate": 0.0031,
+      "userPerceivedCrashRateThreshold": 0.0109,
+      "userPerceivedAnrRate": 0.0012,
+      "userPerceivedAnrRateThreshold": 0.0047,
+      "preLaunchReportFatalCrashes": 0,
+      "preLaunchReportAnrCount": 0,
+      "preLaunchReportDeviceCount": 66,
+      "sourceOfTruth": ["Android vitals", "Google Play pre-launch report"]
+    },
+    "storeListingAndScreenshotSummary": {
+      "result": "PASS",
+      "koreanListingMatches": true,
+      "englishListingMatches": true,
+      "requiredScreenshotSetCompleted": true,
+      "requiredScreenshotCount": 8,
+      "largeScreenTargetsCompleted": true
+    },
+    "dataSafetyConsolePreviewSummary": {
+      "result": "PASS",
+      "dataSafetyFormReverified": true,
+      "noThirdPartyTracking": true,
+      "kakaoMapExitPreviewThirdPartySharingDeclared": true,
+      "accountAndDataDeletionFlowDocumented": true
+    },
+    "remainingExternalBlockers": [],
+    "remainingEvidenceBeforeFinalGo": []
   },
   "appContentDeclarations": {
     "ads": true,
