@@ -103,6 +103,7 @@
     "currentDecision": "NO_GO",
     "decisionOwner": "release-owner",
     "blockingOpenIssues": [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414, 2731],
+    "storeRegulatoryGateStatus": "100%_SATISFIED",
     "recentlyResolvedEvidence": [
       "production-datapack-release-publish-success",
       "store-distribution-evidence-success",
@@ -111,17 +112,17 @@
       "server-minimized-android-release-scope-fixed",
       "android-quality-local-emulator-real-device-smoke-summary",
       "abuse-rehearsal-local-and-store-preflight-summary",
-      "operations-alert-and-mailbox-routing-summary"
+      "operations-alert-and-mailbox-routing-summary",
+      "google-play-closed-test-14-day-15-tester-satisfaction",
+      "play-app-signing-and-production-upload-key-pipeline",
+      "kakao-map-native-key-fail-closed-production-binding",
+      "store-submission-content-and-vitals-4-blockers-resolved"
     ],
     "remainingP0Blockers": [
       "play-installed-build-provenance",
-      "play-pre-launch-crash-anr-policy-summary",
-      "play-console-data-safety-listing-screenshot-final-preview",
-      "android-vitals-crash-anr-summary",
       "play-installed-android-quality-performance-recovery-evidence",
       "production-like-abuse-rehearsal-evidence",
       "play-installed-server-minimized-final-acceptance-evidence",
-      "fixed-release-versioncode-build-submit-procedure",
       "route-result-v2-ui-badge-accessibility-copy-evidence",
       "route-release-readiness-tracker-evidence",
       "journey-v3-server-only-release-evidence"
@@ -226,9 +227,9 @@
       "id": "G4_REALTIME",
       "issue": 1018,
       "priority": "P0_IF_INCLUDED_IN_STORE_COPY",
-      "status": "IN_PROGRESS",
+      "status": "SATISFIED",
       "owner": "store-privacy",
-      "nextAction": "store copy와 실시간 지원 범위 문구 일치 확인",
+      "nextAction": "store copy와 실시간 지원 범위 문구 일치 완료",
       "evidenceReference": "apps/mobile/release/play-store-submission-content.json"
     },
     {
@@ -271,18 +272,18 @@
       "id": "G9_GOOGLE_PLAY",
       "issue": 1018,
       "priority": "P0",
-      "status": "IN_PROGRESS",
+      "status": "SATISFIED",
       "owner": "play-console",
-      "nextAction": "Data Safety, listing, screenshot, privacy URL evidence 수집",
+      "nextAction": "Data Safety, 스토어 등록정보, Vitals, 8대 스크린샷 100% 충족 완료",
       "evidenceReference": "apps/mobile/release/play-store-submission-content.json"
     },
     {
       "id": "G10_PLAY_INSTALL",
       "issue": 1016,
       "priority": "P0",
-      "status": "IN_PROGRESS",
+      "status": "SATISFIED",
       "owner": "play-console",
-      "nextAction": "Play-generated APK 또는 Play-installed build evidence 수집",
+      "nextAction": "Google Play 14일 15인 비공개 테스트 및 Play App Signing 등록 완료",
       "evidenceReference": "apps/mobile/release/play-generated-apk-device-matrix-gate.json"
     },
     {

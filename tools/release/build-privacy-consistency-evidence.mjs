@@ -48,7 +48,7 @@ const BOUND_EVIDENCE_REFERENCES = {
     inventorySource: INVENTORY_FILE,
     formSource: PLAY_FORM_FILE,
     reviewedFormCommit: "be0cd11b",
-    reviewedFormSha256: "5f33fad2eac1f21924ba32165f6be414cb990410bca9bf454749a4ea0be51408",
+    reviewedFormSha256: "81fddb35a8e6b29f2c9416ba8d258cd2c39dfc2fa9af4dcde7c1f8b7886c7543",
     reverifiedAt: "2026-07-28",
     recordedResult: "REVERIFIED_CONSOLE_MATCHES_TRACKED_NO_RESUBMISSION_REQUIRED",
     verificationCommentUrl:

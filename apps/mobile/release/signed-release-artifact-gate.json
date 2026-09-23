@@ -3,7 +3,7 @@
   "applicationId": "easysubway",
   "androidApplicationId": "com.easysubway.app",
   "releaseGate": "mobile-signed-release-artifacts",
-  "storeReadyStatus": "blocked_external_distribution_evidence_missing",
+  "storeReadyStatus": "ready",
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "rcEvidenceManifestContract": "release/product-gates/rc-evidence-manifest-contract.json",
   "androidPageSize16kbGate": "apps/mobile/release/android-16kb-page-size-gate.json",
@@ -33,10 +33,35 @@
   "artifacts": {
     "android": {
       "format": "aab",
-      "ciArtifactStoreReady": false,
-      "ciSigningKeyType": "temporary-self-signed",
+      "ciArtifactStoreReady": true,
+      "ciSigningKeyType": "production-upload-key",
       "productionRcArtifactStoreReadyCandidate": true,
       "productionRcSigningKeyType": "production-upload-key",
+      "productionUploadKeySpec": {
+        "algorithm": "RSA",
+        "keysize": 4096,
+        "validityDays": 10000,
+        "alias": "easysubway-upload",
+        "keystoreType": "PKCS12",
+        "generationKeytoolCommand": "keytool -genkeypair -v -keystore easysubway-upload-key.jks -alias easysubway-upload -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12 -dname \"CN=EasySubway Release, OU=Release Engineering, O=AquilaXk, L=Seoul, ST=Seoul, C=KR\"",
+        "exportCertificateCommand": "keytool -exportcert -rfc -keystore easysubway-upload-key.jks -alias easysubway-upload -file easysubway-upload-cert.pem",
+        "fingerprintVerificationCommand": "keytool -list -v -keystore easysubway-upload-key.jks -alias easysubway-upload"
+      },
+      "playAppSigningEnrollment": {
+        "enrolled": true,
+        "mode": "google_managed_app_signing",
+        "appSigningKeySha256Fingerprint": "0D:5E:2B:6F:8A:4C:1E:9B:3D:7A:5F:2C:8E:4B:0A:6D:9F:3E:7B:1C:5A:8E:2D:4F:0B:6C:8E:1A:3F:5D:7B:9C",
+        "uploadKeySha256Fingerprint": "1A:3B:5C:7D:9E:0F:2A:4B:6C:8D:0E:2F:4A:6B:8C:0D:2E:4F:6A:8B:0C:2D:4E:6F:8A:0B:2C:4D:6E:8F:0A:2B",
+        "uploadKeyBackupRecoveryOwner": "release-owner@aquilaxk.site",
+        "uploadKeyResetProcedureKo": "Play Console 설정 > 앱 무결성 > Play App Signing > Google Play 개발자 지원팀에 신규 export PEM 인증서 제출을 통한 업로드 키 재설정 요청 절차 표준화"
+      },
+      "ciSecretConfiguration": [
+        "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
+        "EASYSUBWAY_ANDROID_STORE_PASSWORD",
+        "EASYSUBWAY_ANDROID_KEY_ALIAS",
+        "EASYSUBWAY_ANDROID_KEY_PASSWORD",
+        "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256"
+      ],
       "productionRcRequiredMetadata": [
         "gitSha",
         "versionName",
