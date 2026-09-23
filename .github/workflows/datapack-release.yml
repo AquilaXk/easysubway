@@ -10,8 +10,6 @@ on:
       - release/product-gates/datapack-freshness-sla.json
       - release/product-gates/production-datapack-scope.json
       - .github/workflows/datapack-release.yml
-  schedule:
-    - cron: "17 18 * * *"
   workflow_dispatch:
     inputs:
       mode:
