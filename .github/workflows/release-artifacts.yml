@@ -197,7 +197,7 @@ jobs:
       contents: read
     outputs:
       artifact_available: ${{ steps.release-env.outputs.artifact_available }}
-    if: ${{ (needs.changes.outputs.android == 'true' || needs.changes.outputs.mobile == 'true') && hashFiles('apps/mobile/android/app/build.gradle.kts') != '' }}
+    if: ${{ needs.changes.outputs.android == 'true' || needs.changes.outputs.mobile == 'true' }}
 
     steps:
       - name: Android Release Artifact / Checkout repository
@@ -754,7 +754,7 @@ jobs:
       contents: read
       # Main push에서 GHCR image를 publish할 때만 사용한다.
       packages: write
-    if: ${{ (needs.changes.outputs.backend == 'true' || needs.changes.outputs.deploy == 'true' || needs.changes.outputs.android == 'true' || needs.changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch') && hashFiles('backend/build.gradle') != '' }}
+    if: ${{ (needs.changes.outputs.backend == 'true' || needs.changes.outputs.deploy == 'true' || needs.changes.outputs.android == 'true' || needs.changes.outputs.mobile == 'true' || github.event_name == 'workflow_dispatch') && needs.changes.outputs.backend == 'true' }}
 
     steps:
       - name: Backend Release Image / Checkout repository
