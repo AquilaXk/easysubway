@@ -5,8 +5,6 @@ on:
     branches:
       - main
     paths:
-      - tools/datapack/**
-      - tools/route-map/**
       - release/product-gates/datapack-freshness-sla.json
       - release/product-gates/production-datapack-scope.json
       - .github/workflows/datapack-release.yml
@@ -342,7 +340,7 @@ jobs:
             echo "source_governance_evaluation_at=${source_governance_evaluation_at}"
             echo "candidate_run_id=${candidate_run_id}"
             echo "promotion_run_id=${promotion_run_id}"
-            if [[ "${mode}" == "rollback" || "${mode}" == "rollout-update" ]]; then
+            if [[ "${mode}" == "rollback" || "${mode}" == "rollout-update" || ( "${mode}" == "exploratory" && ! -f tools/datapack/build-datapack.mjs ) ]]; then
               echo "is-pointer-only=true"
             else
               echo "is-pointer-only=false"
