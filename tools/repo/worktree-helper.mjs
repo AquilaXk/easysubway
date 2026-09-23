@@ -23,6 +23,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const WORKSPACE_BASE = process.env.EASYSUBWAY_WORKSPACE_BASE || '/Volumes/MACSSD/Projects/GitProjects';
+const GIT_BIN = process.env.GIT_BIN || '/usr/bin/git';
 
 const COMPONENT_REPO_MAP = {
   hub: 'swieun-jihacheol',
@@ -42,7 +43,7 @@ export function parseArgs(argv = process.argv.slice(2)) {
 
 export function getWorktrees(repoDir) {
   try {
-    const raw = execFileSync('git', ['worktree', 'list', '--porcelain'], {
+    const raw = execFileSync(GIT_BIN, ['worktree', 'list', '--porcelain'], {
       cwd: repoDir,
       encoding: 'utf8',
     });
@@ -126,7 +127,7 @@ export function createWorktree(component, issueNumber, customBranch) {
 
   console.log(`Fetching latest origin/main in ${repoName}...`);
   try {
-    execFileSync('git', ['fetch', 'origin', 'main'], { cwd: repoDir, stdio: 'inherit' });
+    execFileSync(GIT_BIN, ['fetch', 'origin', 'main'], { cwd: repoDir, stdio: 'inherit' });
   } catch (e) {
     console.warn(`Warning: failed to fetch origin/main: ${e.message}`);
   }
@@ -134,7 +135,7 @@ export function createWorktree(component, issueNumber, customBranch) {
   console.log(`Creating worktree at: ${targetDir}`);
   console.log(`Branch: ${branchName} (based on origin/main)`);
 
-  execFileSync('git', ['worktree', 'add', '-b', branchName, targetDir, 'origin/main'], {
+  execFileSync(GIT_BIN, ['worktree', 'add', '-b', branchName, targetDir, 'origin/main'], {
     cwd: repoDir,
     stdio: 'inherit',
   });
@@ -143,52 +144,53 @@ export function createWorktree(component, issueNumber, customBranch) {
   console.log(`   To begin work: cd ${targetDir}\n`);
 }
 
+function isBranchMergedIntoMain(repoDir, branch) {
+  try {
+    const mergedOutput = execFileSync(GIT_BIN, ['branch', '--merged', 'origin/main'], {
+      cwd: repoDir,
+      encoding: 'utf8',
+    });
+    const mergedBranches = mergedOutput.split('\n').map((b) => b.trim().replace(/^\*\s*/, ''));
+    return mergedBranches.includes(branch);
+  } catch {
+    return false;
+  }
+}
+
+function removeMergedWorktree(repoDir, wt, dryRun) {
+  if (wt.worktree === repoDir || !wt.branch) return;
+  if (!isBranchMergedIntoMain(repoDir, wt.branch)) return;
+
+  console.log(`🗑️  Merged worktree found: ${wt.worktree} (Branch: ${wt.branch})`);
+  if (dryRun) return;
+
+  try {
+    execFileSync(GIT_BIN, ['worktree', 'remove', '--force', wt.worktree], {
+      cwd: repoDir,
+      stdio: 'inherit',
+    });
+    console.log('   Removed successfully.');
+  } catch (e) {
+    console.error(`   Failed to remove: ${e.message}`);
+  }
+}
+
 export function pruneWorktrees(options = {}) {
   const dryRun = options.dryRun || false;
   console.log(`\n=== Pruning Merged Worktrees (dryRun=${dryRun}) ===\n`);
 
-  for (const [component, repoName] of Object.entries(COMPONENT_REPO_MAP)) {
+  for (const repoName of Object.values(COMPONENT_REPO_MAP)) {
     const repoDir = path.join(WORKSPACE_BASE, repoName);
     if (!existsSync(repoDir)) continue;
 
     const worktrees = getWorktrees(repoDir);
     for (const wt of worktrees) {
-      if (wt.worktree === repoDir) continue; // Never remove root
-
-      // Check if branch is merged into origin/main
-      if (!wt.branch) continue;
-
-      let isMerged = false;
-      try {
-        const mergedOutput = execFileSync('git', ['branch', '--merged', 'origin/main'], {
-          cwd: repoDir,
-          encoding: 'utf8',
-        });
-        const mergedBranches = mergedOutput.split('\n').map((b) => b.trim().replace(/^\*\s*/, ''));
-        isMerged = mergedBranches.includes(wt.branch);
-      } catch {
-        // Ignored
-      }
-
-      if (isMerged) {
-        console.log(`🗑️  Merged worktree found: ${wt.worktree} (Branch: ${wt.branch})`);
-        if (!dryRun) {
-          try {
-            execFileSync('git', ['worktree', 'remove', '--force', wt.worktree], {
-              cwd: repoDir,
-              stdio: 'inherit',
-            });
-            console.log(`   Removed successfully.`);
-          } catch (e) {
-            console.error(`   Failed to remove: ${e.message}`);
-          }
-        }
-      }
+      removeMergedWorktree(repoDir, wt, dryRun);
     }
 
     if (!dryRun) {
       try {
-        execFileSync('git', ['worktree', 'prune'], { cwd: repoDir });
+        execFileSync(GIT_BIN, ['worktree', 'prune'], { cwd: repoDir });
       } catch {}
     }
   }
