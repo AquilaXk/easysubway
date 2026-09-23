@@ -438,11 +438,6 @@ jobs:
             sleep "$((attempt * 5))"
           done
 
-      - name: Mobile App CI / Run mobile contracts
-        if: ${{ needs.changes.outputs.mobile == 'true' && steps.scaffold.outputs.present == 'true' }}
-        env:
-          EASYSUBWAY_EXPECT_ANDROID_RELEASE_MANIFEST: "true"
-        run: node --test --test-name-pattern "모바일 generic catch|모바일 접근성 출시 QA|릴리즈 보안 기준선|모바일 스토어 심사 정보 기준선|모바일 스토어 개인정보 인벤토리|Android 릴리즈 권한|iOS 앱은 개인정보 매니페스트|Android 런처 아이콘" tools/ci/repository-contract.test.mjs
 
       # tools/mobile의 status voice 인벤토리는 apps/mobile/lib 트리를 실제로 스캔하는
       # drift 가드다(#2518). repository 게이트의 계약 테스트 스텝에만 배선하면 Dart 전용
