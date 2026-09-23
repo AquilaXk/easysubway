@@ -50,8 +50,8 @@
       "playAppSigningEnrollment": {
         "enrolled": true,
         "mode": "google_managed_app_signing",
-        "appSigningKeySha256Fingerprint": "0D:5E:2B:6F:8A:4C:1E:9B:3D:7A:5F:2C:8E:4B:0A:6D:9F:3E:7B:1C:5A:8E:2D:4F:0B:6C:8E:1A:3F:5D:7B:9C",
-        "uploadKeySha256Fingerprint": "1A:3B:5C:7D:9E:0F:2A:4B:6C:8D:0E:2F:4A:6B:8C:0D:2E:4F:6A:8B:0C:2D:4E:6F:8A:0B:2C:4D:6E:8F:0A:2B",
+        "appSigningKeySha256Fingerprint": "55:87:FE:52:CA:7F:90:30:4F:24:7A:1F:C0:E5:03:32:94:56:A4:89:4E:03:0E:02:30:6A:F0:7A:8D:C6:7F:6A",
+        "uploadKeySha256Fingerprint": "17:58:5A:E3:9E:19:11:8B:CA:29:97:48:17:3A:94:05:55:79:DB:BA:C1:7A:70:F4:43:97:22:29:F6:2F:10:54",
         "uploadKeyBackupRecoveryOwner": "release-owner@aquilaxk.site",
         "uploadKeyResetProcedureKo": "Play Console 설정 > 앱 무결성 > Play App Signing > Google Play 개발자 지원팀에 신규 export PEM 인증서 제출을 통한 업로드 키 재설정 요청 절차 표준화"
       },
