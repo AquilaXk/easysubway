@@ -1,0 +1,8 @@
+name: easysubway_mobile
+description: "EasySubway mobile app contract identity."
+publish_to: 'none'
+version: 1.0.5+10006
+
+environment:
+  sdk: '>=3.4.0 <4.0.0'
+  flutter: '>=3.22.0'

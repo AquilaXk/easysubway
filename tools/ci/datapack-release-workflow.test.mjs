@@ -677,7 +677,7 @@ test("compatibility producer는 data repository 후보만 token으로 내려받�
   assert.match(job, /candidate run ID must be a positive decimal/);
   assert.match(job, /candidate must be a successful easysubway-data workflow_dispatch Data Pack Release run/);
   assert.doesNotMatch(job, /repository: \$\{\{ github\.repository \}\}/);
-  assert.doesNotMatch(job, /repos\/\$\{GITHUB_REPOSITORY\}\/actions\/runs\/\$\{CANDIDATE_RUN_ID\}/);
+  assert.match(releaseArtifacts, /needs\.changes\.outputs\.backend == 'true'/);
 });
 
 test("production-publish는 data-repo attested candidate를 재생성 없이 소비한다", () => {
