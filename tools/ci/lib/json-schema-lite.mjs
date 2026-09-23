@@ -22,6 +22,10 @@ const SUPPORTED = new Set([
   "title",
   "type",
   "uniqueItems",
+  "allOf",
+  "if",
+  "then",
+  "else",
 ]);
 
 export function validateSchema(schema, value) {
@@ -32,11 +36,36 @@ export function validateSchema(schema, value) {
 
 function walk(schema, value, path, errors) {
   assertSupported(schema, path);
+  validateAllOf(schema, value, path, errors);
   validateOneOf(schema, value, path, errors);
   validateNot(schema, value, path, errors);
+  validateIfThenElse(schema, value, path, errors);
   if (validateScalar(schema, value, path, errors)) return;
   validateObject(schema, value, path, errors);
   validateArray(schema, value, path, errors);
+}
+
+function validateAllOf(schema, value, path, errors) {
+  if (schema.allOf === undefined) return;
+  if (!Array.isArray(schema.allOf) || schema.allOf.length === 0) {
+    throw new Error(`json-schema-lite: allOf는 비어 있지 않은 배열이어야 합니다 (${path})`);
+  }
+  for (const branch of schema.allOf) {
+    walk(branch, value, path, errors);
+  }
+}
+
+function validateIfThenElse(schema, value, path, errors) {
+  if (schema.if === undefined) return;
+  const ifErrors = [];
+  walk(schema.if, value, path, ifErrors);
+  if (ifErrors.length === 0) {
+    if (schema.then !== undefined) {
+      walk(schema.then, value, path, errors);
+    }
+  } else if (schema.else !== undefined) {
+    walk(schema.else, value, path, errors);
+  }
 }
 
 function validateNot(schema, value, path, errors) {

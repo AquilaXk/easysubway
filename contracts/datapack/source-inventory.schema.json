@@ -802,7 +802,73 @@
               "status": { "type": "string", "enum": ["LOCKED"] }
             }
           }
-        }
+        },
+        "allOf": [
+          {
+            "if": {
+              "type": "object",
+              "required": ["retainedScheduleAdmissionEvidence"]
+            },
+            "then": {
+              "type": "object",
+              "properties": { "id": { "const": "kric-nationwide-timetable-file" } },
+              "not": {
+                "type": "object",
+                "required": ["scheduleAdmissionEvidence"]
+              }
+            }
+          },
+          {
+            "if": {
+              "type": "object",
+              "required": ["id", "requiredForProductionPack"],
+              "properties": {
+                "id": { "const": "seoul-metro-transfer-distance-duration" },
+                "requiredForProductionPack": { "const": true }
+              }
+            },
+            "then": {
+              "type": "object",
+              "required": ["transferAdmissionEvidence"],
+              "properties": {
+                "capabilities": {
+                  "type": "object",
+                  "required": ["schedule", "realtime", "facility", "transfer"],
+                  "properties": {
+                    "transfer": {
+                      "type": "object",
+                      "additionalProperties": false,
+                      "required": ["status", "productionUseAllowed", "coverageStatus", "updateFrequency", "unsupportedNotes"],
+                      "properties": {
+                        "status": { "const": "SUPPORTED" },
+                        "productionUseAllowed": { "const": true },
+                        "coverageStatus": { "const": "CAPITAL_SEOUL_METRO_15_PAIRS_30_DIRECTED_METRICS" },
+                        "updateFrequency": { "const": "annual file snapshot" },
+                        "unsupportedNotes": { "const": "공식 소요시간은 reference-only이며 runtime 환승시간은 거리와 선택한 보행속도로 계산한다" }
+                      }
+                    }
+                  }
+                },
+                "transferAdmissionEvidence": {
+                  "type": "object",
+                  "required": ["artifactKind"]
+                }
+              }
+            },
+            "else": {
+              "type": "object",
+              "properties": {
+                "capabilities": {
+                  "type": "object",
+                  "not": {
+                    "type": "object",
+                    "required": ["transfer"]
+                  }
+                }
+              }
+            }
+          }
+        ]
       }
     }
   }
