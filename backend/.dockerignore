@@ -1,5 +1,0 @@
-*
-!Dockerfile
-!build
-!build/libs
-!build/libs/*.jar

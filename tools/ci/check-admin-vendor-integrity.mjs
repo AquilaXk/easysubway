@@ -11,6 +11,9 @@ const defaultRoot = path.resolve(path.dirname(scriptPath), "../..");
 
 export function checkAdminVendorIntegrity(root = defaultRoot) {
   const vendorRoot = path.join(root, "backend/src/main/resources/static/vendor");
+  if (!existsSync(vendorRoot)) {
+    return { checkedVendorFiles: 0, checkedTemplateScripts: 0, skipped: true };
+  }
   const templateRoots = [
     path.join(root, "backend/src/main/resources/templates/admin"),
     path.join(root, "backend/src/main/resources/templates/operator"),

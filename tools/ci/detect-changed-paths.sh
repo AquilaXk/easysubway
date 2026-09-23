@@ -211,6 +211,29 @@ if [[ "${ci}" == "true" ]]; then
   docs_only=false
 fi
 
+if [[ ! -f "backend/build.gradle" ]]; then
+  backend=false
+fi
+if [[ ! -d "apps/mobile/android" ]]; then
+  android=false
+fi
+if [[ ! -f "apps/mobile/pubspec.yaml" ]]; then
+  mobile=false
+  ios=false
+fi
+if [[ ! -d "tools/datapack" || ! -f "tools/datapack/build-datapack.mjs" ]]; then
+  datapack=false
+fi
+if [[ ! -d "tools/route-map" ]]; then
+  route_map=false
+fi
+if [[ ! -d "tools/realtime" ]]; then
+  realtime=false
+fi
+if [[ ! -f "infra/docker-compose.yml" ]]; then
+  deploy=false
+fi
+
 outputs_payload() {
   cat <<EOF
 android=${android}
