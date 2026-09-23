@@ -41,6 +41,7 @@ jobs:
             --source-sha "${GITHUB_SHA}" \
             --observed-at "${OBSERVED_AT}" \
             --repository-root "${RUNNER_TEMP}/documentation-inventory-repositories-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}" \
+            --dynamic-resolution \
             --output "${REPORT_PATH}"
       - name: Upload sanitized documentation inventory audit
         if: ${{ always() }}

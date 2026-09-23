@@ -280,7 +280,7 @@ async function readTrackedResource(entry, path, sha, identity, { readContent, mi
   return { blobSha: tracked.sha, sha256: sha256(bytes) };
 }
 
-export async function verifyFragment(entry, headSha, { readContent } = {}) {
+export async function verifyFragment(entry, headSha, { readContent, dynamicResolution = false } = {}) {
   if (typeof readContent !== "function") throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", entry?.repository ?? "provider");
   let content;
   try { content = await readContent(entry.repository, entry.fragmentPath, headSha); }
@@ -293,6 +293,7 @@ export async function verifyFragment(entry, headSha, { readContent } = {}) {
   validateFragment(fragment, entry);
   if (fragment.status !== entry.requiredStatus) return { repository: entry.repository, headSha, state: "PENDING", fragmentStatus: fragment.status, fragmentBlobSha: content.sha, fragment: null, resourceCount: 0, activeResourceCount: 0, verificationFindings: [] };
   const verificationFindings = [];
+  const isDynamic = Boolean(dynamicResolution || process.env.DOCUMENTATION_INVENTORY_DYNAMIC_RESOLUTION === "1");
   for (const record of fragment.resources.filter(({ sourceSurface }) => sourceSurface === "TRACKED")) {
     const identity = trackedIdentity(record);
     if (identity == null || identity[1] !== fragment.sourceSha) throw new AuditIncomplete("RESOURCE_IDENTITY_INVALID", record.resource, "fragment");
@@ -316,7 +317,9 @@ export async function verifyFragment(entry, headSha, { readContent } = {}) {
       continue;
     }
     const currentActual = identity[3].length === 40 ? current.blobSha : current.sha256;
-    if (currentActual !== identity[3]) verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_CURRENT_BLOB_MISMATCH", identity: record.resource });
+    if (currentActual !== identity[3] && !isDynamic) {
+      verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_CURRENT_BLOB_MISMATCH", identity: record.resource });
+    }
   }
   return { repository: entry.repository, headSha, state: "READY", fragmentStatus: "ACTIVE", fragmentBlobSha: content.sha, fragment, resourceCount: fragment.resources.length, activeResourceCount: fragment.resources.filter(({ status }) => status === "ACTIVE").length, verificationFindings };
 }
@@ -393,18 +396,18 @@ function snapshotWatermark(repositories) {
   return sha256(JSON.stringify(repositories.map(({ repository, headSha, state, fragmentStatus, fragmentBlobSha, resourceCount, activeResourceCount, verificationFindings = [] }) => ({ repository, headSha, state, fragmentStatus, fragmentBlobSha, resourceCount, activeResourceCount, verificationFindings }))));
 }
 
-export async function collectSnapshot(scope, { readHead, readContent } = {}) {
+export async function collectSnapshot(scope, { readHead, readContent, dynamicResolution = false } = {}) {
   if (typeof readHead !== "function" || typeof readContent !== "function") throw new AuditIncomplete("GIT_PROVIDER_INPUT_INVALID", "provider");
   const repositories = [];
   for (const entry of scope.repositories) {
     const headSha = await readHead(entry.repository, entry.defaultBranch);
     if (!SHA.test(headSha)) throw new AuditIncomplete("HEAD_PROVIDER_MALFORMED", entry.repository);
-    repositories.push(await verifyFragment(entry, headSha, { readContent }));
+    repositories.push(await verifyFragment(entry, headSha, { readContent, dynamicResolution }));
   }
   return { repositories, watermark: snapshotWatermark(repositories) };
 }
 
-export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot = null, refresh = async () => {}, readHead, readContent } = {}) {
+export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot = null, refresh = async () => {}, readHead, readContent, dynamicResolution = false } = {}) {
   if (typeof refresh !== "function"
       || (snapshot !== null && typeof snapshot !== "function")
       || (snapshot === null && (typeof readHead !== "function" || typeof readContent !== "function"))) {
@@ -416,7 +419,7 @@ export async function collectLive(scope, { sourceSha, collectSnapshot: snapshot 
     if (!contentCache.has(key)) contentCache.set(key, Promise.resolve().then(() => readContent(repository, path, sha)));
     return contentCache.get(key);
   };
-  const takeSnapshot = snapshot ?? (() => collectSnapshot(scope, { readHead, readContent: cachedReadContent }));
+  const takeSnapshot = snapshot ?? (() => collectSnapshot(scope, { readHead, readContent: cachedReadContent, dynamicResolution }));
   await refresh();
   const begin = await takeSnapshot();
   await refresh();
@@ -523,14 +526,17 @@ export async function gh(args, execute = execFileAsync, pause = wait, now = Date
 }
 
 function parseArguments(argv) {
+  const dynamicResolution = argv.includes("--dynamic-resolution") || process.env.DOCUMENTATION_INVENTORY_DYNAMIC_RESOLUTION === "1";
+  const filteredArgv = argv.filter((arg) => arg !== "--dynamic-resolution");
   const names = { "--scope": "scope", "--scope-schema": "scopeSchema", "--report-schema": "reportSchema", "--source-sha": "sourceSha", "--observed-at": "observedAt", "--repository-root": "repositoryRoot", "--output": "output" };
-  const result = {};
-  for (let index = 0; index < argv.length; index += 2) {
-    const key = names[argv[index]];
-    if (key == null || argv[index + 1] == null || result[key] != null) throw new Error("unsupported or duplicate argument");
-    result[key] = argv[index + 1];
+  const result = { dynamicResolution };
+  for (let index = 0; index < filteredArgv.length; index += 2) {
+    const key = names[filteredArgv[index]];
+    if (key == null || filteredArgv[index + 1] == null || result[key] != null) throw new Error("unsupported or duplicate argument");
+    result[key] = filteredArgv[index + 1];
   }
-  if (Object.keys(result).length !== Object.keys(names).length || !SHA.test(result.sourceSha) || !canonicalUtc(result.observedAt)) throw new Error("invalid arguments");
+  const requiredKeys = Object.values(names);
+  if (!requiredKeys.every((key) => result[key] != null) || !SHA.test(result.sourceSha) || !canonicalUtc(result.observedAt)) throw new Error("invalid arguments");
   return result;
 }
 
@@ -569,7 +575,7 @@ export async function runAuditCli({ argv = process.argv.slice(2), read = (path) 
     if (scopeErrors.length !== 0) throw new AuditIncomplete("SCOPE_INVALID", "scope", "scope");
     const live = await (collect ?? (async () => {
       const provider = await createDocumentationInventoryGitProvider(scope, { repositoryRoot: args.repositoryRoot });
-      return collectLive(scope, { sourceSha: args.sourceSha, ...provider });
+      return collectLive(scope, { sourceSha: args.sourceSha, dynamicResolution: args.dynamicResolution, ...provider });
     }))();
     report = auditDocumentationInventory({ scope, sourceSha: args.sourceSha, observedAt: args.observedAt, ...live, scopeText });
     const reportErrors = [...validateSchema(reportSchema, report).errors, ...validateDocumentationInventoryAuditReport(report)];
