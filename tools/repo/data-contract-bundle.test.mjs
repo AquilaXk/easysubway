@@ -77,6 +77,27 @@ test("data contract bundle generator는 닫힌 resource set의 현재 바이트�
   assert.deepEqual(generated, existing);
 });
 
+test("data contract bundle v1.1.0은 갱신된 Datapack 스키마를 포함하여 exact bytes로 고정한다", async () => {
+  const bundle = JSON.parse(await readFile("contracts/bundles/data-contracts-v1.1.0.json", "utf8"));
+
+  assert.deepEqual(Object.keys(bundle), ["schemaVersion", "bundleVersion", "resources"]);
+  assert.equal(bundle.schemaVersion, 1);
+  assert.equal(bundle.bundleVersion, "1.1.0");
+  const expectedKeys = [...resources.keys(), "datapack/source-inventory.schema.json"];
+  assert.deepEqual(Object.keys(bundle.resources), expectedKeys);
+  for (const [resource, source] of resources) {
+    assert.equal(bundle.resources[resource], await readFile(source, "utf8"));
+  }
+  assert.equal(
+    bundle.resources["datapack/source-inventory.schema.json"],
+    await readFile("contracts/datapack/source-inventory.schema.json", "utf8"),
+  );
+
+  const generated = await buildDataContractBundle({ repositoryRoot: process.cwd(), version: "1.1.0" });
+  const existing = await readFile("contracts/bundles/data-contracts-v1.1.0.json");
+  assert.deepEqual(generated, existing);
+});
+
 test("data contract bundle --write는 output symlink와 그 referent를 거부한다", () => {
   const directory = mkdtempSync(path.join(tmpdir(), "data-contract-bundle-output-"));
   const outputPath = path.join(directory, "contracts/bundles/data-contracts-v1.0.0.json");

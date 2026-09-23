@@ -3543,6 +3543,65 @@ test("capital topology route-map source는 currentTopologyAdmission을 필수로
   )));
 });
 
+test("source inventory schema allOf는 kric-nationwide-timetable-file의 retainedScheduleAdmission과 scheduleAdmission 공존을 거부한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const source = inventory.sources.find((entry) => entry.id === "kric-nationwide-timetable-file");
+  if (!source) return;
+
+  const mutated = structuredClone(inventory);
+  const target = mutated.sources.find((entry) => entry.id === "kric-nationwide-timetable-file");
+  target.retainedScheduleAdmissionEvidence = {
+    snapshotId: "kric-timetable-20260901",
+    rawSha256: "a".repeat(64),
+    recordsSha256: "b".repeat(64),
+    observationIdentitySha256: "c".repeat(64),
+    receiptSha256: "d".repeat(64),
+    observedAt: "2026-09-01T00:00:00.000Z",
+    retainedContractSha256: "e".repeat(64),
+    topologySourceId: "capital-route-topology",
+    topologySnapshotId: "capital-route-topology-20260901",
+    topologyContentSha256: "f".repeat(64),
+  };
+  target.scheduleAdmissionEvidence = {
+    snapshotId: "kric-timetable-20260901",
+    rawSha256: "a".repeat(64),
+    contentSha256: "b".repeat(64),
+    schemaFingerprint: "c".repeat(64),
+    snapshotFileSha256: "d".repeat(64),
+    datasetIds: ["1"],
+  };
+
+  assert.ok(validateSchema(schema, mutated).errors.length > 0);
+});
+
+test("source inventory schema allOf는 seoul-metro-transfer production 필수 시 transferAdmissionEvidence와 transfer capability를 강제한다", () => {
+  const schema = loadJson("contracts/datapack/source-inventory.schema.json");
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const source = inventory.sources.find((entry) => entry.id === "seoul-metro-transfer-distance-duration");
+  assert.ok(source);
+
+  const missingEvidence = structuredClone(inventory);
+  const target1 = missingEvidence.sources.find((entry) => entry.id === "seoul-metro-transfer-distance-duration");
+  target1.requiredForProductionPack = true;
+  delete target1.transferAdmissionEvidence;
+
+  assert.ok(validateSchema(schema, missingEvidence).errors.length > 0);
+
+  const invalidElse = structuredClone(inventory);
+  const target2 = invalidElse.sources.find((entry) => entry.id === "seoul-metro-transfer-distance-duration");
+  target2.requiredForProductionPack = false;
+  target2.capabilities.transfer = {
+    status: "SUPPORTED",
+    productionUseAllowed: true,
+    coverageStatus: "CAPITAL_SEOUL_METRO_15_PAIRS_30_DIRECTED_METRICS",
+    updateFrequency: "annual file snapshot",
+    unsupportedNotes: "none",
+  };
+
+  assert.ok(validateSchema(schema, invalidElse).errors.length > 0);
+});
+
 test("boundaries.json이 스스로 정합하다", () => {
   const boundaries = loadJson("contracts/boundaries.json");
 

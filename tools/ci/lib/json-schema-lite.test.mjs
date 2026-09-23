@@ -140,3 +140,48 @@ test("date·date-time·uri format은 달력과 URL 구조까지 검증한다", (
     assert.equal(validateSchema({ type: "string", format: "uri" }, malformed).ok, false, malformed);
   }
 });
+
+test("allOf는 모든 하위 스키마 조건을 동시에 검증한다", () => {
+  const schema = {
+    type: "object",
+    allOf: [
+      { type: "object", required: ["id"] },
+      { type: "object", properties: { id: { type: "string" } } },
+      { type: "object", properties: { score: { type: "integer", minimum: 0 } } },
+    ],
+  };
+
+  assert.equal(validateSchema(schema, { id: "alpha", score: 10 }).ok, true);
+  assert.equal(validateSchema(schema, { id: "alpha", score: -1 }).ok, false);
+  assert.equal(validateSchema(schema, { score: 10 }).ok, false);
+});
+
+test("if/then/else는 조건부 스키마 분기를 검증한다", () => {
+  const schema = {
+    type: "object",
+    if: {
+      type: "object",
+      required: ["role"],
+      properties: { role: { const: "admin" } },
+    },
+    then: {
+      type: "object",
+      required: ["adminToken"],
+      properties: { adminToken: { type: "string", minLength: 8 } },
+    },
+    else: {
+      type: "object",
+      not: {
+        type: "object",
+        required: ["adminToken"],
+      },
+    },
+  };
+
+  assert.equal(validateSchema(schema, { role: "admin", adminToken: "secret123" }).ok, true);
+  assert.equal(validateSchema(schema, { role: "admin", adminToken: "short" }).ok, false);
+  assert.equal(validateSchema(schema, { role: "admin" }).ok, false);
+  assert.equal(validateSchema(schema, { role: "user" }).ok, true);
+  assert.equal(validateSchema(schema, { role: "user", adminToken: "secret123" }).ok, false);
+});
+
