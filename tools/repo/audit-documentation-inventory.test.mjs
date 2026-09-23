@@ -667,4 +667,45 @@ test("documentation inventory audit workflow uses canonical public Git provider"
   assert.doesNotMatch(workflow, /^\s*(?:GH_TOKEN|GITHUB_TOKEN)\s*:/m);
   assert.doesNotMatch(workflow, /\$\{\{\s*secrets\./);
   assert.match(workflow, /--repository-root "\$\{RUNNER_TEMP\}\/documentation-inventory-repositories-\$\{GITHUB_RUN_ID\}-\$\{GITHUB_RUN_ATTEMPT\}"/);
+  assert.match(workflow, /--dynamic-resolution/);
+});
+
+test("documentation inventory audit supports dynamic resolution mode for D01 liveness and path integrity", async () => {
+  const canonicalIdentity = `git:${SOURCE_SHA}:contracts/easysubway.json:${"c".repeat(40)}`;
+  const candidate = fragment(REPOSITORIES[0], [record(REPOSITORIES[0], {
+    canonicalIdentity,
+    lastVerifiedIdentity: canonicalIdentity,
+  })], { sourceSha: SOURCE_SHA });
+  // Resource blob differs between SOURCE_SHA and HEAD
+  const readContentWithBlobChange = async (_repository, path, sha) => path === PATH
+    ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(candidate)).toString("base64") }
+    : { type: "file", sha: sha === SOURCE_SHA ? "c".repeat(40) : "f".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") };
+
+  // Strict mode: produces mismatch finding
+  const strictResult = await verifyFragment(SCOPE.repositories[0], SHA, {
+    readContent: readContentWithBlobChange,
+    dynamicResolution: false,
+  });
+  assert.equal(strictResult.verificationFindings.length, 1);
+  assert.equal(strictResult.verificationFindings[0].code, "TRACKED_RESOURCE_CURRENT_BLOB_MISMATCH");
+
+  // Dynamic resolution mode: accepts live blob, zero findings
+  const dynamicResult = await verifyFragment(SCOPE.repositories[0], SHA, {
+    readContent: readContentWithBlobChange,
+    dynamicResolution: true,
+  });
+  assert.equal(dynamicResult.verificationFindings.length, 0);
+
+  // Missing resource at HEAD: dynamic resolution STILL fails closed with TRACKED_RESOURCE_CURRENT_MISSING
+  const readContentWithMissingHead = async (_repository, path, sha) => {
+    if (path === PATH) return { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(candidate)).toString("base64") };
+    if (sha === SOURCE_SHA) return { type: "file", sha: "c".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") };
+    throw Object.assign(new Error("missing"), { status: 404 });
+  };
+  const dynamicMissingResult = await verifyFragment(SCOPE.repositories[0], SHA, {
+    readContent: readContentWithMissingHead,
+    dynamicResolution: true,
+  });
+  assert.equal(dynamicMissingResult.verificationFindings.length, 1);
+  assert.equal(dynamicMissingResult.verificationFindings[0].code, "TRACKED_RESOURCE_CURRENT_MISSING");
 });
