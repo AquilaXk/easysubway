@@ -24,7 +24,7 @@
         ]
       },
       "displayName": "부산교통공사_부산도시철도 장애인 편의시설 정보",
-      "detailUrl": "https://www.data.go.kr/data/15001020/openapi.do",
+      "detailUrl": "https://data.humetro.busan.kr",
       "requestUrl": "http://data.humetro.busan.kr/voc/api/open_api_convenience.tnn",
       "operation": {
         "method": "GET",
@@ -7291,7 +7291,7 @@
     },
     {
       "id": "molit-railway-transfer-movement",
-      "apiCatalog": false,
+      "apiCatalog": true,
       "priority": "P0",
       "domain": "indoor_movement_paths",
       "coverageScope": {
@@ -7330,6 +7330,210 @@
         "licenseText": "이용허락범위 제한 없음"
       },
       "rawSnapshotAdmission": { "snapshotId": "molit-railway-transfer-movement-20250811", "metadataPath": "tools/datapack/sources/molit-railway-transfer-movement-20250811.csv.gz.json", "metadataFileSha256": "f75e3ec2a2270cdd8d3b2303f12db0167cf0b5f5525115f6c980680468faa284", "rawSha256": "3a45dc1d82f81666c48eeef81fdc35b0e4a0c59312e4b26907f644c45b518ce3", "gzipSha256": "94e712d32860a7a6e4b4c1f1d9651dc25823305f537e50370142009c1ca66d28", "rowCount": 8054, "status": "LOCKED" }
+    },
+    {
+      "id": "daegu-line1-train-timetable",
+      "apiCatalog": true,
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": [
+          "daegu"
+        ],
+        "operatorIds": [
+          "daegu-transportation"
+        ],
+        "lineIds": [
+          "line-5b8d9b05e7e6"
+        ]
+      },
+      "displayName": "대구교통공사_1호선_열차시각표",
+      "detailUrl": "https://www.data.go.kr/data/15138731/fileData.do",
+      "requestUrl": "https://www.data.go.kr/data/15138731/fileData.do",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://www.data.go.kr/data/15138731/fileData.do",
+        "auth": {
+          "placement": "none"
+        },
+        "requiredParameters": [],
+        "fixedParameters": {},
+        "responseEnvelope": "official CSV file data 15138731",
+        "responseFields": [
+          "역명",
+          "방향",
+          "평일",
+          "토요일",
+          "휴일",
+          "출발시간"
+        ],
+        "runner": {
+          "command": "node tools/datapack/collect-daegu-timetable.mjs",
+          "arguments": [
+            "--line",
+            "1"
+          ],
+          "requiredEnv": []
+        },
+        "secretPolicy": "credential-free-output"
+      },
+      "licenseEvidenceStatus": "confirmed_free_use",
+      "sampleEvidenceStatus": "official_file_admitted",
+      "admissionStatus": "official_snapshot_admitted",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-09-24",
+        "searchTerms": [
+          "대구교통공사",
+          "1호선",
+          "열차시각표"
+        ],
+        "outputFields": [
+          "역명",
+          "방향",
+          "평일",
+          "토요일",
+          "휴일",
+          "출발시간"
+        ],
+        "licenseText": "이용허락범위 제한 없음"
+      }
+    },
+    {
+      "id": "daegu-line2-train-timetable",
+      "apiCatalog": true,
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": [
+          "daegu"
+        ],
+        "operatorIds": [
+          "daegu-transportation"
+        ],
+        "lineIds": [
+          "line-e2938a4cc492"
+        ]
+      },
+      "displayName": "대구교통공사_2호선_열차시각표",
+      "detailUrl": "https://www.data.go.kr/data/15138732/fileData.do",
+      "requestUrl": "https://www.data.go.kr/data/15138732/fileData.do",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://www.data.go.kr/data/15138732/fileData.do",
+        "auth": {
+          "placement": "none"
+        },
+        "requiredParameters": [],
+        "fixedParameters": {},
+        "responseEnvelope": "official CSV file data 15138732",
+        "responseFields": [
+          "역명",
+          "방향",
+          "평일",
+          "토요일",
+          "휴일",
+          "출발시간"
+        ],
+        "runner": {
+          "command": "node tools/datapack/collect-daegu-timetable.mjs",
+          "arguments": [
+            "--line",
+            "2"
+          ],
+          "requiredEnv": []
+        },
+        "secretPolicy": "credential-free-output"
+      },
+      "licenseEvidenceStatus": "confirmed_free_use",
+      "sampleEvidenceStatus": "official_file_admitted",
+      "admissionStatus": "official_snapshot_admitted",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-09-24",
+        "searchTerms": [
+          "대구교통공사",
+          "2호선",
+          "열차시각표"
+        ],
+        "outputFields": [
+          "역명",
+          "방향",
+          "평일",
+          "토요일",
+          "휴일",
+          "출발시간"
+        ],
+        "licenseText": "이용허락범위 제한 없음"
+      }
+    },
+    {
+      "id": "daegu-line3-train-timetable",
+      "apiCatalog": true,
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": [
+          "daegu"
+        ],
+        "operatorIds": [
+          "daegu-transportation"
+        ],
+        "lineIds": [
+          "line-0ffaa95b1b5d"
+        ]
+      },
+      "displayName": "대구교통공사_3호선_열차시각표",
+      "detailUrl": "https://www.data.go.kr/data/15138734/fileData.do",
+      "requestUrl": "https://www.data.go.kr/data/15138734/fileData.do",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://www.data.go.kr/data/15138734/fileData.do",
+        "auth": {
+          "placement": "none"
+        },
+        "requiredParameters": [],
+        "fixedParameters": {},
+        "responseEnvelope": "official CSV file data 15138734",
+        "responseFields": [
+          "역명",
+          "방향",
+          "평일",
+          "토요일",
+          "휴일",
+          "출발시간"
+        ],
+        "runner": {
+          "command": "node tools/datapack/collect-daegu-timetable.mjs",
+          "arguments": [
+            "--line",
+            "3"
+          ],
+          "requiredEnv": []
+        },
+        "secretPolicy": "credential-free-output"
+      },
+      "licenseEvidenceStatus": "confirmed_free_use",
+      "sampleEvidenceStatus": "official_file_admitted",
+      "admissionStatus": "official_snapshot_admitted",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-09-24",
+        "searchTerms": [
+          "대구교통공사",
+          "3호선",
+          "열차시각표"
+        ],
+        "outputFields": [
+          "역명",
+          "방향",
+          "평일",
+          "토요일",
+          "휴일",
+          "출발시간"
+        ],
+        "licenseText": "이용허락범위 제한 없음"
+      }
     }
   ]
 }
