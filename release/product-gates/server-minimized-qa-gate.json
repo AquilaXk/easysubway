@@ -234,7 +234,7 @@
       "manualTarget": "Runner.app bundle contains assets/datapacks index and baseline sqlite packs",
       "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/archive-baseline-pack",
       "evidence": ["xcodebuild_log_excerpt", "bundle_file_listing"],
-      "linkedArtifacts": ["apps/mobile/pubspec.yaml", "apps/mobile/assets/datapacks/index.json", "apps/mobile/assets/datapacks/core.sqlite.gz", "apps/mobile/assets/datapacks/capital.sqlite.gz"]
+      "linkedArtifacts": ["apps/mobile/pubspec.yaml", "apps/mobile/assets/datapacks/index.json", "apps/mobile/assets/datapacks/nationwide.sqlite.gz"]
     },
     {
       "id": "ios_archive_contains_privacy_manifest",
