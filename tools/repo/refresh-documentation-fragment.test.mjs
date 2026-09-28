@@ -164,6 +164,7 @@ function createMockGitRepo() {
 test("parseArgs parses flags and rejects unknown options", () => {
   const args = parseArgs([
     "--check",
+    "--strict-commit-sha",
     "--worktree",
     "--quiet",
     "--head",
@@ -177,6 +178,7 @@ test("parseArgs parses flags and rejects unknown options", () => {
   ]);
 
   assert.equal(args.check, true);
+  assert.equal(args.strictCommitSha, true);
   assert.equal(args.worktree, true);
   assert.equal(args.quiet, true);
   assert.equal(args.headSha, "a".repeat(40));
@@ -381,6 +383,39 @@ test("runCli returns 0 on in-sync and 1 on drift in check mode", () => {
 
     const driftCode = runCli(["--repo-root", dir, "--check", "--quiet"]);
     assert.equal(driftCode, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("refreshDocumentationFragment in --check mode distinguishes content drift from commit SHA drift", () => {
+  const { dir, initialCommitSha } = createMockGitRepo();
+  try {
+    // Commit an unrelated file
+    writeFileSync(join(dir, "unrelated.txt"), "some content\n", "utf8");
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["commit", "-m", "Unrelated commit"], { cwd: dir });
+
+    const newCommitSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
+
+    const checkResult = refreshDocumentationFragment({
+      repoRoot: dir,
+      check: true,
+    });
+
+    assert.equal(checkResult.sourceShaChanged, true);
+    assert.equal(checkResult.previousSourceSha, initialCommitSha);
+    assert.equal(checkResult.headSha, newCommitSha);
+    assert.equal(checkResult.hasContentDrift, false);
+    assert.equal(checkResult.contentDriftCount, 0);
+
+    // Default --check should pass (exit code 0) because content has not drifted
+    const defaultCheckExitCode = runCli(["--repo-root", dir, "--check", "--quiet"]);
+    assert.equal(defaultCheckExitCode, 0);
+
+    // Strict --check --strict-commit-sha should fail (exit code 1) because commit SHA changed
+    const strictCheckExitCode = runCli(["--repo-root", dir, "--check", "--strict-commit-sha", "--quiet"]);
+    assert.equal(strictCheckExitCode, 1);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
