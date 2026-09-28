@@ -375,3 +375,94 @@ test("checkDocumentationFragmentSync with --worktree detects uncommitted working
   }
 });
 
+test("checkDocumentationFragmentSync fails in PR mode when fragment is modified alone with mismatched blob SHA", () => {
+  const { dir } = setupTestRepo();
+  try {
+    // Checkout PR branch
+    execFileSync("git", ["checkout", "-b", "feature/bad-fragment"], { cwd: dir });
+
+    // Modify ONLY documentation-fragment.json with an invalid blob SHA for README.md
+    const fragPath = join(dir, "contracts/documentation/documentation-fragment.json");
+    const frag = JSON.parse(readFileSync(fragPath, "utf8"));
+    frag.resources[0].canonicalIdentity = `git:${frag.sourceSha}:README.md:0000000000000000000000000000000000000000`;
+    writeFileSync(fragPath, JSON.stringify(frag, null, 2) + "\n", "utf8");
+    execFileSync("git", ["commit", "-am", "Corrupt fragment blob SHA without modifying README"], { cwd: dir });
+
+    const result = checkDocumentationFragmentSync({
+      repoRoot: dir,
+      baseRef: "main",
+      headRef: "HEAD",
+    });
+
+    assert.equal(result.passed, false, "PR gate must reject PR when fragment has mismatched blob SHA");
+    assert.equal(result.reason, "BLOB_SHA_MISMATCH");
+    assert.equal(result.mismatches.length, 1);
+    assert.equal(result.mismatches[0].path, "README.md");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("runCli in PR mode correctly outputs error message when tracked resource is deleted in PR", () => {
+  const { dir } = setupTestRepo();
+  try {
+    // Checkout PR branch
+    execFileSync("git", ["checkout", "-b", "feature/delete-tracked"], { cwd: dir });
+
+    // Delete README.md and touch fragment
+    execFileSync("git", ["rm", "README.md"], { cwd: dir });
+    const fragPath = join(dir, "contracts/documentation/documentation-fragment.json");
+    const frag = JSON.parse(readFileSync(fragPath, "utf8"));
+    frag.lastVerifiedAt = new Date().toISOString();
+    writeFileSync(fragPath, JSON.stringify(frag, null, 2) + "\n", "utf8");
+    execFileSync("git", ["commit", "-am", "Delete README and update fragment"], { cwd: dir });
+
+    const errors = [];
+    const originalConsoleError = console.error;
+    console.error = (...args) => errors.push(args.join(" "));
+
+    let exitCode;
+    try {
+      exitCode = runCli(["--repo-root", dir, "--base", "main", "--head", "HEAD"]);
+    } finally {
+      console.error = originalConsoleError;
+    }
+
+    assert.equal(exitCode, 1);
+    const combinedErrors = errors.join("\n");
+    assert.match(combinedErrors, /Resource does not exist in HEAD ref/);
+    assert.doesNotMatch(combinedErrors, /recorded=undefined, actual PR HEAD=undefined/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("runCli in --check-all --worktree mode formats actual worktree label instead of HEAD", () => {
+  const { dir } = setupTestRepo();
+  try {
+    // Modify README on disk without committing
+    writeFileSync(join(dir, "README.md"), "# Modified in worktree\n", "utf8");
+
+    const errors = [];
+    const originalConsoleError = console.error;
+    console.error = (...args) => errors.push(args.join(" "));
+
+    let exitCode;
+    try {
+      exitCode = runCli(["--repo-root", dir, "--check-all", "--worktree"]);
+    } finally {
+      console.error = originalConsoleError;
+    }
+
+    assert.equal(exitCode, 1);
+    const combinedErrors = errors.join("\n");
+    assert.match(combinedErrors, /actual worktree=/);
+    assert.doesNotMatch(combinedErrors, /actual HEAD=/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+
+
+

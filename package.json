@@ -4,8 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tools/ci/*.test.mjs tools/repo/worktree-helper.test.mjs",
+    "test": "node --test tools/ci/*.test.mjs tools/repo/*.test.mjs",
     "test:ci": "node --test tools/ci/*.test.mjs",
+    "test:repo": "node --test tools/repo/*.test.mjs",
     "test:worktree": "node --test tools/repo/worktree-helper.test.mjs",
     "check:fragment": "node tools/ci/check-documentation-fragment-sync.mjs --base origin/main",
     "refresh:fragment": "node tools/repo/refresh-documentation-fragment.mjs --worktree"

@@ -135,7 +135,7 @@ export function refreshDocumentationFragment({
     }
 
     const currentBlobSha = record.canonicalIdentity
-      ? record.canonicalIdentity.split(":")[3]
+      ? record.canonicalIdentity.split(":").pop()
       : null;
 
     const targetIdentity = `git:${effectiveHeadSha}:${relativePath}:${blobSha}`;
