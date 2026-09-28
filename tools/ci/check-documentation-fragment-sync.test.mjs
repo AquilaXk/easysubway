@@ -254,3 +254,124 @@ test("runCli returns 0 for passing PR gate and 1 for failure", () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("checkDocumentationFragmentSync passes in --check-all mode when HEAD commit SHA changes but all tracked blob SHAs remain identical", () => {
+  const { dir } = setupTestRepo();
+  try {
+    // Commit several unrelated code files to move HEAD far ahead of fragment.sourceSha
+    writeFileSync(join(dir, "unrelated.txt"), "modified code file 1\n", "utf8");
+    execFileSync("git", ["commit", "-am", "Code change 1"], { cwd: dir });
+
+    writeFileSync(join(dir, "unrelated2.txt"), "modified code file 2\n", "utf8");
+    execFileSync("git", ["add", "."], { cwd: dir });
+    execFileSync("git", ["commit", "-m", "Code change 2"], { cwd: dir });
+
+    const headSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
+    const frag = JSON.parse(readFileSync(join(dir, "contracts/documentation/documentation-fragment.json"), "utf8"));
+    assert.notEqual(headSha, frag.sourceSha, "Precondition: HEAD SHA must differ from fragment sourceSha");
+
+    const result = checkDocumentationFragmentSync({
+      repoRoot: dir,
+      checkAll: true,
+    });
+
+    assert.equal(result.passed, true);
+    assert.equal(result.mode, "FULL_CHECK");
+    assert.equal(result.reason, "IN_SYNC");
+    assert.equal(result.totalTrackedCount, 1);
+    assert.equal(result.mismatches.length, 0);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("checkDocumentationFragmentSync fails in --check-all mode when a tracked documentation resource has modified blob SHA", () => {
+  const { dir } = setupTestRepo();
+  try {
+    // Modify README
+    writeFileSync(join(dir, "README.md"), "# Modified Content That Drifts\n", "utf8");
+    execFileSync("git", ["commit", "-am", "Modify README without updating fragment"], { cwd: dir });
+
+    const expectedNewBlob = execFileSync("git", ["rev-parse", "HEAD:README.md"], { cwd: dir, encoding: "utf8" }).trim();
+
+    const result = checkDocumentationFragmentSync({
+      repoRoot: dir,
+      checkAll: true,
+    });
+
+    assert.equal(result.passed, false);
+    assert.equal(result.mode, "FULL_CHECK");
+    assert.equal(result.reason, "BLOB_SHA_MISMATCH");
+    assert.equal(result.totalTrackedCount, 1);
+    assert.equal(result.mismatches.length, 1);
+    assert.equal(result.mismatches[0].path, "README.md");
+    assert.equal(result.mismatches[0].headBlobSha, expectedNewBlob);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("checkDocumentationFragmentSync fails in --check-all mode when a tracked resource is deleted", () => {
+  const { dir } = setupTestRepo();
+  try {
+    execFileSync("git", ["rm", "README.md"], { cwd: dir });
+    execFileSync("git", ["commit", "-m", "Delete README"], { cwd: dir });
+
+    const result = checkDocumentationFragmentSync({
+      repoRoot: dir,
+      checkAll: true,
+    });
+
+    assert.equal(result.passed, false);
+    assert.equal(result.mode, "FULL_CHECK");
+    assert.equal(result.reason, "BLOB_SHA_MISMATCH");
+    assert.equal(result.mismatches.length, 1);
+    assert.equal(result.mismatches[0].path, "README.md");
+    assert.match(result.mismatches[0].error, /does not exist in HEAD ref/);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("runCli returns 0 for --check-all when blobs match, and 1 when blobs drift", () => {
+  const { dir } = setupTestRepo();
+  try {
+    // Case 1: Unrelated commit does NOT cause --check-all failure
+    writeFileSync(join(dir, "unrelated.txt"), "another change\n", "utf8");
+    execFileSync("git", ["commit", "-am", "unrelated commit"], { cwd: dir });
+
+    const passExitCode = runCli(["--repo-root", dir, "--check-all", "--quiet"]);
+    assert.equal(passExitCode, 0);
+
+    // Case 2: Tracked file modified causes --check-all failure
+    writeFileSync(join(dir, "README.md"), "# Drifted Documentation\n", "utf8");
+    execFileSync("git", ["commit", "-am", "drift documentation"], { cwd: dir });
+
+    const failExitCode = runCli(["--repo-root", dir, "--check-all", "--quiet"]);
+    assert.equal(failExitCode, 1);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("checkDocumentationFragmentSync with --worktree detects uncommitted working tree modifications", () => {
+  const { dir } = setupTestRepo();
+  try {
+    // Modify README on disk without committing
+    writeFileSync(join(dir, "README.md"), "# Dirty working tree content\n", "utf8");
+
+    const result = checkDocumentationFragmentSync({
+      repoRoot: dir,
+      checkAll: true,
+      worktree: true,
+    });
+
+    assert.equal(result.passed, false);
+    assert.equal(result.reason, "BLOB_SHA_MISMATCH");
+    assert.equal(result.mismatches.length, 1);
+    assert.equal(result.mismatches[0].path, "README.md");
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
