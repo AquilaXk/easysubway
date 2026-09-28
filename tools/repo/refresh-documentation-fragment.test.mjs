@@ -420,4 +420,3 @@ test("refreshDocumentationFragment in --check mode distinguishes content drift f
     rmSync(dir, { recursive: true, force: true });
   }
 });
-
