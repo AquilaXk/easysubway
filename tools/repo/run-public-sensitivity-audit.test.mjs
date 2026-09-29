@@ -51,8 +51,9 @@ test("valid CLI arguments write a sanitized incomplete report on malformed hando
   await writeFile(join(root, "scope.json"), "{}"); await writeFile(join(root, "handoffs.json"), "{raw-provider-secret");
   const resolvedName = `resolved-owner-receipts-${createHash("sha256").update("out/report.json").digest("hex").slice(0, 16)}-0.json`;
   await writeFile(join(root, "out", resolvedName), "already-owned-by-another-attempt\n");
-  const exitCode = await runFanInCli(["--scope", "scope.json", "--owner-receipts", "handoffs.json", "--observed-at", OBSERVED_AT, "--runner-sha", SHA, "--repository-root", root, "--output", "out/report.json"]);
-  assert.equal(exitCode, 2);
+  let calls = 0;
+  const exitCode = await runFanInCli(["--scope", "scope.json", "--owner-receipts", "handoffs.json", "--observed-at", OBSERVED_AT, "--runner-sha", SHA, "--repository-root", root, "--output", "out/report.json"], { execGh: async () => { calls += 1; throw new Error("must not call"); } });
+  assert.equal(exitCode, 2); assert.equal(calls, 0);
   const text = await readFile(join(root, "out/report.json"), "utf8");
   assert.equal(text.includes("raw-provider-secret"), false);
   assert.equal(JSON.parse(text).status, "AUDIT_INCOMPLETE");
@@ -63,8 +64,9 @@ test("valid CLI arguments write a sanitized incomplete report on malformed hando
 test("malformed observed_at still writes one schema-valid incomplete report", async () => {
   const root = await mkdtemp(join(tmpdir(), "d20-invalid-time-")); await mkdir(join(root, "out"));
   await writeFile(join(root, "scope.json"), await readFile("contracts/documentation/public-sensitivity-audit-scope.json", "utf8")); await writeFile(join(root, "handoffs.json"), "[]");
-  const exitCode = await runFanInCli(["--scope", "scope.json", "--owner-receipts", "handoffs.json", "--observed-at", "not-a-time", "--runner-sha", SHA, "--repository-root", root, "--output", "out/report.json"]);
-  assert.equal(exitCode, 2);
+  let calls = 0;
+  const exitCode = await runFanInCli(["--scope", "scope.json", "--owner-receipts", "handoffs.json", "--observed-at", "not-a-time", "--runner-sha", SHA, "--repository-root", root, "--output", "out/report.json"], { execGh: async () => { calls += 1; throw new Error("must not call"); } });
+  assert.equal(exitCode, 2); assert.equal(calls, 0);
   const report = JSON.parse(await readFile(join(root, "out/report.json"), "utf8"));
   assert.equal(report.status, "AUDIT_INCOMPLETE"); assert.equal(report.observedAt, "1970-01-01T00:00:00.000Z");
 });
@@ -117,10 +119,20 @@ test("fan-in success passes only the five A-bound receipts to the existing audit
 
 test("runFanInCli call paths in test suite explicitly provide execGh to disallow default provider invocation", async () => {
   const content = await readFile(new URL("./run-public-sensitivity-audit.test.mjs", import.meta.url), "utf8");
-  const calls = content.match(/runFanInCli\s*\([\s\S]*?\)/g) ?? [];
-  assert.ok(calls.length >= 4, "must find runFanInCli invocations");
+  const calls = [];
+  let current = null;
+  for (const line of content.split("\n")) {
+    if (line.trim().startsWith("const exitCode = await runFanInCli(")) {
+      current = line;
+      if (line.includes(";")) { calls.push(current); current = null; }
+    } else if (current != null) {
+      current += " " + line;
+      if (line.includes(";")) { calls.push(current); current = null; }
+    }
+  }
+  assert.equal(calls.length, 4, "must find exactly four runFanInCli test invocations");
   for (const call of calls) {
-    assert.match(call, /execGh/, `runFanInCli call must provide execGh: ${call.slice(0, 40)}...`);
+    assert.match(call, /execGh/, `runFanInCli call must provide execGh: ${call.slice(0, 60)}...`);
   }
 });
 
