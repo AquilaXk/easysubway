@@ -210,7 +210,7 @@ jobs:
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
         env:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
-        run: node --test tools/ci/check-contracts.test.mjs tools/ci/check-boundaries.test.mjs tools/ci/apply-main-ruleset-required-checks.test.mjs tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs tools/ci/documentation-inventory.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs
+        run: node --test tools/ci/check-contracts.test.mjs tools/ci/check-boundaries.test.mjs tools/ci/apply-main-ruleset-required-checks.test.mjs tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs tools/ci/documentation-inventory.test.mjs tools/ci/automerge-queue.test.mjs tools/ci/claude-code-review-workflow.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs
 
       - name: Repository CI / Prepare active documentation fragment workspace
         if: ${{ needs.changes.outputs.contracts == 'true' }}

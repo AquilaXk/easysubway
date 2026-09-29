@@ -26,13 +26,16 @@ test("트리거는 PR opened·ready_for_review와 PR 번호 수동 재실행뿐�
   assert.doesNotMatch(on, /synchronize|reopened|labeled|pull_request_target|push:|schedule:|issue_comment|pull_request_review/);
 });
 
-test("Draft와 fork PR은 job if로 명시적으로 건너뛴다", () => {
+test("Draft·fork·봇이 연 PR은 job-level if로 명시적으로 건너뛰고 수동 재실행은 영향받지 않는다", () => {
   const jobIf = workflow.match(/^ {4}if: (?:>-?\n)?([\s\S]*?)^ {4}runs-on:/m)?.[1];
-  assert.ok(jobIf, "review job에 if 조건이 필요하다");
-  assert.match(jobIf, /github\.event_name == 'pull_request'/);
-  assert.match(jobIf, /github\.event\.pull_request\.draft == false/);
-  assert.match(jobIf, /github\.event\.pull_request\.head\.repo\.full_name == github\.repository/);
-  assert.match(jobIf, /github\.event_name == 'workflow_dispatch'/);
+  assert.ok(jobIf, "review job에 job-level if 조건이 필요하다");
+  assert.equal(
+    jobIf.replace(/\s+/g, " ").trim(),
+    "(github.event_name == 'pull_request' && github.event.pull_request.draft == false && "
+      + "github.event.pull_request.head.repo.full_name == github.repository && "
+      + "github.event.pull_request.user.type != 'Bot') || github.event_name == 'workflow_dispatch'",
+  );
+  // skip된 job은 claude[bot] Review를 만들지 않으므로 게이트 통과가 아니다(automerge-queue.test.mjs의 빈 Review 목록 → false).
 });
 
 test("수동 재실행도 open·non-draft·same-repo PR만 받고 아니면 실패한다", () => {
@@ -51,7 +54,8 @@ test("수동 재실행도 open·non-draft·same-repo PR만 받고 아니면 실�
 
 test("인증은 CLAUDE_CODE_OAUTH_TOKEN만 쓰고 API 키·커스텀 github_token을 쓰지 않는다", () => {
   const review = stepBlock("Run Claude Code review");
-  assert.match(review, /uses: anthropics\/claude-code-action@v1\n/);
+  assert.match(review, /uses: anthropics\/claude-code-action@[0-9a-f]{40} # v1\.0\.\d+\n/, "40자 커밋 SHA 고정 + 버전 주석");
+  assert.doesNotMatch(workflow, /claude-code-action@v\d/, "움직이는 tag 참조 금지");
   assert.match(review, /claude_code_oauth_token: \$\{\{ secrets\.CLAUDE_CODE_OAUTH_TOKEN \}\}/);
   assert.doesNotMatch(workflow, /anthropic_api_key|ANTHROPIC_API_KEY/);
   assert.doesNotMatch(review, /github_token:/, "커스텀 토큰은 claude[bot]이 아닌 신원으로 게시하게 만든다");
@@ -105,7 +109,7 @@ test("실행 뒤 current head의 claude[bot] COMMENT Review가 정확히 하나�
   // action 내부 단계가 전부 skipped여도 job이 pass로 끝나는 가짜 통과를 막는 별도 검증 step (easyconvert #238 실측).
   const verify = stepBlock("Verify Claude review object");
   assert.ok(workflow.indexOf("- name: Run Claude Code review") < workflow.indexOf("- name: Verify Claude review object"));
-  assert.doesNotMatch(workflow, /^ {8}if:/m, "action·검증 step에 step-level if를 두지 않는다");
+  assert.doesNotMatch(verify, /^ {8}if:/m, "검증 step에는 step-level if를 두지 않는다");
   assert.match(verify, /HEAD_SHA: \$\{\{ steps\.pr\.outputs\.head_sha \}\}/);
   assert.match(verify, /gh api --paginate --slurp "repos\/\$\{REPO\}\/pulls\/\$\{PR_NUMBER\}\/reviews"/);
   assert.match(verify, /\.user\.login == "claude\[bot\]"/);
@@ -143,4 +147,15 @@ test("실행 뒤 current head의 claude[bot] COMMENT Review가 정확히 하나�
   assert.equal(verdict([[reviewAt(1, "2026-09-29T01:05:00Z", { body: "" })]]), "false", "빈 본문(inline wrapper만)");
   assert.equal(verdict([[reviewAt(1, "2026-09-29T01:05:00Z", { state: "APPROVED" })]]), "false", "APPROVE 게시");
   assert.equal(verdict([[reviewAt(1, "2026-09-29T01:05:00Z", { user: { ...CLAUDE, id: 1 } })]]), "false", "위조 신원");
+});
+
+test("#3006 계약 테스트 두 파일은 Repository CI 계약 테스트 step에 등록된다", () => {
+  const ci = readFileSync(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const run = ci.match(/- name: Repository CI \/ Run contract tests\n(?: {8}[^\n]*\n)*? {8}run: ([^\n]+)\n/)?.[1];
+  assert.ok(run, "Repository CI / Run contract tests step의 run 명령이 필요하다");
+  const files = run.split(/\s+/);
+  assert.equal(files.slice(0, 2).join(" "), "node --test");
+  for (const file of ["tools/ci/automerge-queue.test.mjs", "tools/ci/claude-code-review-workflow.test.mjs"]) {
+    assert.ok(files.includes(file), `${file}이 Repository CI 계약 테스트 목록에 있어야 한다`);
+  }
 });

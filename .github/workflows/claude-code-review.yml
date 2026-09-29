@@ -4,7 +4,8 @@ name: Claude Code Review
 # change set당 discovery 1회 규약에 따라 PR opened·ready_for_review와 수동 재실행에서만 돈다(push마다 돌지 않는다).
 # 결과는 claude[bot] 신원의 단일 COMMENT Review(finding은 그 Review의 inline thread)로 게시되고,
 # automerge-queue.yml review gate가 고정된 봇 신원으로 이를 discovery로 인정한다.
-# fork PR은 시크릿이 없으므로 job if로 건너뛴다. 시크릿 누락·action 실패·Review 미게시는 job 실패다.
+# fork PR(시크릿 없음)과 봇이 연 PR(action이 봇 actor를 거부)은 job if로 건너뛴다. skip은 게이트 통과가 아니다.
+# 시크릿 누락·action 실패·Review 미게시는 job 실패다.
 
 on:
   pull_request:
@@ -31,7 +32,8 @@ jobs:
     if: >-
       (github.event_name == 'pull_request' &&
         github.event.pull_request.draft == false &&
-        github.event.pull_request.head.repo.full_name == github.repository) ||
+        github.event.pull_request.head.repo.full_name == github.repository &&
+        github.event.pull_request.user.type != 'Bot') ||
       github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     timeout-minutes: 45
@@ -75,7 +77,7 @@ jobs:
           fetch-depth: 1
 
       - name: Run Claude Code review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@8ce9314fa9a404564fa7e954cd84f25bcba2b829 # v1.0.236
         with:
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
           prompt: /code-review high ${{ steps.pr.outputs.number }}
