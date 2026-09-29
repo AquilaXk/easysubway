@@ -935,6 +935,7 @@ test("documentation catalog uses workspace-selected fragment schemas and sanitiz
     const contracts = join(fixture.directory, "selected-contracts");
     cpSync("contracts", contracts, { recursive: true });
     cpSync("README.md", join(fixture.directory, "README.md"));
+    cpSync("README.ko.md", join(fixture.directory, "README.ko.md"));
     initializeHubInventoryFixtureRepository(fixture.directory);
     const workspace = loadJson(fixture.workspacePath);
     workspace.contracts = "selected-contracts";
@@ -1409,6 +1410,7 @@ test("documentation catalog CLI accepts compatibility modes and rejects malforme
       mkdirSync(copied);
       cpSync("contracts", join(clone, "contracts"), { recursive: true });
       cpSync("README.md", join(clone, "README.md"));
+      cpSync("README.ko.md", join(clone, "README.ko.md"));
       for (const name of ["hub.json", "inputs", "gates"]) cpSync(join(fixture.directory, name), join(copied, name), { recursive: true });
       mkdirSync(join(clone, "release/migrations"), { recursive: true });
       cpSync("release/migrations/repository-split-issues.json", join(clone, "release/migrations/repository-split-issues.json"));
@@ -1615,13 +1617,66 @@ for (const field of ["requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
 
 for (const [name, mutate, expected] of [
   ["top-level GO does not leave NO_GO claim and README", (catalog) => {}, "release-status claim decision token"],
-  ["GO claim does not leave NO_GO README", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다."; }, "README.md decision token"],
+  ["GO claim does not leave NO_GO README copy", (catalog, readme) => {
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다.";
+    readme.text = "EasySubway is not yet publicly released.";
+  }, "README.md"],
   ["missing release-status claim token", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정을 확인합니다."; }, "release-status claim decision token"],
   ["multiple release-status claim tokens", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "GO와 NO_GO를 함께 쓰지 않습니다."; }, "release-status claim decision token"],
   ["opposite release-status claim token", (catalog) => {}, "release-status claim decision token"],
-  ["missing README decision token", (catalog, readme) => { readme.text = "현재 출시 결정을 확인합니다."; }, "README.md decision token"],
-  ["multiple README decision tokens", (catalog, readme) => { readme.text = "GO와 NO_GO를 함께 쓰지 않습니다."; }, "README.md decision token"],
-  ["opposite README decision token", (catalog, readme) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다."; readme.text = "현재 출시 결정은 NO_GO입니다."; }, "README.md decision token"],
+  ["(1) README with NO_GO token", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.text = "The current release decision is NO_GO. EasySubway is not yet publicly released.";
+  }, "decision token"],
+  ["(2) decision NO_GO but README missing NO_GO copy", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.text = "Here is some text without release status copy.";
+  }, "release status copy 누락"],
+  ["(3) decision NO_GO but README has GO copy", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.text = "EasySubway is officially released and available for download.";
+  }, "다른 결정"],
+  ["(5-1) Korean README with NO_GO token", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.lang = "ko";
+    readme.text = "결정은 NO_GO 입니다. 쉬운 지하철은 아직 정식 출시 전입니다.";
+  }, "README.ko.md decision token"],
+  ["(5-2) decision NO_GO but Korean README missing NO_GO copy", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.lang = "ko";
+    readme.text = "쉬운 지하철 소개 본문입니다.";
+  }, "README.ko.md release status copy 누락"],
+  ["(5-3) decision NO_GO but Korean README has GO copy", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.lang = "ko";
+    readme.text = "쉬운 지하철이 정식 출시되었습니다.";
+  }, "README.ko.md에 다른 결정"],
+  ...[
+    ["en", "## Current focus\n\nWe validate station details. EasySubway is not yet publicly released.\n", "validate"],
+    ["en", "## Current focus\n\nRelease evidence is ready. EasySubway is not yet publicly released.\n", "evidence"],
+    ["en", "## Current focus\n\nA pilot runs first. EasySubway is not yet publicly released.\n", "pilot"],
+    ["en", "## Current focus\n\nThe gate is open. EasySubway is not yet publicly released.\n", "gate"],
+    ["ko", "### 지금은\n접근성 정보를 검증하고 있습니다. 쉬운 지하철은 아직 정식 출시 전입니다.\n", "검증"],
+    ["ko", "### 지금은\n출시 근거를 준비합니다. 쉬운 지하철은 아직 정식 출시 전입니다.\n", "근거"],
+  ].map(([lang, text, word]) => [`${lang} focus section with forbidden word ${word}`, (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.lang = lang;
+    readme.text = text;
+  }, `금지 단어 '${word}'`]),
 ]) {
   test(`product claim catalog rejects ${name}`, () => {
     const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
@@ -1629,18 +1684,20 @@ for (const [name, mutate, expected] of [
     catalog.releaseDecision = "GO";
     const releaseDecision = loadJson("release/product-gates/production-datapack-scope.json");
     releaseDecision.decision.currentLaunchDecision = "GO";
-    mutate(catalog, readme);
+    const context = { decision: "GO" };
+    mutate(catalog, readme, context);
+    releaseDecision.decision.currentLaunchDecision = context.decision;
     const errors = [];
     validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
       releaseDecision,
       forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
-      publicCopy: readme.text,
+      publicCopy: { [readme.lang ?? "en"]: readme.text },
     });
-    assert.ok(errors.some((error) => error.includes(expected)));
+    assert.ok(errors.some((error) => error.includes(expected)), errors.join("\n"));
   });
 }
 
-test("product claim catalog accepts matching GO release-status tokens", () => {
+test("(4) product claim catalog accepts matching GO release-status copy and claim", () => {
   const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
   catalog.releaseDecision = "GO";
   catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다.";
@@ -1650,9 +1707,46 @@ test("product claim catalog accepts matching GO release-status tokens", () => {
   validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
     releaseDecision,
     forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
-    publicCopy: "현재 출시 결정은 GO입니다.",
+    publicCopy: {
+      en: "EasySubway is officially released and available for download.",
+      ko: "쉬운 지하철이 정식 출시되었습니다.",
+    },
   });
   assert.deepEqual(errors, []);
+});
+
+test("product claim catalog accepts forbidden focus words outside the focus section", () => {
+  const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
+  const releaseDecision = loadJson("release/product-gates/production-datapack-scope.json");
+  releaseDecision.decision.currentLaunchDecision = "NO_GO";
+  catalog.releaseDecision = "NO_GO";
+  const errors = [];
+  validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
+    releaseDecision,
+    forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
+    publicCopy: {
+      en: "## Data\n\nWe validate sources.\n\n## Current focus\n\nEasySubway is not yet publicly released.\n",
+      ko: "### 데이터\n출처를 검증합니다.\n\n### 지금은\n쉬운 지하철은 아직 정식 출시 전입니다.\n",
+    },
+  });
+  assert.deepEqual(errors.filter((error) => error.includes("금지 단어")), []);
+});
+
+test("product claim catalog fails when README.ko.md is missing", () => {
+  const { directory, workspacePath } = createExternalWorkspace();
+  try {
+    const repositoryCopy = join(directory, "repository");
+    cpSync("contracts", join(repositoryCopy, "contracts"), { recursive: true });
+    cpSync("README.md", join(repositoryCopy, "README.md"));
+    const workspace = JSON.parse(readFileSync(workspacePath, "utf8"));
+    workspace.contracts = relative(directory, join(repositoryCopy, "contracts"));
+    writeFileSync(workspacePath, JSON.stringify(workspace));
+
+    const errors = collectContractErrors(workspacePath);
+    assert.ok(errors.some((error) => error.includes("README.ko.md public surface를 읽을 수 없다")), errors.join("\n"));
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
 });
 
 test("product claim catalog reads the workspace README public surface", () => {
@@ -1668,7 +1762,7 @@ test("product claim catalog reads the workspace README public surface", () => {
     releaseDecision.decision.currentLaunchDecision = "GO";
     writeFileSync(releaseDecisionPath, JSON.stringify(releaseDecision));
 
-    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("README.md decision token")));
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("README.md release status copy")));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }

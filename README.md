@@ -48,7 +48,7 @@ No account. No tracking. No selling your habits. Your saved favorites never leav
 
 ## Current focus
 
-We are validating accessibility details for Sangnoksu and Sadang stations, while preparing release evidence for the Gyeongchun Line ITX-Cheongchun route planner. The current release decision is NO_GO.
+We are preparing accessibility route planning for the Seoul metropolitan area, starting with Sangnoksu and Sadang stations, as well as route planning for the Gyeongchun Line ITX-Cheongchun. EasySubway is not yet publicly released.
 
 ## Downloads
 
