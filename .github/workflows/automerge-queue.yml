@@ -118,20 +118,25 @@ jobs:
                 .user.login == "coderabbitai[bot]" and
                 .user.id == 136622811 and
                 .user.type == "Bot";
+              def is_claude:
+                .author_association == "NONE" and
+                .user.login == "claude[bot]" and
+                .user.id == 209825114 and
+                .user.type == "Bot";
               def is_trusted_human:
                 . as $review |
                 (["OWNER", "MEMBER", "COLLABORATOR"] | index($review.author_association)) != null;
               def is_discovery:
                 (.state == "APPROVED" and is_trusted_human) or
                 (.state == "COMMENTED" and
-                  (is_coderabbit or
+                  (is_coderabbit or is_claude or
                     ((.body // "" | startswith("**Actionable comments posted: ")) and
                       ((.body // "" | contains("<!-- Review source: Aquila fallback; canonical visible structure:")) or
                        (.body // "" | contains("<!-- Review source: Aquila Universal Review; engine: aquila-review -->")) or
                        (.body // "" | contains("<!-- Review source: Codex CLI fallback; canonical visible structure:"))))));
               [flatten[]
                 | select(.user != null)
-                | select(is_trusted_human or is_coderabbit)] as $eligible
+                | select(is_trusted_human or is_coderabbit or is_claude)] as $eligible
               | ($eligible | map(select(is_discovery)) | length > 0) as $has_discovery
               | ($eligible
                 | group_by(.user.id)
