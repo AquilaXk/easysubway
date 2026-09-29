@@ -9,6 +9,7 @@
     "test:repo": "node --test tools/repo/*.test.mjs",
     "test:worktree": "node --test tools/repo/worktree-helper.test.mjs",
     "check:fragment": "node tools/ci/check-documentation-fragment-sync.mjs --base origin/main",
-    "refresh:fragment": "node tools/repo/refresh-documentation-fragment.mjs --worktree"
+    "refresh:fragment": "node tools/repo/refresh-documentation-fragment.mjs --worktree",
+    "guard:anti-cheat": "node tools/ci/guard-anti-cheat.mjs"
   }
 }
