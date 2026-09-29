@@ -176,13 +176,12 @@ export function collectContractErrors(
     const releaseDecision = loadProductClaimInput(join(workspace.gateDirectories.hub, "production-datapack-scope.json"), "production-datapack-scope", errors);
     const forbiddenClaims = loadProductClaimInput(join(workspace.gateDirectories.hub, "forbidden-release-claims.json"), "forbidden-release-claims", errors);
     if (releaseDecision != null && forbiddenClaims != null) {
-      const readmeKoPath = join(repositoryRoot, "README.ko.md");
       validateProductClaimCatalog(loadJson(workspace.productClaimCatalog), loadJson(productClaimCatalogSchema), errors, {
         releaseDecision,
         forbiddenClaims,
         publicCopy: {
           en: readProductClaimReadme(join(repositoryRoot, "README.md"), "README.md", errors),
-          ko: existsSync(readmeKoPath) ? readProductClaimReadme(readmeKoPath, "README.ko.md", errors) : null,
+          ko: readProductClaimReadme(join(repositoryRoot, "README.ko.md"), "README.ko.md", errors),
         },
       });
     }
@@ -1237,25 +1236,9 @@ function validateProductClaimDecisionTokens(catalog, releaseDecision, publicCopy
   const releaseStatusClaim = catalog.claims?.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS");
   const decision = releaseDecision?.decision?.currentLaunchDecision;
   if (releaseStatusClaim != null) validateReleaseDecisionToken("release-status claim", releaseStatusClaim.copyKo, decision, errors);
-  if (publicCopy != null) {
-    if (typeof publicCopy === "string") {
-      const surface = publicCopy.includes("쉬운 지하철") ? "README.ko.md" : "README.md";
-      validateReadmePublicCopy(surface, publicCopy, decision, catalog, errors);
-    } else if (typeof publicCopy === "object") {
-      if (publicCopy.en != null) {
-        validateReadmePublicCopy("README.md", publicCopy.en, decision, catalog, errors);
-      }
-      if (publicCopy.ko != null) {
-        validateReadmePublicCopy("README.ko.md", publicCopy.ko, decision, catalog, errors);
-      }
-      if (publicCopy["README.md"] != null) {
-        validateReadmePublicCopy("README.md", publicCopy["README.md"], decision, catalog, errors);
-      }
-      if (publicCopy["README.ko.md"] != null) {
-        validateReadmePublicCopy("README.ko.md", publicCopy["README.ko.md"], decision, catalog, errors);
-      }
-    }
-  }
+  // publicCopy는 { en, ko }다. 읽지 못한 쪽은 null이며 그 오류는 readProductClaimReadme가 이미 남겼다.
+  if (publicCopy?.en != null) validateReadmePublicCopy("README.md", publicCopy.en, decision, catalog, errors);
+  if (publicCopy?.ko != null) validateReadmePublicCopy("README.ko.md", publicCopy.ko, decision, catalog, errors);
 }
 
 function validateProductClaimSemantics(claims, errors) {
