@@ -5,6 +5,7 @@ import test from "node:test";
 
 // automerge-queue.yml의 review_gate jq 식을 그대로 추출해 실제 jq로 실행한다.
 // 문자열 존재 여부가 아니라 리뷰 입력 → 게이트 판정 동작을 계약으로 고정한다 (#3006).
+// #3008: 리뷰 경로를 Aquila Review로 통일해 claude[bot] Review는 더 이상 discovery로 인정하지 않는다.
 const coordinator = readFileSync(new URL("../../.github/workflows/automerge-queue.yml", import.meta.url), "utf8");
 const expression = coordinator.match(/review_gate=\$\(jq -r '([\s\S]*?)' <<<"\$\{reviews\}"\)/)?.[1];
 
@@ -41,70 +42,39 @@ const CODEX_FALLBACK_BODY = "**Actionable comments posted: 2**\n<!-- Review sour
 
 test("automerge review_gate jq 식은 workflow 안에 inline으로 유지된다", () => {
   assert.ok(expression, "workflow must keep an inline review_gate jq expression");
-  assert.match(expression, /def is_claude:/);
+  assert.doesNotMatch(expression, /claude/, "claude[bot] 신원 정의·인정 조건을 두지 않는다 (#3008)");
 });
 
-test("고정된 claude[bot] 신원의 COMMENTED Review는 본문 마커 없이 discovery로 인정된다", () => {
-  assert.equal(reviewGate([[claudeReview(1)]]), "true", "inline comment wrapper(빈 본문) Review도 봇 신원으로 인정한다");
+test("claude[bot] Review는 고정 신원이 일치해도 discovery로 인정하지 않는다 (#3008)", () => {
+  assert.equal(reviewGate([[claudeReview(1)]]), "false", "빈 본문 claude[bot] COMMENTED");
   assert.equal(
     reviewGate([[claudeReview(1, { body: "🔴 0 · 🟡 0 · 🟣 0\n변경 범위를 검토했고 finding이 없습니다." })]]),
-    "true",
-    "요약 본문이 있는 Claude Code Review도 인정한다",
-  );
-  assert.equal(
-    reviewGate([[claudeReview(1)], [ownerReview(2, "COMMENTED")]]),
-    "true",
-    "후속 페이지의 빈 COMMENTED가 claude[bot] discovery를 지우지 않는다",
-  );
-});
-
-test("claude[bot] 이름만 같거나 신원이 어긋난 Review는 discovery로 인정하지 않는다", () => {
-  assert.equal(reviewGate([[claudeReview(1, { user: { ...CLAUDE, id: 999 } })]]), "false", "user.id가 다르면 거부한다");
-  assert.equal(reviewGate([[claudeReview(1, { user: { ...CLAUDE, type: "User" } })]]), "false", "user.type이 Bot이 아니면 거부한다");
-  assert.equal(
-    reviewGate([[claudeReview(1, { user: { login: "claude", id: 209825114, type: "Bot" } })]]),
     "false",
-    "id가 같아도 login이 다르면 거부한다",
+    "개수 줄 요약이 있는 claude[bot] COMMENTED",
   );
-  assert.equal(
-    reviewGate([[claudeReview(1, { user: { login: "claude-bot[bot]", id: 55, type: "Bot" } })]]),
-    "false",
-    "유사한 봇 login은 거부한다",
-  );
-  assert.equal(
-    reviewGate([[claudeReview(1, { association: "CONTRIBUTOR" })]]),
-    "false",
-    "CodeRabbit과 같이 author_association NONE까지 고정한다",
-  );
+  assert.equal(reviewGate([[claudeReview(1)], [ownerReview(2, "COMMENTED")]]), "false", "후속 페이지 사람 COMMENTED와 함께여도 거부");
+  assert.equal(reviewGate([[claudeReview(1, { state: "APPROVED" })]]), "false", "claude[bot] APPROVED");
   assert.equal(
     reviewGate([[review(1, { state: "COMMENTED", user: { login: "claude", id: 77, type: "User" }, association: "COLLABORATOR" })]]),
     "false",
-    "신뢰된 사람이 claude를 흉내 낸 마커 없는 COMMENTED는 discovery가 아니다",
+    "신뢰된 사람이 claude를 흉내 낸 마커 없는 COMMENTED",
   );
 });
 
-test("claude[bot]은 COMMENTED Review로만 discovery가 되고 자기 CHANGES_REQUESTED는 차단한다", () => {
-  assert.equal(reviewGate([[claudeReview(1, { state: "APPROVED" })]]), "false", "봇 APPROVED는 discovery가 아니다");
+test("discovery 뒤 신뢰된 사람의 CHANGES_REQUESTED는 병합을 막는다", () => {
+  const coderabbit = review(1, { state: "COMMENTED", user: CODERABBIT, association: "NONE" });
   assert.equal(
-    reviewGate([[claudeReview(1), claudeReview(2, { state: "CHANGES_REQUESTED" })]]),
-    "false",
-    "claude[bot]의 active change request는 차단한다",
-  );
-});
-
-test("claude[bot] discovery 뒤 신뢰된 사람의 CHANGES_REQUESTED는 병합을 막는다", () => {
-  assert.equal(
-    reviewGate([[claudeReview(1), memberReview(2, "CHANGES_REQUESTED")]]),
+    reviewGate([[coderabbit, memberReview(2, "CHANGES_REQUESTED")]]),
     "false",
     "다른 reviewer의 active change request가 있으면 거부한다",
   );
   assert.equal(
-    reviewGate([[claudeReview(1), ownerReview(2, "CHANGES_REQUESTED"), ownerReview(3, "COMMENTED")]]),
+    reviewGate([[coderabbit, ownerReview(2, "CHANGES_REQUESTED"), ownerReview(3, "COMMENTED")]]),
     "false",
     "후속 빈 COMMENTED가 change request를 지우지 않는다",
   );
   assert.equal(
-    reviewGate([[claudeReview(1), memberReview(2, "CHANGES_REQUESTED"), memberReview(3, "APPROVED")]]),
+    reviewGate([[coderabbit, memberReview(2, "CHANGES_REQUESTED"), memberReview(3, "APPROVED")]]),
     "true",
     "같은 reviewer의 이후 APPROVED는 자기 change request를 해제한다",
   );
@@ -133,4 +103,13 @@ test("기존 CodeRabbit·신뢰된 사람 APPROVED 동작은 그대로다 (회�
   assert.equal(reviewGate([[memberReview(1, "APPROVED")]]), "true", "신뢰된 사람 APPROVED");
   assert.equal(reviewGate([[ownerReview(1, "COMMENTED")]]), "false", "마커 없는 사람 COMMENTED");
   assert.equal(reviewGate([]), "false", "빈 Review 목록");
+});
+
+test("게이트 계약 테스트는 Repository CI 계약 테스트 step에 등록된다", () => {
+  const ci = readFileSync(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const run = ci.match(/- name: Repository CI \/ Run contract tests\n(?: {8}[^\n]*\n)*? {8}run: ([^\n]+)\n/)?.[1];
+  assert.ok(run, "Repository CI / Run contract tests step의 run 명령이 필요하다");
+  const files = run.split(/\s+/);
+  assert.equal(files.slice(0, 2).join(" "), "node --test");
+  assert.ok(files.includes("tools/ci/automerge-queue.test.mjs"), "tools/ci/automerge-queue.test.mjs가 Repository CI 계약 테스트 목록에 있어야 한다");
 });
