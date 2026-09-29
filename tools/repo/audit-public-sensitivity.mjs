@@ -373,7 +373,7 @@ export async function runAuditCli(args = process.argv.slice(2)) {
     const errors = [
       ...validateSchema(JSON.parse(scopeSchemaText), scope).errors,
       ...validateScope(scope),
-      ...(Array.isArray(receipts) ? receipts : [null]).flatMap((receipt) => validateSchema(JSON.parse(receiptSchemaText), receipt).errors),
+      ...((Array.isArray(receipts) && receipts.length === REPOSITORIES.length) ? receipts : [null]).flatMap((receipt) => validateSchema(JSON.parse(receiptSchemaText), receipt).errors),
     ];
     const schemaText = `${scopeSchemaText}${receiptSchemaText}${reportSchemaText}`;
     const audit = errors.length

@@ -1,15 +1,34 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import test from "node:test";
+import { delimiter, join } from "node:path";
+import test, { after, before } from "node:test";
 
 import { assembleOwnerReceipts, downloadOwnerHandoffs, runFanInCli, verifyOwnerEvidence } from "./run-public-sensitivity-audit.mjs";
 
 const REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
 const SHA = "a".repeat(40);
 const OBSERVED_AT = "2026-08-09T00:00:00.000Z";
+
+// 이 파일의 어떤 테스트도 실제 gh를 실행하면 안 된다. PATH 맨 앞에 호출을 기록만 하는 가짜 gh를 두고,
+// 파일 전체가 끝난 뒤 기록이 비어 있는지 확인한다(주입되지 않은 기본 provider 경로까지 잡는다).
+let fakeGhLog = null;
+let originalPath = null;
+before(async () => {
+  const directory = await mkdtemp(join(tmpdir(), "d20-fake-gh-"));
+  fakeGhLog = join(directory, "calls.log");
+  await writeFile(fakeGhLog, "");
+  const script = join(directory, "gh");
+  await writeFile(script, `#!/bin/sh\necho "$*" >> "${fakeGhLog}"\nexit 1\n`);
+  await chmod(script, 0o755);
+  originalPath = process.env.PATH;
+  process.env.PATH = `${directory}${delimiter}${originalPath ?? ""}`;
+});
+after(async () => {
+  process.env.PATH = originalPath;
+  assert.equal(await readFile(fakeGhLog, "utf8"), "", "tests must not invoke the real gh CLI");
+});
 
 function receipt(repository, overrides = {}) {
   return { schemaVersion: 1, repository, gitSha: SHA, observedAt: OBSERVED_AT, secretScanningEnabled: true, pushProtectionEnabled: true, reachableRefAuditComplete: true, alertEnumerationComplete: true, locationEnumerationComplete: true, openAlertCount: 0, unresolvedAlertCount: 0, detectorPolicyVersion: "public-sensitivity-v1", evidenceLocator: `https://github.com/${repository}/actions/runs/7/artifacts/9`, publicArtifactEnumerationComplete: true, publicArtifacts: [], ...overrides };
@@ -51,8 +70,9 @@ test("valid CLI arguments write a sanitized incomplete report on malformed hando
   await writeFile(join(root, "scope.json"), "{}"); await writeFile(join(root, "handoffs.json"), "{raw-provider-secret");
   const resolvedName = `resolved-owner-receipts-${createHash("sha256").update("out/report.json").digest("hex").slice(0, 16)}-0.json`;
   await writeFile(join(root, "out", resolvedName), "already-owned-by-another-attempt\n");
-  const exitCode = await runFanInCli(["--scope", "scope.json", "--owner-receipts", "handoffs.json", "--observed-at", OBSERVED_AT, "--runner-sha", SHA, "--repository-root", root, "--output", "out/report.json"]);
-  assert.equal(exitCode, 2);
+  let calls = 0;
+  const exitCode = await runFanInCli(["--scope", "scope.json", "--owner-receipts", "handoffs.json", "--observed-at", OBSERVED_AT, "--runner-sha", SHA, "--repository-root", root, "--output", "out/report.json"], { execGh: async () => { calls += 1; throw new Error("must not call"); } });
+  assert.equal(exitCode, 2); assert.equal(calls, 0);
   const text = await readFile(join(root, "out/report.json"), "utf8");
   assert.equal(text.includes("raw-provider-secret"), false);
   assert.equal(JSON.parse(text).status, "AUDIT_INCOMPLETE");
@@ -63,8 +83,9 @@ test("valid CLI arguments write a sanitized incomplete report on malformed hando
 test("malformed observed_at still writes one schema-valid incomplete report", async () => {
   const root = await mkdtemp(join(tmpdir(), "d20-invalid-time-")); await mkdir(join(root, "out"));
   await writeFile(join(root, "scope.json"), await readFile("contracts/documentation/public-sensitivity-audit-scope.json", "utf8")); await writeFile(join(root, "handoffs.json"), "[]");
-  const exitCode = await runFanInCli(["--scope", "scope.json", "--owner-receipts", "handoffs.json", "--observed-at", "not-a-time", "--runner-sha", SHA, "--repository-root", root, "--output", "out/report.json"]);
-  assert.equal(exitCode, 2);
+  let calls = 0;
+  const exitCode = await runFanInCli(["--scope", "scope.json", "--owner-receipts", "handoffs.json", "--observed-at", "not-a-time", "--runner-sha", SHA, "--repository-root", root, "--output", "out/report.json"], { execGh: async () => { calls += 1; throw new Error("must not call"); } });
+  assert.equal(exitCode, 2); assert.equal(calls, 0);
   const report = JSON.parse(await readFile(join(root, "out/report.json"), "utf8"));
   assert.equal(report.status, "AUDIT_INCOMPLETE"); assert.equal(report.observedAt, "1970-01-01T00:00:00.000Z");
 });
@@ -113,6 +134,25 @@ test("fan-in success passes only the five A-bound receipts to the existing audit
   let resolved;
   const exitCode = await runFanInCli(["--scope", "scope.json", "--owner-receipts", "handoffs.json", "--observed-at", OBSERVED_AT, "--runner-sha", SHA, "--repository-root", root, "--output", "out/report.json"], { execGh, auditCli: async (args) => { resolved = JSON.parse(await readFile(join(root, args[3]), "utf8")); return 0; } });
   assert.equal(exitCode, 0); assert.deepEqual(resolved.map(({ repository }) => repository), REPOSITORIES);
+});
+
+test("runFanInCli call paths in test suite explicitly provide execGh to disallow default provider invocation", async () => {
+  const content = await readFile(new URL("./run-public-sensitivity-audit.test.mjs", import.meta.url), "utf8");
+  const calls = [];
+  let current = null;
+  for (const line of content.split("\n")) {
+    if (line.trim().startsWith("const exitCode = await runFanInCli(")) {
+      current = line;
+      if (line.includes(";")) { calls.push(current); current = null; }
+    } else if (current != null) {
+      current += " " + line;
+      if (line.includes(";")) { calls.push(current); current = null; }
+    }
+  }
+  assert.equal(calls.length, 4, "must find exactly four runFanInCli test invocations");
+  for (const call of calls) {
+    assert.match(call, /execGh/, `runFanInCli call must provide execGh: ${call.slice(0, 60)}...`);
+  }
 });
 
 function zip(name, text) {
