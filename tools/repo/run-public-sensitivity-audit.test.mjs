@@ -115,6 +115,15 @@ test("fan-in success passes only the five A-bound receipts to the existing audit
   assert.equal(exitCode, 0); assert.deepEqual(resolved.map(({ repository }) => repository), REPOSITORIES);
 });
 
+test("runFanInCli call paths in test suite explicitly provide execGh to disallow default provider invocation", async () => {
+  const content = await readFile(new URL("./run-public-sensitivity-audit.test.mjs", import.meta.url), "utf8");
+  const calls = content.match(/runFanInCli\s*\([\s\S]*?\)/g) ?? [];
+  assert.ok(calls.length >= 4, "must find runFanInCli invocations");
+  for (const call of calls) {
+    assert.match(call, /execGh/, `runFanInCli call must provide execGh: ${call.slice(0, 40)}...`);
+  }
+});
+
 function zip(name, text) {
   const filename = Buffer.from(name); const data = Buffer.from(text); const crc = crc32(data);
   const local = Buffer.alloc(30 + filename.length + data.length); local.writeUInt32LE(0x04034b50, 0); local.writeUInt32LE(crc, 14); local.writeUInt32LE(data.length, 18); local.writeUInt32LE(data.length, 22); local.writeUInt16LE(filename.length, 26); filename.copy(local, 30); data.copy(local, 30 + filename.length);
