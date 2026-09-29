@@ -1615,13 +1615,49 @@ for (const field of ["requiredEvidence", "forbiddenWhen", "reviewTrigger"]) {
 
 for (const [name, mutate, expected] of [
   ["top-level GO does not leave NO_GO claim and README", (catalog) => {}, "release-status claim decision token"],
-  ["GO claim does not leave NO_GO README", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다."; }, "README.md decision token"],
+  ["GO claim does not leave NO_GO README copy", (catalog, readme) => {
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다.";
+    readme.text = "EasySubway is not yet publicly released.";
+  }, "README.md"],
   ["missing release-status claim token", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정을 확인합니다."; }, "release-status claim decision token"],
   ["multiple release-status claim tokens", (catalog) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "GO와 NO_GO를 함께 쓰지 않습니다."; }, "release-status claim decision token"],
   ["opposite release-status claim token", (catalog) => {}, "release-status claim decision token"],
-  ["missing README decision token", (catalog, readme) => { readme.text = "현재 출시 결정을 확인합니다."; }, "README.md decision token"],
-  ["multiple README decision tokens", (catalog, readme) => { readme.text = "GO와 NO_GO를 함께 쓰지 않습니다."; }, "README.md decision token"],
-  ["opposite README decision token", (catalog, readme) => { catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다."; readme.text = "현재 출시 결정은 NO_GO입니다."; }, "README.md decision token"],
+  ["(1) README with NO_GO token", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.text = "The current release decision is NO_GO. EasySubway is not yet publicly released.";
+  }, "decision token"],
+  ["(2) decision NO_GO but README missing NO_GO copy", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.text = "Here is some text without release status copy.";
+  }, "release status copy 누락"],
+  ["(3) decision NO_GO but README has GO copy", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.text = "EasySubway is officially released and available for download.";
+  }, "다른 결정"],
+  ["(5-1) Korean README with NO_GO token", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.text = "결정은 NO_GO 입니다. 쉬운 지하철은 아직 정식 출시 전입니다.";
+  }, "decision token"],
+  ["(5-2) decision NO_GO but Korean README missing NO_GO copy", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.text = "쉬운 지하철 소개 본문입니다.";
+  }, "release status copy 누락"],
+  ["(5-3) decision NO_GO but Korean README has GO copy", (catalog, readme, context) => {
+    context.decision = "NO_GO";
+    catalog.releaseDecision = "NO_GO";
+    catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 NO_GO입니다.";
+    readme.text = "쉬운 지하철이 정식 출시되었습니다.";
+  }, "다른 결정"],
 ]) {
   test(`product claim catalog rejects ${name}`, () => {
     const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
@@ -1629,7 +1665,9 @@ for (const [name, mutate, expected] of [
     catalog.releaseDecision = "GO";
     const releaseDecision = loadJson("release/product-gates/production-datapack-scope.json");
     releaseDecision.decision.currentLaunchDecision = "GO";
-    mutate(catalog, readme);
+    const context = { decision: "GO" };
+    mutate(catalog, readme, context);
+    releaseDecision.decision.currentLaunchDecision = context.decision;
     const errors = [];
     validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
       releaseDecision,
@@ -1640,7 +1678,7 @@ for (const [name, mutate, expected] of [
   });
 }
 
-test("product claim catalog accepts matching GO release-status tokens", () => {
+test("(4) product claim catalog accepts matching GO release-status copy and claim", () => {
   const catalog = structuredClone(loadJson("contracts/documentation/product-claim-catalog.json"));
   catalog.releaseDecision = "GO";
   catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS").copyKo = "현재 출시 결정은 GO입니다.";
@@ -1650,7 +1688,10 @@ test("product claim catalog accepts matching GO release-status tokens", () => {
   validateProductClaimCatalog(catalog, loadJson("contracts/documentation/product-claim-catalog.schema.json"), errors, {
     releaseDecision,
     forbiddenClaims: loadJson("release/product-gates/forbidden-release-claims.json"),
-    publicCopy: "현재 출시 결정은 GO입니다.",
+    publicCopy: {
+      en: "EasySubway is officially released and available for download.",
+      ko: "쉬운 지하철이 정식 출시되었습니다.",
+    },
   });
   assert.deepEqual(errors, []);
 });
