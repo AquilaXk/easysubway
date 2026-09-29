@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { writeFileSync, unlinkSync } from "node:fs";
+import { writeFileSync, unlinkSync, readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -49,8 +49,8 @@ test("validate-store-privacy-env allows ci-preflight kakao key in preflight mode
     ], {
       encoding: "utf8",
     });
-    // Exited with code 0 without throwing
-    assert.ok(true);
+    const written = readFileSync(githubEnvFile, "utf8");
+    assert.match(written, /EASYSUBWAY_TERMS_OF_SERVICE_URL=/);
   } finally {
     unlinkSync(envFile);
     unlinkSync(githubEnvFile);
@@ -107,7 +107,8 @@ test("validate-store-privacy-env accepts valid production keys when --require-an
     ], {
       encoding: "utf8",
     });
-    assert.ok(true);
+    const written = readFileSync(githubEnvFile, "utf8");
+    assert.match(written, /EASYSUBWAY_DATA_PACK_BASE_URL=/);
   } finally {
     unlinkSync(envFile);
     unlinkSync(githubEnvFile);

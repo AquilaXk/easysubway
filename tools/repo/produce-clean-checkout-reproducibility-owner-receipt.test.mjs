@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
 import { createHash } from "node:crypto";
+import { existsSync } from "node:fs";
 import {
   chmod,
   lstat,
@@ -158,8 +159,8 @@ async function runFixture(fixture, { overrides, env = {} } = {}) {
   });
 }
 
-async function absent(file) {
-  try { await lstat(file); return false; } catch (error) { if (error?.code === "ENOENT") return true; throw error; }
+function absent(file) {
+  return !existsSync(file);
 }
 
 test("valid clean fixture produces one schema-valid deterministic four-phase receipt", async (t) => {
