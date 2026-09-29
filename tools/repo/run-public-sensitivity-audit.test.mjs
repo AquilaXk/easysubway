@@ -1,15 +1,34 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
-import test from "node:test";
+import { delimiter, join } from "node:path";
+import test, { after, before } from "node:test";
 
 import { assembleOwnerReceipts, downloadOwnerHandoffs, runFanInCli, verifyOwnerEvidence } from "./run-public-sensitivity-audit.mjs";
 
 const REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
 const SHA = "a".repeat(40);
 const OBSERVED_AT = "2026-08-09T00:00:00.000Z";
+
+// 이 파일의 어떤 테스트도 실제 gh를 실행하면 안 된다. PATH 맨 앞에 호출을 기록만 하는 가짜 gh를 두고,
+// 파일 전체가 끝난 뒤 기록이 비어 있는지 확인한다(주입되지 않은 기본 provider 경로까지 잡는다).
+let fakeGhLog = null;
+let originalPath = null;
+before(async () => {
+  const directory = await mkdtemp(join(tmpdir(), "d20-fake-gh-"));
+  fakeGhLog = join(directory, "calls.log");
+  await writeFile(fakeGhLog, "");
+  const script = join(directory, "gh");
+  await writeFile(script, `#!/bin/sh\necho "$*" >> "${fakeGhLog}"\nexit 1\n`);
+  await chmod(script, 0o755);
+  originalPath = process.env.PATH;
+  process.env.PATH = `${directory}${delimiter}${originalPath ?? ""}`;
+});
+after(async () => {
+  process.env.PATH = originalPath;
+  assert.equal(await readFile(fakeGhLog, "utf8"), "", "tests must not invoke the real gh CLI");
+});
 
 function receipt(repository, overrides = {}) {
   return { schemaVersion: 1, repository, gitSha: SHA, observedAt: OBSERVED_AT, secretScanningEnabled: true, pushProtectionEnabled: true, reachableRefAuditComplete: true, alertEnumerationComplete: true, locationEnumerationComplete: true, openAlertCount: 0, unresolvedAlertCount: 0, detectorPolicyVersion: "public-sensitivity-v1", evidenceLocator: `https://github.com/${repository}/actions/runs/7/artifacts/9`, publicArtifactEnumerationComplete: true, publicArtifacts: [], ...overrides };
