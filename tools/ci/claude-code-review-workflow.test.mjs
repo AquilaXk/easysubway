@@ -102,9 +102,16 @@ test("최소 권한·PR별 concurrency·timeout을 두고 실패를 성공으로
 });
 
 test("실행 뒤 current head의 claude[bot] COMMENT Review가 정확히 하나인지 검증하고 아니면 실패한다", () => {
+  // action 내부 단계가 전부 skipped여도 job이 pass로 끝나는 가짜 통과를 막는 별도 검증 step (easyconvert #238 실측).
   const verify = stepBlock("Verify Claude review object");
   assert.ok(workflow.indexOf("- name: Run Claude Code review") < workflow.indexOf("- name: Verify Claude review object"));
+  assert.doesNotMatch(workflow, /^ {8}if:/m, "action·검증 step에 step-level if를 두지 않는다");
+  assert.match(verify, /HEAD_SHA: \$\{\{ steps\.pr\.outputs\.head_sha \}\}/);
   assert.match(verify, /gh api --paginate --slurp "repos\/\$\{REPO\}\/pulls\/\$\{PR_NUMBER\}\/reviews"/);
+  assert.match(verify, /\.user\.login == "claude\[bot\]"/);
+  assert.match(verify, /\.user\.id == 209825114/);
+  assert.match(verify, /\.user\.type == "Bot"/);
+  assert.match(verify, /\.commit_id == \$head/);
   assert.match(verify, /if \[ "\$\{verdict\}" != "true" \]; then[\s\S]*?exit 1/);
   const expression = verify.match(/verdict=\$\(jq -r --arg since "\$\{STARTED_AT\}" --arg head "\$\{HEAD_SHA\}" '([\s\S]*?)' <<<"\$\{reviews\}"\)/)?.[1];
   assert.ok(expression, "verify step must keep an inline verdict jq expression");
