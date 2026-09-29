@@ -3,7 +3,7 @@
   "$id": "easysubway/contracts/documentation/product-claim-catalog",
   "title": "EasySubway Hub product claim catalog",
   "type": "object",
-  "required": ["$schema", "schemaVersion", "catalogId", "status", "owner", "releaseDecisionSource", "releaseDecision", "publicCopyPolicy", "claims"],
+  "required": ["$schema", "schemaVersion", "catalogId", "status", "owner", "releaseDecisionSource", "releaseDecision", "releaseStatusCopy", "publicCopyPolicy", "claims"],
   "additionalProperties": false,
   "properties": {
     "$schema": { "type": "string", "const": "./product-claim-catalog.schema.json" },
@@ -13,6 +13,31 @@
     "owner": { "type": "string", "const": "https://github.com/AquilaXk/easysubway/issues/2762" },
     "releaseDecisionSource": { "type": "string", "const": "release/product-gates/production-datapack-scope.json#/decision/currentLaunchDecision" },
     "releaseDecision": { "type": "string", "enum": ["GO", "NO_GO"] },
+    "releaseStatusCopy": {
+      "type": "object",
+      "required": ["NO_GO", "GO"],
+      "additionalProperties": false,
+      "properties": {
+        "NO_GO": {
+          "type": "object",
+          "required": ["en", "ko"],
+          "additionalProperties": false,
+          "properties": {
+            "en": { "type": "string", "minLength": 1 },
+            "ko": { "type": "string", "minLength": 1 }
+          }
+        },
+        "GO": {
+          "type": "object",
+          "required": ["en", "ko"],
+          "additionalProperties": false,
+          "properties": {
+            "en": { "type": "string", "minLength": 1 },
+            "ko": { "type": "string", "minLength": 1 }
+          }
+        }
+      }
+    },
     "publicCopyPolicy": { "type": "string", "const": "release/product-gates/forbidden-release-claims.json" },
     "claims": {
       "type": "array",

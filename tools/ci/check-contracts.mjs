@@ -176,10 +176,14 @@ export function collectContractErrors(
     const releaseDecision = loadProductClaimInput(join(workspace.gateDirectories.hub, "production-datapack-scope.json"), "production-datapack-scope", errors);
     const forbiddenClaims = loadProductClaimInput(join(workspace.gateDirectories.hub, "forbidden-release-claims.json"), "forbidden-release-claims", errors);
     if (releaseDecision != null && forbiddenClaims != null) {
+      const readmeKoPath = join(repositoryRoot, "README.ko.md");
       validateProductClaimCatalog(loadJson(workspace.productClaimCatalog), loadJson(productClaimCatalogSchema), errors, {
         releaseDecision,
         forbiddenClaims,
-        publicCopy: readProductClaimReadme(join(repositoryRoot, "README.md"), errors),
+        publicCopy: {
+          en: readProductClaimReadme(join(repositoryRoot, "README.md"), "README.md", errors),
+          ko: existsSync(readmeKoPath) ? readProductClaimReadme(readmeKoPath, "README.ko.md", errors) : null,
+        },
       });
     }
   }
@@ -1175,11 +1179,83 @@ function validateProductClaimInventory(catalog, errors) {
   }
 }
 
+const FORBIDDEN_RELEASE_FOCUS_PATTERNS = [
+  { pattern: /validat/i, name: "validate" },
+  { pattern: /evidence/i, name: "evidence" },
+  { pattern: /검증/, name: "검증" },
+  { pattern: /근거/, name: "근거" },
+  { pattern: /pilot/i, name: "pilot" },
+  { pattern: /gate/i, name: "gate" },
+  { pattern: /(?:^|[^A-Z0-9_])NO_GO(?=$|[^A-Z0-9_])/, name: "NO_GO" },
+];
+
+function extractFocusSection(text, surface) {
+  if (surface.includes("README.ko")) {
+    const match = text.match(/### 지금은\s*([\s\S]*?)(?=\n### |\n---|$)/);
+    return match ? match[1] : null;
+  } else {
+    const match = text.match(/## Current focus\s*([\s\S]*?)(?=\n## |\n---|$)/);
+    return match ? match[1] : null;
+  }
+}
+
+function validateReadmePublicCopy(surface, copy, decision, catalog, errors) {
+  const tokens = [...copy.matchAll(/(?:^|[^A-Z0-9_])(NO_GO|GO)(?=$|[^A-Z0-9_])/g)].map(([, token]) => token);
+  if (tokens.length > 0) {
+    errors.push(`product-claim-catalog: ${surface} decision token(NO_GO/GO) 노출은 금지된다`);
+  }
+
+  const lang = surface.includes("README.ko") ? "ko" : "en";
+  const expectedCopy = catalog?.releaseStatusCopy?.[decision]?.[lang];
+  const otherDecision = decision === "GO" ? "NO_GO" : "GO";
+  const otherCopy = catalog?.releaseStatusCopy?.[otherDecision]?.[lang];
+
+  if (expectedCopy) {
+    const occurrences = copy.split(expectedCopy).length - 1;
+    if (occurrences === 0) {
+      errors.push(`product-claim-catalog: ${surface} release status copy 누락: ${decision} 상품 문구가 필요하다`);
+    } else if (occurrences > 1) {
+      errors.push(`product-claim-catalog: ${surface} release status copy 중복: ${decision} 상품 문구는 정확히 한 번 나와야 한다`);
+    }
+  }
+
+  if (otherCopy && copy.includes(otherCopy)) {
+    errors.push(`product-claim-catalog: ${surface}에 다른 결정(${otherDecision}) 상품 문구가 포함되어서는 안 된다`);
+  }
+
+  const focusSection = extractFocusSection(copy, surface);
+  if (focusSection) {
+    for (const { pattern, name } of FORBIDDEN_RELEASE_FOCUS_PATTERNS) {
+      if (pattern.test(focusSection)) {
+        errors.push(`product-claim-catalog: ${surface} focus 절에 금지 단어 '${name}'가 포함되어 있다`);
+      }
+    }
+  }
+}
+
 function validateProductClaimDecisionTokens(catalog, releaseDecision, publicCopy, errors) {
-  const releaseStatusClaim = catalog.claims.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS");
+  const releaseStatusClaim = catalog.claims?.find(({ claimId }) => claimId === "PRODUCT_CLAIM_RELEASE_STATUS");
   const decision = releaseDecision?.decision?.currentLaunchDecision;
   if (releaseStatusClaim != null) validateReleaseDecisionToken("release-status claim", releaseStatusClaim.copyKo, decision, errors);
-  if (publicCopy != null) validateReleaseDecisionToken("README.md", publicCopy, decision, errors);
+  if (publicCopy != null) {
+    if (typeof publicCopy === "string") {
+      const surface = publicCopy.includes("쉬운 지하철") ? "README.ko.md" : "README.md";
+      validateReadmePublicCopy(surface, publicCopy, decision, catalog, errors);
+    } else if (typeof publicCopy === "object") {
+      if (publicCopy.en != null) {
+        validateReadmePublicCopy("README.md", publicCopy.en, decision, catalog, errors);
+      }
+      if (publicCopy.ko != null) {
+        validateReadmePublicCopy("README.ko.md", publicCopy.ko, decision, catalog, errors);
+      }
+      if (publicCopy["README.md"] != null) {
+        validateReadmePublicCopy("README.md", publicCopy["README.md"], decision, catalog, errors);
+      }
+      if (publicCopy["README.ko.md"] != null) {
+        validateReadmePublicCopy("README.ko.md", publicCopy["README.ko.md"], decision, catalog, errors);
+      }
+    }
+  }
 }
 
 function validateProductClaimSemantics(claims, errors) {
@@ -1200,11 +1276,11 @@ function validateProductClaimSemantics(claims, errors) {
   }
 }
 
-function readProductClaimReadme(path, errors) {
+function readProductClaimReadme(path, label, errors) {
   try {
     return readFileSync(path, "utf8");
   } catch {
-    errors.push("product-claim-catalog: README.md public surface를 읽을 수 없다");
+    errors.push(`product-claim-catalog: ${label} public surface를 읽을 수 없다`);
     return null;
   }
 }

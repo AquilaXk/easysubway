@@ -484,7 +484,7 @@
       "documentationFamily": "PRODUCT",
       "kindCandidate": "PRODUCT_CLAIM_CATALOG",
       "sourceSurface": "TRACKED",
-      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/product-claim-catalog.json:328236058488f878d507423d53d147bc4fb46301",
+      "canonicalIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/product-claim-catalog.json:2b227dd82af209abf6f9b890dfb801dd651ef40d",
       "status": "ACTIVE",
       "ownerRepository": "AquilaXk/easysubway",
       "ownerIssue": "https://github.com/AquilaXk/easysubway/issues/2762",
@@ -510,7 +510,7 @@
         "event:public-claim-change"
       ],
       "lastVerifiedAt": "2026-08-21T14:00:00.000Z",
-      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/product-claim-catalog.json:328236058488f878d507423d53d147bc4fb46301",
+      "lastVerifiedIdentity": "git:a7743fb3b4eacd34ce2ae478a47214c1f29931cb:contracts/documentation/product-claim-catalog.json:2b227dd82af209abf6f9b890dfb801dd651ef40d",
       "verificationMethod": "contract-test",
       "verificationEvidence": [
         "https://github.com/AquilaXk/easysubway/issues/2762"

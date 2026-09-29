@@ -1709,7 +1709,7 @@ test("product claim catalog reads the workspace README public surface", () => {
     releaseDecision.decision.currentLaunchDecision = "GO";
     writeFileSync(releaseDecisionPath, JSON.stringify(releaseDecision));
 
-    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("README.md decision token")));
+    assert.ok(collectContractErrors(workspacePath).some((error) => error.includes("README.md release status copy")));
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
