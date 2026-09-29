@@ -149,6 +149,34 @@ test("실행 뒤 current head의 claude[bot] COMMENT Review가 정확히 하나�
   assert.equal(verdict([[reviewAt(1, "2026-09-29T01:05:00Z", { user: { ...CLAUDE, id: 1 } })]]), "false", "위조 신원");
 });
 
+test("🔴·🟡 finding은 inline thread로만 인정되고 본문에만 둔 blocking finding은 job을 실패시킨다", () => {
+  // 병합 차단은 미해결 inline thread에 의존하므로, 본문 개수보다 inline 코멘트가 적으면 thread gate 우회다 (PR #3007 F2).
+  const verify = stepBlock("Verify Claude review object");
+  assert.match(verify, /gh api --paginate --slurp "repos\/\$\{REPO\}\/pulls\/\$\{PR_NUMBER\}\/reviews\/\$\{review_id\}\/comments"/);
+  assert.match(verify, /if \[ "\$\{coverage\}" != "true" \]; then[\s\S]*?exit 1/);
+  const expression = verify.match(/coverage=\$\(jq -r --argjson inline "\$\{inline_count\}" '([\s\S]*?)' <<<"\$\{review\}"\)/)?.[1];
+  assert.ok(expression, "verify step must keep an inline coverage jq expression");
+  const coverage = (body, inline) => execFileSync("jq", ["-r", "--argjson", "inline", String(inline), expression], {
+    input: JSON.stringify({ body }),
+    encoding: "utf8",
+  }).trim();
+
+  assert.equal(coverage("🔴 1 · 🟡 0 · 🟣 0\n요약", 0), "false", "본문에만 둔 Important");
+  assert.equal(coverage("🔴 1 · 🟡 0 · 🟣 0\n요약", 1), "true", "Important 1건 inline");
+  assert.equal(coverage("🔴 0 · 🟡 2 · 🟣 1\n요약", 1), "false", "Nit 1건 누락");
+  assert.equal(coverage("🔴 0 · 🟡 2 · 🟣 1\n요약", 2), "true", "Pre-existing은 본문 허용");
+  assert.equal(coverage("🔴 0 · 🟡 0 · 🟣 0\nfinding 없음", 0), "true", "finding 없음");
+  assert.equal(coverage("요약만 있고 개수 줄 없음", 3), "false", "개수 줄 누락");
+  assert.equal(coverage("", 0), "false", "빈 본문");
+});
+
+test("문서 파편 규칙은 fragment resources 목록 기준이고 README·workflow를 직접 지목하지 않는다", () => {
+  // hub fragment는 contracts/documentation resources만 추적한다. 파일군을 직접 나열하면 오탐 finding이 된다 (PR #3007 F1).
+  const review = stepBlock("Run Claude Code review");
+  assert.match(review, /contracts\/documentation\/documentation-fragment\.json의 resources에 등록된 파일/);
+  assert.doesNotMatch(review, /SecurityConfig|README, workflow/);
+});
+
 test("#3006 계약 테스트 두 파일은 Repository CI 계약 테스트 step에 등록된다", () => {
   const ci = readFileSync(new URL("../../.github/workflows/ci.yml", import.meta.url), "utf8");
   const run = ci.match(/- name: Repository CI \/ Run contract tests\n(?: {8}[^\n]*\n)*? {8}run: ([^\n]+)\n/)?.[1];

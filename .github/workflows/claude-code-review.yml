@@ -95,7 +95,7 @@ jobs:
                - 교통약자 접근성 회귀: 엘리베이터, 휠체어 리프트, 경사로, 환승 동선, 스크린리더 라벨
                - 버그 수정인데 수정 전에는 실패하는 테스트가 없음
                - CI와 릴리스 게이트 약화: warning-only 전환, continue-on-error, 검사 subset 또는 skip, 성공 fallback
-               - README, workflow, SecurityConfig, 프로덕션 프로파일, OpenAPI, 인벤토리를 바꾸고 contracts/documentation/documentation-fragment.json을 같은 PR에서 갱신하지 않음
+               - contracts/documentation/documentation-fragment.json의 resources에 등록된 파일을 바꾸고 같은 PR에서 그 파일을 갱신하지 않음
                - Flyway 마이그레이션 버전 번호 충돌(main 최고 번호와 중복, H2와 PostgreSQL 불일치)
                - 시크릿, API 키, 토큰, 내부 절대경로, 비공개 근거 데이터 노출
             4. 게시 절차(필수):
@@ -103,7 +103,7 @@ jobs:
                  {"commit_id": "${{ steps.pr.outputs.head_sha }}", "event": "COMMENT", "body": "한국어 요약", "comments": [{"path": "파일 경로", "line": 123, "side": "RIGHT", "body": "finding"}]}
                - 그다음 정확히 이 명령 하나로 게시한다: gh api repos/${{ github.repository }}/pulls/${{ steps.pr.outputs.number }}/reviews --method POST --input claude-code-review.json
                - 🔴 Important와 🟡 Nit finding은 반드시 comments의 inline 항목으로 넣는다. line은 gh pr diff ${{ steps.pr.outputs.number }}에서 새 파일(RIGHT) 쪽에 보이는 줄이어야 한다. diff 밖에 있는 🟣 Pre-existing finding만 body 목록에 쓸 수 있다.
-               - body 첫 줄은 심각도별 개수(예: 🔴 1 · 🟡 2 · 🟣 0)이고, 이어서 finding마다 한 줄 요약을 쓴다. finding이 없으면 comments는 빈 배열이고 body에 검토한 범위와 finding이 없다는 사실을 쓴다.
+               - body 첫 줄은 정확히 "🔴 <개수> · 🟡 <개수> · 🟣 <개수>" 형식의 심각도별 개수이고(검증 step이 이 줄과 inline 개수를 대조한다), 이어서 finding마다 한 줄 요약을 쓴다. finding이 없으면 comments는 빈 배열이고 body에 검토한 범위와 finding이 없다는 사실을 쓴다.
                - 게시 명령이 실패하면 오류를 읽고 JSON을 고쳐 같은 명령을 다시 실행한다. 성공한 뒤에는 다시 실행하지 않는다. 끝내 게시하지 못하면 게시했다고 말하지 말고 실패로 보고한다.
                - event는 항상 COMMENT다. APPROVE나 REQUEST_CHANGES를 쓰지 않고, 다른 댓글, 커밋, push, claude-code-review.json 밖의 파일 수정을 하지 않는다.'
 
@@ -132,4 +132,25 @@ jobs:
             echo "::error::이번 실행에서 head ${HEAD_SHA}에 대한 claude[bot] COMMENT Review가 정확히 하나 게시되지 않았다. automerge review gate가 인정할 discovery Review가 없다."
             exit 1
           fi
-          echo "PR #${PR_NUMBER}: claude[bot] COMMENT Review 1건 확인 (head ${HEAD_SHA})."
+          review=$(jq -c --arg since "${STARTED_AT}" '
+            [flatten[]
+              | select(.user != null)
+              | select(.author_association == "NONE" and
+                  .user.login == "claude[bot]" and
+                  .user.id == 209825114 and
+                  .user.type == "Bot")
+              | select(.submitted_at >= $since)][0]
+          ' <<<"${reviews}")
+          review_id=$(jq -r '.id' <<<"${review}")
+          inline_count=$(gh api --paginate --slurp "repos/${REPO}/pulls/${PR_NUMBER}/reviews/${review_id}/comments" | jq '[flatten[]] | length')
+          # 병합 차단은 미해결 inline thread에 의존한다. 🔴·🟡 finding이 본문에만 있으면 thread gate를 우회하므로 실패시킨다.
+          coverage=$(jq -r --argjson inline "${inline_count}" '
+            (((.body // "") | split("\n")[0]) // "") as $first
+            | ([$first | capture("^🔴 (?<red>[0-9]+) · 🟡 (?<nit>[0-9]+) · 🟣 (?<pre>[0-9]+)$")] | first) as $counts
+            | $counts != null and $inline >= (($counts.red | tonumber) + ($counts.nit | tonumber))
+          ' <<<"${review}")
+          if [ "${coverage}" != "true" ]; then
+            echo "::error::claude[bot] Review 본문의 🔴·🟡 개수보다 inline 코멘트(${inline_count}건)가 적거나 개수 줄이 없다. blocking finding이 thread 없이 병합될 수 있다."
+            exit 1
+          fi
+          echo "PR #${PR_NUMBER}: claude[bot] COMMENT Review 1건 확인 (head ${HEAD_SHA}, inline ${inline_count}건)."
