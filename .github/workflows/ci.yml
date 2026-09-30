@@ -246,6 +246,10 @@ jobs:
           --current-only
           --documentation-fragment-workspace "${RUNNER_TEMP}/documentation-fragment-workspace.json"
 
+      - name: Repository CI / Check component contract mirrors
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.contracts == 'true' || needs.changes.outputs.ci == 'true' }}
+        run: node tools/repo/sync-component-mirrors.mjs --check
+
       - name: Repository CI / Check directory boundaries
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' || needs.changes.outputs.contracts == 'true' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.mobile == 'true' || needs.changes.outputs.datapack == 'true' }}
         run: node tools/ci/check-boundaries.mjs

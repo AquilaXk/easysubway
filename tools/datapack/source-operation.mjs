@@ -246,7 +246,7 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   }
   requireAllowedKeys(operation, new Set([
     "method", "endpoint", "sampleUrl", "auth", "requiredParameters", "fixedParameters", "optionalParameters",
-    "responseEnvelope", "responseFields", "runner", "secretPolicy",
+    "responseEnvelope", "responseFields", "runner", "secretPolicy", "maxRetries", "retryPolicy", "requestTimeoutMs",
   ]), `${candidate.id}.operation`);
   if (!new Set(["GET", "POST"]).has(operation.method)) {
     throw new Error(`${candidate.id}.operation.method must be GET or POST`);
@@ -325,35 +325,37 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
     stringList(operation.responseFields, `${candidate.id}.operation.responseFields`);
   }
   const runner = operation.runner;
-  if (!runner || typeof runner !== "object" || Array.isArray(runner)) {
-    throw new Error(`${candidate.id}.operation.runner must be an object`);
-  }
-  requireAllowedKeys(runner, new Set(["command", "arguments", "requiredEnv"]), `${candidate.id}.operation.runner`);
-  const command = requiredText(runner.command, `${candidate.id}.operation.runner.command`);
-  if (!/^node tools\/[A-Za-z0-9_./-]+\.mjs$/.test(command)) {
-    throw new Error(`${candidate.id}.operation.runner.command must be a literal repository Node command`);
-  }
-  const runnerArguments = stringList(
-    runner.arguments ?? [],
-    `${candidate.id}.operation.runner.arguments`,
-    { allowEmpty: true },
-  );
-  if (runnerArguments.some((argument) => {
-    const option = /^--([^=]+)(?:=|$)/.exec(argument);
-    return option && CREDENTIAL_NAME.test(normalizedName(option[1]));
-  })) {
-    throw new Error(`${candidate.id}.operation.runner.arguments must not include credential options`);
-  }
-  const requiredEnv = stringList(
-    runner.requiredEnv,
-    `${candidate.id}.operation.runner.requiredEnv`,
-    { allowEmpty: true },
-  );
-  if (requiredEnv.some((name) => !/^[A-Z][A-Z0-9_]*$/.test(name))) {
-    throw new Error(`${candidate.id}.operation.runner.requiredEnv must contain environment variable names`);
-  }
-  if (authEnv != null && !requiredEnv.includes(authEnv)) {
-    throw new Error(`${candidate.id}.operation.runner.requiredEnv must include auth.env`);
+  if (runner != null) {
+    if (typeof runner !== "object" || Array.isArray(runner)) {
+      throw new Error(`${candidate.id}.operation.runner must be an object`);
+    }
+    requireAllowedKeys(runner, new Set(["command", "arguments", "requiredEnv"]), `${candidate.id}.operation.runner`);
+    const command = requiredText(runner.command, `${candidate.id}.operation.runner.command`);
+    if (!/^node tools\/[A-Za-z0-9_./-]+\.mjs$/.test(command)) {
+      throw new Error(`${candidate.id}.operation.runner.command must be a literal repository Node command`);
+    }
+    const runnerArguments = stringList(
+      runner.arguments ?? [],
+      `${candidate.id}.operation.runner.arguments`,
+      { allowEmpty: true },
+    );
+    if (runnerArguments.some((argument) => {
+      const option = /^--([^=]+)(?:=|$)/.exec(argument);
+      return option && CREDENTIAL_NAME.test(normalizedName(option[1]));
+    })) {
+      throw new Error(`${candidate.id}.operation.runner.arguments must not include credential options`);
+    }
+    const requiredEnv = stringList(
+      runner.requiredEnv,
+      `${candidate.id}.operation.runner.requiredEnv`,
+      { allowEmpty: true },
+    );
+    if (requiredEnv.some((name) => !/^[A-Z][A-Z0-9_]*$/.test(name))) {
+      throw new Error(`${candidate.id}.operation.runner.requiredEnv must contain environment variable names`);
+    }
+    if (authEnv != null && !requiredEnv.includes(authEnv)) {
+      throw new Error(`${candidate.id}.operation.runner.requiredEnv must include auth.env`);
+    }
   }
   const expectedSecretPolicy = credentialFree ? "credential-free-output" : "env-only-redacted-output";
   if (operation.secretPolicy !== expectedSecretPolicy) {
