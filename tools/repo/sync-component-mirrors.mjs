@@ -37,6 +37,11 @@ export const MIRROR_DEFINITIONS = Object.freeze([
     repository: "AquilaXk/easysubway-data",
     sourcePath: "tools/datapack/source-candidates.json",
   },
+  {
+    hubPath: "tools/datapack/source-operation.mjs",
+    repository: "AquilaXk/easysubway-data",
+    sourcePath: "tools/datapack/source-operation.mjs",
+  },
 ]);
 
 export async function defaultExecGh({ repository, path, ref }) {

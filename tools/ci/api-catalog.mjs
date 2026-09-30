@@ -141,7 +141,9 @@ export function validateCatalog(catalog) {
       }
     }
     if (entry.kind === "provider") {
-      if (!httpUrl(entry.endpoint)) throw new Error(`${entry.id}: invalid provider endpoint`);
+      // 정본(data source-operation.mjs)은 AGGREGATE_SOURCE_SET 운영에 단일 요청 URL을 두지 않는다.
+      const aggregateSourceSet = entry.operation?.kind === "AGGREGATE_SOURCE_SET" && entry.endpoint === null;
+      if (!aggregateSourceSet && !httpUrl(entry.endpoint)) throw new Error(`${entry.id}: invalid provider endpoint`);
       if (entry.operationValidationError) {
         throw new Error(`${entry.id}: provider operation contract is invalid: ${entry.operationValidationError}`);
       }
