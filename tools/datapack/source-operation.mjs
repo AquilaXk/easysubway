@@ -327,7 +327,7 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   const runner = operation.runner;
   if (runner != null) {
     if (typeof runner !== "object" || Array.isArray(runner)) {
-      throw new Error(`${candidate.id}.operation.runner must be an object`);
+      throw new TypeError(`${candidate.id}.operation.runner must be an object`);
     }
     requireAllowedKeys(runner, new Set(["command", "arguments", "requiredEnv"]), `${candidate.id}.operation.runner`);
     const command = requiredText(runner.command, `${candidate.id}.operation.runner.command`);

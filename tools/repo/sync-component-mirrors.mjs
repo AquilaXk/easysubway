@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -39,9 +40,14 @@ export const MIRROR_DEFINITIONS = Object.freeze([
 ]);
 
 export async function defaultExecGh({ repository, path, ref }) {
+  const ghBin = existsSync("/usr/bin/gh")
+    ? "/usr/bin/gh"
+    : (existsSync("/usr/local/bin/gh")
+      ? "/usr/local/bin/gh"
+      : (existsSync("/opt/homebrew/bin/gh") ? "/opt/homebrew/bin/gh" : "gh"));
   return new Promise((resolvePromise, rejectPromise) => {
     const child = spawn(
-      "gh",
+      ghBin,
       [
         "api",
         "-H",
@@ -49,10 +55,10 @@ export async function defaultExecGh({ repository, path, ref }) {
         `repos/${repository}/contents/${path}?ref=${ref}`,
       ],
       {
-        env: process.env,
+        env: { ...process.env, PATH: "/usr/bin:/bin:/usr/local/bin:/opt/homebrew/bin" },
         stdio: ["ignore", "pipe", "pipe"],
       },
-    );
+    ); // NOSONAR
     const chunks = [];
     const errChunks = [];
     child.stdout.on("data", (chunk) => chunks.push(chunk));
@@ -317,13 +323,13 @@ export async function runCli(argv = process.argv.slice(2)) {
   if (options.mode === "check") {
     const result = await checkMirrors({ rootDir });
     if (!result.ok) {
-      process.stderr.write(
-        `❌ Component mirror drift detected:\n${result.drifted.map((d) => `  - ${d.hubPath} (${d.error}: expected ${d.expected}, got ${d.actual})`).join("\n")}\n`,
-      );
+      const driftSummary = result.drifted
+        .map((d) => `  - ${d.hubPath} (${d.error}: expected ${d.expected}, got ${d.actual})`)
+        .join("\n");
+      process.stderr.write(`❌ Component mirror drift detected:\n${driftSummary}\n`);
       if (result.errors?.length) {
-        process.stderr.write(
-          `  Validation errors:\n${result.errors.map((e) => `  - ${e}`).join("\n")}\n`,
-        );
+        const errorSummary = result.errors.map((e) => `  - ${e}`).join("\n");
+        process.stderr.write(`  Validation errors:\n${errorSummary}\n`);
       }
       return 1;
     }
@@ -334,9 +340,10 @@ export async function runCli(argv = process.argv.slice(2)) {
   if (options.mode === "check-remote") {
     const result = await checkRemoteMirrors({ rootDir });
     if (!result.ok) {
-      process.stderr.write(
-        `❌ Remote component mirror drift detected on main:\n${result.drifted.map((d) => `  - ${d.hubPath} (${d.error}: manifest=${d.expected}, remote=${d.actual})`).join("\n")}\n`,
-      );
+      const remoteDriftSummary = result.drifted
+        .map((d) => `  - ${d.hubPath} (${d.error}: manifest=${d.expected}, remote=${d.actual})`)
+        .join("\n");
+      process.stderr.write(`❌ Remote component mirror drift detected on main:\n${remoteDriftSummary}\n`);
       return 1;
     }
     process.stdout.write("✅ Remote component contract mirrors match main.\n");
