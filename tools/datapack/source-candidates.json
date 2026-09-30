@@ -3,10 +3,676 @@
   "artifactKind": "production-source-candidates",
   "source": "tools/datapack/source-candidates.json",
   "retrievedAt": "2026-06-22",
-  "updatedAt": "2026-07-29",
+  "updatedAt": "2026-09-01",
+  "providers": {
+    "kric": {
+      "credential": {
+        "env": "KRIC_SERVICE_KEY",
+        "length": 60,
+        "characterClasses": [
+          "digit",
+          "lower",
+          "symbol",
+          "upper"
+        ],
+        "fingerprintAlgorithm": "sha256-12",
+        "fingerprint": null
+      },
+      "controlOperation": {
+        "candidateId": "kric-station-convenience-standard",
+        "endpoint": "https://openapi.kric.go.kr/openapi/handicapped/stationCnvFacl",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/handicapped/stationCnvFacl?serviceKey=[서비스키값]&format=json&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "expectedSuccess": {
+          "minimumRowCount": 1,
+          "requiredFields": [
+            "dtlLoc",
+            "gubun",
+            "stinFlor"
+          ]
+        },
+        "verifiedAt": "2026-08-02"
+      },
+      "credentialSignalResultCodes": [
+        "30"
+      ]
+    }
+  },
+  "credentialBearingProviderCoverage": [
+    {
+      "providerId": "data-go-kr",
+      "credentialEnv": "DATA_GO_KR_SERVICE_KEY",
+      "requiredClassification": "DETERMINISTIC_CREDENTIAL_VALIDATION_ONLY",
+      "implementationStatus": "IMPLEMENTED",
+      "reason": "all current runners validate DATA_GO_KR_SERVICE_KEY through the shared deterministic boundary before provider calls",
+      "runners": [
+        "tools/datapack/collect-busan-accessibility.mjs",
+        "tools/datapack/collect-busan-route-topology.mjs",
+        "tools/datapack/collect-busan-timetable.mjs",
+        "tools/datapack/collect-current-seoul-transfer-distance-duration-snapshot.mjs",
+        "tools/datapack/collect-daejeon-route-topology.mjs",
+        "tools/datapack/collect-datago-source-candidate-evidence.mjs",
+        "tools/datapack/collect-gwangju-timetable.mjs",
+        "tools/datapack/collect-korail-itx-cheongchun-timetable.mjs",
+        "tools/datapack/collect-nationwide-public-api-coverage.mjs",
+        "tools/datapack/collect-public-static-network-v2.mjs",
+        "tools/datapack/collect-seoul-accessibility-evidence.mjs",
+        "tools/datapack/collect-seoul-metro-congestion.mjs",
+        "tools/datapack/collect-tago-itx-cheongchun-od.mjs",
+        "tools/datapack/current-capital-accessibility-source-handoff.mjs",
+        "tools/datapack/fetch-kasi-public-holiday-calendar.mjs",
+        "tools/datapack/probe-daejeon-coverage-api.mjs",
+        "tools/datapack/probe-korail-train-operation-api.mjs",
+        "tools/datapack/probe-seoul-fare-api.mjs",
+        "tools/datapack/probe-tago-train-date-semantics.mjs",
+        "tools/datapack/revalidate-current-molit-transfer-source.mjs",
+        "tools/datapack/run-current-itx-collection.mjs",
+        "tools/datapack/run-current-seoul-accessibility-registration.mjs",
+        "tools/datapack/run-public-static-network-v2-operation.mjs",
+        "tools/datapack/run-retained-gwangju-timetable-refresh.mjs",
+        "tools/datapack/validate-tago-schedule-sample.mjs"
+      ]
+    }
+  ],
   "candidates": [
     {
+      "id": "daegu-line1-route-topology",
+      "priority": "P0",
+      "domain": "route_graph_topology",
+      "coverageScope": {
+        "regionIds": [
+          "daegu"
+        ],
+        "operatorIds": [
+          "daegu-transportation"
+        ],
+        "lineIds": [
+          "line-5b8d9b05e7e6"
+        ]
+      },
+      "displayName": "대구교통공사 1호선 역 구간정보",
+      "detailUrl": "https://www.data.go.kr/data/15061836/fileData.do",
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "pending_retained_raw_files",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15061836/fileData.do",
+        "license": "unrestricted",
+        "formats": [
+          "CSV"
+        ],
+        "retainedReader": "tools/datapack/collect-daegu-datapack-sources.mjs#parseDaeguRouteTopology",
+        "provider": "대구교통공사",
+        "notes": "Registration requires retained official CSV bytes and exact parser replay. Normalized snapshots alone are not raw-source evidence. No provider operation or runner is declared."
+      },
+      "registrationMetadata": {
+        "governance": {
+          "sourceId": "daegu-line1-route-topology",
+          "sourceClassId": "route_graph_topology",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "c98bd5db00ca63f1198df00e2fafeb71c9e43e026b0edd297af5efca7650979f",
+            "reviewedAt": "2026-09-08T18:42:57.610Z",
+            "nextReviewAt": "2027-09-08T18:42:57.610Z",
+            "termsUrl": "https://www.data.go.kr/data/15061836/fileData.do",
+            "reviewedProvider": "대구교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15061836/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      }
+    },
+    {
+      "id": "daegu-line1-train-timetable",
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": [
+          "daegu"
+        ],
+        "operatorIds": [
+          "daegu-transportation"
+        ],
+        "lineIds": [
+          "line-5b8d9b05e7e6"
+        ]
+      },
+      "displayName": "대구교통공사 1호선 열차시각표",
+      "detailUrl": "https://www.data.go.kr/data/15065526/fileData.do",
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "pending_retained_raw_files",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15065526/fileData.do",
+        "license": "unrestricted",
+        "formats": [
+          "CSV"
+        ],
+        "retainedReader": "tools/datapack/collect-daegu-datapack-sources.mjs#parseDaeguTrainTimetable",
+        "provider": "대구교통공사",
+        "notes": "Registration requires retained official CSV bytes and exact parser replay. Normalized snapshots alone are not raw-source evidence. No provider operation or runner is declared."
+      },
+      "registrationMetadata": {
+        "governance": {
+          "sourceId": "daegu-line1-train-timetable",
+          "sourceClassId": "daegu_timetable_observation",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "862d086d47937be7798da0344dd7f5ec0beb3598e84fea60fa44efe48c79c468",
+            "reviewedAt": "2026-09-08T18:42:57.610Z",
+            "nextReviewAt": "2027-09-08T18:42:57.610Z",
+            "termsUrl": "https://www.data.go.kr/data/15065526/fileData.do",
+            "reviewedProvider": "대구교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15065526/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        "freshness": {
+          "id": "daegu_timetable_observation",
+          "sourceIds": [
+            "daegu-line1-train-timetable",
+            "daegu-line2-train-timetable",
+            "daegu-line3-train-timetable"
+          ],
+          "basisField": "capturedAt",
+          "reverificationCadence": "P30D",
+          "futureBasisAllowed": false,
+          "providerValidityEndField": null,
+          "eventTriggers": [
+            "official timetable revision"
+          ]
+        }
+      }
+    },
+    {
+      "id": "daegu-line2-route-topology",
+      "priority": "P0",
+      "domain": "route_graph_topology",
+      "coverageScope": {
+        "regionIds": [
+          "daegu"
+        ],
+        "operatorIds": [
+          "daegu-transportation"
+        ],
+        "lineIds": [
+          "line-e2938a4cc492"
+        ]
+      },
+      "displayName": "대구교통공사 2호선 역 구간정보",
+      "detailUrl": "https://www.data.go.kr/data/15061835/fileData.do",
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "pending_retained_raw_files",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15061835/fileData.do",
+        "license": "unrestricted",
+        "formats": [
+          "CSV"
+        ],
+        "retainedReader": "tools/datapack/collect-daegu-datapack-sources.mjs#parseDaeguRouteTopology",
+        "provider": "대구교통공사",
+        "notes": "Registration requires retained official CSV bytes and exact parser replay. Normalized snapshots alone are not raw-source evidence. No provider operation or runner is declared."
+      },
+      "registrationMetadata": {
+        "governance": {
+          "sourceId": "daegu-line2-route-topology",
+          "sourceClassId": "route_graph_topology",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "e809432b02503d8b61bf1962c9b26604bf4a2299f3ebce285c51f479c7982e73",
+            "reviewedAt": "2026-09-08T18:42:57.610Z",
+            "nextReviewAt": "2027-09-08T18:42:57.610Z",
+            "termsUrl": "https://www.data.go.kr/data/15061835/fileData.do",
+            "reviewedProvider": "대구교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15061835/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      }
+    },
+    {
+      "id": "daegu-line2-train-timetable",
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": [
+          "daegu"
+        ],
+        "operatorIds": [
+          "daegu-transportation"
+        ],
+        "lineIds": [
+          "line-e2938a4cc492"
+        ]
+      },
+      "displayName": "대구교통공사 2호선 열차시각표",
+      "detailUrl": "https://www.data.go.kr/data/3033376/fileData.do",
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "pending_retained_raw_files",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/3033376/fileData.do",
+        "license": "unrestricted",
+        "formats": [
+          "CSV"
+        ],
+        "retainedReader": "tools/datapack/collect-daegu-datapack-sources.mjs#parseDaeguTrainTimetable",
+        "provider": "대구교통공사",
+        "notes": "Registration requires retained official CSV bytes and exact parser replay. Normalized snapshots alone are not raw-source evidence. No provider operation or runner is declared."
+      },
+      "registrationMetadata": {
+        "governance": {
+          "sourceId": "daegu-line2-train-timetable",
+          "sourceClassId": "daegu_timetable_observation",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "35683fc9e94884cd0787b44e896dcbcaa781529ed30a8b1cb5416e5002a6a701",
+            "reviewedAt": "2026-09-08T18:42:57.610Z",
+            "nextReviewAt": "2027-09-08T18:42:57.610Z",
+            "termsUrl": "https://www.data.go.kr/data/3033376/fileData.do",
+            "reviewedProvider": "대구교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/3033376/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      }
+    },
+    {
+      "id": "daegu-line3-route-topology",
+      "priority": "P0",
+      "domain": "route_graph_topology",
+      "coverageScope": {
+        "regionIds": [
+          "daegu"
+        ],
+        "operatorIds": [
+          "daegu-transportation"
+        ],
+        "lineIds": [
+          "line-0ffaa95b1b5d"
+        ]
+      },
+      "displayName": "대구교통공사 3호선 역 구간정보",
+      "detailUrl": "https://www.data.go.kr/data/15061797/fileData.do",
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "pending_retained_raw_files",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15061797/fileData.do",
+        "license": "unrestricted",
+        "formats": [
+          "CSV"
+        ],
+        "retainedReader": "tools/datapack/collect-daegu-datapack-sources.mjs#parseDaeguRouteTopology",
+        "provider": "대구교통공사",
+        "notes": "Registration requires retained official CSV bytes and exact parser replay. Normalized snapshots alone are not raw-source evidence. No provider operation or runner is declared."
+      },
+      "registrationMetadata": {
+        "governance": {
+          "sourceId": "daegu-line3-route-topology",
+          "sourceClassId": "route_graph_topology",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "293202c5ad65d7f7098ba7fb126f366103ca2162ef267695cacd63394f11f0ec",
+            "reviewedAt": "2026-09-08T18:42:57.610Z",
+            "nextReviewAt": "2027-09-08T18:42:57.610Z",
+            "termsUrl": "https://www.data.go.kr/data/15061797/fileData.do",
+            "reviewedProvider": "대구교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15061797/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      }
+    },
+    {
+      "id": "daegu-line3-train-timetable",
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": [
+          "daegu"
+        ],
+        "operatorIds": [
+          "daegu-transportation"
+        ],
+        "lineIds": [
+          "line-0ffaa95b1b5d"
+        ]
+      },
+      "displayName": "대구교통공사 3호선 열차시각표",
+      "detailUrl": "https://www.data.go.kr/data/15065532/fileData.do",
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "pending_retained_raw_files",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15065532/fileData.do",
+        "license": "unrestricted",
+        "formats": [
+          "CSV"
+        ],
+        "retainedReader": "tools/datapack/collect-daegu-datapack-sources.mjs#parseDaeguTrainTimetable",
+        "provider": "대구교통공사",
+        "notes": "Registration requires retained official CSV bytes and exact parser replay. Normalized snapshots alone are not raw-source evidence. No provider operation or runner is declared."
+      },
+      "registrationMetadata": {
+        "governance": {
+          "sourceId": "daegu-line3-train-timetable",
+          "sourceClassId": "daegu_timetable_observation",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "0568fd2350cf6c424a5be292a89a1160eb9df5e49e858eee57a872912d32dc24",
+            "reviewedAt": "2026-09-08T18:42:57.610Z",
+            "nextReviewAt": "2027-09-08T18:42:57.610Z",
+            "termsUrl": "https://www.data.go.kr/data/15065532/fileData.do",
+            "reviewedProvider": "대구교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15065532/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      }
+    },
+    {
+      "id": "kasi-public-holiday-calendar",
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": { "regionIds": ["all"], "operatorIds": ["all-urban-metropolitan-rail-operators"] },
+      "displayName": "한국천문연구원 특일 정보 — 공휴일 달력",
+      "detailUrl": "https://www.data.go.kr/data/15012690/openapi.do",
+      "requestUrl": "https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo",
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "not_collected",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15012690/openapi.do",
+        "license": "unrestricted",
+        "formats": ["XML"],
+        "notes": "Register the existing monthly collector without claiming source admission. Retain response bytes and month coverage; operator-specific timetable categories remain separate. Existing transport retry behavior is unchanged."
+      },
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://apis.data.go.kr/B090041/openapi/service/SpcdeInfoService/getRestDeInfo",
+        "auth": {
+          "env": "DATA_GO_KR_SERVICE_KEY", "placement": "query", "parameter": "ServiceKey",
+          "valueEncoding": "url-search-params-once", "loadPolicy": "process-env-no-shell-parsing"
+        },
+        "requiredParameters": ["ServiceKey", "solYear", "solMonth"],
+        "fixedParameters": { "pageNo": "1", "numOfRows": "100" },
+        "responseEnvelope": "response.header + response.body.items.item + response.body.totalCount",
+        "responseFields": ["locdate", "dateName", "isHoliday", "dateKind", "seq"],
+        "runner": {
+          "command": "node tools/datapack/fetch-kasi-public-holiday-calendar.mjs",
+          "arguments": ["--year", "[year]", "--months", "[requested-months]", "--output-directory", "[new-absolute-operation-directory]"],
+          "requiredEnv": ["DATA_GO_KR_SERVICE_KEY"]
+        },
+        "secretPolicy": "env-only-redacted-output"
+      }
+    },
+    {
+      "id": "korail-metropolitan-timetable-file",
+      "priority": "P0",
+      "domain": "route_graph_topology",
+      "coverageScope": {
+        "regionIds": ["daegu"],
+        "operatorIds": ["korail"],
+        "lineIds": ["line-8f7ed01f290a"]
+      },
+      "displayName": "한국철도공사 광역전철 시각표 — 대경선",
+      "topologyRegistration": {
+        "sourceClassId": "route_graph_topology",
+        "retentionClassId": "standard-90d",
+        "ownerRole": "datapack-source-owner",
+        "stewardRole": "datapack-data-steward",
+        "approvalRole": "datapack-release-approver",
+        "derivationPolicy": "MIN_OBSERVED_SCHEDULED_DURATION_V1"
+      },
+      "detailUrl": "https://www.data.go.kr/data/15052169/fileData.do",
+      "requestUrl": "https://www.korail.com/ticket/reserve/train-timeTable",
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "retained_file_parsed",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15052169/fileData.do",
+        "license": "unrestricted",
+        "formats": ["XLSX"],
+        "retainedReader": "tools/datapack/parse-korail-metropolitan-timetable.mjs#parseRetainedKorailWorkbook",
+        "provider": "한국철도공사",
+        "collectionContract": {
+          "collector": "tools/datapack/collect-korail-metropolitan-timetable-file.mjs#collectKorailMetropolitanTimetableFile",
+          "officialAttachmentOrigin": "https://www.korail.com",
+          "officialAttachmentPathPrefix": "/file/cubedata/COMMON/jfile/",
+          "expectedAttachmentSha256Required": true,
+          "requestTimeoutMs": 30000,
+          "maximumBytes": 134217728,
+          "maxRetries": 0,
+          "redirect": "error",
+          "receiptIsAdmission": false
+        },
+        "membershipSourceId": "kric-current-station-line-file",
+        "coverage": "DaeGyeong passenger topology and source-native scheduled segment observations",
+        "notes": "The distribution page is not a download operation. Retained attachment SHA is supplied to the reader; no provider runner, calendar applicability or production admission is claimed."
+      }
+    },
+    {
+      "id": "korail-metropolitan-planned-timetable",
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "sourceFamilyId": "korail-metropolitan-timetable-file",
+      "coverageScope": {
+        "regionIds": ["daegu"],
+        "operatorIds": ["korail"],
+        "lineIds": ["line-8f7ed01f290a"]
+      },
+      "displayName": "한국철도공사 광역전철 계획 시각표 — 대경선",
+      "detailUrl": "https://www.data.go.kr/data/15052169/fileData.do",
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "retained_file_parsed",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "scheduleRegistration": {
+        "sourceClassId": "planned_timetable",
+        "retentionClassId": "standard-90d",
+        "ownerRole": "datapack-source-owner",
+        "stewardRole": "datapack-data-steward",
+        "approvalRole": "datapack-release-approver"
+      },
+      "evidence": {
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15052169/fileData.do",
+        "license": "unrestricted",
+        "formats": ["XLSX"],
+        "provider": "한국철도공사",
+        "coverage": "DaeGyeong planned service calendar, trips, and stop times derived from the retained official timetable receipt",
+        "retainedReceiptSourceId": "korail-metropolitan-timetable-file"
+      }
+    },
+    {
+      "id": "kric-nationwide-timetable-file",
+      "retainedRoutePolicy": {
+        "routeNumber": "S2901",
+        "stationAliases": {
+          "광주송정": "광주송정역",
+          "학동증심사": "학동증심사입구",
+          "금남4가": "금남로4가",
+          "금남5가": "금남로5가",
+          "양동": "양동시장",
+          "컨벤션": "김대중컨벤션센터"
+        },
+        "excludedEndpointLabels": ["기지사업소", "옥동기지"]
+      },
+      "confirmationPolicy": {
+        "id": "official_static_timetable_confirmation",
+        "sourceIds": ["kric-nationwide-timetable-file"],
+        "basisField": "observedAt",
+        "reverificationCadence": "P7D",
+        "futureBasisAllowed": false,
+        "eventTriggers": ["official timetable revision notice"],
+        "providerValidityEndField": "serviceEffectiveUntil"
+      },
+      "priority": "P0",
+      "domain": "schedule_timetable",
+      "coverageScope": {
+        "regionIds": ["all"],
+        "operatorIds": ["all-urban-metropolitan-rail-operators"]
+      },
+      "displayName": "전체_도시철도운행정보_20260630",
+      "detailUrl": "https://data.kric.go.kr/rips/M_01_01/detail.do?id=900",
+      "requestUrl": "https://data.kric.go.kr/rips/dataset/download.file?type=filedata&id=900&operation=1",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://data.kric.go.kr/rips/dataset/download.file?type=filedata&id=900&operation=1",
+        "auth": { "placement": "none" },
+        "requiredParameters": [],
+        "fixedParameters": { "type": "filedata", "id": "900", "operation": "1" },
+        "responseEnvelope": "XLSX ZIP attachment",
+        "runner": {
+          "command": "node tools/datapack/collect-kric-nationwide-timetable-file.mjs",
+          "arguments": ["--output-file", "[absent-task-owned-absolute-file.xlsx]"],
+          "requiredEnv": []
+        },
+        "secretPolicy": "credential-free-output"
+      },
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "metadata_observed",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-08-27",
+        "detailPageId": "900",
+        "provider": "국가철도공단",
+        "providerDepartment": "철도산업정보센터",
+        "licenseEvidenceUrl": "https://www.data.go.kr/data/15013206/standard.do",
+        "license": "unrestricted",
+        "formats": ["XLSX"],
+        "modifiedAt": "2026-07-06",
+        "coverage": "all urban/metropolitan rail operators"
+      }
+    },
+    {
+      "id": "kric-current-station-line-file",
+      "priority": "P0",
+      "domain": "station_line_membership",
+      "coverageScope": {
+        "regionIds": ["all"],
+        "operatorIds": ["all-urban-metropolitan-rail-operators"]
+      },
+      "displayName": "전체 도시철도 역사정보",
+      "detailUrl": "https://data.kric.go.kr/rips/M_01_01/detail.do?id=1294",
+      "requestUrl": "https://data.kric.go.kr/rips/dataset/download.file?type=filedata&id=1294&operation=1",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://data.kric.go.kr/rips/dataset/download.file?type=filedata&id=1294&operation=1",
+        "auth": { "placement": "none" },
+        "requiredParameters": [],
+        "fixedParameters": { "type": "filedata", "id": "1294", "operation": "1" },
+        "responseEnvelope": "XLSX ZIP attachment",
+        "runner": {
+          "command": "node tools/datapack/collect-kric-nationwide-timetable-file.mjs",
+          "arguments": ["--profile", "current-station-line", "--output-file", "[absent-task-owned-absolute-file.xlsx]"],
+          "requiredEnv": []
+        },
+        "secretPolicy": "credential-free-output"
+      },
+      "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
+      "sampleEvidenceStatus": "metadata_observed",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-08-27",
+        "detailPageId": "1294",
+        "licenseEvidenceUrl": "https://data.kric.go.kr/rips/M_01_01/detail.do?id=1294",
+        "license": "unrestricted",
+        "formats": ["XLSX"],
+        "coverage": "all urban/metropolitan rail operators"
+      }
+    },
+    {
       "id": "busan-transportation-accessibility",
+      "registrationMetadata": {
+        "governance": {
+          "sourceId": "busan-transportation-accessibility",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "82dc0d5a7c726532e8aca86b31603c0edd3cd238a67b4067f4aab0ac59e27edf",
+            "reviewedAt": "2026-09-09T03:10:13.781Z",
+            "nextReviewAt": "2027-09-09T03:10:13.781Z",
+            "termsUrl": "https://www.data.go.kr/data/15001020/openapi.do",
+            "reviewedProvider": "부산교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15001020/openapi.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      },
       "priority": "P0",
       "domain": "accessibility_facilities",
       "coverageScope": {
@@ -24,7 +690,7 @@
         ]
       },
       "displayName": "부산교통공사_부산도시철도 장애인 편의시설 정보",
-      "detailUrl": "https://data.humetro.busan.kr",
+      "detailUrl": "https://www.data.go.kr/data/15001020/openapi.do",
       "requestUrl": "http://data.humetro.busan.kr/voc/api/open_api_convenience.tnn",
       "operation": {
         "method": "GET",
@@ -237,11 +903,10 @@
       "detailUrl": "https://www.data.go.kr/data/15054957/fileData.do",
       "requestUrl": "https://www2.humetro.busan.kr/homepage/cyberstation/map.do",
       "licenseEvidenceStatus": "confirmed_free_use",
-      "sampleEvidenceStatus": "validated_official_full_snapshot",
-      "admissionStatus": "production_route_map_positions_materialized",
-      "productionInventoryReferenceId": "busan-transportation-route-map-positions",
+      "sampleEvidenceStatus": "diagnostic_web_assets_only",
+      "admissionStatus": "preflight_only",
       "serviceKeyHandling": "not_required",
-      "mobileEmbeddingAllowed": true,
+      "mobileEmbeddingAllowed": false,
       "evidence": {
         "retrievedAt": "2026-07-20",
         "endpoint": "https://www2.humetro.busan.kr/homepage/cyberstation/map.do",
@@ -271,20 +936,12 @@
         "connectorEvidenceArtifact": "tools/datapack/sources/busan-transportation-route-map-connectors-20260720.json",
         "connectorEvidenceArtifactSha256": "8f119b7c2cd8d9527abbbd8d6937f237a5ea9f03e70ff5f7ef425b8af10ce941",
         "evidenceArtifact": "tools/datapack/sources/busan-transportation-route-map-positions-20260720.json",
-        "coverageAssessment": {
-          "state": "SUPPORTED",
-          "requirementCount": 4,
-          "sourceDomain": "route_map_positions",
-          "artifactKind": "production",
-          "materializer": "tools/datapack/materialize-busan-route-map-positions.mjs",
-          "verificationTest": "tools/datapack/materialize-busan-route-map-positions.test.mjs"
-        },
         "coverageLimitations": [
-          "부산교통공사 1~4호선 114개 역에 한정한다",
-          "공식 HTML/CSS와 32개 PNG 연결선 snapshot을 offline materializer에서만 소비하며 runtime 네트워크 호출은 하지 않는다"
+          "공식 웹 자산은 진단용 byte evidence이며 production route-map input이 아니다",
+          "HTML/CSS·PNG 자산은 source snapshot 또는 mobile embedding으로 사용하지 않는다"
         ]
       },
-      "nextAction": "공식 사이버스테이션 변경 시 HTML/CSS·PNG hash와 114개 좌표·110개 연결선 snapshot을 함께 갱신한다"
+      "nextAction": "공식 API 또는 배포 가능한 정식 source contract를 확인하기 전까지 web assets는 진단 evidence로만 유지한다"
     },
     {
       "id": "busan-transportation-route-topology",
@@ -355,6 +1012,30 @@
       "sampleEvidenceStatus": "validated_live_full_snapshot",
       "admissionStatus": "validated_live_topology_materialized_to_production_candidate",
       "productionInventoryReferenceId": "busan-transportation-route-topology",
+      "registrationMetadata": {
+        "admissionReference": "https://github.com/AquilaXk/easysubway/pull/2320",
+        "governance": {
+          "sourceId": "busan-transportation-route-topology",
+          "sourceClassId": "route_graph_topology",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "c95b17313528bec500646e6e22900d998d936d5f3f9824704335cddc60875583",
+            "reviewedAt": "2026-09-08T15:44:42.000Z",
+            "nextReviewAt": "2027-09-08T15:44:42.000Z",
+            "termsUrl": "https://www.data.go.kr/data/15001019/openapi.do",
+            "reviewedProvider": "부산교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15001019/openapi.do",
+            "redistributionScopes": ["DERIVED_DATAPACK"],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      },
       "serviceKeyHandling": "offline_collector_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
@@ -397,10 +1078,43 @@
       "nextAction": "#2138의 나머지 provider/domain batch를 같은 production SQLite·field provenance 계약으로 합치고 최종 nationwide candidate를 rehearsal한다"
     },
     {
-      "id": "busan-transportation-timetable",
-      "priority": "P0",
-      "domain": "schedule_timetable",
-      "coverageScope": {
+    "id": "busan-transportation-timetable",
+    "priority": "P0",
+    "domain": "schedule_timetable",
+    "registrationMetadata": {
+      "admissionReference": "https://github.com/AquilaXk/easysubway/issues/2368",
+      "freshness": {
+        "id": "busan_timetable_observation",
+        "sourceIds": ["busan-transportation-timetable"],
+        "basisField": "capturedAt",
+        "reverificationCadence": "P30D",
+        "futureBasisAllowed": false,
+        "providerValidityEndField": null,
+        "eventTriggers": ["official timetable revision"]
+      },
+      "governance": {
+        "sourceId": "busan-transportation-timetable",
+        "sourceClassId": "busan_timetable_observation",
+        "retentionClassId": "standard-90d",
+        "ownerRole": "datapack-source-owner",
+        "stewardRole": "datapack-data-steward",
+        "approvalRole": "datapack-release-approver",
+        "escalationHours": 4,
+        "alertRoute": "github:area-datapack",
+        "licenseReview": {
+          "status": "APPROVED",
+          "termsHash": "da99648cbd80d9263482ae707dfcf6cd11c19c50461bf60cbad85183ff45dec1",
+          "reviewedAt": "2026-09-08T18:03:48.286Z",
+          "nextReviewAt": "2027-09-08T18:03:48.286Z",
+          "termsUrl": "https://www.data.go.kr/data/15000522/openapi.do",
+          "reviewedProvider": "부산교통공사",
+          "reviewedDatasetUrl": "https://www.data.go.kr/data/15000522/openapi.do",
+          "redistributionScopes": ["DERIVED_DATAPACK"],
+          "approvedByRole": "datapack-release-approver"
+        }
+      }
+    },
+    "coverageScope": {
         "regionIds": [
           "busan"
         ],
@@ -521,6 +1235,31 @@
     },
     {
       "id": "daegu-transportation-accessibility",
+      "registrationMetadata": {
+        "governance": {
+          "sourceId": "daegu-transportation-accessibility",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "56aea1437ed41bfa113dae3553aa6823b9eb1a0c18418fa2e4f4347ca4155595",
+            "reviewedAt": "2026-09-09T02:52:25.000Z",
+            "nextReviewAt": "2027-09-09T02:52:25.000Z",
+            "termsUrl": "https://www.data.go.kr/data/15149872/fileData.do",
+            "reviewedProvider": "대구교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15149872/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      },
       "priority": "P0",
       "domain": "accessibility_facilities",
       "coverageScope": {
@@ -562,6 +1301,8 @@
             "tools/datapack/fixtures/daegu-accessibility-raw/data-go-15149872.csv",
             "--sources-dir",
             "tools/datapack/sources",
+            "--inventory",
+            "tools/datapack/source-inventory.json",
             "--output",
             "/tmp/easysubway-daegu-accessibility.json",
             "--captured-at",
@@ -647,6 +1388,13 @@
       "sampleEvidenceStatus": "validated_official_full_snapshot",
       "admissionStatus": "production_route_map_positions_materialized",
       "productionInventoryReferenceId": "daegu-transportation-route-map-positions",
+      "registrationMetadata": {
+        "dependentInputs": {
+          "line1CsvPath": "tools/datapack/fixtures/daegu-route-map-positions-raw/data-go-15133918.csv",
+          "line2CsvPath": "tools/datapack/fixtures/daegu-route-map-positions-raw/data-go-15133920.csv",
+          "line3CsvPath": "tools/datapack/fixtures/daegu-route-map-positions-raw/data-go-15133922.csv"
+        }
+      },
       "serviceKeyHandling": "not_required",
       "mobileEmbeddingAllowed": true,
       "evidence": {
@@ -703,6 +1451,36 @@
       "id": "daejeon-station-distance-fare",
       "priority": "P0",
       "domain": "route_graph_topology",
+      "registrationMetadata": {
+        "dependentInputs": {
+          "mapXlsxPath": "tools/datapack/fixtures/daejeon-route-map-positions-raw/kric-metropolitan-rail-station-info-20260630.xlsx",
+          "schematicCanvasPath": "tools/datapack/fixtures/daejeon-route-map-positions-raw/owner-self-drawn-sma-schematic-canvas-20260725.json",
+          "elevatorPath": "tools/datapack/fixtures/daejeon-accessibility-raw/data-go-15041384.csv",
+          "escalatorPath": "tools/datapack/fixtures/daejeon-accessibility-raw/data-go-15041361.csv"
+        },
+        "admissionReference": "https://github.com/AquilaXk/easysubway/pull/2336",
+        "governance": {
+          "sourceId": "daejeon-station-distance-fare",
+          "sourceClassId": "route_graph_topology",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "8790a427f3f87892951d529c118cffa50b3ecc517f829b4fc46b382647bb034d",
+            "reviewedAt": "2026-09-08T16:06:25.000Z",
+            "nextReviewAt": "2027-09-08T16:06:25.000Z",
+            "termsUrl": "https://www.data.go.kr/data/15158794/openapi.do",
+            "reviewedProvider": "대전교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15158794/openapi.do",
+            "redistributionScopes": ["DERIVED_DATAPACK"],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      },
       "coverageScope": {
         "regionIds": [
           "daejeon"
@@ -817,10 +1595,43 @@
       "nextAction": "#2325에서 공식 timetable과 이 topology의 인접 소요시간을 결합해 schedule_timetable production admission을 완료한다."
     },
     {
-      "id": "daejeon-train-timetable",
-      "priority": "P0",
-      "domain": "schedule_timetable",
-      "coverageScope": {
+    "id": "daejeon-train-timetable",
+    "priority": "P0",
+    "domain": "schedule_timetable",
+    "registrationMetadata": {
+      "admissionReference": "https://github.com/AquilaXk/easysubway/issues/2325",
+      "freshness": {
+        "id": "daejeon_timetable_observation",
+        "sourceIds": ["daejeon-train-timetable"],
+        "basisField": "observedAt",
+        "reverificationCadence": "P30D",
+        "futureBasisAllowed": false,
+        "providerValidityEndField": null,
+        "eventTriggers": ["official timetable revision"]
+      },
+      "governance": {
+        "sourceId": "daejeon-train-timetable",
+        "sourceClassId": "daejeon_timetable_observation",
+        "retentionClassId": "standard-90d",
+        "ownerRole": "datapack-source-owner",
+        "stewardRole": "datapack-data-steward",
+        "approvalRole": "datapack-release-approver",
+        "escalationHours": 4,
+        "alertRoute": "github:area-datapack",
+        "licenseReview": {
+          "status": "APPROVED",
+          "termsHash": "01b8a44e329e5a4efa9ac332c73f03e2485bfe93002479d0b9e1df1eb0d5b2aa",
+          "reviewedAt": "2026-09-08T17:54:38.982Z",
+          "nextReviewAt": "2027-09-08T17:54:38.982Z",
+          "termsUrl": "https://www.data.go.kr/data/15159278/openapi.do",
+          "reviewedProvider": "대전교통공사",
+          "reviewedDatasetUrl": "https://www.data.go.kr/data/15159278/openapi.do",
+          "redistributionScopes": ["DERIVED_DATAPACK"],
+          "approvedByRole": "datapack-release-approver"
+        }
+      }
+    },
+    "coverageScope": {
         "regionIds": [
           "daejeon"
         ],
@@ -912,6 +1723,31 @@
     },
     {
       "id": "daejeon-transportation-accessibility",
+      "registrationMetadata": {
+        "governance": {
+          "sourceId": "daejeon-transportation-accessibility",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "057e89316465215d7bc0add5d28d4bddc7f10d3756970ff4d2def02c51838a1f",
+            "reviewedAt": "2026-09-09T02:52:25.000Z",
+            "nextReviewAt": "2027-09-09T02:52:25.000Z",
+            "termsUrl": "https://www.data.go.kr/data/15041384/fileData.do",
+            "reviewedProvider": "대전교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15041384/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      },
       "priority": "P0",
       "domain": "accessibility_facilities",
       "coverageScope": {
@@ -1093,6 +1929,31 @@
     },
     {
       "id": "gwangju-transportation-accessibility",
+      "registrationMetadata": {
+        "governance": {
+          "sourceId": "gwangju-transportation-accessibility",
+          "sourceClassId": "static_accessibility_facility",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "0532458dc81590ad020987ddb34ef301ab96a86d1475325f94c8c956066f8b84",
+            "reviewedAt": "2026-09-09T03:10:13.781Z",
+            "nextReviewAt": "2027-09-09T03:10:13.781Z",
+            "termsUrl": "https://www.data.go.kr/data/15041385/fileData.do",
+            "reviewedProvider": "광주교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15041385/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      },
       "priority": "P0",
       "domain": "accessibility_facilities",
       "coverageScope": {
@@ -1137,8 +1998,8 @@
             "tools/datapack/fixtures/gwangju-accessibility-raw/data-go-15041385.csv",
             "--escalator-input",
             "tools/datapack/fixtures/gwangju-accessibility-raw/data-go-15041362.csv",
-            "--topology-snapshot",
-            "tools/datapack/sources/gwangju-transportation-route-topology-20260720.json",
+            "--inventory",
+            "tools/datapack/source-inventory.json",
             "--output",
             "/tmp/easysubway-gwangju-accessibility.json",
             "--captured-at",
@@ -1202,87 +2063,6 @@
         }
       },
       "nextAction": "24시간 admission snapshot을 갱신해 immutable production pack을 재생성한다"
-    },
-    {
-      "id": "gwangju-transportation-cyberstation-timetable",
-      "priority": "P0",
-      "domain": "schedule_timetable",
-      "coverageScope": {
-        "regionIds": [
-          "gwangju"
-        ],
-        "operatorIds": [
-          "gwangju-metropolitan-rapid-transit"
-        ],
-        "lineIds": [
-          "line-e57a361e8892"
-        ]
-      },
-      "displayName": "광주교통공사 사이버스테이션 열차시각표",
-      "detailUrl": "https://www.grtc.co.kr/subway/menu/trainTimetableSubMenu",
-      "requestUrl": "https://www.grtc.co.kr/cyber/portlet/subwayTimetable",
-      "operation": {
-        "method": "POST",
-        "endpoint": "https://www.grtc.co.kr/cyber/portlet/subwayTimetable",
-        "auth": {
-          "placement": "none"
-        },
-        "requiredParameters": [
-          "subwayid"
-        ],
-        "fixedParameters": {
-          "lineNo": "1"
-        },
-        "responseEnvelope": "official HTML fragment per station",
-        "responseFields": [
-          "dayCode",
-          "direction",
-          "hour",
-          "minute"
-        ],
-        "runner": {
-          "command": "node tools/datapack/collect-gwangju-cyberstation-timetable.mjs",
-          "arguments": [
-            "--output",
-            "/tmp/easysubway-gwangju-cyberstation-timetable.json"
-          ],
-          "requiredEnv": []
-        },
-        "secretPolicy": "credential-free-output"
-      },
-      "licenseEvidenceStatus": "covered_by_unrestricted_data_go_timetable_dataset_15111298",
-      "sampleEvidenceStatus": "validated_live_full_snapshot",
-      "admissionStatus": "production_materialized",
-      "mobileEmbeddingAllowed": false,
-      "evidence": {
-        "retrievedAt": "2026-07-20",
-        "officialTimetablePage": "https://www.grtc.co.kr/subway/menu/trainTimetableSubMenu",
-        "officialRequestContractSource": "https://www.grtc.co.kr/cyber?timetable=19",
-        "licenseEvidenceUrl": "https://www.data.go.kr/data/15111298/openapi.do",
-        "license": "unrestricted",
-        "liveSampleRetrievedAt": "2026-07-20T12:55:50.079Z",
-        "liveSampleStationCount": 20,
-        "liveSampleRowCount": 13362,
-        "excludedPlaceholderCount": 1,
-        "normalizedBoundaryMinuteCount": 1,
-        "liveSampleContentSha256": "b050ed92cbdd555e22e987e4854a7d60b5293951992d6c14ae26c110f9b4fb5a",
-        "liveSampleRowsSha256": "2eec08dc30a97c50fd349dc607e77677829881790b5ca896856caa4b9bbd3ccd",
-        "evidenceArtifact": "tools/datapack/sources/gwangju-transportation-cyberstation-timetable-20260720.json",
-        "materializedTripCount": 810,
-        "materializedStopTimeCount": 14171,
-        "admittedOfficialRowCount": 13360,
-        "generatedStopTimeCount": 811,
-        "quarantinedIncompleteTripRowCount": 2,
-        "coverageAssessment": {
-          "state": "SUPPORTED",
-          "requirementCount": 1,
-          "sourceDomain": "schedule_timetable",
-          "artifactKind": "production",
-          "materializer": "tools/datapack/materialize-gwangju-timetable.mjs",
-          "verificationTest": "tools/datapack/materialize-gwangju-timetable.test.mjs"
-        }
-      },
-      "nextAction": "24시간 timetable snapshot을 갱신해 immutable production pack을 재생성한다"
     },
     {
       "id": "gwangju-transportation-route-map-positions",
@@ -1354,6 +2134,35 @@
     },
     {
       "id": "gwangju-transportation-route-topology",
+      "registrationMetadata": {
+        "dependentInputs": {
+          "mapCsvPath": "tools/datapack/fixtures/gwangju-route-map-positions-raw/data-go-15109340.csv",
+          "schematicCanvasPath": "tools/datapack/fixtures/gwangju-route-map-positions-raw/owner-self-drawn-sma-schematic-canvas-20260725.json",
+          "elevatorPath": "tools/datapack/fixtures/gwangju-accessibility-raw/data-go-15041385.csv",
+          "escalatorPath": "tools/datapack/fixtures/gwangju-accessibility-raw/data-go-15041362.csv"
+        },
+        "governance": {
+          "sourceId": "gwangju-transportation-route-topology",
+          "sourceClassId": "route_graph_topology",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "a0daff78b1cdab2497fed25c22f158320137e70ef19c6f0a66ae8d5cfffc2c0c",
+            "reviewedAt": "2026-09-08T12:06:34.000Z",
+            "nextReviewAt": "2027-09-08T12:06:34.000Z",
+            "termsUrl": "https://www.data.go.kr/data/15046044/fileData.do",
+            "reviewedProvider": "광주교통공사",
+            "reviewedDatasetUrl": "https://www.grtc.co.kr/subway/contents/apiRunInfo",
+            "redistributionScopes": ["DERIVED_DATAPACK"],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      },
       "priority": "P0",
       "domain": "route_graph_topology",
       "coverageScope": {
@@ -1392,6 +2201,8 @@
         "runner": {
           "command": "node tools/datapack/collect-gwangju-route-topology.mjs",
           "arguments": [
+            "--inventory",
+            "tools/datapack/source-inventory.json",
             "--output",
             "/tmp/easysubway-gwangju-route-topology.json"
           ],
@@ -1568,14 +2379,11 @@
         "runner": {
           "command": "node tools/datapack/collect-incheon-timetable.mjs",
           "arguments": [
-            "--input-dir",
-            "tools/datapack/fixtures/incheon-timetable-raw",
+            "--download",
             "--topology-snapshot",
-            "tools/datapack/sources/incheon-transit-station-info-20260724.json",
+            "<tracked-current-incheon-topology-snapshot>",
             "--output-dir",
-            "/tmp/easysubway-incheon-timetable",
-            "--captured-at",
-            "2026-07-24T08:00:00.000Z",
+            "<absolute-operation-owned-output-directory>",
             "--line",
             "1"
           ],
@@ -1677,14 +2485,11 @@
         "runner": {
           "command": "node tools/datapack/collect-incheon-timetable.mjs",
           "arguments": [
-            "--input-dir",
-            "tools/datapack/fixtures/incheon-timetable-raw",
+            "--download",
             "--topology-snapshot",
-            "tools/datapack/sources/incheon-transit-station-info-20260724.json",
+            "<tracked-current-incheon-topology-snapshot>",
             "--output-dir",
-            "/tmp/easysubway-incheon-timetable",
-            "--captured-at",
-            "2026-07-24T08:00:00.000Z",
+            "<absolute-operation-owned-output-directory>",
             "--line",
             "2"
           ],
@@ -1801,11 +2606,9 @@
             "--wheelchair-input",
             "tools/datapack/fixtures/incheon-accessibility-raw/data-go-15146049.csv",
             "--topology-snapshot",
-            "tools/datapack/sources/incheon-transit-station-info-20260724.json",
-            "--output",
-            "/tmp/easysubway-incheon-accessibility.json",
-            "--captured-at",
-            "2026-07-24T07:00:00.000Z"
+            "tools/datapack/sources/incheon-transit-station-info-20260828.json",
+            "--observation-output",
+            "<absolute-operation-owned-observation-directory>"
           ],
           "requiredEnv": []
         },
@@ -2185,7 +2988,7 @@
             "--day8-date",
             "--day7-date",
             "--day9-date",
-            "--canonical-pack",
+            "--station-catalog-pack",
             "--completeness-output",
             "--output"
           ]
@@ -2453,20 +3256,20 @@
           "route_map_position",
           "route_map_label_polygon"
         ],
-        "stationCount": 14,
+        "stationCount": 15,
         "datasetId": "15041326",
         "datasetIds": [
           "15041326"
         ],
         "rawSha256": "2160020177352775418c863ebd9846ab5cc0df08c1da0f4b435dbf599b214187",
-        "positionsSha256": "cda5fa54ab66e79de7b6fa025c81c7276a3dbd21dbcf8d57db6a4097e3f2651a",
+        "positionsSha256": "29e4b1017adf05916ad38c7cce94dadb1658b40b4c203937cf7704680f1a9d72",
         "lineIds": [
           "line-828f04afc588"
         ],
         "lineStationCounts": {
-          "everline": 14
+          "everline": 15
         },
-        "evidenceArtifact": "tools/datapack/sources/kric-everline-route-map-positions-20260725.json",
+        "evidenceArtifact": "tools/datapack/sources/kric-everline-route-map-positions-ac71a346f351d059fb3563b0baef920d9d294015028d15be98bb36184f040aa9.json",
         "coverageAssessment": {
           "state": "SUPPORTED",
           "requirementCount": 1,
@@ -2476,7 +3279,21 @@
           "verificationTest": "tools/datapack/materialize-kric-capital-light-rail-route-map-positions.test.mjs"
         },
         "coverageLimitations": [
-          "data.go.kr FILE 15041326 용인에버라인 14역 admit(전대·에버랜드 잉여 무시)"
+          "Official route-map position data is limited to the admitted line and approved schematic geometry."
+        ],
+        "rawStationCount": 15,
+        "quarantinedCount": 0,
+        "schematicGeometrySha256": "fde0d2878949a9cce42261a783ddcfd5bfc112efa6c0670bb2e4f1be28d4d44a",
+        "topologySourceId": "capital-route-topology",
+        "topologySnapshotId": "capital-route-topology-20260904",
+        "topologyContentSha256": "a2218c9072fc89ea12ea167da767db7598dc3af7f6d93d340d9f906b48410c2d",
+        "topologyLineages": [
+          {
+            "sourceId": "capital-route-topology",
+            "snapshotId": "capital-route-topology-20260904",
+            "contentSha256": "a2218c9072fc89ea12ea167da767db7598dc3af7f6d93d340d9f906b48410c2d",
+            "lineId": "line-828f04afc588"
+          }
         ]
       },
       "nextAction": "공식 FILE 갱신 시 CSV byte hash와 admitted 좌표 snapshot을 함께 갱신한다"
@@ -2831,11 +3648,12 @@
       "priority": "P0",
       "domain": "station_line_membership",
       "displayName": "국가철도공단 운영기관·노선·역 API 코드정보",
-      "detailUrl": "https://data.kric.go.kr/rips/M_04_01/detail.do?id=395",
-      "requestUrl": "https://data.kric.go.kr/rips/download.file?answerId=395&fileId=1&id=395&type=N",
+      "detailUrl": "https://openapi.kric.go.kr/rips/M_04_02/detail.do?id=17",
+      "requestUrl": "https://openapi.kric.go.kr/rips/download.file?answerId=17&fileId=1&id=17&type=L",
       "operation": {
         "method": "GET",
-        "endpoint": "https://data.kric.go.kr/rips/download.file?answerId=395&fileId=1&id=395&type=N",
+        "endpoint": "https://openapi.kric.go.kr/rips/download.file?answerId=17&fileId=1&id=17&type=L",
+        "maxRetries": 0,
         "auth": {
           "placement": "none"
         },
@@ -2845,7 +3663,7 @@
           "id",
           "type"
         ],
-        "responseEnvelope": "XLSX ZIP workbook Sheet1",
+        "responseEnvelope": "XLSX ZIP workbook with exactly one sheet matching the six responseFields",
         "responseFields": [
           "RAIL_OPR_ISTT_CD",
           "RAIL_OPR_ISTT_NM",
@@ -2897,7 +3715,7 @@
         "liveSampleRawSha256": "ef1f8b094e32e81c7390e8566984293dcefcc85e7fadacfe4433e77ddcc61272",
         "liveSampleNote": "공식 2026-02-28 XLSX를 credential-free tracked collector로 수집하고 ZIP·workbook·6개 column·1,108 station row를 검증한 뒤 provider-line 정본으로 축약했습니다. 공개 다운로드는 확인했지만 포털 약관만으로 재배포 허용을 확정할 수 없어 code mapping 외 production admission과 mobile embedding은 금지합니다."
       },
-      "nextAction": "재배포 범위의 명시적 승인을 확보한 뒤 license evidence를 재검토하고, 공식 코드 변경 공지 시 동일 collector로 재수집해 provider-line diff를 검토한다"
+      "nextAction": "Collect the registered official attachment and review its code relationships before admission. Preserve the historical sample evidence; it does not validate the newly selected attachment. Resolve redistribution rights separately. Latest-notice discovery is not yet automated."
     },
     {
       "id": "kric-seohae-route-map-positions",
@@ -3325,7 +4143,7 @@
       "priority": "P0",
       "domain": "accessibility_facilities",
       "displayName": "국가철도공단_역사별 엘리베이터 현황",
-      "detailUrl": "https://www.data.go.kr/data/15041682/openapi.do",
+      "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=189&service=convenientInfo&operation=stationElevator",
       "requestUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator",
       "operation": {
         "method": "GET",
@@ -3378,9 +4196,9 @@
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "detailPageUrl": "https://www.data.go.kr/data/15041682/openapi.do",
+        "detailPageUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=189&service=convenientInfo&operation=stationElevator",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://apis.data.go.kr/B551181/stationElevatorInfo/getStationElevatorList",
+        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationElevator",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
           "JSON"
@@ -3452,7 +4270,7 @@
       "priority": "P0",
       "domain": "accessibility_facilities",
       "displayName": "국가철도공단_역사별 엘리베이터 이동동선",
-      "detailUrl": "https://www.data.go.kr/data/15041689/openapi.do",
+      "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=208&service=vulnerableUserInfo&operation=stationElevatorMovement",
       "requestUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationElevatorMovement",
       "operation": {
         "method": "GET",
@@ -3499,13 +4317,13 @@
       },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
-      "admissionStatus": "admitted_to_production_inventory",
+      "admissionStatus": "superseded_by_standard_operation",
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "detailPageUrl": "https://www.data.go.kr/data/15041689/openapi.do",
+        "detailPageUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=208&service=vulnerableUserInfo&operation=stationElevatorMovement",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://apis.data.go.kr/B551181/stationElevatorMovement/getStationElevatorMovementList",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationElevatorMovement",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
           "JSON"
@@ -3537,7 +4355,7 @@
         ],
         "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
-      "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
+      "nextAction": "상세 operation은 provider result 30 해소 전까지 candidate로 보존하고 production은 stationCnvFacl standard operation만 소비한다.",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -3556,22 +4374,22 @@
           "rateLimitStatus": "NOT_APPLICABLE"
         },
         "facility": {
-          "status": "SUPPORTED",
-          "productionUseAllowed": true,
-          "coverageStatus": "PROVIDER_DOCUMENTED_CAPITAL_PILOT",
-          "updateFrequency": "provider documented; production cadence admitted for capital pilot",
-          "unsupportedNotes": "production use admitted for capital pilot facility records"
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "PROVIDER_RESULT_30_20260728",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "stationCnvFacl standard operation supersedes this detailed operation for production"
         }
       },
       "productionInventoryReferenceId": "kric-station-elevator-movement",
-      "productionInventoryRelationship": "same_dataset_inventory_entry_admitted_for_capital_pack"
+      "productionInventoryRelationship": "candidate_only_standard_operation_supersedes_production_use"
     },
     {
       "id": "kric-station-escalator",
       "priority": "P0",
       "domain": "accessibility_facilities",
       "displayName": "국가철도공단_역사별 에스컬레이터 현황",
-      "detailUrl": "https://www.data.go.kr/data/15041683/openapi.do",
+      "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=190&service=convenientInfo&operation=stationEscalator",
       "requestUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationEscalator",
       "operation": {
         "method": "GET",
@@ -3623,9 +4441,9 @@
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "detailPageUrl": "https://www.data.go.kr/data/15041683/openapi.do",
+        "detailPageUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=190&service=convenientInfo&operation=stationEscalator",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://apis.data.go.kr/B551181/stationEscalatorInfo/getStationEscalatorList",
+        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationEscalator",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
           "JSON"
@@ -4067,9 +4885,40 @@
           "productionUseAllowed": false,
           "sampleEvidenceHash": "cfa233eee0dbeaf4a8db7eb5798d081c1ce7e7e5a1dfae3d7bf8222902e1f365",
           "adminReviewRecordHash": "91d0e5fca8bd8529ebb1c9c4a296b8e6550f0a2182c9a67ce5730f413ede76fe"
+        },
+        "productionUseAdmission": {
+          "artifactKind": "source-production-use-admission",
+          "issue": 834,
+          "decisionRef": "https://github.com/AquilaXk/easysubway-data/issues/834",
+          "decision": "APPROVED",
+          "approvedBy": "AquilaXk",
+          "approvedAt": "2026-09-30",
+          "scope": "SERVER_ROUTE_BUNDLE_STATION_ELEVATOR_PATH",
+          "productionUseAllowed": true,
+          "consumer": "tools/datapack/build-station-elevator-paths.mjs",
+          "evidenceManifest": "tools/datapack/release/station-elevator-path-inputs.json",
+          "rationale": "QA 결정(2026-09-30): stationMovement는 요청 파라미터 nextStinCd로 승강장 방향을 공식 지정하고, 출발 위치(stMovePath)와 도착 방향(edMovePath)을 전용 필드로 준다. 출입구→승강장 공식 이동경로를 추정 없이 (역, 노선, 다음 역, mvPathMgNo) 단위로 적재하기 위해 운영 사용으로 승격한다.",
+          "relationToExistingSources": "kric-station-elevator·kric-station-elevator-movement를 대체한다. 두 원천은 구조화된 엘리베이터 참조와 방향 필드가 없고 mvPathMgNo가 경로 종류마다 따로 매겨져 계속 materializer 차단 목록에 둔다. 역·노선 매핑은 kric-station-convenience-standard의 canonicalMappings만 쓰고, 엘리베이터 시설은 seoul-metro-facility-location(getFcElvtr)에서 만든다.",
+          "fieldMapping": {
+            "nextStinCd(request)": "station_elevator_path.next_station_id",
+            "mvPathMgNo": "station_elevator_path.path_id",
+            "exitMvTpOrdr": "station_elevator_path.step",
+            "mvContDtl": "station_elevator_path.detail",
+            "stMovePath": "station_elevator_path.exit_no (^(\\d+)번 출입구로 시작할 때만, 아니면 형식 불일치 제외)",
+            "edMovePath": "station_elevator_path.platform_direction (<X> 방면 형식일 때만, 아니면 형식 불일치 제외)"
+          },
+          "license": {
+            "usePermissionRange": "저작권표시",
+            "attribution": "출처: 국가철도공단 철도산업정보센터(KRIC) 교통약자 역사 이동경로(stationMovement)",
+            "attributionLocation": "서버 번들 accessibility 구성요소 station_elevator_path 행의 path_id(kric-mv 접두, 원천 코드 보존)와 이 admission 기록. 사용자 화면의 출처 표기 위치는 이 기록에서 정하지 않는다."
+          },
+          "quota": {
+            "selfImposedCallLimit": "NONE",
+            "collectionCadence": "번들 입력 스냅샷 수집 시 1회(역·노선·다음 역 조합마다 1회 호출)"
+          }
         }
       },
-      "nextAction": "source admin review와 inventory provenance 승격 완료(오너 승인 2026-07-13). #1701에서 coverage·품질·provider operation 승인 근거를 확인하기 전에는 productionUseAllowed=false를 유지한다",
+      "nextAction": "#834에서 서버 번들 station_elevator_path 적재 용도로 운영 사용 승격(QA 결정 2026-09-30). production inventory(source-inventory.json) 승격은 별도 결정 대상이다",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -4088,11 +4937,11 @@
           "unsupportedNotes": "candidate does not provide realtime arrival data for production live ETA"
         },
         "facility": {
-          "status": "CANDIDATE",
-          "productionUseAllowed": false,
-          "coverageStatus": "ADMISSION_EVIDENCE_REQUIRED",
-          "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "candidate facility coverage has validated live sample provenance but requires remaining admission evidence before production use"
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SERVER_ROUTE_BUNDLE_STATION_ELEVATOR_PATH",
+          "updateFrequency": "번들 입력 스냅샷 수집 시 1회",
+          "unsupportedNotes": "production use is limited to the server route bundle station elevator path tables built from committed raw-archived snapshots"
         }
       },
       "productionInventoryReferenceId": "kric-station-movement-standard",
@@ -5260,21 +6109,21 @@
           "route_map_position",
           "route_map_label_polygon"
         ],
-        "stationCount": 12,
+        "stationCount": 13,
         "datasetId": "15041324",
         "datasetIds": [
           "15041324",
           "1294"
         ],
         "rawSha256": "fe2d8d0b24d16561c8fbbafe1b2b8bf1bb67bb24ca0c200bae222f502fefe055",
-        "positionsSha256": "432088124437b63148bcacf7274472d02147f53d5e32a310c0c065f5e4cbd8ed",
+        "positionsSha256": "a3bbf767216f7074cfcdb7742807dcf43be259272b4a592f9e53b4b63a62560b",
         "lineIds": [
           "line-30886152e4f8"
         ],
         "lineStationCounts": {
-          "ui": 12
+          "ui": 13
         },
-        "evidenceArtifact": "tools/datapack/sources/kric-ui-sinseol-route-map-positions-20260725.json",
+        "evidenceArtifact": "tools/datapack/sources/kric-ui-sinseol-route-map-positions-ea86b8629935d416de0e54bd1993cedeafbc61f6e825f97d69e56abbcebf4dbf.json",
         "coverageAssessment": {
           "state": "SUPPORTED",
           "requirementCount": 1,
@@ -5284,7 +6133,21 @@
           "verificationTest": "tools/datapack/materialize-kric-capital-light-rail-route-map-positions.test.mjs"
         },
         "coverageLimitations": [
-          "data.go.kr FILE 15041324 우이신설 12역 admit(신설동 잉여 무시, 위경도 KRIC 1294 overlay)"
+          "Official route-map position data is limited to the admitted line and approved schematic geometry."
+        ],
+        "rawStationCount": 13,
+        "quarantinedCount": 0,
+        "schematicGeometrySha256": "fde0d2878949a9cce42261a783ddcfd5bfc112efa6c0670bb2e4f1be28d4d44a",
+        "topologySourceId": "capital-route-topology",
+        "topologySnapshotId": "capital-route-topology-20260904",
+        "topologyContentSha256": "a2218c9072fc89ea12ea167da767db7598dc3af7f6d93d340d9f906b48410c2d",
+        "topologyLineages": [
+          {
+            "sourceId": "capital-route-topology",
+            "snapshotId": "capital-route-topology-20260904",
+            "contentSha256": "a2218c9072fc89ea12ea167da767db7598dc3af7f6d93d340d9f906b48410c2d",
+            "lineId": "line-30886152e4f8"
+          }
         ]
       },
       "nextAction": "공식 FILE 갱신 시 CSV byte hash와 admitted 좌표 snapshot을 함께 갱신한다"
@@ -5362,7 +6225,7 @@
       "priority": "P0",
       "domain": "accessibility_facilities",
       "displayName": "국가철도공단_역사별 휠체어리프트 위치",
-      "detailUrl": "https://www.data.go.kr/data/15041686/openapi.do",
+      "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=205&service=vulnerableUserInfo&operation=stationWheelchairLiftLocation",
       "requestUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftLocation",
       "operation": {
         "method": "GET",
@@ -5416,9 +6279,9 @@
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "detailPageUrl": "https://www.data.go.kr/data/15041686/openapi.do",
+        "detailPageUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=205&service=vulnerableUserInfo&operation=stationWheelchairLiftLocation",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://apis.data.go.kr/B551181/wheelchairLiftLocation/getWheelchairLiftLocationList",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftLocation",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
           "JSON"
@@ -5478,7 +6341,7 @@
       "priority": "P0",
       "domain": "accessibility_facilities",
       "displayName": "국가철도공단_역사별 휠체어리프트 이동동선",
-      "detailUrl": "https://www.data.go.kr/data/15041690/openapi.do",
+      "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=209&service=vulnerableUserInfo&operation=stationWheelchairLiftMovement",
       "requestUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftMovement",
       "operation": {
         "method": "GET",
@@ -5525,13 +6388,13 @@
       },
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
-      "admissionStatus": "admitted_to_production_inventory",
+      "admissionStatus": "superseded_by_standard_operation",
       "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "detailPageUrl": "https://www.data.go.kr/data/15041690/openapi.do",
+        "detailPageUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=209&service=vulnerableUserInfo&operation=stationWheelchairLiftMovement",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://apis.data.go.kr/B551181/wheelchairLiftMovement/getWheelchairLiftMovementList",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationWheelchairLiftMovement",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
           "JSON"
@@ -5563,7 +6426,7 @@
         ],
         "liveSampleNote": "legacy data.go.kr endpoint의 리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 현재 KRIC LINK operation의 검증 근거로 사용하지 않는다. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
       },
-      "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
+      "nextAction": "상세 operation은 provider result 30 해소 전까지 candidate로 보존하고 production은 stationCnvFacl standard operation만 소비한다.",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -5582,15 +6445,15 @@
           "rateLimitStatus": "NOT_APPLICABLE"
         },
         "facility": {
-          "status": "SUPPORTED",
-          "productionUseAllowed": true,
-          "coverageStatus": "PROVIDER_DOCUMENTED_CAPITAL_PILOT",
-          "updateFrequency": "provider documented; production cadence admitted for capital pilot",
-          "unsupportedNotes": "production use admitted for capital pilot facility records"
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "PROVIDER_RESULT_30_20260728",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "stationCnvFacl standard operation supersedes this detailed operation for production"
         }
       },
       "productionInventoryReferenceId": "kric-wheelchair-lift-movement",
-      "productionInventoryRelationship": "same_dataset_inventory_entry_admitted_for_capital_pack"
+      "productionInventoryRelationship": "candidate_only_standard_operation_supersedes_production_use"
     },
     {
       "id": "molit-tago-subway-info",
@@ -5749,19 +6612,19 @@
       "domain": "station_line_membership",
       "displayName": "국토교통부_도시철도 전체노선",
       "detailUrl": "https://www.data.go.kr/data/15122916/fileData.do",
-      "requestUrl": "https://api.odcloud.kr/api/15122916/v1/uddi:urban-rail-full-route",
+      "requestUrl": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003561913&fileDetailSn=1&insertDataPrcus=N",
       "licenseEvidenceStatus": "confirmed_attribution",
       "sampleEvidenceStatus": "validated_live_sample",
       "admissionStatus": "admitted_to_production_inventory",
-      "serviceKeyHandling": "offline_import_secret_only",
+      "serviceKeyHandling": "not_required",
       "mobileEmbeddingAllowed": false,
       "evidence": {
         "detailPageUrl": "https://www.data.go.kr/data/15122916/fileData.do",
         "retrievedAt": "2026-06-22",
-        "endpoint": "https://api.odcloud.kr/api/15122916/v1/uddi:urban-rail-full-route",
+        "endpoint": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000003561913&fileDetailSn=1&insertDataPrcus=N",
         "usePermissionRange": "이용허락범위 제한 없음",
         "formats": [
-          "JSON"
+          "CSV"
         ],
         "outputFields": [
           "line_name",
@@ -6055,9 +6918,39 @@
           "sampleResponse",
           "credentialFreeSnapshotHash",
           "adminAdmissionEvidence"
-        ]
+        ],
+        "productionUseAdmission": {
+          "artifactKind": "source-production-use-admission",
+          "issue": 834,
+          "decisionRef": "https://github.com/AquilaXk/easysubway-data/issues/834",
+          "decision": "APPROVED",
+          "approvedBy": "AquilaXk",
+          "approvedAt": "2026-09-30",
+          "scope": "SERVER_ROUTE_BUNDLE_STATION_ELEVATOR_PATH",
+          "productionUseAllowed": true,
+          "consumer": "tools/datapack/build-station-elevator-paths.mjs",
+          "evidenceManifest": "tools/datapack/release/station-elevator-path-inputs.json",
+          "rationale": "QA 결정(2026-09-30): getFcElvtr는 엘리베이터 한 대마다 역코드(stnCd)·노선(lineNm)·위치 표현(dtlPstn)을 주고, 같은 원천이 가동 상태(#419)의 키가 된다. smrt-elev:<stnCd>:<노선코드>:<위치 정규화> 시설 id로 엘리베이터 한 대 단위 시설 행을 만들기 위해 운영 사용으로 승격한다. 가동 상태는 번들에 굽지 않고 UNKNOWN으로 둔다.",
+          "relationToExistingSources": "seoul-metro-accessibility(getWksnElvtr)는 역 단위 상태 증거로만 쓰이고 역코드가 없다. getFcElvtr의 stnCd는 kric-station-convenience-standard canonicalMappings의 S1 stinCd를 4자리 0 채움한 값과 정확히 일치할 때만 canonical 역·노선에 붙이고, 이름 조인은 하지 않는다. 위치 표현이 'N번 출입구'·'X 방면N-M' 문법 밖이거나 같은 id가 2개 이상이면 식별 불가로 제외한다.",
+          "fieldMapping": {
+            "stnCd": "facilities.id (smrt-elev 두 번째 구간) 및 canonical 역 매핑 키",
+            "lineNm": "facilities.id (N호선 → 노선코드 N) 및 canonical 노선 매핑 키",
+            "dtlPstn": "facilities.id (위치 정규화)·facilities.description, 출입구 번호 집합 또는 방면·칸 위치로 파싱",
+            "stnNm": "facilities.name 표시 문구",
+            "oprtngSitu": "번들에 굽지 않음(가동 상태는 #419 운영 상태 테이블)"
+          },
+          "license": {
+            "usePermissionRange": "이용허락범위 제한 없음",
+            "attribution": "출처: 서울교통공사 편의시설위치정보(getFcElvtr)",
+            "attributionLocation": "서버 번들 accessibility 구성요소 facilities 행의 source_id·source_snapshot_id와 이 admission 기록. 사용자 화면의 출처 표기 위치는 이 기록에서 정하지 않는다."
+          },
+          "quota": {
+            "selfImposedCallLimit": "NONE",
+            "collectionCadence": "번들 입력 스냅샷 수집 시 1회(전체 목록 페이지 호출)"
+          }
+        }
       },
-      "nextAction": "collect credential-free facility location evidence and require admin admission evidence before production inventory admission",
+      "nextAction": "#834에서 서버 번들 smrt-elev 엘리베이터 시설 행 적재 용도로 운영 사용 승격(QA 결정 2026-09-30). production inventory(source-inventory.json) 승격은 별도 결정 대상이다",
       "capabilities": {
         "schedule": {
           "status": "UNSUPPORTED",
@@ -6076,11 +6969,11 @@
           "unsupportedNotes": "candidate does not provide realtime arrival data for production live ETA"
         },
         "facility": {
-          "status": "CANDIDATE",
-          "productionUseAllowed": false,
-          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
-          "updateFrequency": "provider realtime; production cadence not admitted",
-          "unsupportedNotes": "candidate requires credential-free snapshot hashes and admin admission evidence before production use"
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SERVER_ROUTE_BUNDLE_STATION_ELEVATOR_PATH",
+          "updateFrequency": "번들 입력 스냅샷 수집 시 1회",
+          "unsupportedNotes": "production use is limited to the server route bundle station elevator path tables built from committed raw-archived snapshots"
         }
       }
     },
@@ -6463,16 +7356,37 @@
       },
       "displayName": "서울교통공사_1_8호선 역사 좌표(위경도) 정보",
       "detailUrl": "https://www.data.go.kr/data/15099316/fileData.do",
-      "requestUrl": "https://www.data.go.kr/data/15099316/fileData.do",
+      "requestUrl": "https://api.odcloud.kr/api/15099316/v1/uddi:bc51de47-d3ea-4aa1-8ac2-d70f2b5e701e",
+      "operation": {
+        "method": "GET",
+        "endpoint": "https://api.odcloud.kr/api/15099316/v1/uddi:bc51de47-d3ea-4aa1-8ac2-d70f2b5e701e",
+        "auth": {
+          "env": "DATA_GO_KR_SERVICE_KEY",
+          "placement": "query",
+          "parameter": "serviceKey",
+          "valueEncoding": "url-search-params-once",
+          "loadPolicy": "process-env-no-shell-parsing"
+        },
+        "requiredParameters": ["serviceKey", "page", "perPage"],
+        "fixedParameters": { "returnType": "JSON" },
+        "responseEnvelope": "data + currentCount + matchCount + page + perPage + totalCount",
+        "responseFields": ["연번", "호선", "고유역번호(외부역코드)", "역명", "위도", "경도", "작성기준일", "작성일자"],
+        "runner": {
+          "command": "node tools/datapack/run-public-static-network-v2-operation.mjs",
+          "requiredEnv": ["DATA_GO_KR_SERVICE_KEY", "EASYSUBWAY_OBJECT_STORAGE_PREAUTH_BASE_URL"],
+          "arguments": ["<absolute-operation-root>"]
+        },
+        "secretPolicy": "env-only-redacted-output"
+      },
       "licenseEvidenceStatus": "confirmed_unrestricted_public_data_free_use",
       "sampleEvidenceStatus": "validated_official_full_snapshot",
       "admissionStatus": "production_route_map_positions_materialized",
       "productionInventoryReferenceId": "seoul-metro-route-map-positions",
-      "serviceKeyHandling": "not_required",
+      "serviceKeyHandling": "offline_collector_secret_only",
       "mobileEmbeddingAllowed": true,
       "evidence": {
         "retrievedAt": "2026-07-24",
-        "endpoint": "https://www.data.go.kr/data/15099316/fileData.do",
+        "endpoint": "https://api.odcloud.kr/api/15099316/v1/uddi:bc51de47-d3ea-4aa1-8ac2-d70f2b5e701e",
         "licenseEvidenceUrl": "https://www.data.go.kr/data/15099316/fileData.do",
         "usePermissionRange": "공공데이터포털 이용허락범위 제한 없음",
         "formats": [
@@ -6480,34 +7394,16 @@
           "JSON"
         ],
         "outputFields": [
-          "route_map_position",
-          "route_map_label_polygon"
+          "연번",
+          "호선",
+          "고유역번호(외부역코드)",
+          "역명",
+          "위도",
+          "경도",
+          "작성기준일",
+          "작성일자"
         ],
-        "stationCount": 274,
         "datasetId": "15099316",
-        "rawSha256": "713d6a7353748f1f29b974cd70df9b7a24b3600b6aeb60a58ed7bfa6975e02ed",
-        "positionsSha256": "fb04a674e9e1ccf7491e1a20ac87cb79604edbbe31517d712fc290f919ee6398",
-        "lineIds": [
-          "line-472a81add377",
-          "seoul-2",
-          "line-41a8c75ec9d8",
-          "seoul-4",
-          "line-80fc4d5350d4",
-          "line-3f41718e0833",
-          "line-15b3b8a93259",
-          "line-2b2d9eaa53d0"
-        ],
-        "lineStationCounts": {
-          "1": 10,
-          "2": 51,
-          "3": 34,
-          "4": 26,
-          "5": 54,
-          "6": 39,
-          "7": 42,
-          "8": 18
-        },
-        "evidenceArtifact": "tools/datapack/sources/seoul-metro-route-map-positions-20260724.json",
         "coverageAssessment": {
           "state": "SUPPORTED",
           "requirementCount": 8,
@@ -6517,12 +7413,11 @@
           "verificationTest": "tools/datapack/materialize-seoul-route-map-positions.test.mjs"
         },
         "coverageLimitations": [
-          "서울교통공사 1~8호선 공식 FILE 원본 276행 중 마곡·발산 동일 위경도 2건은 OFFICIAL_DUPLICATE_LATLON으로 quarantine하고 274개만 admission한다(9호선·다른 운영사 구간 제외)",
-          "공식 FILE 위경도를 offline materializer에서 canvas 정수 좌표로 투영하며 runtime 네트워크 호출은 하지 않는다",
-          "기존 seoulmetro-cyberstation-route-map capital pilot 행은 유지하고 동일 station/line/region PK(사당·seoul-4)는 FILE 행을 건너뛴다"
+          "공식 raw 위경도는 보존하고, 노선도 canvas 좌표·label·track은 versioned deterministic layout에서 별도 산출한다",
+          "runtime 네트워크 호출은 하지 않는다"
         ]
       },
-      "nextAction": "공식 FILE 갱신 시 CSV byte hash와 admitted 좌표 snapshot·quarantine을 함께 갱신한다"
+      "nextAction": "공식 API 관측과 결정론적 layout 입력·출력 hash를 함께 갱신한다"
     },
     {
       "id": "seoul-metro-transfer-distance-duration",
@@ -6883,75 +7778,6 @@
       }
     },
     {
-      "id": "seoulmetro-cyberstation-route-map",
-      "apiCatalog": false,
-      "priority": "P1",
-      "domain": "route_map_positions",
-      "displayName": "서울교통공사 사이버스테이션 노선도",
-      "detailUrl": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
-      "requestUrl": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
-      "licenseEvidenceStatus": "confirmed_attribution",
-      "sampleEvidenceStatus": "validated_live_sample",
-      "admissionStatus": "admitted_to_production_inventory",
-      "serviceKeyHandling": "offline_import_secret_only",
-      "mobileEmbeddingAllowed": false,
-      "evidence": {
-        "detailPageUrl": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
-        "retrievedAt": "2026-06-28",
-        "endpoint": "https://www.seoulmetro.co.kr/kr/cyberStation.do",
-        "usePermissionRange": "공공누리 1유형",
-        "formats": [
-          "JSON"
-        ],
-        "outputFields": [
-          "line",
-          "route_map_label_polygon",
-          "route_map_position",
-          "station_name"
-        ],
-        "liveSampleRetrievedAt": "2026-07-12T00:00:00Z",
-        "liveSampleRowCount": 5,
-        "liveSampleRawSha256": "738a8bc8523a1ff408a78ea5777577b9daa8cc556a8522d864e99953ab650608",
-        "liveSampleSchemaFingerprint": "3ef53470a34e1d44db931b0bc2b7ac333fb2640f3e297902c4ee554688ef9052",
-        "liveSampleEvidenceHash": "0a495c65c45d834fcba9b287d48016aa1483f7ee23720de6aacf45d9f9960776",
-        "liveSampleFields": [
-          "line",
-          "route_map_label_polygon",
-          "route_map_position",
-          "station_name"
-        ],
-        "liveSampleNote": "리포 내장 raw(공식 source)에서 산출한 sanitized sample evidence 해시. 원본은 .codex/evidence 로컬 전용, 커밋하지 않음 — 해시로 재현 검증."
-      },
-      "nextAction": "capital 팩 production inventory 소비 대상으로 유지한다.",
-      "capabilities": {
-        "schedule": {
-          "status": "UNSUPPORTED",
-          "productionUseAllowed": false,
-          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
-          "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "candidate does not provide schedule data for production"
-        },
-        "realtime": {
-          "status": "UNSUPPORTED",
-          "productionUseAllowed": false,
-          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
-          "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "candidate does not provide realtime data for production",
-          "liveEtaEligible": false,
-          "rateLimitStatus": "NOT_APPLICABLE"
-        },
-        "facility": {
-          "status": "UNSUPPORTED",
-          "productionUseAllowed": false,
-          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
-          "updateFrequency": "provider documented; production cadence not admitted",
-          "unsupportedNotes": "candidate does not provide accessibility facility data for production"
-        }
-      },
-      "productionInventoryReferenceId": "seoulmetro-cyberstation-route-map",
-      "productionInventoryRelationship": "same_dataset_inventory_entry_admitted_for_capital_pack"
-    },
-    {
       "id": "seoulmetro-station-line-info",
       "priority": "P0",
       "domain": "station_line_membership",
@@ -7007,12 +7833,24 @@
       "mobileEmbeddingAllowed": false,
       "evidence": {
         "detailPageUrl": "https://data.seoul.go.kr/dataList/OA-15442/S/1/datasetView.do",
+        "retainedReader": "tools/datapack/collect-seoul-station-line-info.mjs#collectSeoulStationLineInfo",
+        "collectionContract": {
+          "mode": "OWNER_DOWNLOADED_OFFICIAL_SHEET_CSV",
+          "runner": "node tools/datapack/collect-seoul-station-line-info.mjs",
+          "arguments": ["--input", "[absolute-csv-path]", "--output", "[new-absolute-snapshot-path]", "--captured-at", "[actual-download-instant]"],
+          "encoding": "EUC-KR",
+          "requiredFields": ["STATION_CD", "STATION_NM", "LINE_NUM", "FR_CODE"],
+          "rawBytesPreserved": true,
+          "providerCalls": 0,
+          "receiptIsAdmission": false
+        },
         "retrievedAt": "2026-06-21",
         "endpoint": "http://openapi.seoul.go.kr:8088/{serviceKey}/json/SearchSTNBySubwayLineInfo",
-        "sampleUrl": "http://openapi.seoul.go.kr:8088/[서비스키값]/json/SearchSTNBySubwayLineInfo/1/5///4호선",
+        "sampleUrl": "http://openapi.seoul.go.kr:8088/[서비스키값]/json/SearchSTNBySubwayLineInfo/1/5/%20/%20/4호선",
         "usePermissionRange": "공공누리 1유형",
         "formats": [
-          "JSON"
+          "JSON",
+          "CSV"
         ],
         "outputFields": [
           "line",
@@ -7290,6 +8128,116 @@
       }
     },
     {
+      "id": "capital-route-topology",
+      "priority": "P0",
+      "domain": "route_graph_topology",
+      "coverageScope": {
+        "regionIds": ["capital"],
+        "operatorIds": ["capital-urban-rail-operators"]
+      },
+      "displayName": "수도권 도시철도 노선별 역간거리 FILE source set",
+      "registrationMetadata": {
+        "inventory": {
+          "owner": "국가철도공단·국토교통부",
+          "provider": "data.go.kr official FILE",
+          "providerDepartment": "복수 공식 제공부서",
+          "sourceSystem": "공공데이터포털",
+          "datasetUrl": "https://www.data.go.kr/",
+          "datasetKind": "official-file-source-set",
+          "coverage": "24 ordered Capital topology source definitions",
+          "licenseName": "공공누리 제1유형",
+          "licenseTermsUrl": "https://www.kogl.or.kr/info/faqList.do?dataGroup=2&mstIdx=KOGL_005",
+          "commercialUseAllowed": true,
+          "derivativeWorkAllowed": true,
+          "redistributionAllowed": true,
+          "capabilities": {
+            "schedule": {
+              "status": "UNSUPPORTED",
+              "productionUseAllowed": false,
+              "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+              "updateFrequency": "P1D",
+              "unsupportedNotes": "source does not provide scheduled timetable data"
+            },
+            "realtime": {
+              "status": "UNSUPPORTED",
+              "productionUseAllowed": false,
+              "liveEtaEligible": false,
+              "rateLimitStatus": "NOT_APPLICABLE",
+              "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+              "updateFrequency": "P1D",
+              "unsupportedNotes": "source provides static route topology, not realtime arrivals"
+            },
+            "facility": {
+              "status": "UNSUPPORTED",
+              "productionUseAllowed": false,
+              "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+              "updateFrequency": "P1D",
+              "unsupportedNotes": "source does not provide accessibility facility records"
+            }
+          }
+        },
+        "governance": {
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "8af4d3c1d50cfa78ba2be42b46ffcfeba5366f91e07592dae863b9a76e98bd54",
+            "reviewedAt": "2026-09-03T14:01:45Z",
+            "nextReviewAt": "2027-09-03T14:01:45Z",
+            "termsUrl": "https://www.kogl.or.kr/info/faqList.do?dataGroup=2&mstIdx=KOGL_005",
+            "reviewedProvider": "data.go.kr official FILE",
+            "reviewedDatasetUrl": "https://www.data.go.kr/",
+            "redistributionScopes": ["DERIVED_DATAPACK"],
+            "approvedByRole": "datapack-release-approver"
+          }
+        },
+        "freshness": {
+          "examples": ["official capital route graph topology"],
+          "basisField": "retrievedAt",
+          "reverificationCadence": "P1D",
+          "offlinePackEligible": true,
+          "eventTriggers": ["official source revision", "line extension opening"],
+          "changePublishSla": "P3D",
+          "freshnessMetric": "routeTopologyFreshnessRatio"
+        }
+      },
+      "operation": {
+        "kind": "AGGREGATE_SOURCE_SET",
+        "method": "GET",
+        "auth": { "placement": "none" },
+        "retryPolicy": { "maxRetries": 0 },
+        "requestTimeoutMs": 30000,
+        "responseEnvelope": "capital-route-topology-snapshot",
+        "runner": {
+          "command": "node tools/datapack/collect-capital-route-topology.mjs",
+          "arguments": ["--download", "--output", "[absent-task-owned-absolute-file.json]"],
+          "requiredEnv": []
+        },
+        "sourceDefinition": {
+          "module": "tools/datapack/collect-capital-route-topology.mjs",
+          "exportName": "LINE_SOURCES",
+          "sourceCount": 24,
+          "datasetCount": 23,
+          "excludedFields": ["localCsv", "localMolitCsv", "note"],
+          "sourceSetSha256": "15c9bc1573f1b6e35b478472c29b9b404b2cf2d60a68cf7fff4187a2f6e08534"
+        },
+        "secretPolicy": "credential-free-output"
+      },
+      "licenseEvidenceStatus": "confirmed_attribution",
+      "sampleEvidenceStatus": "operation_contract_recorded",
+      "admissionStatus": "preflight_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "formats": ["CSV", "XLSX"],
+        "coverage": "24 ordered Capital topology source definitions",
+        "provider": "data.go.kr official FILE"
+      }
+    },
+    {
       "id": "molit-railway-transfer-movement",
       "apiCatalog": true,
       "priority": "P0",
@@ -7302,237 +8250,429 @@
       },
       "displayName": "국토교통부_철도역 환승 이동경로 정보",
       "detailUrl": "https://www.data.go.kr/data/15130556/fileData.do",
-      "requestUrl": "https://www.data.go.kr/data/15130556/fileData.do",
+      "requestUrl": "https://api.odcloud.kr/api/15130556/v1/uddi:93021737-5337-442c-9006-b9748f87d0a4",
       "operation": {
         "method": "GET",
-        "endpoint": "https://www.data.go.kr/data/15130556/fileData.do",
-        "auth": { "placement": "none" },
-        "requiredParameters": [],
+        "endpoint": "https://api.odcloud.kr/api/15130556/v1/uddi:93021737-5337-442c-9006-b9748f87d0a4",
+        "auth": {
+          "env": "DATA_GO_KR_SERVICE_KEY",
+          "placement": "query",
+          "parameter": "serviceKey",
+          "valueEncoding": "url-search-params-once",
+          "loadPolicy": "process-env-no-shell-parsing"
+        },
+        "requiredParameters": ["serviceKey", "page", "perPage", "returnType"],
         "fixedParameters": {},
         "optionalParameters": [],
-        "responseEnvelope": "GET inspects official detail page; portal visible Download supplies CP949 CSV, then offline collector consumes explicit local input",
-        "responseFields": ["RAIL_OPR_ISTT_CD", "LN_NM", "STIN_NM", "CHTN_MV_TP_ORDR", "MV_CONT_DTL", "CHTN_MV_CONT"],
+        "responseEnvelope": "{currentCount,data[],matchCount,page,perPage,totalCount}",
+        "responseFields": ["철도운영기관코드", "선명", "역명", "환승이동순서", "이동내용상세", "환승이동내용"],
         "runner": {
-          "command": "node tools/datapack/collect-molit-railway-transfer-movement.mjs",
-          "arguments": ["--input", "[downloaded-cp949-csv]", "--output", "[absolute-output-directory]/molit-railway-transfer-movement-20250811.csv.gz", "--captured-at", "[ISO-8601-capture-instant]"],
-          "requiredEnv": []
+          "command": "node tools/datapack/revalidate-current-molit-transfer-source.mjs",
+          "arguments": ["--observed-at", "[ISO-8601-observation-instant]", "--output", "[absent-absolute-path]"],
+          "requiredEnv": ["DATA_GO_KR_SERVICE_KEY"]
         },
-        "secretPolicy": "credential-free-output"
+        "secretPolicy": "env-only-redacted-output"
       },
       "licenseEvidenceStatus": "confirmed_free_use",
       "sampleEvidenceStatus": "official_file_admitted",
       "admissionStatus": "official_snapshot_admitted",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "retrievedAt": "2026-07-29",
+        "retrievedAt": "2026-08-14",
+        "detailPageUrl": "https://www.data.go.kr/data/15130556/fileData.do",
+        "endpoint": "https://api.odcloud.kr/api/15130556/v1/uddi:93021737-5337-442c-9006-b9748f87d0a4",
+        "sampleUrl": "https://api.odcloud.kr/api/15130556/v1/uddi:93021737-5337-442c-9006-b9748f87d0a4?serviceKey=[서비스키값]&page=1&perPage=1000&returnType=JSON",
+        "formats": ["CSV", "JSON", "XML"],
         "searchTerms": ["철도역", "환승 이동경로"],
-        "outputFields": ["RAIL_OPR_ISTT_CD", "LN_NM", "STIN_NM", "CHTN_MV_TP_ORDR", "MV_CONT_DTL", "CHTN_MV_CONT"],
-        "licenseText": "이용허락범위 제한 없음"
+        "outputFields": ["철도운영기관코드", "선명", "역명", "환승이동순서", "이동내용상세", "환승이동내용"],
+        "licenseText": "이용허락범위 제한 없음",
+        "currentDatasetVersion": "20250811",
+        "currentRowCount": 8054,
+        "currentOperationVerifiedAt": "2026-08-14"
       },
       "rawSnapshotAdmission": { "snapshotId": "molit-railway-transfer-movement-20250811", "metadataPath": "tools/datapack/sources/molit-railway-transfer-movement-20250811.csv.gz.json", "metadataFileSha256": "f75e3ec2a2270cdd8d3b2303f12db0167cf0b5f5525115f6c980680468faa284", "rawSha256": "3a45dc1d82f81666c48eeef81fdc35b0e4a0c59312e4b26907f644c45b518ce3", "gzipSha256": "94e712d32860a7a6e4b4c1f1d9651dc25823305f537e50370142009c1ca66d28", "rowCount": 8054, "status": "LOCKED" }
     },
     {
-      "id": "daegu-line1-train-timetable",
-      "apiCatalog": true,
-      "priority": "P0",
-      "domain": "schedule_timetable",
-      "coverageScope": {
-        "regionIds": [
-          "daegu"
-        ],
-        "operatorIds": [
-          "daegu-transportation"
-        ],
-        "lineIds": [
-          "line-5b8d9b05e7e6"
-        ]
-      },
-      "displayName": "대구교통공사_1호선_열차시각표",
-      "detailUrl": "https://www.data.go.kr/data/15138731/fileData.do",
-      "requestUrl": "https://www.data.go.kr/data/15138731/fileData.do",
+      "id": "seoul-metro-congestion-statistics",
+      "priority": "P1",
+      "domain": "station_congestion_statistics",
+      "displayName": "서울교통공사 지하철혼잡도정보",
+      "detailUrl": "https://www.data.go.kr/data/15071311/fileData.do",
+      "requestUrl": "https://api.odcloud.kr/api/15071311/v1/uddi:ec6e85c3-f01a-415d-8705-e20650f1be84",
       "operation": {
         "method": "GET",
-        "endpoint": "https://www.data.go.kr/data/15138731/fileData.do",
+        "endpoint": "https://api.odcloud.kr/api/15071311/v1/uddi:ec6e85c3-f01a-415d-8705-e20650f1be84",
         "auth": {
-          "placement": "none"
+          "env": "DATA_GO_KR_SERVICE_KEY",
+          "placement": "header",
+          "parameter": "Authorization"
         },
-        "requiredParameters": [],
-        "fixedParameters": {},
-        "responseEnvelope": "official CSV file data 15138731",
-        "responseFields": [
-          "역명",
-          "방향",
-          "평일",
-          "토요일",
-          "휴일",
-          "출발시간"
+        "requiredParameters": [
+          "Authorization",
+          "page",
+          "perPage",
+          "returnType"
         ],
+        "responseEnvelope": "data[].{구분,상하구분,역번호,역명,호선,시간대}",
         "runner": {
-          "command": "node tools/datapack/collect-daegu-timetable.mjs",
-          "arguments": [
-            "--line",
-            "1"
-          ],
-          "requiredEnv": []
+          "command": "node tools/datapack/collect-seoul-metro-congestion.mjs",
+          "arguments": [],
+          "requiredEnv": [
+            "DATA_GO_KR_SERVICE_KEY"
+          ]
         },
-        "secretPolicy": "credential-free-output"
+        "secretPolicy": "env-only-redacted-output"
       },
       "licenseEvidenceStatus": "confirmed_free_use",
-      "sampleEvidenceStatus": "official_file_admitted",
-      "admissionStatus": "official_snapshot_admitted",
+      "sampleEvidenceStatus": "collector_sample_verified",
+      "admissionStatus": "evidence_recorded_admin_review_required",
+      "serviceKeyHandling": "offline_search_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "retrievedAt": "2026-09-24",
-        "searchTerms": [
-          "대구교통공사",
-          "1호선",
-          "열차시각표"
+        "retrievedAt": "2026-09-30",
+        "endpoint": "https://api.odcloud.kr/api/15071311/v1/uddi:ec6e85c3-f01a-415d-8705-e20650f1be84",
+        "provider": "서울교통공사",
+        "datasetId": "15071311",
+        "datasetPageUrl": "https://www.data.go.kr/data/15071311/fileData.do",
+        "versionListUrl": "https://infuser.odcloud.kr/oas/docs?namespace=15071311/v1",
+        "formats": [
+          "JSON"
         ],
+        "versionResolution": "분기마다 새 uddi 경로가 추가된다. 수집 시 versionListUrl의 OAS 문서에서 '서울교통공사_지하철혼잡도정보_YYYYMMDD' 제목 중 날짜가 가장 큰 항목의 /15071311/v1/uddi:<id> 경로를 고른다. 2026-09-30 확인한 최신은 서울교통공사_지하철혼잡도정보_20260630 = uddi:ec6e85c3-f01a-415d-8705-e20650f1be84.",
+        "observedDatasetVersion": "20260630",
+        "observedUddi": "uddi:ec6e85c3-f01a-415d-8705-e20650f1be84",
+        "observedTotalCount": 1671,
+        "observedStationCount": 282,
+        "usePermissionRange": "이용허락범위 제한 없음",
+        "attribution": "서울교통공사 (공공데이터포털)",
+        "snapshotFile": "tools/datapack/sources/seoul-metro-congestion-20260930T020244Z.json",
+        "rawArchiveFile": "tools/datapack/sources/seoul-metro-congestion-20260930T020244Z.raw.json",
+        "rawSha256": "b6eaf75023a74f02b828638d39f3ec60729730e55478851590b9672ddb0aed34",
+        "contentSha256": "3afc688b7f2d61351dee5cea211e83fb7b0f1d72f92716a5a3418f6e36f0fab1",
+        "snapshotSha256": "bc01657e571b3f7dd2cf6c9f46907a50ca5cc23fe12297ed73f557139361a4e5",
+        "definition": "혼잡도는 열차 정원 대비 실제 승차 인원의 비율(단위: %)로 정의되며, 정원 기준으로 좌석만 모두 찼을 경우 혼잡도를 34%로 산정합니다.",
+        "admissionReason": "서울교통공사 공식 지하철혼잡도정보 원천으로, 이용허락범위 제한 없음 확인, 최신 OAS 기반 uddi 수집, 원문 응답 보관본과 rawSha256 대조, 승인된 역번호 membership 결속까지 검증했다.",
+        "membershipVerification": {
+          "verifiedAt": "2026-09-30",
+          "artifact": "tools/datapack/sources/seoul-station-code-membership-20260909T041501Z.json",
+          "liveEndpoint": "http://openapi.seoul.go.kr:8088/{serviceKey}/json/SearchSTNBySubwayLineInfo",
+          "csvRowCount": 799,
+          "liveRowCount": 799,
+          "result": "서울 열린데이터광장 OA-15442 시트 CSV로 만든 membership 원천 행 799건을 같은 날 공식 Open API SearchSTNBySubwayLineInfo 응답 799건과 대조했고, 역명 1건(CSV '4?19민주묘지' 인코딩 손실, 공식 '4·19민주묘지')을 제외하고 모두 일치했다. 역명은 조인에 쓰지 않는다.",
+          "nameMismatch": {
+            "csv": "4?19민주묘지",
+            "official": "4·19민주묘지",
+            "usedForJoin": false
+          },
+          "unmappedCodes": "혼잡도 원천 역번호 중 승인된 membership에 없는 코드 5개(지선 분기 코드)와 2호선 까치산(혼잡도 260, 공식 STATION_CD 0200)은 미매핑으로 격리하고 적재하지 않는다."
+        },
+        "productionUseAdmission": {
+          "artifactKind": "source-production-use-admission",
+          "issue": 840,
+          "decisionRef": "https://github.com/AquilaXk/easysubway-data/pull/842",
+          "decision": "APPROVED",
+          "approvedBy": "AquilaXk",
+          "approvedAt": "2026-09-30",
+          "scope": "SERVER_ROUTE_BUNDLE_STATION_CONGESTION",
+          "productionUseAllowed": true,
+          "consumer": "tools/datapack/build-datapack.mjs#loadSeoulMetroCongestionForBuild",
+          "snapshotFile": "tools/datapack/sources/seoul-metro-congestion-20260930T020244Z.json",
+          "rawArchiveFile": "tools/datapack/sources/seoul-metro-congestion-20260930T020244Z.raw.json",
+          "rawSha256": "b6eaf75023a74f02b828638d39f3ec60729730e55478851590b9672ddb0aed34",
+          "contentSha256": "3afc688b7f2d61351dee5cea211e83fb7b0f1d72f92716a5a3418f6e36f0fab1",
+          "rationale": "QA 승인(2026-09-30): 서울교통공사 지하철혼잡도정보(data.go.kr 15071311, 이용허락범위 제한 없음)를 서버 번들 station_congestion_stats·station_congestion_sources 적재 용도로 운영 사용 승격한다. 위 스냅샷과 원문 보관본의 해시가 이 기록과 다르면 빌드는 실패한다.",
+          "relationToExistingSources": "역 결속은 seoulmetro-station-line-info로 만든 승인된 역번호 membership만 사용하고 이름 조인은 하지 않는다. 팩에 없는 역과 membership에 없는 코드는 적재하지 않고 미매핑으로 남긴다.",
+          "fieldMapping": {
+            "역번호": "승인된 membership으로 canonical station_id·line_id 결속",
+            "구분": "day_type (평일 WEEKDAY·토요일 SATURDAY·일요일 SUNDAY)",
+            "상하구분": "direction (상선·내선 UP, 하선·외선 DOWN)",
+            "시간대 39개 열": "slot_start_minute·congestion_permille (퍼센트 값을 천분율로 변환)"
+          },
+          "license": {
+            "usePermissionRange": "이용허락범위 제한 없음",
+            "attribution": "서울교통공사 (공공데이터포털)",
+            "attributionLocation": "서버 번들 station_congestion_sources.attribution과 이 admission 기록. 사용자 화면의 출처 표기 위치는 이 기록에서 정하지 않는다."
+          },
+          "quota": {
+            "selfImposedCallLimit": "NONE",
+            "collectionCadence": "분기마다 새 uddi 경로가 추가될 때 1회(전량 한 번 호출)"
+          }
+        },
         "outputFields": [
+          "구분",
+          "상하구분",
+          "역번호",
           "역명",
-          "방향",
-          "평일",
-          "토요일",
-          "휴일",
-          "출발시간"
+          "호선",
+          "5시30분",
+          "6시00분",
+          "6시30분",
+          "7시00분",
+          "7시30분",
+          "8시00분",
+          "8시30분",
+          "9시00분",
+          "9시30분",
+          "10시00분",
+          "10시30분",
+          "11시00분",
+          "11시30분",
+          "12시00분",
+          "12시30분",
+          "13시00분",
+          "13시30분",
+          "14시00분",
+          "14시30분",
+          "15시00분",
+          "15시30분",
+          "16시00분",
+          "16시30분",
+          "17시00분",
+          "17시30분",
+          "18시00분",
+          "18시30분",
+          "19시00분",
+          "19시30분",
+          "20시00분",
+          "20시30분",
+          "21시00분",
+          "21시30분",
+          "22시00분",
+          "22시30분",
+          "23시00분",
+          "23시30분",
+          "00시00분",
+          "00시30분"
         ],
-        "licenseText": "이용허락범위 제한 없음"
+        "fieldValueNotes": {
+          "구분": "평일·토요일·일요일 각 557행",
+          "상하구분": "상선 663·하선 684·내선 162·외선 162",
+          "호선": "1호선~8호선",
+          "시간대": "30분 간격 39개 열, 값은 소수 문자열(예: \"39.50\")",
+          "emptyValueRows": 0
+        },
+        "liveSampleNote": "2026-09-30 DATA_GO_KR_SERVICE_KEY로 최신 uddi를 perPage=2000 한 번에 전량 수집해 totalCount=1671, 44개 필드(메타데이터 5 + 시간대 39)를 실측했고, 원문 응답 본문(rawSha256 b6eaf750…0aed34)을 스냅샷 옆에 그대로 보관해 해시를 대조했다. 재수집 결과 rawSha256·contentSha256이 첫 수집과 동일했다.",
+        "missingEvidence": [
+          "licenseTermsPageCapture",
+          "adminAdmissionEvidence",
+          "rawObjectUri"
+        ]
+      },
+      "nextAction": "서버 번들 station_congestion 적재 용도로 운영 사용 승격(QA 승인 2026-09-30). production inventory(source-inventory.json) 승격은 raw object 보관·ledger 해시 기록이 필요한 별도 결정 대상이다",
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "candidate does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "candidate does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "candidate provides station congestion statistics, not facility location data"
+        },
+        "congestion": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SERVER_ROUTE_BUNDLE_STATION_CONGESTION",
+          "updateFrequency": "quarterly",
+          "notes": "official Seoul Metro 30-minute interval statistical congestion; production use is limited to the server route bundle station congestion tables built from the committed raw-archived snapshot"
+        }
+
       }
     },
     {
-      "id": "daegu-line2-train-timetable",
-      "apiCatalog": true,
-      "priority": "P0",
-      "domain": "schedule_timetable",
-      "coverageScope": {
-        "regionIds": [
-          "daegu"
-        ],
-        "operatorIds": [
-          "daegu-transportation"
-        ],
-        "lineIds": [
-          "line-e2938a4cc492"
-        ]
-      },
-      "displayName": "대구교통공사_2호선_열차시각표",
-      "detailUrl": "https://www.data.go.kr/data/15138732/fileData.do",
-      "requestUrl": "https://www.data.go.kr/data/15138732/fileData.do",
+      "id": "kric-station-toilet",
+      "priority": "P1",
+      "domain": "accessibility_facilities",
+      "displayName": "KRIC 역사별 화장실 현황",
+      "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=186&service=convenientInfo&operation=stationToilet&page=3",
+      "requestUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationToilet",
       "operation": {
         "method": "GET",
-        "endpoint": "https://www.data.go.kr/data/15138732/fileData.do",
+        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationToilet",
         "auth": {
-          "placement": "none"
+          "env": "KRIC_SERVICE_KEY",
+          "placement": "query",
+          "parameter": "serviceKey",
+          "valueEncoding": "url-search-params-once",
+          "loadPolicy": "process-env-no-shell-parsing"
         },
-        "requiredParameters": [],
-        "fixedParameters": {},
-        "responseEnvelope": "official CSV file data 15138732",
-        "responseFields": [
-          "역명",
-          "방향",
-          "평일",
-          "토요일",
-          "휴일",
-          "출발시간"
+        "requiredParameters": [
+          "serviceKey",
+          "format",
+          "railOprIsttCd",
+          "lnCd",
+          "stinCd"
         ],
-        "runner": {
-          "command": "node tools/datapack/collect-daegu-timetable.mjs",
-          "arguments": [
-            "--line",
-            "2"
-          ],
-          "requiredEnv": []
-        },
-        "secretPolicy": "credential-free-output"
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "secretPolicy": "env-only-redacted-output"
       },
-      "licenseEvidenceStatus": "confirmed_free_use",
-      "sampleEvidenceStatus": "official_file_admitted",
-      "admissionStatus": "official_snapshot_admitted",
+      "licenseEvidenceStatus": "confirmed_attribution",
+      "sampleEvidenceStatus": "sample_url_documented_key_required",
+      "admissionStatus": "preflight_only",
+      "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "retrievedAt": "2026-09-24",
-        "searchTerms": [
-          "대구교통공사",
-          "2호선",
-          "열차시각표"
+        "detailPageUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=186&service=convenientInfo&operation=stationToilet&page=3",
+        "retrievedAt": "2026-09-30",
+        "endpoint": "https://openapi.kric.go.kr/openapi/convenientInfo/stationToilet",
+        "usePermissionRange": "저작권표시",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/convenientInfo/stationToilet?serviceKey=[서비스키값]&format=xml&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "formats": [
+          "JSON",
+          "XML"
         ],
         "outputFields": [
-          "역명",
-          "방향",
-          "평일",
-          "토요일",
-          "휴일",
-          "출발시간"
+          "diapExchNum",
+          "dtlLoc",
+          "exitNo",
+          "gateInotDvNm",
+          "grndDvNm",
+          "lnCd",
+          "mlFmlDvNm",
+          "railOprIsttCd",
+          "stinCd",
+          "stinFlor",
+          "toltNum"
         ],
-        "licenseText": "이용허락범위 제한 없음"
+        "liveSampleNote": "2026-09-30T01:23Z KRIC_SERVICE_KEY로 railOprIsttCd=S1, lnCd=2, stinCd=222, format=json을 호출해 HTTP 응답 header.resultCode=41(승인 대기중 입니다.)을 확인했다. QA 활용신청은 완료됐고 KRIC 승인 전이라 응답 행과 필드 실측은 없다. 출력 필드는 상세 페이지 문서 기준이다.",
+        "missingEvidence": [
+          "approvedKeyLiveSample",
+          "sampleResponse",
+          "licenseCommercialRedistributionEvidence",
+          "providerTermsOrQuotaApproval"
+        ],
+        "listPageUrl": "https://data.kric.go.kr/rips/M_01_02/intro.do?page=3"
+      },
+      "nextAction": "KRIC 승인(resultCode 41 해소) 뒤 승인 키로 대표 역 실호출 sample을 수집해 행 수·필드를 검증하고 후속 수집 이슈에서 게이트 안팎·남녀·기저귀교환대 필드의 수집기를 구현한다",
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "candidate does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "candidate does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "candidate facility coverage requires approved-key live sample evidence and inventory admission before production use"
+        }
       }
     },
     {
-      "id": "daegu-line3-train-timetable",
-      "apiCatalog": true,
-      "priority": "P0",
-      "domain": "schedule_timetable",
-      "coverageScope": {
-        "regionIds": [
-          "daegu"
-        ],
-        "operatorIds": [
-          "daegu-transportation"
-        ],
-        "lineIds": [
-          "line-0ffaa95b1b5d"
-        ]
-      },
-      "displayName": "대구교통공사_3호선_열차시각표",
-      "detailUrl": "https://www.data.go.kr/data/15138734/fileData.do",
-      "requestUrl": "https://www.data.go.kr/data/15138734/fileData.do",
+      "id": "kric-station-disabled-toilet",
+      "priority": "P1",
+      "domain": "accessibility_facilities",
+      "displayName": "KRIC 역사별 장애인 화장실 위치",
+      "detailUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=432&service=vulnerableUserInfo&operation=stationDisabledToilet&page=6",
+      "requestUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationDisabledToilet",
       "operation": {
         "method": "GET",
-        "endpoint": "https://www.data.go.kr/data/15138734/fileData.do",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationDisabledToilet",
         "auth": {
-          "placement": "none"
+          "env": "KRIC_SERVICE_KEY",
+          "placement": "query",
+          "parameter": "serviceKey",
+          "valueEncoding": "url-search-params-once",
+          "loadPolicy": "process-env-no-shell-parsing"
         },
-        "requiredParameters": [],
-        "fixedParameters": {},
-        "responseEnvelope": "official CSV file data 15138734",
-        "responseFields": [
-          "역명",
-          "방향",
-          "평일",
-          "토요일",
-          "휴일",
-          "출발시간"
+        "requiredParameters": [
+          "serviceKey",
+          "format",
+          "railOprIsttCd",
+          "lnCd",
+          "stinCd"
         ],
-        "runner": {
-          "command": "node tools/datapack/collect-daegu-timetable.mjs",
-          "arguments": [
-            "--line",
-            "3"
-          ],
-          "requiredEnv": []
-        },
-        "secretPolicy": "credential-free-output"
+        "responseEnvelope": "JSON array | XML root.body.items.item",
+        "secretPolicy": "env-only-redacted-output"
       },
-      "licenseEvidenceStatus": "confirmed_free_use",
-      "sampleEvidenceStatus": "official_file_admitted",
-      "admissionStatus": "official_snapshot_admitted",
+      "licenseEvidenceStatus": "confirmed_attribution",
+      "sampleEvidenceStatus": "sample_url_documented_key_required",
+      "admissionStatus": "preflight_only",
+      "serviceKeyHandling": "offline_import_secret_only",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "retrievedAt": "2026-09-24",
-        "searchTerms": [
-          "대구교통공사",
-          "3호선",
-          "열차시각표"
+        "detailPageUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=432&service=vulnerableUserInfo&operation=stationDisabledToilet&page=6",
+        "retrievedAt": "2026-09-30",
+        "endpoint": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationDisabledToilet",
+        "usePermissionRange": "저작권표시",
+        "sampleUrl": "https://openapi.kric.go.kr/openapi/vulnerableUserInfo/stationDisabledToilet?serviceKey=[서비스키값]&format=xml&railOprIsttCd=S1&lnCd=3&stinCd=322",
+        "formats": [
+          "JSON",
+          "XML"
         ],
         "outputFields": [
-          "역명",
-          "방향",
-          "평일",
-          "토요일",
-          "휴일",
-          "출발시간"
+          "diapExchNum",
+          "dtlLoc",
+          "exitNo",
+          "gateInotDvNm",
+          "grndDvNm",
+          "lnCd",
+          "mlFmlDvNm",
+          "railOprIsttCd",
+          "stinCd",
+          "stinFlor",
+          "toltNum"
         ],
-        "licenseText": "이용허락범위 제한 없음"
+        "liveSampleNote": "2026-09-30T01:23Z KRIC_SERVICE_KEY로 railOprIsttCd=S1, lnCd=2, stinCd=222, format=json을 호출해 HTTP 응답 header.resultCode=41(승인 대기중 입니다.)을 확인했다. QA 활용신청은 완료됐고 KRIC 승인 전이라 응답 행과 필드 실측은 없다. 출력 필드는 상세 페이지 문서 기준이다.",
+        "missingEvidence": [
+          "approvedKeyLiveSample",
+          "sampleResponse",
+          "licenseCommercialRedistributionEvidence",
+          "providerTermsOrQuotaApproval"
+        ],
+        "listPageUrl": "https://data.kric.go.kr/rips/M_01_02/intro.do?page=6"
+      },
+      "nextAction": "KRIC 승인(resultCode 41 해소) 뒤 승인 키로 대표 역 실호출 sample을 수집해 행 수·필드를 검증하고 후속 수집 이슈에서 장애인 화장실 위치 수집기를 구현한다",
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "candidate does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "candidate does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "CANDIDATE",
+          "productionUseAllowed": false,
+          "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
+          "updateFrequency": "provider documented; production cadence not admitted",
+          "unsupportedNotes": "candidate facility coverage requires approved-key live sample evidence and inventory admission before production use"
+        }
       }
     }
   ]

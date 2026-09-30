@@ -221,33 +221,130 @@ export function providerApprovalExpirySummary(document, { today = new Date().toI
   };
 }
 
-export function validateOperation(candidate, { allowMissing = false } = {}) {
-  const requestUrl = requiredHttpUrl(candidate?.requestUrl, `${candidate?.id ?? "candidate"}.requestUrl`);
-  if (hasCredentialValue(candidate.requestUrl)) {
-    throw new Error(`${candidate.id}.requestUrl credential values are forbidden`);
+function validateAggregateSourceSetOperation(candidate, operation) {
+  const label = `${candidate.id}.aggregate source-set operation`;
+  if (candidate.requestUrl != null) {
+    throw new Error(`${label} must not invent requestUrl`);
   }
+  requireAllowedKeys(operation, new Set([
+    "kind", "method", "auth", "retryPolicy", "responseEnvelope", "runner",
+    "sourceDefinition", "secretPolicy", "requestTimeoutMs",
+  ]), label);
+  if (operation.kind !== "AGGREGATE_SOURCE_SET" || operation.method !== "GET") {
+    throw new Error(`${label} identity is invalid`);
+  }
+  if (operation.auth == null || typeof operation.auth !== "object" || Array.isArray(operation.auth)) {
+    throw new Error(`${label} auth is invalid`);
+  }
+  requireAllowedKeys(operation.auth, new Set(["placement"]), `${label}.auth`);
+  if (operation.auth.placement !== "none") throw new Error(`${label} auth must be credential-free`);
+  if (operation.retryPolicy == null || typeof operation.retryPolicy !== "object"
+    || Array.isArray(operation.retryPolicy)) {
+    throw new Error(`${label} retry policy is invalid`);
+  }
+  requireAllowedKeys(operation.retryPolicy, new Set(["maxRetries"]), `${label}.retryPolicy`);
+  if (operation.retryPolicy.maxRetries !== 0) throw new Error(`${label} retry max must be zero`);
+  if (candidate.id === "capital-route-topology" && operation.requestTimeoutMs !== 30_000) {
+    throw new Error(`${label} requestTimeoutMs must be exactly 30000`);
+  }
+  if (candidate.id !== "capital-route-topology" && operation.requestTimeoutMs != null) {
+    throw new Error(`${label} requestTimeoutMs is unsupported`);
+  }
+  requiredText(operation.responseEnvelope, `${label}.responseEnvelope`);
+
+  const runner = operation.runner;
+  if (runner == null || typeof runner !== "object" || Array.isArray(runner)) {
+    throw new Error(`${label} runner is invalid`);
+  }
+  requireAllowedKeys(runner, new Set(["command", "arguments", "requiredEnv"]), `${label}.runner`);
+  const command = requiredText(runner.command, `${label}.runner.command`);
+  if (!/^node tools\/[A-Za-z0-9_./-]+\.mjs$/.test(command)) {
+    throw new Error(`${label} runner command must be a literal repository Node command`);
+  }
+  const runnerArguments = stringList(runner.arguments ?? [], `${label}.runner.arguments`, { allowEmpty: true });
+  if (runnerArguments.some((argument) => {
+    const option = /^--([^=]+)(?:=|$)/.exec(argument);
+    return option && CREDENTIAL_NAME.test(normalizedName(option[1]));
+  })) throw new Error(`${label} runner arguments must not include credential options`);
+  if (stringList(runner.requiredEnv, `${label}.runner.requiredEnv`, { allowEmpty: true }).length !== 0) {
+    throw new Error(`${label} runner environment must be empty`);
+  }
+
+  const sourceDefinition = operation.sourceDefinition;
+  if (sourceDefinition == null || typeof sourceDefinition !== "object" || Array.isArray(sourceDefinition)) {
+    throw new Error(`${label} source definition is invalid`);
+  }
+  requireAllowedKeys(sourceDefinition, new Set([
+    "module", "exportName", "sourceCount", "datasetCount", "excludedFields", "sourceSetSha256",
+  ]), `${label}.sourceDefinition`);
+  const module = requiredText(sourceDefinition.module, `${label}.sourceDefinition.module`);
+  if (!/^tools\/datapack\/[A-Za-z0-9_./-]+\.mjs$/.test(module)) {
+    throw new Error(`${label} source module is invalid`);
+  }
+  if (!/^[A-Za-z_$][A-Za-z0-9_$]*$/.test(
+    requiredText(sourceDefinition.exportName, `${label}.sourceDefinition.exportName`),
+  )) throw new Error(`${label} source export is invalid`);
+  if (!Number.isInteger(sourceDefinition.sourceCount) || sourceDefinition.sourceCount < 1
+    || !Number.isInteger(sourceDefinition.datasetCount) || sourceDefinition.datasetCount < 1
+    || sourceDefinition.datasetCount > sourceDefinition.sourceCount) {
+    throw new Error(`${label} source counts are invalid`);
+  }
+  stringList(sourceDefinition.excludedFields, `${label}.sourceDefinition.excludedFields`, { allowEmpty: true });
+  if (!/^[0-9a-f]{64}$/.test(sourceDefinition.sourceSetSha256 ?? "")) {
+    throw new Error(`${label} source-set digest is invalid`);
+  }
+  if (operation.secretPolicy !== "credential-free-output") {
+    throw new Error(`${label} secret policy is invalid`);
+  }
+  return operation;
+}
+
+function validateSummaryCredentialValues(candidate) {
+  if (candidate?.requestUrl != null && hasCredentialValue(candidate.requestUrl)) {
+    throw new Error(`${candidate?.id ?? "candidate"}.requestUrl credential values are forbidden`);
+  }
+  if (candidate?.evidence?.sampleUrl != null && hasCredentialValue(candidate.evidence.sampleUrl)) {
+    throw new Error(`${candidate?.id ?? "candidate"}.evidence.sampleUrl credential values are forbidden`);
+  }
+  if (candidate?.operation != null && hasCredentialValue(candidate.operation)) {
+    throw new Error(`${candidate?.id ?? "candidate"}.operation credential values are forbidden`);
+  }
+}
+
+function validateCandidateRequestUrl(candidate) {
+  const requestUrl = requiredHttpUrl(candidate?.requestUrl, `${candidate?.id ?? "candidate"}.requestUrl`);
   const sampleValue = candidate?.evidence?.sampleUrl;
   if (sampleValue != null) {
     const sampleUrl = requiredHttpUrl(sampleValue, `${candidate.id}.evidence.sampleUrl`);
-    if (hasCredentialValue(sampleValue) || hasConcretePathCredential(requestUrl, sampleUrl)) {
+    if (hasConcretePathCredential(requestUrl, sampleUrl)) {
       throw new Error(`${candidate.id}.evidence.sampleUrl credential values are forbidden`);
     }
   }
+  return requestUrl;
+}
+
+export function validateOperation(candidate, { allowMissing = false } = {}) {
+  validateSummaryCredentialValues(candidate);
   const operation = candidate?.operation;
   if (operation == null) {
+    validateCandidateRequestUrl(candidate);
     if (allowMissing) return null;
     throw new Error(`${candidate?.id ?? "candidate"}.operation is required`);
   }
   if (typeof operation !== "object" || Array.isArray(operation)) {
     throw new Error(`${candidate.id}.operation must be an object`);
   }
-  if (hasCredentialValue(operation)) {
-    throw new Error(`${candidate.id}.operation credential values are forbidden`);
+  if (operation.kind === "AGGREGATE_SOURCE_SET") {
+    return validateAggregateSourceSetOperation(candidate, operation);
   }
+  const requestUrl = validateCandidateRequestUrl(candidate);
   requireAllowedKeys(operation, new Set([
     "method", "endpoint", "sampleUrl", "auth", "requiredParameters", "fixedParameters", "optionalParameters",
-    "responseEnvelope", "responseFields", "runner", "secretPolicy",
+    "responseEnvelope", "responseFields", "runner", "secretPolicy", "maxRetries",
   ]), `${candidate.id}.operation`);
+  if (operation.maxRetries != null && operation.maxRetries !== 0) {
+    throw new Error(`${candidate.id}.operation retry max must be zero`);
+  }
   if (!new Set(["GET", "POST"]).has(operation.method)) {
     throw new Error(`${candidate.id}.operation.method must be GET or POST`);
   }
@@ -325,6 +422,11 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
     stringList(operation.responseFields, `${candidate.id}.operation.responseFields`);
   }
   const runner = operation.runner;
+  // 수집기가 아직 없는 preflight 후보만 runner를 생략할 수 있다. 채택된 원천은 재현 가능한 수집 명령이 필수다.
+  if (runner == null && candidate.admissionStatus === "preflight_only") {
+    validateGeneralSecretPolicy(candidate, operation, credentialFree);
+    return operation;
+  }
   if (!runner || typeof runner !== "object" || Array.isArray(runner)) {
     throw new Error(`${candidate.id}.operation.runner must be an object`);
   }
@@ -355,11 +457,15 @@ export function validateOperation(candidate, { allowMissing = false } = {}) {
   if (authEnv != null && !requiredEnv.includes(authEnv)) {
     throw new Error(`${candidate.id}.operation.runner.requiredEnv must include auth.env`);
   }
+  validateGeneralSecretPolicy(candidate, operation, credentialFree);
+  return operation;
+}
+
+function validateGeneralSecretPolicy(candidate, operation, credentialFree) {
   const expectedSecretPolicy = credentialFree ? "credential-free-output" : "env-only-redacted-output";
   if (operation.secretPolicy !== expectedSecretPolicy) {
     throw new Error(`${candidate.id}.operation.secretPolicy is invalid`);
   }
-  return operation;
 }
 
 export function operationSummary(candidate) {
@@ -388,7 +494,9 @@ export function operationSummary(candidate) {
     detailUrl: candidate.detailUrl ?? null,
     searchTerms: candidate.evidence?.searchTerms ?? [],
     status: candidate.admissionStatus ?? null,
-    endpoint: requiredText(candidate.requestUrl, `${candidate.id}.requestUrl`),
+    endpoint: candidate.operation?.kind === "AGGREGATE_SOURCE_SET"
+      ? null
+      : requiredText(candidate.requestUrl, `${candidate.id}.requestUrl`),
     sampleUrl: candidate.operation?.sampleUrl ?? candidate.evidence?.sampleUrl ?? null,
     responseFields: candidate.operation?.responseFields ?? candidate.evidence?.outputFields ?? [],
     providerApproval: candidate.providerApproval ?? null,
@@ -401,16 +509,18 @@ export function operationSummary(candidate) {
 export function listOperations(document) {
   const candidates = Array.isArray(document?.candidates) ? document.candidates : [];
   return candidates
-    .filter((candidate) => typeof candidate.requestUrl === "string")
+    .filter((candidate) => typeof candidate.requestUrl === "string"
+      || candidate.operation?.kind === "AGGREGATE_SOURCE_SET")
     .map(operationSummary)
     .sort((left, right) => left.id.localeCompare(right.id, "en"));
 }
 
 export function operationHumanSummary(summary) {
+  const aggregate = summary.operation?.kind === "AGGREGATE_SOURCE_SET";
   const lines = [
     `id: ${summary.id}`,
     `status: ${summary.status ?? "unknown"}`,
-    `endpoint: ${summary.endpoint}`,
+    `endpoint: ${aggregate ? "aggregate source set" : summary.endpoint}`,
     `sample: ${summary.sampleUrl ?? "not documented"}`,
     `response fields: ${summary.responseFields.join(", ") || "not documented"}`,
   ];
@@ -432,6 +542,20 @@ export function operationHumanSummary(summary) {
   }
   if (summary.operation && !summary.operationValidationError) {
     const runner = [summary.operation.runner.command, ...(summary.operation.runner.arguments ?? [])].join(" ");
+    if (aggregate) {
+      lines.push(
+        `source set: ${summary.operation.sourceDefinition.module}#${summary.operation.sourceDefinition.exportName}`,
+        `source count: ${summary.operation.sourceDefinition.sourceCount}`,
+        `dataset count: ${summary.operation.sourceDefinition.datasetCount}`,
+        `source-set digest: ${summary.operation.sourceDefinition.sourceSetSha256}`,
+        `retry max: ${summary.operation.retryPolicy.maxRetries}`,
+        `request timeout ms: ${summary.operation.requestTimeoutMs}`,
+        `response envelope: ${summary.operation.responseEnvelope}`,
+        `runner: ${runner}`,
+        "runner env: not required",
+      );
+      return lines.join("\n");
+    }
     const fixedParameters = Object.entries(summary.operation.fixedParameters ?? {})
       .map(([key, value]) => `${key}=${value}`)
       .join(", ") || "none";

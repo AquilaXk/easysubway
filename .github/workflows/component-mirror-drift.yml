@@ -1,0 +1,36 @@
+name: Component Mirror Drift
+
+on:
+  schedule:
+    # Monday 00:00 UTC
+    - cron: "0 0 * * 1"
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: component-mirror-drift-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  check-drift:
+    name: Check Component Mirror Drift
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+      - name: Check remote component contract mirrors against main
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.AUTOMERGE_PAT }}
+        run: |
+          set -euo pipefail
+          node tools/repo/sync-component-mirrors.mjs --check-remote
