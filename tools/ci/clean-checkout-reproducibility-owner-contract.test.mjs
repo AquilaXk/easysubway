@@ -78,6 +78,33 @@ test("Hub caller is dispatch-only and invokes the immutable reusable producer wi
   ]) assert.equal(validateCaller(mutation), false);
 });
 
+test("Audit workflow produces the same-head owner receipt before auditing without weakening the audit", async () => {
+  const text = await readFile(
+    new URL("../../.github/workflows/clean-checkout-reproducibility-audit.yml", import.meta.url),
+    "utf8",
+  );
+  const receiptStep = text.indexOf("- name: Produce same-head owner receipt");
+  const auditStep = text.indexOf("- name: Audit current clean-checkout reproducibility evidence");
+  assert.notEqual(receiptStep, -1);
+  assert.ok(receiptStep < auditStep, "receipt must be produced before the audit reads it");
+  const receiptBlock = text.slice(receiptStep, auditStep);
+  assert.match(text, /on:\n  push:\n    branches: \[main\]/);
+  assert.match(text, /permissions:\n      contents: read\n      issues: read\n      actions: write\n/);
+  assert.match(receiptBlock, /CALLER="clean-checkout-reproducibility-owner-receipt-caller\.yml"/);
+  assert.match(receiptBlock, /gh workflow run "\$\{CALLER\}" --ref "\$\{DEFAULT_BRANCH\}"/);
+  assert.match(receiptBlock, /gh run watch .* --exit-status/);
+  assert.match(receiptBlock, /GITHUB_SHA/);
+  assert.match(receiptBlock, /git ls-remote|repos\/\$\{GITHUB_REPOSITORY\}\/commits/);
+  assert.match(receiptBlock, /superseded/);
+  // the audit itself keeps the strict same-head inputs
+  assert.match(text, /--source-sha "\$\{GITHUB_SHA\}"/);
+  // the receipt caller stays dispatch-only so the audit's workflow_dispatch run filter still holds
+  assert.equal(await readFile(
+    new URL("../../.github/workflows/clean-checkout-reproducibility-owner-receipt-caller.yml", import.meta.url),
+    "utf8",
+  ), expectedWorkflow);
+});
+
 test("phase entrypoint maps only the four approved commands and fails closed", async () => {
   const { runHubReproducibilityPhase } = await import("./run-clean-checkout-reproducibility-phase.mjs");
   const lockBytes = await readFile(new URL("../../tools/qa/package-lock.json", import.meta.url));
