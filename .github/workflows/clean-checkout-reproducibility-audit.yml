@@ -14,11 +14,11 @@ concurrency:
 jobs:
   audit:
     runs-on: ubuntu-24.04
-    timeout-minutes: 15
+    timeout-minutes: 110
     permissions:
       contents: read
       issues: read
-      actions: read
+      actions: write
     steps:
       - name: Verify default branch source
         env:
@@ -36,6 +36,36 @@ jobs:
       - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: "24"
+      - name: Produce same-head owner receipt
+        env:
+          GH_TOKEN: ${{ github.token }}
+          DEFAULT_BRANCH: ${{ github.event.repository.default_branch }}
+        run: |
+          set -euo pipefail
+          CALLER="clean-checkout-reproducibility-owner-receipt-caller.yml"
+          HEAD_SHA="$(gh api "repos/${GITHUB_REPOSITORY}/commits/${DEFAULT_BRANCH}" --jq .sha)"
+          if [[ "${HEAD_SHA}" != "${GITHUB_SHA}" ]]; then
+            echo "main moved to ${HEAD_SHA}; this run for ${GITHUB_SHA} is superseded and cannot produce a same-head receipt" >&2
+            exit 1
+          fi
+          EXISTING="$(gh run list --workflow "${CALLER}" --event workflow_dispatch --branch "${DEFAULT_BRANCH}" --status success --json headSha --jq "[.[] | select(.headSha == \"${GITHUB_SHA}\")] | length")"
+          if [[ "${EXISTING}" != "0" ]]; then
+            echo "same-head owner receipt already exists for ${GITHUB_SHA}"
+            exit 0
+          fi
+          STARTED_AT="$(date --utc +"%Y-%m-%dT%H:%M:%SZ")"
+          gh workflow run "${CALLER}" --ref "${DEFAULT_BRANCH}"
+          RUN_ID=""
+          for _ in $(seq 1 30); do
+            RUN_ID="$(gh run list --workflow "${CALLER}" --event workflow_dispatch --branch "${DEFAULT_BRANCH}" --json databaseId,headSha,createdAt --jq "[.[] | select(.headSha == \"${GITHUB_SHA}\" and .createdAt >= \"${STARTED_AT}\")] | sort_by(.createdAt) | last | .databaseId // empty")"
+            if [[ -n "${RUN_ID}" ]]; then break; fi
+            sleep 5
+          done
+          if [[ -z "${RUN_ID}" ]]; then
+            echo "dispatched owner receipt run for ${GITHUB_SHA} was not found" >&2
+            exit 1
+          fi
+          gh run watch "${RUN_ID}" --interval 20 --exit-status
       - name: Audit current clean-checkout reproducibility evidence
         env:
           GH_TOKEN: ${{ github.token }}
