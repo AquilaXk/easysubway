@@ -260,6 +260,20 @@ test("datapack freshness SLA는 current public route-map position과 연간 공�
   });
   assert.equal(classes.get("planned_timetable").unchangedReverificationBasisField, "reverifiedUnchangedAt");
   assert.ok(classes.get("route_graph_topology").sourceIds.includes("incheon-transit-station-info"));
+  // QA 승인(2026-10-02): 노선 topology는 이벤트 기반 갱신이고, 재검증 실패가 일주일 이어지면 만료로 막는 P7D 안전망을 둔다.
+  // 일일 재확인 주기(monitoring·scheduledPipeline P1D)는 그대로 유지한다(#870).
+  assert.equal(classes.get("route_graph_topology").reverificationCadence, "P7D");
+  assert.equal(policy.monitoring.manualCheckCadence, "P1D");
+  assert.equal(policy.scheduledPipeline.cadence, "P1D");
+  for (const version of ["1.0.0", "1.1.0"]) {
+    const bundle = JSON.parse(await readFile(`contracts/bundles/data-contracts-v${version}.json`, "utf8"));
+    const bundled = JSON.parse(bundle.resources["datapack/datapack-freshness-sla.json"]);
+    assert.equal(
+      bundled.sourceClasses.find((sourceClass) => sourceClass.id === "route_graph_topology").reverificationCadence,
+      "P7D",
+      `data-contracts-v${version} route_graph_topology cadence`,
+    );
+  }
   assert.deepEqual(classes.get("incheon_timetable_observation"), {
     id: "incheon_timetable_observation",
     sourceIds: ["incheon-line1-train-timetable", "incheon-line2-train-timetable"],
