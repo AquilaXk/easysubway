@@ -29,6 +29,16 @@ const requiredProductionSourceIds = [
   "kric-subway-timetable",
   "seoul-metro-transfer-distance-duration",
 ];
+// data 레포 신선도 정책에는 있지만 Hub governance·inventory 사본에는 없는 원천의 닫힌 목록이다.
+// - 인천 원천 3개: governance 등록(라이선스 검토)이 아직 없다(easysubway-data#868).
+// - seoul-metro-transfer-car-door-duration: Hub inventory 계약(check-contracts 2129-2141)이 data 항목
+//   (productionUseAllowed:true, domain evidence 없음)을 거부한다. 정합은 easysubway-data#888에서 처리한다.
+const dataRepositoryOnlyFreshnessSourceIds = [
+  "incheon-line1-train-timetable",
+  "incheon-line2-train-timetable",
+  "incheon-transit-station-info",
+  "seoul-metro-transfer-car-door-duration",
+];
 const externalSourceRegistrations = [
   {
     sourceId: "incheon-transit-accessibility",
@@ -166,7 +176,20 @@ test("staged freshness와 governance는 annual official source binding 및 licen
   const governanceBySource = new Map(governance.sources.map((source) => [source.sourceId, source]));
   const freshnessSourceIds = freshness.sourceClasses.flatMap((sourceClass) => sourceClass.sourceIds).sort();
 
-  assert.deepEqual([...governanceBySource.keys()].sort(), freshnessSourceIds);
+  // data release는 이 번들의 freshness로 governance 결속을 판정하므로 class 등록은 Hub에 있어야 한다
+  // (easysubway-data#876). governance owner 없는 freshness 원천은 닫힌 예외 목록만 허용한다.
+  assert.deepEqual(
+    freshnessSourceIds.filter((sourceId) => !governanceBySource.has(sourceId)),
+    dataRepositoryOnlyFreshnessSourceIds,
+  );
+  assert.deepEqual(
+    [...governanceBySource.keys()].sort(),
+    freshnessSourceIds.filter((sourceId) => !dataRepositoryOnlyFreshnessSourceIds.includes(sourceId)),
+  );
+  for (const [sourceId, entry] of governanceBySource) {
+    const sourceClass = freshness.sourceClasses.find((candidate) => candidate.id === entry.sourceClassId);
+    assert.ok(sourceClass?.sourceIds.includes(sourceId), `${sourceId}: governance class binding`);
+  }
   for (const sourceId of ["incheon-transit-accessibility", "molit-railway-transfer-movement", "seoul-metro-transfer-distance-duration"]) {
     const source = inventory.sources.find((candidate) => candidate.id === sourceId);
     const mobileSource = mobileInventory.sources.find((candidate) => candidate.id === sourceId);
@@ -194,6 +217,7 @@ test("datapack freshness SLA는 current public route-map position과 연간 공�
       "daejeon_timetable_observation",
       "busan_timetable_observation",
       "daegu_timetable_observation",
+      "incheon_timetable_observation",
     ],
   );
   assert.deepEqual(classes.get("route_map_positions"), {
@@ -221,7 +245,11 @@ test("datapack freshness SLA는 current public route-map position과 연간 공�
   });
   assert.deepEqual(classes.get("annual_official_file"), {
     id: "annual_official_file",
-    sourceIds: ["molit-railway-transfer-movement", "seoul-metro-transfer-distance-duration"],
+    sourceIds: [
+      "molit-railway-transfer-movement",
+      "seoul-metro-transfer-distance-duration",
+      "seoul-metro-transfer-car-door-duration",
+    ],
     examples: ["official annual railway transfer movement CSV"],
     basisField: "observedAt",
     reverificationCadence: "P1Y",
@@ -229,6 +257,17 @@ test("datapack freshness SLA는 current public route-map position과 연간 공�
     eventTriggers: ["official file revision", "station transfer path revision", "line or station opening"],
     changePublishSla: "P14D",
     freshnessMetric: "freshnessValidRatio",
+  });
+  assert.equal(classes.get("planned_timetable").unchangedReverificationBasisField, "reverifiedUnchangedAt");
+  assert.ok(classes.get("route_graph_topology").sourceIds.includes("incheon-transit-station-info"));
+  assert.deepEqual(classes.get("incheon_timetable_observation"), {
+    id: "incheon_timetable_observation",
+    sourceIds: ["incheon-line1-train-timetable", "incheon-line2-train-timetable"],
+    basisField: "capturedAt",
+    reverificationCadence: "P30D",
+    futureBasisAllowed: false,
+    providerValidityEndField: null,
+    eventTriggers: ["official timetable revision"],
   });
 });
 
