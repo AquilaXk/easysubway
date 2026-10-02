@@ -85,7 +85,8 @@
         "line extension opening"
       ],
       "changePublishSla": "before-effective-date",
-      "freshnessMetric": "plannedEtaCoverageRatio"
+      "freshnessMetric": "plannedEtaCoverageRatio",
+      "unchangedReverificationBasisField": "reverifiedUnchangedAt"
     },
     {
       "id": "route_map_positions",
@@ -128,7 +129,8 @@
       "id": "annual_official_file",
       "sourceIds": [
         "molit-railway-transfer-movement",
-        "seoul-metro-transfer-distance-duration"
+        "seoul-metro-transfer-distance-duration",
+        "seoul-metro-transfer-car-door-duration"
       ],
       "examples": [
         "official annual railway transfer movement CSV"
@@ -172,7 +174,8 @@
         "daejeon-station-distance-fare",
         "daegu-line1-route-topology",
         "daegu-line2-route-topology",
-        "daegu-line3-route-topology"
+        "daegu-line3-route-topology",
+        "incheon-transit-station-info"
       ],
       "examples": [
         "official capital route graph topology"
@@ -232,6 +235,20 @@
         "daegu-line1-train-timetable",
         "daegu-line2-train-timetable",
         "daegu-line3-train-timetable"
+      ],
+      "basisField": "capturedAt",
+      "reverificationCadence": "P30D",
+      "futureBasisAllowed": false,
+      "providerValidityEndField": null,
+      "eventTriggers": [
+        "official timetable revision"
+      ]
+    },
+    {
+      "id": "incheon_timetable_observation",
+      "sourceIds": [
+        "incheon-line1-train-timetable",
+        "incheon-line2-train-timetable"
       ],
       "basisField": "capturedAt",
       "reverificationCadence": "P30D",
