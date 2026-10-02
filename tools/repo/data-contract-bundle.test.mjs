@@ -29,6 +29,10 @@ const requiredProductionSourceIds = [
   "kric-subway-timetable",
   "seoul-metro-transfer-distance-duration",
 ];
+// data 레포 신선도 정책에는 있지만 Hub governance·inventory 사본에는 없는 원천의 닫힌 목록이다.
+// - 인천 원천 3개: governance 등록(라이선스 검토)이 아직 없다(easysubway-data#868).
+// - seoul-metro-transfer-car-door-duration: Hub inventory 계약(check-contracts 2129-2141)이 data 항목
+//   (productionUseAllowed:true, domain evidence 없음)을 거부한다. 정합은 easysubway-data#888에서 처리한다.
 const dataRepositoryOnlyFreshnessSourceIds = [
   "incheon-line1-train-timetable",
   "incheon-line2-train-timetable",
@@ -172,9 +176,8 @@ test("staged freshness와 governance는 annual official source binding 및 licen
   const governanceBySource = new Map(governance.sources.map((source) => [source.sourceId, source]));
   const freshnessSourceIds = freshness.sourceClasses.flatMap((sourceClass) => sourceClass.sourceIds).sort();
 
-  // data 레포가 등록해 data release governance가 결속하지만 Hub governance·inventory 사본에는 아직 없는 원천이다.
-  // data release는 이 번들의 freshness로 판정하므로 class 등록은 Hub에 있어야 한다(easysubway-data#876).
-  // 목록을 닫아 둬 owner 없는 freshness 원천이 새로 늘면 실패한다.
+  // data release는 이 번들의 freshness로 governance 결속을 판정하므로 class 등록은 Hub에 있어야 한다
+  // (easysubway-data#876). governance owner 없는 freshness 원천은 닫힌 예외 목록만 허용한다.
   assert.deepEqual(
     freshnessSourceIds.filter((sourceId) => !governanceBySource.has(sourceId)),
     dataRepositoryOnlyFreshnessSourceIds,
