@@ -33,10 +33,12 @@ const requiredProductionSourceIds = [
 // - 인천 원천 3개: governance 등록(라이선스 검토)이 아직 없다(easysubway-data#868).
 // - seoul-metro-transfer-car-door-duration: Hub inventory 계약(check-contracts 2129-2141)이 data 항목
 //   (productionUseAllowed:true, domain evidence 없음)을 거부한다. 정합은 easysubway-data#888에서 처리한다.
+// - kric-subway-timetable-station-lines: data 레포 등록(easysubway-data#903) 전이라 Hub 사본에 아직 없다.
 const dataRepositoryOnlyFreshnessSourceIds = [
   "incheon-line1-train-timetable",
   "incheon-line2-train-timetable",
   "incheon-transit-station-info",
+  "kric-subway-timetable-station-lines",
   "seoul-metro-transfer-car-door-duration",
 ];
 const externalSourceRegistrations = [
@@ -272,6 +274,21 @@ test("datapack freshness SLA는 current public route-map position과 연간 공�
       bundled.sourceClasses.find((sourceClass) => sourceClass.id === "route_graph_topology").reverificationCadence,
       "P7D",
       `data-contracts-v${version} route_graph_topology cadence`,
+    );
+  }
+  // QA 승인(2026-10-03, data#903): KRIC 역별 시간표(GTX-A·에버라인·의정부·김포골드·부산김해)는
+  // 같은 KRIC subwayTimetable 계획 시간표 원천을 새 sourceId로 등록하므로 planned_timetable 기준을 그대로 따른다.
+  assert.deepEqual(classes.get("planned_timetable").sourceIds, [
+    "korail-metropolitan-planned-timetable",
+    "kric-subway-timetable",
+    "kric-subway-timetable-station-lines",
+  ]);
+  for (const version of ["1.0.0", "1.1.0"]) {
+    const bundle = JSON.parse(await readFile(`contracts/bundles/data-contracts-v${version}.json`, "utf8"));
+    const bundled = JSON.parse(bundle.resources["datapack/datapack-freshness-sla.json"]);
+    assert.ok(
+      bundled.sourceClasses.find((sourceClass) => sourceClass.id === "planned_timetable").sourceIds.includes("kric-subway-timetable-station-lines"),
+      `data-contracts-v${version} planned_timetable station-lines source`,
     );
   }
   assert.deepEqual(classes.get("incheon_timetable_observation"), {
