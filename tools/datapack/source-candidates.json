@@ -7332,6 +7332,138 @@
       }
     },
     {
+      "id": "seoul-metro-platform-gap",
+      "priority": "P0",
+      "domain": "accessibility_facilities",
+      "coverageScope": {
+        "operatorIds": [
+          "seoul-metro"
+        ]
+      },
+      "displayName": "서울교통공사_연단정보와 곡선구간 정보",
+      "detailUrl": "https://data.seoul.go.kr/dataList/OA-22124/S/1/datasetView.do",
+      "requestUrl": "http://openapi.seoul.go.kr:8088/{serviceKey}/json/TbSubwayLineInfo",
+      "operation": {
+        "method": "GET",
+        "endpoint": "http://openapi.seoul.go.kr:8088/{serviceKey}/json/TbSubwayLineInfo",
+        "auth": {
+          "env": "SEOUL_OPENAPI_KEY",
+          "placement": "path",
+          "parameter": "serviceKey",
+          "loadPolicy": "process-env-no-shell-parsing"
+        },
+        "requiredParameters": [
+          "serviceKey",
+          "startIndex",
+          "endIndex"
+        ],
+        "responseEnvelope": "TbSubwayLineInfo.{RESULT,row[]}",
+        "responseFields": [
+          "LINE",
+          "SBWY_STNS_OTSD_CD",
+          "SBWY_STNS_CD",
+          "SBWY_STNS_NM",
+          "UPLN_DNLN",
+          "PLF_PSTN",
+          "TRN_PLF_INTVL",
+          "HGT_DIFF",
+          "PLF_LNR"
+        ],
+        "runner": {
+          "command": "node tools/datapack/collect-seoul-metro-platform-gap.mjs",
+          "requiredEnv": [
+            "SEOUL_OPENAPI_KEY"
+          ]
+        },
+        "secretPolicy": "env-only-redacted-output"
+      },
+      "licenseEvidenceStatus": "confirmed_attribution",
+      "sampleEvidenceStatus": "collector_sample_verified",
+      "admissionStatus": "evidence_recorded_admin_review_required",
+      "serviceKeyHandling": "offline_collection_secret_only",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "detailPageUrl": "https://data.seoul.go.kr/dataList/OA-22124/S/1/datasetView.do",
+        "retrievedAt": "2026-09-30",
+        "endpoint": "http://openapi.seoul.go.kr:8088/{serviceKey}/json/TbSubwayLineInfo",
+        "sampleUrl": "http://openapi.seoul.go.kr:8088/[서비스키값]/json/TbSubwayLineInfo/1/5",
+        "usePermissionRange": "공공누리 1유형",
+        "formats": [
+          "JSON"
+        ],
+        "outputFields": [
+          "LINE",
+          "SBWY_STNS_OTSD_CD",
+          "SBWY_STNS_CD",
+          "SBWY_STNS_NM",
+          "UPLN_DNLN",
+          "PLF_PSTN",
+          "TRN_PLF_INTVL",
+          "HGT_DIFF",
+          "PLF_LNR"
+        ],
+        "productionUseAdmission": {
+          "artifactKind": "source-production-use-admission",
+          "issue": 837,
+          "decisionRef": "https://github.com/AquilaXk/easysubway-data/issues/837",
+          "decision": "APPROVED",
+          "approvedBy": "AquilaXk",
+          "approvedAt": "2026-09-30",
+          "scope": "SERVER_ROUTE_BUNDLE_PLATFORM_GAP",
+          "productionUseAllowed": true,
+          "consumer": "tools/datapack/build-station-platform-gaps.mjs",
+          "evidenceManifest": "tools/datapack/release/station-platform-gap-inputs.json",
+          "rawSha256": "ff0a2ce2bafdf5749b982602c15d4bcfcb7aa3fcae276f6e6b5ded0d5fc84a0b",
+          "contentSha256": "0224f38bc1eb6140993f81320ee5e3feb9fdb4f5fa84e72467cacb3f00f2d28a",
+          "rationale": "QA 결정(2026-09-30, 이슈 #837 \"연단 간격은 공식 등급으로 싣는다\"): TbSubwayLineInfo(OA-22124)는 서울교통공사 관할역 승강장 위치별 연단 간격·높이차를 공식 등급(좁음·보통·넓음 / 낮음·보통·높음)으로 제공하는 공식 원천이다. 등급을 영문 코드로 그대로 옮겨 서버 번들 accessibility station_platform_gaps 테이블에 적재하기 위해 운영 사용으로 승격한다. 수치(mm)는 원천에 없으므로 만들지 않는다.",
+          "relationToExistingSources": "연단 간격·높이차 등급을 담은 최초의 접근성 원천이다. 역 결속은 #842가 승격한 서울 역코드 membership(seoul-station-code-membership)의 (호선 번호, 역코드)만 쓰고 이름 조인은 하지 않는다. 등급·방향·곡선 값이 정의된 값이 아니면 행을 제외하고 사유별 개수를 보고한다.",
+          "fieldMapping": {
+            "LINE": "역 결속 키의 호선 번호 (N호선 → N)",
+            "SBWY_STNS_CD": "역 결속 키의 역코드 (seoul-station-code-membership STATION_CD와 일치, station_id·line_id 결정)",
+            "UPLN_DNLN": "station_platform_gaps.direction (상선=UP, 하선=DOWN, 그 밖은 제외)",
+            "PLF_PSTN": "station_platform_gaps.platform_position (원문 보존) 및 끝이 N-M일 때 car_number, door_number",
+            "TRN_PLF_INTVL": "station_platform_gaps.gap_grade (좁음=NARROW, 보통=NORMAL, 넓음=WIDE, 그 밖은 제외)",
+            "HGT_DIFF": "station_platform_gaps.height_diff_grade (낮음=LOW, 보통=NORMAL, 높음=HIGH, 그 밖은 제외)",
+            "PLF_LNR": "station_platform_gaps.curved (곡선=1, 직선=0, 그 밖은 제외)"
+          },
+          "license": {
+            "usePermissionRange": "공공누리 1유형",
+            "attribution": "출처: 서울 열린데이터광장 서울교통공사 연단정보와 곡선구간 정보(TbSubwayLineInfo)",
+            "attributionLocation": "서버 번들 accessibility 구성요소 station_platform_gaps 행의 source_snapshot_id와 이 admission 기록."
+          },
+          "quota": {
+            "selfImposedCallLimit": "NONE",
+            "collectionCadence": "번들 입력 스냅샷 수집 시 1회(전체 목록 페이지 호출)"
+          }
+        }
+      },
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider realtime; production cadence not admitted",
+          "unsupportedNotes": "candidate does not provide scheduled timetable data for production route ETA"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider realtime; production cadence not admitted",
+          "unsupportedNotes": "candidate does not provide realtime arrival data for production live ETA"
+        },
+        "facility": {
+          "status": "SUPPORTED",
+          "productionUseAllowed": true,
+          "coverageStatus": "SERVER_ROUTE_BUNDLE_PLATFORM_GAP",
+          "updateFrequency": "번들 입력 스냅샷 수집 시 1회",
+          "unsupportedNotes": "production use is limited to the server route bundle station platform gap table built from committed raw-archived snapshots"
+        }
+      }
+    },
+    {
       "id": "seoul-metro-route-map-positions",
       "apiCatalog": false,
       "priority": "P1",
@@ -7418,6 +7550,115 @@
         ]
       },
       "nextAction": "공식 API 관측과 결정론적 layout 입력·출력 hash를 함께 갱신한다"
+    },
+    {
+      "id": "seoul-metro-station-contact",
+      "priority": "P0",
+      "domain": "station_info",
+      "coverageScope": {
+        "operatorIds": [
+          "seoul-metro"
+        ]
+      },
+      "displayName": "서울교통공사_역주소 및 전화번호",
+      "detailUrl": "https://data.seoul.go.kr/dataList/OA-12035/S/1/datasetView.do",
+      "requestUrl": "https://datafile.seoul.go.kr/bigfile/iot/inf/nio_download.do?&useCache=false",
+      "operation": {
+        "method": "POST",
+        "endpoint": "https://datafile.seoul.go.kr/bigfile/iot/inf/nio_download.do?&useCache=false",
+        "auth": {
+          "placement": "none"
+        },
+        "requiredParameters": [
+          "infId",
+          "seq",
+          "infSeq"
+        ],
+        "responseEnvelope": "CSV(EUC-KR)",
+        "runner": {
+          "command": "node tools/datapack/collect-seoul-metro-station-contact.mjs",
+          "requiredEnv": []
+        },
+        "secretPolicy": "credential-free-output"
+      },
+      "licenseEvidenceStatus": "confirmed_attribution",
+      "sampleEvidenceStatus": "validated_live_sample",
+      "admissionStatus": "evidence_recorded_admin_review_required",
+      "serviceKeyHandling": "offline_collection_secret_only",
+      "mobileEmbeddingAllowed": true,
+      "evidence": {
+        "detailPageUrl": "https://data.seoul.go.kr/dataList/OA-12035/S/1/datasetView.do",
+        "retrievedAt": "2026-09-30",
+        "endpoint": "https://datafile.seoul.go.kr/bigfile/iot/inf/nio_download.do?&useCache=false",
+        "sampleUrl": "https://datafile.seoul.go.kr/bigfile/iot/inf/nio_download.do?&useCache=false",
+        "usePermissionRange": "공공누리 1유형",
+        "formats": [
+          "CSV"
+        ],
+        "outputFields": [
+          "연번",
+          "역번호",
+          "호선",
+          "역명",
+          "역전화번호",
+          "도로명주소",
+          "지번주소"
+        ],
+        "productionUseAdmission": {
+          "artifactKind": "source-production-use-admission",
+          "issue": 838,
+          "decisionRef": "https://github.com/AquilaXk/easysubway-data/issues/838",
+          "decision": "APPROVED",
+          "approvedBy": "AquilaXk",
+          "approvedAt": "2026-09-30",
+          "scope": "MOBILE_STATION_CATALOG_CONTACT",
+          "productionUseAllowed": true,
+          "consumer": "tools/datapack/build-station-contacts.mjs",
+          "evidenceManifest": "tools/datapack/release/station-contact-inputs.json",
+          "rationale": "QA 결정(2026-09-30): OA-12035 서울교통공사_역주소 및 전화번호는 서울교통공사 관할역 대표 전화번호를 제공하는 공식 원천이다. 모바일 역 카탈로그 station_contacts 적재를 위해 운영 사용으로 승격한다.",
+          "relationToExistingSources": "역 대표 전화번호를 담은 최초의 역 연락처 원천이다. 역코드 매핑은 kric-station-convenience-standard canonicalMappings의 S1 stinCd를 쓰고 이름 조인은 하지 않는다.",
+          "fieldMapping": {
+            "stnNo": "station_contacts.station_id 및 line_id 매핑 키 (4자리 0 채움 역번호)",
+            "line": "station_contacts.line_id 매핑 키 (호선 번호)",
+            "phone": "station_contacts.phone (정규화된 전화번호, 숫자와 -만 유지)",
+            "phoneRaw": "station_contacts.phone_raw (원문 전화번호)"
+          },
+          "license": {
+            "usePermissionRange": "공공누리 1유형",
+            "attribution": "출처: 서울 열린데이터광장 서울교통공사 역주소 및 전화번호(OA-12035)",
+            "attributionLocation": "모바일 역 카탈로그 station_contacts 행의 source_snapshot_id와 이 admission 기록."
+          },
+          "quota": {
+            "selfImposedCallLimit": "NONE",
+            "collectionCadence": "카탈로그 팩 입력 스냅샷 수집 시 1회"
+          }
+        }
+      },
+      "nextAction": "#838에서 모바일 역 카탈로그 station_contacts 적재 용도로 운영 사용 승격(QA 결정 2026-09-30). production inventory(source-inventory.json) 승격은 별도 결정 대상이다",
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider file; production cadence not admitted",
+          "unsupportedNotes": "candidate does not provide scheduled timetable data"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE",
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "provider file; production cadence not admitted",
+          "unsupportedNotes": "candidate does not provide realtime arrival data"
+        },
+        "stationInfo": {
+          "status": "OFFICIAL_PROVENANCE_SOURCE",
+          "productionUseAllowed": true,
+          "coverageStatus": "FULL_COVERAGE_FOR_OPERATOR",
+          "updateFrequency": "annual or ad-hoc file revision"
+        }
+      }
     },
     {
       "id": "seoul-metro-transfer-distance-duration",
@@ -8250,10 +8491,10 @@
       },
       "displayName": "국토교통부_철도역 환승 이동경로 정보",
       "detailUrl": "https://www.data.go.kr/data/15130556/fileData.do",
-      "requestUrl": "https://api.odcloud.kr/api/15130556/v1/uddi:93021737-5337-442c-9006-b9748f87d0a4",
+      "requestUrl": "https://api.odcloud.kr/api/15130556/v1/uddi:26d9d0f2-a4fb-489c-b4b7-dfc6e50ecf76",
       "operation": {
         "method": "GET",
-        "endpoint": "https://api.odcloud.kr/api/15130556/v1/uddi:93021737-5337-442c-9006-b9748f87d0a4",
+        "endpoint": "https://api.odcloud.kr/api/15130556/v1/uddi:26d9d0f2-a4fb-489c-b4b7-dfc6e50ecf76",
         "auth": {
           "env": "DATA_GO_KR_SERVICE_KEY",
           "placement": "query",
@@ -8278,19 +8519,19 @@
       "admissionStatus": "official_snapshot_admitted",
       "mobileEmbeddingAllowed": false,
       "evidence": {
-        "retrievedAt": "2026-08-14",
+        "retrievedAt": "2026-10-01",
         "detailPageUrl": "https://www.data.go.kr/data/15130556/fileData.do",
-        "endpoint": "https://api.odcloud.kr/api/15130556/v1/uddi:93021737-5337-442c-9006-b9748f87d0a4",
-        "sampleUrl": "https://api.odcloud.kr/api/15130556/v1/uddi:93021737-5337-442c-9006-b9748f87d0a4?serviceKey=[서비스키값]&page=1&perPage=1000&returnType=JSON",
+        "endpoint": "https://api.odcloud.kr/api/15130556/v1/uddi:26d9d0f2-a4fb-489c-b4b7-dfc6e50ecf76",
+        "sampleUrl": "https://api.odcloud.kr/api/15130556/v1/uddi:26d9d0f2-a4fb-489c-b4b7-dfc6e50ecf76?serviceKey=[서비스키값]&page=1&perPage=1000&returnType=JSON",
         "formats": ["CSV", "JSON", "XML"],
         "searchTerms": ["철도역", "환승 이동경로"],
         "outputFields": ["철도운영기관코드", "선명", "역명", "환승이동순서", "이동내용상세", "환승이동내용"],
         "licenseText": "이용허락범위 제한 없음",
-        "currentDatasetVersion": "20250811",
-        "currentRowCount": 8054,
-        "currentOperationVerifiedAt": "2026-08-14"
+        "currentDatasetVersion": "20260811",
+        "currentRowCount": 8094,
+        "currentOperationVerifiedAt": "2026-10-01"
       },
-      "rawSnapshotAdmission": { "snapshotId": "molit-railway-transfer-movement-20250811", "metadataPath": "tools/datapack/sources/molit-railway-transfer-movement-20250811.csv.gz.json", "metadataFileSha256": "f75e3ec2a2270cdd8d3b2303f12db0167cf0b5f5525115f6c980680468faa284", "rawSha256": "3a45dc1d82f81666c48eeef81fdc35b0e4a0c59312e4b26907f644c45b518ce3", "gzipSha256": "94e712d32860a7a6e4b4c1f1d9651dc25823305f537e50370142009c1ca66d28", "rowCount": 8054, "status": "LOCKED" }
+      "rawSnapshotAdmission": { "snapshotId": "molit-railway-transfer-movement-20260811", "metadataPath": "tools/datapack/sources/molit-railway-transfer-movement-20260811.csv.gz.json", "metadataFileSha256": "e59ad302178f583ca959be87f04dc387eb08f781bb5a0a24648549299883f150", "rawSha256": "8f9a448e1601bc49dd370de5af0d7ab8884d930131e05f8fc9773445bded16f8", "gzipSha256": "d509b22ec20e770e1e55853feae88721741a91a8d3ee85eaae27b44455ed3ef5", "rowCount": 8094, "status": "LOCKED" }
     },
     {
       "id": "seoul-metro-congestion-statistics",
@@ -8672,6 +8913,119 @@
           "coverageStatus": "SAMPLE_EVIDENCE_REQUIRED",
           "updateFrequency": "provider documented; production cadence not admitted",
           "unsupportedNotes": "candidate facility coverage requires approved-key live sample evidence and inventory admission before production use"
+        }
+      }
+    },
+    {
+      "id": "seoul-metro-transfer-car-door-duration",
+      "priority": "P0",
+      "domain": "transfer_walk_duration",
+      "coverageScope": {
+        "regionIds": [
+          "capital"
+        ],
+        "operatorIds": [
+          "seoul-metro"
+        ]
+      },
+      "displayName": "서울교통공사_서울 도시철도 환승정보",
+      "detailUrl": "https://www.data.go.kr/data/15098252/fileData.do",
+      "requestUrl": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000007644508&fileDetailSn=1&insertDataPrcus=N",
+      "licenseEvidenceStatus": "confirmed_free_use",
+      "sampleEvidenceStatus": "official_file_full_snapshot",
+      "admissionStatus": "official_file_admitted_to_production_inventory",
+      "productionInventoryReferenceId": "seoul-metro-transfer-car-door-duration",
+      "registrationMetadata": {
+        "admissionReference": "https://github.com/AquilaXk/easysubway-data/issues/876",
+        "approval": {
+          "decision": "APPROVED",
+          "approvedBy": "AquilaXk",
+          "approvedAt": "2026-10-01T15:00:00.000Z",
+          "noteKo": "QA 채택 결정(2026-10-02, data#876): 15098252를 공식 환승 시간 원천으로 채택한다. QA 확인: 소요시간은 실측값이다. 같은 방향 칸·문 조합 중 가장 짧은 시간을 쓰고, 빈 시간은 사용 불가로 둔다."
+        },
+        "governance": {
+          "sourceId": "seoul-metro-transfer-car-door-duration",
+          "sourceClassId": "annual_official_file",
+          "retentionClassId": "standard-90d",
+          "ownerRole": "datapack-source-owner",
+          "stewardRole": "datapack-data-steward",
+          "approvalRole": "datapack-release-approver",
+          "escalationHours": 4,
+          "alertRoute": "github:area-datapack",
+          "licenseReview": {
+            "status": "APPROVED",
+            "termsHash": "01eacf354bff12ea667b9db874dfa53fc8a77ed4723c246ba877e954a3c635b3",
+            "reviewedAt": "2026-10-01T15:00:00.000Z",
+            "nextReviewAt": "2027-10-01T15:00:00.000Z",
+            "termsUrl": "https://www.data.go.kr/data/15098252/fileData.do",
+            "reviewedProvider": "서울교통공사",
+            "reviewedDatasetUrl": "https://www.data.go.kr/data/15098252/fileData.do",
+            "redistributionScopes": [
+              "DERIVED_DATAPACK"
+            ],
+            "approvedByRole": "datapack-release-approver"
+          }
+        }
+      },
+      "serviceKeyHandling": "not_required",
+      "mobileEmbeddingAllowed": false,
+      "evidence": {
+        "retrievedAt": "2026-10-02",
+        "detailPageUrl": "https://www.data.go.kr/data/15098252/fileData.do",
+        "endpoint": "https://www.data.go.kr/cmm/cmm/fileDownload.do?atchFileId=FILE_000000007644508&fileDetailSn=1&insertDataPrcus=N",
+        "usePermissionRange": "이용허락범위 제한 없음",
+        "formats": [
+          "CSV"
+        ],
+        "encoding": "cp949",
+        "outputFields": [
+          "고유번호",
+          "환승시작역",
+          "환승시작역 코드",
+          "환승시작 호선",
+          "하차 열차 방면",
+          "하차위치(호차)",
+          "하차위치(문)",
+          "환승종료역",
+          "환승 열차 방면",
+          "환승 승차위치(호차)",
+          "환승 승차위치(문)",
+          "소요시간"
+        ],
+        "currentDatasetVersion": "20260902",
+        "currentRowCount": 1024,
+        "updateCycle": "수시 (1회성 데이터)",
+        "coverageLimitations": [
+          "소요시간은 하차 칸·문에서 환승 승차 칸·문까지의 실측값이다(QA 확인 2026-10-02). 거리는 제공하지 않는다.",
+          "환승종료역 열은 환승 열차 방면의 다음 역 코드다. 도착 노선은 서울 역코드 카탈로그(seoulmetro-station-line-info)로 정한다.",
+          "소요시간이 빈 행이 있다(노선 경유). 빈 행은 사용 불가로 둔다.",
+          "포털 설명은 개인 걸음걸이에 따라 차이가 있어 단순 참고용이라고 안내한다. 측정 방식은 제공기관(정보운영센터) 확인 대상이다."
+        ]
+      },
+      "nextAction": "수집기(collect-seoul-metro-transfer-car-door-duration.mjs)·등록기(register-seoul-metro-transfer-car-door-duration.mjs)로 원문을 OCI source-raw에 보존하고 원장에 등록한 뒤, 실측 환승시간 지표(current-seoul-measured-transfer-metrics.json)를 전국 후보에 반영한다. 거리 null 계약 확장은 후속이다.",
+      "capabilities": {
+        "schedule": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular official file",
+          "unsupportedNotes": "source does not provide scheduled timetable data"
+        },
+        "realtime": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular official file",
+          "unsupportedNotes": "source does not provide realtime arrival data",
+          "liveEtaEligible": false,
+          "rateLimitStatus": "NOT_APPLICABLE"
+        },
+        "facility": {
+          "status": "UNSUPPORTED",
+          "productionUseAllowed": false,
+          "coverageStatus": "NOT_PROVIDED_BY_SOURCE",
+          "updateFrequency": "irregular official file",
+          "unsupportedNotes": "source does not provide accessibility facility records"
         }
       }
     }
