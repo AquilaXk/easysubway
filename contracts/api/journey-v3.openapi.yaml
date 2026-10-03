@@ -243,8 +243,9 @@ paths:
       operationId: profileJourneys
       summary: Search identity-bound temporal Journey profiles
       description: >-
-        Returns only compressed profile breakpoints. A destination arrival is complete
-        only after the verified EXIT transition. LAST_CONNECTION is the latest feasible
+        Returns only compressed profile breakpoints. Journeys start at an origin-station
+        platform and end at a destination-station platform; a destination arrival is the
+        final ride arrival at the destination platform. LAST_CONNECTION is the latest feasible
         O/D departure under the request walking, accessibility, transfer, and active
         service-day constraints.
       security:
@@ -454,7 +455,7 @@ paths:
               $ref: "#/components/schemas/StationTimetableSearchRequest"
       responses:
         "200":
-          description: Ordered departures from the active timetable snapshot
+          description: Ordered departures from the active server route bundle timetable
           content:
             application/json:
               schema:
@@ -759,7 +760,7 @@ components:
       additionalProperties: false
       description: >-
         A bounded ordered ready-time and destination-arrival deadline interval. The
-        deadline applies after the verified destination EXIT transition completes.
+        deadline applies to the final ride arrival at the destination platform.
       required: [kind, earliestReadyAt, arrivalDeadline]
       properties:
         kind:
@@ -874,11 +875,22 @@ components:
     StationTimetableDirectionGroup:
       type: object
       additionalProperties: false
-      required: [directionName, departures]
+      description: >-
+        Departures grouped by the next stopping station after the requested station on the requested line.
+        Clients label the group with the next station name ("<name> 방면"). Departures whose trip ends at the
+        requested station are not listed.
+      required: [nextStationId, directionName, departures]
       properties:
+        nextStationId:
+          type: string
+          minLength: 1
         directionName:
           type: string
           minLength: 1
+          nullable: true
+          description: >-
+            Official direction name from the timetable source. Non-null only when every departure in the group
+            carries the same source value; null otherwise. Never synthesized.
         departures:
           type: array
           items:
@@ -886,7 +898,7 @@ components:
     StationTimetableDeparture:
       type: object
       additionalProperties: false
-      required: [serviceDate, secondsFromServiceDayStart, departureAt, servicePattern, serviceClass]
+      required: [serviceDate, secondsFromServiceDayStart, departureAt, servicePattern, serviceClass, terminalStationId]
       properties:
         serviceDate:
           type: string
@@ -904,6 +916,10 @@ components:
         serviceClass:
           type: string
           enum: [SUBWAY, ITX_CHEONGCHUN]
+        terminalStationId:
+          type: string
+          minLength: 1
+          description: Station where this trip ends (its last stop).
     StationTimetableSourceIdentity:
       type: object
       additionalProperties: false
@@ -1250,9 +1266,10 @@ components:
       type: object
       additionalProperties: false
       description: >-
-        readyAt is when the passenger is ready to begin the requested journey; journeyStartTime
-        is entry-transition start; firstBoardingTime is the first ride departure;
-        arrivalAtPlatform is the final ride arrival; arrivalAtDestination is verified EXIT completion.
+        readyAt is when the passenger is ready to board at the origin platform; journeyStartTime
+        equals readyAt; firstBoardingTime is the first ride departure; arrivalAtPlatform is the
+        final ride arrival; arrivalAtDestination equals arrivalAtPlatform because journeys end at
+        the destination platform.
       required:
         - journeyId
         - readyAt
@@ -1456,6 +1473,7 @@ components:
         - walkingDistanceMeters
         - timeSource
         - accessibility
+        - fare
         - legs
       properties:
         journeyId:
@@ -1496,11 +1514,45 @@ components:
           enum: [TIMETABLE, REALTIME]
         accessibility:
           $ref: "#/components/schemas/JourneyAccessibility"
+        fare:
+          $ref: "#/components/schemas/JourneyFare"
         legs:
           type: array
           minItems: 1
           items:
             $ref: "#/components/schemas/JourneyLeg"
+    JourneyFare:
+      type: object
+      additionalProperties: false
+      required:
+        - status
+        - sourceSnapshotIds
+      properties:
+        status:
+          type: string
+          enum: [AVAILABLE, UNAVAILABLE]
+        adultCardWon:
+          type: integer
+          minimum: 0
+        adultCashWon:
+          type: integer
+          minimum: 0
+        youthCardWon:
+          type: integer
+          minimum: 0
+        youthCashWon:
+          type: integer
+          minimum: 0
+        childCardWon:
+          type: integer
+          minimum: 0
+        childCashWon:
+          type: integer
+          minimum: 0
+        sourceSnapshotIds:
+          type: array
+          items:
+            type: string
     JourneyAccessibility:
       type: object
       additionalProperties: false
@@ -1525,6 +1577,10 @@ components:
     JourneyEntryLeg:
       type: object
       additionalProperties: false
+      deprecated: true
+      description: >-
+        Not emitted. Journeys start at the origin platform, so responses contain no ENTRY leg.
+        The schema stays until clients stop decoding it.
       required: [type, fromStationId, durationSeconds]
       properties:
         type:
@@ -1546,10 +1602,12 @@ components:
         - directionStationId
         - fromStationId
         - toStationId
+        - servicePattern
         - plannedDepartureTime
         - plannedArrivalTime
         - realtimeDepartureTime
         - realtimeArrivalTime
+        - stops
       properties:
         type:
           type: string
@@ -1569,6 +1627,9 @@ components:
         toStationId:
           type: string
           minLength: 1
+        servicePattern:
+          type: string
+          enum: [LOCAL, EXPRESS]
         plannedDepartureTime:
           type: string
           format: date-time
@@ -1583,6 +1644,97 @@ components:
           type: string
           format: date-time
           nullable: true
+        stops:
+          type: array
+          minItems: 2
+          items:
+            $ref: "#/components/schemas/JourneyRideStop"
+        alightingCarDoors:
+          type: array
+          items:
+            $ref: "#/components/schemas/JourneyAlightingCarDoor"
+        boardingPlatformGaps:
+          type: array
+          items:
+            $ref: "#/components/schemas/JourneyPlatformGap"
+        alightingPlatformGaps:
+          type: array
+          items:
+            $ref: "#/components/schemas/JourneyPlatformGap"
+    JourneyPlatformGap:
+      type: object
+      additionalProperties: false
+      required:
+        - platformPosition
+        - gapGrade
+        - heightDiffGrade
+        - curved
+      properties:
+        platformPosition:
+          type: string
+          minLength: 1
+        carNumber:
+          type: integer
+          minimum: 1
+        doorNumber:
+          type: integer
+          minimum: 1
+        gapGrade:
+          type: string
+          enum: [WIDE, NORMAL, NARROW]
+        heightDiffGrade:
+          type: string
+          enum: [HIGH, NORMAL, LOW]
+        curved:
+          type: boolean
+    JourneyRideStop:
+      type: object
+      additionalProperties: false
+      required:
+        - stationId
+        - plannedArrivalTime
+        - plannedDepartureTime
+        - realtimeArrivalTime
+        - realtimeDepartureTime
+      properties:
+        stationId:
+          type: string
+          minLength: 1
+        plannedArrivalTime:
+          type: string
+          format: date-time
+          nullable: true
+        plannedDepartureTime:
+          type: string
+          format: date-time
+          nullable: true
+        realtimeArrivalTime:
+          type: string
+          format: date-time
+          nullable: true
+        realtimeDepartureTime:
+          type: string
+          format: date-time
+          nullable: true
+    JourneyAlightingCarDoor:
+      type: object
+      additionalProperties: false
+      required:
+        - carNumber
+        - doorNumber
+        - targetFacilityType
+      properties:
+        carNumber:
+          type: integer
+          minimum: 1
+          maximum: 10
+        doorNumber:
+          type: integer
+          minimum: 1
+          maximum: 4
+        targetFacilityType:
+          type: string
+          enum: [TRANSFER, ELEVATOR, ESCALATOR, STAIR]
     JourneyTransferLeg:
       type: object
       additionalProperties: false
@@ -1606,15 +1758,16 @@ components:
         farePenaltyApplies:
           type: boolean
           default: false
-        additionalFareWon:
-          type: integer
-          default: 0
         transferLimitMinutes:
           type: integer
           minimum: 0
     JourneyExitLeg:
       type: object
       additionalProperties: false
+      deprecated: true
+      description: >-
+        Not emitted. Journeys end at the destination platform, so responses contain no EXIT leg.
+        The schema stays until clients stop decoding it.
       required: [type, fromStationId, durationSeconds]
       properties:
         type:
