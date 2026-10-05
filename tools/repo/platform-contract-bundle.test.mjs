@@ -86,13 +86,21 @@ test("platform contract bundle v1.2.0은 canary 대표 출발 시각 기준을 a
     timeZone: "Asia/Seoul",
     window: "[activeFrom, freshUntil)",
     noMatchFailureReason: "WINDOW_MISMATCH",
-    wallClockIndependent: true,
+    departureIndependentOfWallClock: true,
     coverage: "SINGLE_REPRESENTATIVE_TIME_SMOKE",
     coverageLimit: "TIMETABLE_DEFECTS_AT_OTHER_TIMES_ARE_NOT_DETECTED",
+  });
+  assert.deepEqual(canary.executionWindowCheck, {
+    rule: "EXECUTION_INSTANT_MUST_BE_INSIDE_BUNDLE_VALIDITY_WINDOW",
+    window: "[activeFrom, freshUntil)",
+    outsideWindowFailureReason: "WINDOW_MISMATCH",
+    staleOrFutureBundleLookupFailureReason: "WINDOW_MISMATCH",
   });
   assert.deepEqual(canary.failure, {
     artifactKind: "journey-v3-candidate-canary-failure",
     reasons: ["SNAPSHOT_ERROR", "WINDOW_MISMATCH", "PLAN_ERROR", "NO_CANDIDATES"],
     probeIdField: "probeId",
+    reasonField: "failureReason",
+    reasonPresence: "UNAVAILABLE_RESPONSE_ONLY",
   });
 });
