@@ -60,8 +60,8 @@ test("platform contract bundle v1.2.0은 canary 대표 출발 시각 기준을 a
   const bytes = await readFile("contracts/bundles/platform-contracts-v1.2.0.json");
   const bundle = JSON.parse(bytes);
 
-  assert.equal(sha256(bytes), "db3d4bac4d6fee8375325270a456d806e70d0e8099fa3ad1226af951c2440bae");
-  assert.equal(sha256(bundle.resources["platform/k3s-activation-contract.json"]), "f44a533c2d951855d29a1127a713c94ab1c45d21b52c6a0e4a8e98cdc5f521fb");
+  assert.equal(sha256(bytes), "539229491d8cf072118c8a5d658459ce51d993daac099ee6f00afd019f9059fa");
+  assert.equal(sha256(bundle.resources["platform/k3s-activation-contract.json"]), "dc89f0fdacbc1116dbc8341d62338c3dd38b0b15cb3150234ccb367ec4631d02");
   assert.deepEqual(Object.keys(bundle), Object.keys(v110));
   assert.equal(bundle.bundleVersion, "1.2.0");
   assert.equal(bundle.componentManifestSchemaSha256, v110.componentManifestSchemaSha256);
