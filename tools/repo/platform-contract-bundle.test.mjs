@@ -54,3 +54,53 @@ test("platform contract bundle v1.1.0은 Platform #130 merge의 5개 resource �
   assert.deepEqual(runtimeSchema.const, runtime);
   assert.deepEqual(receiptSchema.oneOf, [{ $ref: "#/$defs/success" }, { $ref: "#/$defs/failure" }]);
 });
+
+test("platform contract bundle v1.2.0은 canary 대표 출발 시각 기준을 additive로 명시하고 나머지 resource는 v1.1.0과 같다", async () => {
+  const v110 = JSON.parse(await readFile("contracts/bundles/platform-contracts-v1.1.0.json", "utf8"));
+  const bytes = await readFile("contracts/bundles/platform-contracts-v1.2.0.json");
+  const bundle = JSON.parse(bytes);
+
+  assert.equal(sha256(bytes), "539229491d8cf072118c8a5d658459ce51d993daac099ee6f00afd019f9059fa");
+  assert.equal(sha256(bundle.resources["platform/k3s-activation-contract.json"]), "dc89f0fdacbc1116dbc8341d62338c3dd38b0b15cb3150234ccb367ec4631d02");
+  assert.deepEqual(Object.keys(bundle), Object.keys(v110));
+  assert.equal(bundle.bundleVersion, "1.2.0");
+  assert.equal(bundle.componentManifestSchemaSha256, v110.componentManifestSchemaSha256);
+  assert.equal(bundle.issueRefSchemaSha256, v110.issueRefSchemaSha256);
+  assert.deepEqual(Object.keys(bundle.resources), resourceKeys);
+  for (const key of resourceKeys.filter((name) => name !== "platform/k3s-activation-contract.json")) {
+    assert.equal(bundle.resources[key], v110.resources[key], `${key} 바이트는 바뀌지 않는다`);
+  }
+
+  const before = JSON.parse(v110.resources["platform/k3s-activation-contract.json"]);
+  const after = JSON.parse(bundle.resources["platform/k3s-activation-contract.json"]);
+  const { canary, ...candidateWithoutCanary } = after.candidate;
+  assert.deepEqual({ ...after, candidate: candidateWithoutCanary }, before, "canary 항목 외 기존 계약 필드와 순서는 그대로다");
+  assert.deepEqual(Object.keys(after), Object.keys(before));
+  assert.deepEqual(after.candidate.requiredOrder, before.candidate.requiredOrder);
+  assert.equal(after.fallback.policy, "FORBIDDEN");
+  assert.equal(after.rollback.policy, "FORBIDDEN");
+
+  assert.deepEqual(canary.representativeDeparture, {
+    rule: "FIRST_1000_KST_IN_BUNDLE_VALIDITY_WINDOW",
+    localTime: "10:00",
+    timeZone: "Asia/Seoul",
+    window: "[activeFrom, freshUntil)",
+    noMatchFailureReason: "WINDOW_MISMATCH",
+    departureIndependentOfWallClock: true,
+    coverage: "SINGLE_REPRESENTATIVE_TIME_SMOKE",
+    coverageLimit: "TIMETABLE_DEFECTS_AT_OTHER_TIMES_ARE_NOT_DETECTED",
+  });
+  assert.deepEqual(canary.executionWindowCheck, {
+    rule: "EXECUTION_INSTANT_MUST_BE_INSIDE_BUNDLE_VALIDITY_WINDOW",
+    window: "[activeFrom, freshUntil)",
+    outsideWindowFailureReason: "WINDOW_MISMATCH",
+    staleOrFutureBundleLookupFailureReason: "WINDOW_MISMATCH",
+  });
+  assert.deepEqual(canary.failure, {
+    artifactKind: "journey-v3-candidate-canary-failure",
+    reasons: ["SNAPSHOT_ERROR", "WINDOW_MISMATCH", "PLAN_ERROR", "NO_CANDIDATES"],
+    probeIdField: "probeId",
+    reasonField: "failureReason",
+    reasonPresence: "UNAVAILABLE_RESPONSE_ONLY",
+  });
+});
