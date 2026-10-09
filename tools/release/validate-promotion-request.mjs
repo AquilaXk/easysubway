@@ -107,6 +107,26 @@ export function validateCompatibilityEvidence(value, component) {
   return value;
 }
 
+// 자동 승격(v3): 환경에서 사람 reviewer를 제거한 뒤에도 승격이 열려 있지 않도록, 승인 기록이 비어 있는 요청은
+// 릴리스 체인 App이 요청한 v3 계약일 때만 수용한다. 사람 승인 1건이 있으면 기존 v2 계약이다(#3030).
+export const RELEASE_CHAIN_APP_LOGIN = "easysubway-release-chain[bot]";
+export const PROMOTION_CONTRACT_V2 = "datapack-promotion-v2";
+export const PROMOTION_CONTRACT_V3 = "datapack-promotion-v3";
+
+export function approvalFromEvidence(bytes) {
+  let reviews;
+  try {
+    reviews = JSON.parse(bytes);
+  } catch {
+    throw new Error("approval evidence must contain JSON");
+  }
+  if (!Array.isArray(reviews)) throw new Error("approval evidence must be an array");
+  if (reviews.length === 0) {
+    return { contractVersion: PROMOTION_CONTRACT_V3, reviewer: RELEASE_CHAIN_APP_LOGIN };
+  }
+  return { contractVersion: PROMOTION_CONTRACT_V2, reviewer: reviewerFromApproval(bytes) };
+}
+
 export function reviewerFromApproval(bytes) {
   let reviews;
   try {
@@ -252,7 +272,7 @@ export function validateRequest({
       releaseEvidenceBundleSha256: hash(releaseEvidenceBundleBytes),
       releaseDecisionSha256: hash(releaseDecisionBytes),
     })
-    || !text(request.requestedBy) || request.contractVersion !== "datapack-promotion-v2"
+    || !text(request.requestedBy)
     || request.issueRef !== "AquilaXk/easysubway#2705") {
     throw new Error("request is invalid");
   }
@@ -262,9 +282,12 @@ export function validateRequest({
     ["workflowRunId", "environment", "reviewer", "approvalEvidenceSha256"],
     "approval",
   );
+  const approval = approvalFromEvidence(approvalBytes);
   if (!positiveDecimal(workflowRunId) || request.approval.workflowRunId !== workflowRunId
     || request.approval.environment !== "datapack-promotion"
-    || request.approval.reviewer !== reviewerFromApproval(approvalBytes)
+    || request.contractVersion !== approval.contractVersion
+    || request.approval.reviewer !== approval.reviewer
+    || (approval.contractVersion === PROMOTION_CONTRACT_V3 && request.requestedBy !== RELEASE_CHAIN_APP_LOGIN)
     || request.approval.approvalEvidenceSha256 !== hash(approvalBytes)
     || component.artifactInventorySha256 !== hash(inventoryBytes)) {
     throw new Error("request identity is invalid");

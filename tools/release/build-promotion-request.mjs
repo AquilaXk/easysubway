@@ -12,7 +12,9 @@ import {
   regularBytes,
   regularJson,
   readCandidateExecutionEvidence,
-  reviewerFromApproval,
+  approvalFromEvidence,
+  PROMOTION_CONTRACT_V3,
+  RELEASE_CHAIN_APP_LOGIN,
   validateCandidateExecutionEvidence,
   validateCompatibilityEvidence,
   validatePromotionCandidate,
@@ -41,12 +43,16 @@ async function main() {
   );
   validateCompatibilityEvidence(compatibility, component);
   const approvalBytes = await regularBytes(args.get("approval-evidence"), "--approval-evidence");
-  const reviewer = reviewerFromApproval(approvalBytes);
+  const approval = approvalFromEvidence(approvalBytes);
   const workflowRunId = args.get("workflow-run-id");
   const requestedBy = args.get("requested-by");
   if (!positiveDecimal(workflowRunId) || requestedBy.trim() === ""
     || args.get("issue-ref") !== "AquilaXk/easysubway#2705") {
     throw new Error("request arguments are invalid");
+  }
+  // 승인 기록이 비어 있는 요청(v3)은 릴리스 체인 App만 만들 수 있다. 사람이 승인 없이 승격을 돌리면 여기서 멈춘다.
+  if (approval.contractVersion === PROMOTION_CONTRACT_V3 && requestedBy !== RELEASE_CHAIN_APP_LOGIN) {
+    throw new Error("an empty approval record is accepted only for the release chain App");
   }
 
   const request = {
@@ -62,10 +68,10 @@ async function main() {
     approval: {
       workflowRunId,
       environment: "datapack-promotion",
-      reviewer,
+      reviewer: approval.reviewer,
       approvalEvidenceSha256: hash(approvalBytes),
     },
-    contractVersion: "datapack-promotion-v2",
+    contractVersion: approval.contractVersion,
     issueRef: args.get("issue-ref"),
   };
   const requestBytes = jsonBytes(request);

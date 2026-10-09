@@ -45,6 +45,60 @@ test("단일 data 후보의 raw inventory와 component identity를 v2 request에
   }
 });
 
+const RELEASE_CHAIN_APP = "easysubway-release-chain[bot]";
+
+// Break caught: removing the environment reviewer must not turn "no approval" into an open door.
+// Only the release chain App may request a promotion whose approval evidence is empty (v3, #3030).
+test("승인 기록이 비어 있고 릴리스 체인 App이 요청하면 v3 request를 발행한다", () => {
+  const fixture = createFixture();
+  try {
+    fixture.approvalBytes = Buffer.from("[]");
+    writeFileSync(fixture.approvalPath, fixture.approvalBytes);
+    fixture.requestedBy = RELEASE_CHAIN_APP;
+    const result = run(fixture);
+    assert.equal(result.status, 0, result.stderr);
+    const request = JSON.parse(readFileSync(fixture.output));
+    assert.equal(request.contractVersion, "datapack-promotion-v3");
+    assert.equal(request.requestedBy, RELEASE_CHAIN_APP);
+    assert.deepEqual(request.approval, {
+      workflowRunId: "456",
+      environment: "datapack-promotion",
+      reviewer: RELEASE_CHAIN_APP,
+      approvalEvidenceSha256: sha256(fixture.approvalBytes),
+    });
+  } finally {
+    fixture.cleanup();
+  }
+});
+
+test("승인 기록이 비어 있는데 요청자가 릴리스 체인 App이 아니면 거부하고 출력을 만들지 않는다", () => {
+  for (const requestedBy of ["AquilaXk", "datapack-release-gates", "easysubway-release-chain", "other[bot]"]) {
+    const fixture = createFixture();
+    try {
+      writeFileSync(fixture.approvalPath, "[]");
+      fixture.requestedBy = requestedBy;
+      assert.notEqual(run(fixture).status, 0, requestedBy);
+      assert.equal(exists(fixture.output), false, requestedBy);
+    } finally {
+      fixture.cleanup();
+    }
+  }
+});
+
+test("사람 승인 1건이 있으면 요청자가 App이어도 v2로 발행한다", () => {
+  const fixture = createFixture();
+  try {
+    fixture.requestedBy = RELEASE_CHAIN_APP;
+    const result = run(fixture);
+    assert.equal(result.status, 0, result.stderr);
+    const request = JSON.parse(readFileSync(fixture.output));
+    assert.equal(request.contractVersion, "datapack-promotion-v2");
+    assert.equal(request.approval.reviewer, "AquilaXk");
+  } finally {
+    fixture.cleanup();
+  }
+});
+
 test("candidate root의 symlink·실제 inventory drift·identity·approval·compatibility를 fail closed한다", () => {
   for (const mutate of [
     (fixture) => {
@@ -412,7 +466,7 @@ function run(fixture, env = {}) {
     "--candidate-workflow-run-id", fixture.candidateWorkflowRunId,
     "--candidate-head-sha", fixture.candidateHeadSha,
     "--candidate-execution-evidence-root", fixture.executionEvidenceRoot,
-    "--compatibility-evidence", fixture.compatibilityPath, "--requested-by", "AquilaXk",
+    "--compatibility-evidence", fixture.compatibilityPath, "--requested-by", fixture.requestedBy ?? "AquilaXk",
     "--approval-evidence", fixture.approvalPath, "--workflow-run-id", fixture.workflowRunId,
     "--issue-ref", "AquilaXk/easysubway#2705",
     "--output", fixture.output,
