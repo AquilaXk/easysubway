@@ -55,7 +55,9 @@ on:
         required: false
 
 concurrency:
-  group: release-artifacts-${{ github.workflow }}-${{ github.ref }}
+  # 데이터팩 체인이 dispatch한 호환성 run(datapack_candidate_run_id 지정)은 후보마다 그룹을 분리한다.
+  # 같은 ref 그룹이면 hub main push가 이 run을 취소해 체인이 멈춘다(#3030). 그 밖의 실행은 기존 그룹 값과 같다.
+  group: release-artifacts-${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && inputs.datapack_candidate_run_id != '' && format('-datapack-compat-{0}', inputs.datapack_candidate_run_id) || '' }}
   cancel-in-progress: true
 
 jobs:

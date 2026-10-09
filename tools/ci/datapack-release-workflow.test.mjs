@@ -563,7 +563,7 @@ test("expiry alert는 publish 없이 같은 decision engine을 소비한다", ()
   assert.doesNotMatch(expiryWorkflow, /productionWriteAllowed == 'true'/);
 });
 
-test("candidate promotion은 정확한 단일 성공 후보와 compatibility 증거를 검증하고 v2 request만 attest한다", () => {
+test("candidate promotion은 정확한 단일 성공 후보와 compatibility 증거를 검증하고 v2/v3 request만 attest한다", () => {
   const promotion = readFileSync(path.join(root, ".github/workflows/datapack-promotion.yml"), "utf8");
   const releaseArtifacts = readFileSync(path.join(root, ".github/workflows/release-artifacts.yml"), "utf8");
   const promotionBuilder = readFileSync(path.join(root, "tools/release/build-promotion-request.mjs"), "utf8");
@@ -660,6 +660,31 @@ test("candidate promotion은 정확한 단일 성공 후보와 compatibility 증
   assert.match(releaseArtifacts, /build-datapack-mobile-compatibility-evidence\.mjs/);
   assert.match(releaseArtifacts, /name: easysubway-datapack-compatibility-\$\{\{ github\.run_id \}\}/);
   assert.match(releaseArtifacts, /path: \$\{\{ runner\.temp \}\}\/compatibility-evidence\.json/);
+});
+
+test("promotion은 허용된 행위자·첫 실행·main에서만 시작하고 어떤 외부 접근보다 먼저 확인한다 (#3030)", () => {
+  const promotion = readFileSync(path.join(root, ".github/workflows/datapack-promotion.yml"), "utf8");
+  const steps = promotion.slice(promotion.indexOf("    steps:\n"));
+  const first = steps.slice(steps.indexOf("      - name:"), steps.indexOf("      - name: Data Pack Promotion / Checkout repository"));
+  assert.match(first, /- name: Data Pack Promotion \/ Require an authorized dispatcher\n/);
+  assert.match(first, /TRIGGERING_ACTOR: \$\{\{ github\.triggering_actor \}\}\n/);
+  assert.match(first, /RUN_ATTEMPT: \$\{\{ github\.run_attempt \}\}\n/);
+  assert.match(first, /REF: \$\{\{ github\.ref \}\}\n/);
+  assert.match(first, /"easysubway-release-chain\[bot\]"\|"AquilaXk"\) ;;/);
+  assert.match(first, /\[\[ "\$\{RUN_ATTEMPT\}" == "1" && "\$\{REF\}" == "refs\/heads\/main" \]\]/);
+  assert.equal(first.slice(first.indexOf("run: |")).includes("${{"), false);
+  assert.ok(steps.indexOf("Require an authorized dispatcher") < steps.indexOf("actions/checkout@"));
+  assert.ok(steps.indexOf("Require an authorized dispatcher") < steps.indexOf("secrets."));
+  // 환경 승인 기록 수집은 그대로 남는다: 비어 있으면 v3, 1건이면 v2로 판정되고 다른 조합은 검증기가 거부한다.
+  assert.match(promotion, /actions\/runs\/\$\{GITHUB_RUN_ID\}\/approvals/);
+});
+
+test("체인이 dispatch한 호환성 run은 hub main push에 취소되지 않는다 (#3030)", () => {
+  const releaseArtifacts = readFileSync(path.join(root, ".github/workflows/release-artifacts.yml"), "utf8");
+  const group = "  group: release-artifacts-${{ github.workflow }}-${{ github.ref }}${{ github.event_name == 'workflow_dispatch' && inputs.datapack_candidate_run_id != '' && format('-datapack-compat-{0}', inputs.datapack_candidate_run_id) || '' }}\n  cancel-in-progress: true\n";
+  assert.equal(releaseArtifacts.split(group).length - 1, 1);
+  // 후보를 지정하지 않은 실행(push·PR·일반 dispatch)의 그룹은 기존과 같은 값으로 평가된다.
+  assert.equal(releaseArtifacts.includes("group: release-artifacts-${{ github.workflow }}-${{ github.ref }}\n"), false);
 });
 
 test("compatibility producer는 data repository 후보만 token으로 내려받고 Hub 후보로 대체하지 않는다", () => {
