@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -662,21 +663,56 @@ test("candidate promotion은 정확한 단일 성공 후보와 compatibility 증
   assert.match(releaseArtifacts, /path: \$\{\{ runner\.temp \}\}\/compatibility-evidence\.json/);
 });
 
-test("promotion은 허용된 행위자·첫 실행·main에서만 시작하고 어떤 외부 접근보다 먼저 확인한다 (#3030)", () => {
+function promotionStepScript() {
   const promotion = readFileSync(path.join(root, ".github/workflows/datapack-promotion.yml"), "utf8");
   const steps = promotion.slice(promotion.indexOf("    steps:\n"));
-  const first = steps.slice(steps.indexOf("      - name:"), steps.indexOf("      - name: Data Pack Promotion / Checkout repository"));
-  assert.match(first, /- name: Data Pack Promotion \/ Require an authorized dispatcher\n/);
-  assert.match(first, /TRIGGERING_ACTOR: \$\{\{ github\.triggering_actor \}\}\n/);
-  assert.match(first, /RUN_ATTEMPT: \$\{\{ github\.run_attempt \}\}\n/);
-  assert.match(first, /REF: \$\{\{ github\.ref \}\}\n/);
-  assert.match(first, /"easysubway-release-chain\[bot\]"\|"AquilaXk"\) ;;/);
-  assert.match(first, /\[\[ "\$\{RUN_ATTEMPT\}" == "1" && "\$\{REF\}" == "refs\/heads\/main" \]\]/);
-  assert.equal(first.slice(first.indexOf("run: |")).includes("${{"), false);
+  const begin = steps.indexOf("      - name: Data Pack Promotion / Require an authorized dispatcher\n");
+  const end = steps.indexOf("\n      - name: Data Pack Promotion / Checkout repository");
+  const body = steps.slice(begin, end);
+  assert.match(body, /TRIGGERING_ACTOR: \$\{\{ github\.triggering_actor \}\}\n/u);
+  assert.match(body, /RUN_ATTEMPT: \$\{\{ github\.run_attempt \}\}\n/u);
+  assert.match(body, /REF: \$\{\{ github\.ref \}\}\n/u);
+  assert.ok(body.includes('          case "${TRIGGERING_ACTOR}" in\n'));
+  const marker = "\n        run: |\n";
+  return { promotion, steps, script: body.slice(body.indexOf(marker) + marker.length).split("\n").map((line) => line.replace(/^ {10}/u, "")).join("\n") };
+}
+
+test("promotion은 허용된 행위자·첫 실행·main에서만 시작하고 어떤 외부 접근보다 먼저 확인한다 (#3030)", () => {
+  const { promotion, steps, script } = promotionStepScript();
+  assert.equal(script.includes("${{"), false);
   assert.ok(steps.indexOf("Require an authorized dispatcher") < steps.indexOf("actions/checkout@"));
   assert.ok(steps.indexOf("Require an authorized dispatcher") < steps.indexOf("secrets."));
-  // 환경 승인 기록 수집은 그대로 남는다: 비어 있으면 v3, 1건이면 v2로 판정되고 다른 조합은 검증기가 거부한다.
   assert.match(promotion, /actions\/runs\/\$\{GITHUB_RUN_ID\}\/approvals/);
+  // job 조건도 같은 허용 목록이라 허용되지 않은 dispatch는 환경을 잡기 전에 건너뛴다.
+  assert.ok(promotion.includes("    if: github.triggering_actor == 'easysubway-release-chain[bot]' || github.triggering_actor == 'AquilaXk'\n"));
+});
+
+// step을 실제 bash로 실행한다. case subject를 상수로 바꾸거나 allow list를 넓히는 변이가 실패해야 한다(#3030 F2).
+test("promotion 행위자 step은 허용 행위자의 첫 실행·main만 통과시키고 나머지는 거부한다 (#3030)", () => {
+  const { script } = promotionStepScript();
+  const run = (env) => spawnSync("/bin/bash", ["-c", script], { encoding: "utf8", env: { PATH: process.env.PATH, ...env } });
+  const base = { RUN_ATTEMPT: "1", REF: "refs/heads/main" };
+  for (const actor of ["easysubway-release-chain[bot]", "AquilaXk"]) assert.equal(run({ ...base, TRIGGERING_ACTOR: actor }).status, 0, actor);
+  for (const actor of ["AquilaXk-evil", "aquilaxk", "easysubway-release-chain", "easysubway-release-chain[bot]x", "other-collaborator", "", "*"]) {
+    const result = run({ ...base, TRIGGERING_ACTOR: actor });
+    assert.notEqual(result.status, 0, JSON.stringify(actor));
+    assert.match(result.stderr, /promotion dispatcher is not authorized/u, JSON.stringify(actor));
+  }
+  for (const [label, env] of [["rerun", { RUN_ATTEMPT: "2", REF: "refs/heads/main" }], ["other branch", { RUN_ATTEMPT: "1", REF: "refs/heads/feature" }], ["empty ref", { RUN_ATTEMPT: "1", REF: "" }]]) {
+    const result = run({ ...env, TRIGGERING_ACTOR: "AquilaXk" });
+    assert.notEqual(result.status, 0, label);
+    assert.match(result.stderr, /first attempt on main/u, label);
+  }
+});
+
+test("승격 요청자는 실제 dispatch 행위자(GITHUB_ACTOR)에서 오고 상수·다른 값으로 바뀌지 않는다 (#3030 F1)", () => {
+  const promotion = readFileSync(path.join(root, ".github/workflows/datapack-promotion.yml"), "utf8");
+  const occurrences = promotion.match(/--requested-by [^\n]*/gu) ?? [];
+  assert.deepEqual(occurrences, ['--requested-by "${GITHUB_ACTOR}" \\']);
+  const build = promotion.match(/- name: Data Pack Promotion \/ Build and validate promotion request[\s\S]*?\n\s+- name:/)?.[0] ?? "";
+  assert.ok(build.includes('--requested-by "${GITHUB_ACTOR}"'));
+  assert.equal(build.includes("GITHUB_ACTOR: "), false, "env로 덮어쓰지 않는다");
+  assert.equal(/GITHUB_ACTOR=/u.test(promotion), false);
 });
 
 test("체인이 dispatch한 호환성 run은 hub main push에 취소되지 않는다 (#3030)", () => {

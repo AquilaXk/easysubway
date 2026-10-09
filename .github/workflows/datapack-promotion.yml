@@ -23,6 +23,8 @@ on:
 jobs:
   promote-candidate:
     name: Data Pack / Promote candidate
+    # 허용되지 않은 행위자의 dispatch는 환경·runner를 잡기 전에 job 단계에서 건너뛴다. 아래 step은 같은 판정을 한 번 더 한다(재실행·ref 확인 포함).
+    if: github.triggering_actor == 'easysubway-release-chain[bot]' || github.triggering_actor == 'AquilaXk'
     runs-on: ubuntu-latest
     permissions:
       contents: read
