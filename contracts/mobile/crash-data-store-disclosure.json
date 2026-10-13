@@ -1,23 +1,10 @@
 {
-  "purpose": "Store / privacy disclosure checklist for Crashlytics introduction (WP5 #2435).",
+  "purpose": "Store / privacy disclosure checklist for Crashlytics introduction (WP5 https://github.com/AquilaXk/easysubway/issues/2435).",
   "privacyPolicyItems": [
-    "앱 안정성 개선을 위해 크래시·오류 진단 정보(스택트레이스, 기기·OS 메타)를 Firebase Crashlytics로 수집할 수 있음",
-    "사용자 식별자·정밀 위치 좌표는 크래시 커스텀 키로 전송하지 않음",
-    "debug 빌드에서는 Crashlytics 전송을 비활성화함"
-  ],
-  "appStorePrivacyLabels": [
-    {
-      "dataType": "Crash Data",
-      "linkedToUser": true,
-      "usedForTracking": false,
-      "purpose": "App Functionality"
-    },
-    {
-      "dataType": "Performance Data",
-      "linkedToUser": true,
-      "usedForTracking": false,
-      "purpose": "App Functionality"
-    }
+    "앱 안정성 개선을 위해 충돌 진단 정보(충돌 스택, 오류 종류 코드, 기기 모델·OS 버전, 앱 버전, 익명 설치 식별자)를 Firebase Crashlytics(Google)로 수집하고 충돌 보고를 위해 Google과 공유함",
+    "사용자 식별자·정밀 위치 좌표·검색어·신고 내용은 크래시 커스텀 키로 전송하지 않으며 setUserIdentifier를 호출하지 않음",
+    "추적·광고 목적으로 사용하지 않음",
+    "정식 배포(release) 빌드에서만 전송하고 debug·profile 빌드에서는 비활성화함"
   ],
   "playDataSafety": [
     {
@@ -26,13 +13,45 @@
       "shared": true,
       "sharedWith": "Firebase Crashlytics (Google)",
       "optional": false,
-      "purpose": "App functionality / stability"
+      "required": true,
+      "deletionSupported": false,
+      "purpose": "App functionality",
+      "usedForTracking": false,
+      "usedForAds": false
+    },
+    {
+      "dataType": "App info and performance — Diagnostics",
+      "collected": true,
+      "shared": true,
+      "sharedWith": "Firebase Crashlytics (Google)",
+      "optional": false,
+      "required": true,
+      "deletionSupported": false,
+      "purpose": "App functionality",
+      "usedForTracking": false,
+      "usedForAds": false
+    },
+    {
+      "dataType": "Device or other IDs",
+      "collected": true,
+      "shared": true,
+      "sharedWith": "Firebase Crashlytics (Google)",
+      "optional": false,
+      "required": true,
+      "deletionSupported": false,
+      "purpose": "App functionality",
+      "usedForTracking": false,
+      "usedForAds": false
     }
   ],
-  "iosPrivacyManifest": {
-    "file": "apps/mobile/ios/Runner/PrivacyInfo.xcprivacy",
-    "alreadyDeclares": ["NSPrivacyCollectedDataTypeCrashData", "NSPrivacyCollectedDataTypePerformanceData"],
-    "action": "keep declarations; no tracking domains added for Crashlytics"
+  "officialSources": [
+    "https://firebase.google.com/support/privacy",
+    "https://firebase.google.com/docs/android/play-data-disclosure"
+  ],
+  "inventoryLink": {
+    "file": "apps/mobile/release/store-privacy-inventory.json",
+    "dataTypeId": "diagnostics_crash_logs",
+    "decision": "crashAnrProviderDecision"
   },
-  "legalReview": "본 항목은 반영 필요성 식별·초안이며 개인정보 처리방침 문안의 법적 검토는 제외 범위(#2435)."
+  "legalReview": "본 항목은 반영 필요성 식별·초안이며 개인정보 처리방침 문안의 법적 검토는 제외 범위(https://github.com/AquilaXk/easysubway/issues/2435)."
 }
