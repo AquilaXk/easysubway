@@ -1,5 +1,7 @@
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { assertTemporaryReleaseDecisionsCurrent } from "./validate-production-readiness-evidence.mjs";
 
@@ -94,4 +96,22 @@ test("production readiness validator는 필수 임시 예외 decision 누락을 
     () => assertTemporaryReleaseDecisionsCurrent(evidence, new Date("2026-07-13T00:00:00.000+09:00")),
     /required temporary release decision missing: adminAuthTransition/,
   );
+});
+
+test("추적 중인 operations-release-evidence.json은 현재 시점 임시 예외 유효성과 post-launch sha256 결속을 만족한다", () => {
+  const evidenceUrl = new URL("../../release/product-gates/operations-release-evidence.json", import.meta.url);
+  const postLaunchUrl = new URL("../../release/product-gates/post-launch-operations-review-gate.json", import.meta.url);
+  const rawEvidence = readFileSync(evidenceUrl);
+  const evidence = JSON.parse(rawEvidence.toString("utf8"));
+  assert.doesNotThrow(() => assertTemporaryReleaseDecisionsCurrent(
+    evidence,
+    new Date("2026-10-14T00:00:00.000+09:00"),
+  ));
+
+  const actualSha256 = createHash("sha256").update(rawEvidence).digest("hex");
+  const postLaunchGate = JSON.parse(readFileSync(postLaunchUrl, "utf8"));
+  const operationsBinding = postLaunchGate.preLaunchReadiness?.finalRcBinding?.refreshBindings
+    ?.find((entry) => entry.refreshOn === "operations-contract-change")
+    ?.files?.find((file) => file.path === "release/product-gates/operations-release-evidence.json");
+  assert.equal(operationsBinding?.sha256, actualSha256);
 });

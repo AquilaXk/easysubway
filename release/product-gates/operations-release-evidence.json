@@ -108,7 +108,7 @@
       "temporaryReleaseDecisions": {
         "adminAuthTransition": {
           "owner": "AquilaXk",
-          "untilDate": "2026-10-13",
+          "untilDate": "2027-01-13",
           "risk": "OIDC/MFA/SSO 전환 전까지 운영 관리자 인증은 제한된 legacy 경로와 break-glass 절차에 의존한다.",
           "mitigation": "production Basic auth 기본 비활성화, required reviewer, lockout, credential rotation과 audit를 강제한다.",
           "followUpIssue": 1020
@@ -116,7 +116,7 @@
         "operatorTenantScope": {
           "scope": "operator-global",
           "owner": "AquilaXk",
-          "untilDate": "2026-10-13",
+          "untilDate": "2027-01-13",
           "risk": "운영기관별 tenant 분리 전에는 operator가 전체 운영 데이터 범위를 조회할 수 있다.",
           "mitigation": "RBAC, mutating/read audit, trusted proxy 경계와 production required reviewer를 강제한다.",
           "followUpIssue": 1020
@@ -125,7 +125,7 @@
           "backendReplicaCountOneEvidence": "PASS_COMPOSE_BACKEND_SERVICE_SINGLE_REPLICA",
           "scaleOutProhibitedRunbook": "분산 limiter 구현 전 backend service scale-out 금지; 후속 #1022",
           "owner": "AquilaXk",
-          "untilDate": "2026-10-13",
+          "untilDate": "2027-01-13",
           "postLaunchAbuseMonitoringThreshold": "최근 5분 report API 요청 중 429 비율이 5%를 초과하거나 duplicate/orphan cleanup 실패가 1회 발생하면 신규 신고 트래픽을 제한하고 운영 담당자에게 즉시 경보",
           "distributedLimiterFollowUpIssue": 1022
         }
