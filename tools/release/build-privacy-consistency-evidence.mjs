@@ -306,10 +306,17 @@ function buildPolicyBoundaryContext(inventory, items) {
 }
 
 // HTML 주석(<!-- ... -->) 안에만 남은 문구는 실제 사용자에게 렌더링되지 않으므로 anchor
-// 검사 대상에서 제외한다. 완전한 HTML 파서는 만들지 않고 주석 블록만 제거하는 최소
-// 정규식을 쓴다(각 anchor는 순수 텍스트 리터럴이라 이 정도로 충분하다).
-function stripHtmlComments(html) {
-  return html.replace(/<!--[\s\S]*?-->/g, "");
+// 검사 대상에서 제외한다. 중첩·분할된 주석 토큰(<!<!-- ... -->-- ... -->)이나 닫히지 않은
+// 주석 꼬리가 단일 패스 치환 뒤에 남아 <!-- 잔재를 만들지 않도록 더 이상 변하지 않을 때까지
+// 반복 제거한다.
+export function stripHtmlComments(html) {
+  let sanitized = String(html);
+  let previous;
+  do {
+    previous = sanitized;
+    sanitized = sanitized.replace(/<!--[\s\S]*?(?:-->|$)/g, "");
+  } while (sanitized !== previous);
+  return sanitized;
 }
 
 // runtime inventory가 선언하는 핵심 경계가 실제로 성립하고, 그 경계를 알리는 정책 문구
