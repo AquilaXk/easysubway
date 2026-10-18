@@ -5,35 +5,35 @@
       "hubPath": "contracts/api/internal-api-index.json",
       "repository": "AquilaXk/easysubway-backend",
       "sourcePath": "contracts/api/internal-api-index.json",
-      "sourceCommit": "f7a61d4b4df45b1a00542c0c16bb24d9f6e1c57d",
+      "sourceCommit": "ff68e1353c2b6c8940596b69c76d339f1b412546",
       "sha256": "e0433afd57e6e0f169efe52355478355d3ae8b621408abc87d9987f13d318f4f"
     },
     {
       "hubPath": "contracts/api/journey-v3.openapi.yaml",
       "repository": "AquilaXk/easysubway-backend",
       "sourcePath": "contracts/api/journey-v3.openapi.yaml",
-      "sourceCommit": "f7a61d4b4df45b1a00542c0c16bb24d9f6e1c57d",
+      "sourceCommit": "ff68e1353c2b6c8940596b69c76d339f1b412546",
       "sha256": "a3e0a75361b6ab74cb7e57eb7b68bb49e01400a874caf4afcbdb450e35f2d0f0"
     },
     {
       "hubPath": "contracts/api/realtime-api.openapi.yaml",
       "repository": "AquilaXk/easysubway-backend",
       "sourcePath": "contracts/api/realtime-api.openapi.yaml",
-      "sourceCommit": "f7a61d4b4df45b1a00542c0c16bb24d9f6e1c57d",
-      "sha256": "02c62e386b1a44a45f85cf142a602d1b36ce2f270d5921c926d7d53874a13b35"
+      "sourceCommit": "ff68e1353c2b6c8940596b69c76d339f1b412546",
+      "sha256": "ec92607318c92f1c922c3ea12fc0ba4fdfd19bdcf391a031e5af911fa268c5de"
     },
     {
       "hubPath": "contracts/api/report-api.openapi.yaml",
       "repository": "AquilaXk/easysubway-backend",
       "sourcePath": "contracts/api/report-api.openapi.yaml",
-      "sourceCommit": "f7a61d4b4df45b1a00542c0c16bb24d9f6e1c57d",
-      "sha256": "3d3820ce0b642b0a0e082edc1844b39a96ba096b90d6975aa28f45cc20db757b"
+      "sourceCommit": "ff68e1353c2b6c8940596b69c76d339f1b412546",
+      "sha256": "1014a5442224dc178c46f5457f2e694924bd504af7f42e2344d43b0eaff8e5ca"
     },
     {
       "hubPath": "contracts/api/train-api.openapi.yaml",
       "repository": "AquilaXk/easysubway-backend",
       "sourcePath": "contracts/api/train-api.openapi.yaml",
-      "sourceCommit": "f7a61d4b4df45b1a00542c0c16bb24d9f6e1c57d",
+      "sourceCommit": "ff68e1353c2b6c8940596b69c76d339f1b412546",
       "sha256": "95c8a72d8ffbd3b76c86d83be65d9c4bd9456e4e4c7a24fbd6ea98196cb93852"
     },
     {
