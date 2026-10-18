@@ -12,6 +12,11 @@ test("production release workflow는 test fixture clock을 사용하지 않는�
   assert.doesNotMatch(yml, /EASYSUBWAY_DATAPACK_BUILD_NOW/);
 });
 
+test("datapack release workflow는 mobile 빌드 도구와 mobile 경로에 의존하지 않는다", () => {
+  assert.doesNotMatch(yml, /flutter/i);
+  assert.doesNotMatch(yml, /apps\/mobile/);
+});
+
 test("product datapack 정책 변경은 release workflow를 실행한다", () => {
   assert.match(yml, /paths:[\s\S]*release\/product-gates\/datapack-freshness-sla\.json/);
   assert.match(yml, /paths:[\s\S]*release\/product-gates\/production-datapack-scope\.json/);

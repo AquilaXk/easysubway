@@ -2372,7 +2372,7 @@ export function validateGateIndex(errors, indexPath, gateDirectories) {
   }
 }
 
-function validateEnvScopeMap(errors, mapPath, envExamplePath) {
+export function validateEnvScopeMap(errors, mapPath, envExamplePath) {
   if (!existsSync(mapPath) || !existsSync(envExamplePath)) return;
   const map = loadJson(mapPath);
   const envKeys = readFileSync(envExamplePath, "utf8")
@@ -2383,6 +2383,11 @@ function validateEnvScopeMap(errors, mapPath, envExamplePath) {
   const mapped = Object.keys(map.keys ?? {}).sort(compareText);
   if (JSON.stringify(envKeys) !== JSON.stringify(mapped)) {
     errors.push(`${mapPath}: .env.example 키 집합과 다르다`);
+  }
+  for (const [key, scopes] of Object.entries(map.keys ?? {})) {
+    if (scopes.includes("datapack-release") && scopes.includes("store-release")) {
+      errors.push(`${mapPath}: ${key}가 datapack-release와 store-release 스코프를 함께 가진다`);
+    }
   }
 }
 
