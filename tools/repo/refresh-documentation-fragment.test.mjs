@@ -420,3 +420,42 @@ test("refreshDocumentationFragment in --check mode distinguishes content drift f
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("refreshDocumentationFragment는 내용이 같으면 관측 시각이 달라도 fragment를 바이트 단위로 유지한다", () => {
+  const { dir, fragPath } = createMockGitRepo();
+  try {
+    writeFileSync(join(dir, "README.md"), "# Changed\n", "utf8");
+    execFileSync("git", ["add", "README.md"], { cwd: dir });
+    execFileSync("git", ["commit", "-m", "Change readme"], { cwd: dir });
+
+    refreshDocumentationFragment({ repoRoot: dir, observedAt: "2026-09-23T12:00:00.000Z" });
+    const first = readFileSync(fragPath, "utf8");
+    const second = refreshDocumentationFragment({ repoRoot: dir, observedAt: "2026-09-24T12:00:00.000Z" });
+
+    assert.equal(second.updated, false);
+    assert.equal(readFileSync(fragPath, "utf8"), first);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test("refreshDocumentationFragment는 tracked resource가 없어도 sourceSha가 바뀌면 fragment를 다시 쓴다", () => {
+  const { dir, fragPath } = createMockGitRepo();
+  try {
+    const fragment = JSON.parse(readFileSync(fragPath, "utf8"));
+    fragment.resources = [];
+    writeFileSync(fragPath, JSON.stringify(fragment, null, 2) + "\n", "utf8");
+    writeFileSync(join(dir, "unrelated.txt"), "x\n", "utf8");
+    execFileSync("git", ["add", "unrelated.txt", "contracts/documentation"], { cwd: dir });
+    execFileSync("git", ["commit", "-m", "Unrelated commit"], { cwd: dir });
+    const headSha = execFileSync("git", ["rev-parse", "HEAD"], { cwd: dir, encoding: "utf8" }).trim();
+
+    const result = refreshDocumentationFragment({ repoRoot: dir, observedAt: "2026-09-23T12:00:00.000Z" });
+
+    assert.equal(result.driftCount, 0);
+    assert.equal(result.updated, true);
+    assert.equal(JSON.parse(readFileSync(fragPath, "utf8")).sourceSha, headSha);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
