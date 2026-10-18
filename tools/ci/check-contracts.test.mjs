@@ -6,6 +6,7 @@ import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync,
 import { tmpdir } from "node:os";
 import { join, relative, resolve } from "node:path";
 import {
+  validateEnvScopeMap,
   collectContractErrors,
   loadArchitectureDecisionAtRef,
   loadWorkspace,
@@ -3982,6 +3983,23 @@ test("env-scope-map이 .env.example 키와 1:1 대응한다", () => {
   const errors = collectContractErrors().filter((error) => error.includes("env-scope-map"));
 
   assert.deepEqual(errors, []);
+});
+
+test("env-scope-map은 한 키가 datapack-release와 store-release 스코프를 함께 갖는 것을 거부한다", () => {
+  const dir = mkdtempSync(join(tmpdir(), "env-scope-"));
+  try {
+    const mapPath = join(dir, "env-scope-map.json");
+    const envPath = join(dir, ".env.example");
+    writeFileSync(envPath, "SHARED_KEY=\nSTORE_KEY=\n");
+    writeFileSync(mapPath, JSON.stringify({ keys: { SHARED_KEY: ["datapack-release", "store-release"], STORE_KEY: ["store-release"] } }));
+    const errors = [];
+
+    validateEnvScopeMap(errors, mapPath, envPath);
+
+    assert.deepEqual(errors, [`${mapPath}: SHARED_KEY가 datapack-release와 store-release 스코프를 함께 가진다`]);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });
 
 function minimalV2Manifest() {
