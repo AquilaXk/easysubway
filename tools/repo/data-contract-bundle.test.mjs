@@ -46,6 +46,9 @@ const dataRepositoryOnlyFreshnessSourceIds = [
   "kric-subway-timetable-station-lines",
   "seoul-metro-transfer-car-door-duration",
 ];
+// candidate가 production inventory 항목을 가리키는데 Hub inventory 사본에 아직 없는 원천의 닫힌 목록이다.
+// seoul-metro-transfer-car-door-duration: Hub inventory 계약이 data 항목을 거부한다(위 dataRepositoryOnlyFreshnessSourceIds와 같은 사유).
+const dataRepositoryOnlyInventoryReferenceIds = ["seoul-metro-transfer-car-door-duration"];
 const externalSourceRegistrations = [
   {
     sourceId: "incheon-transit-accessibility",
@@ -380,4 +383,15 @@ test("퇴역한 원천 5건은 freshness SLA, governance 사본, inventory 사�
     assert.ok(sourceIds.length > 0, `${surface}: 비어 있지 않아야 비교가 의미 있다`);
     assert.deepEqual(sourceIds.filter((sourceId) => retiredSourceIds.includes(sourceId)), [], surface);
   }
+});
+
+test("미러된 source candidate가 가리키는 inventory 항목은 Hub inventory 사본에 존재한다", async () => {
+  const [{ candidates }, inventory] = await Promise.all([
+    readFile("tools/datapack/source-candidates.json", "utf8").then(JSON.parse),
+    readFile("tools/datapack/source-inventory.json", "utf8").then(JSON.parse),
+  ]);
+  const inventoryIds = new Set(inventory.sources.map(({ id }) => id));
+  const referenced = candidates.map(({ productionInventoryReferenceId }) => productionInventoryReferenceId).filter((id) => id != null);
+  assert.ok(referenced.length > 0);
+  assert.deepEqual(referenced.filter((id) => !inventoryIds.has(id)), dataRepositoryOnlyInventoryReferenceIds);
 });
