@@ -125,75 +125,6 @@
       }
     },
     {
-      "sourceId": "kric-station-elevator",
-      "sourceClassId": "static_accessibility_facility",
-      "retentionClassId": "standard-90d",
-      "ownerRole": "datapack-source-owner",
-      "stewardRole": "datapack-data-steward",
-      "approvalRole": "datapack-release-approver",
-      "escalationHours": 4,
-      "alertRoute": "github:area-datapack",
-      "licenseReview": {
-        "status": "APPROVED",
-        "termsHash": "08892ea7773d84a351e1f9f3ea208501fada4d062350b0f588c972af75c1c859",
-        "reviewedAt": "2026-07-11T15:00:00Z",
-        "nextReviewAt": "2027-07-11T15:00:00Z",
-        "termsUrl": "https://www.data.go.kr/data/15041682/openapi.do",
-        "reviewedProvider": "국가철도공단",
-        "reviewedDatasetUrl": "https://www.data.go.kr/data/15041682/openapi.do",
-        "redistributionScopes": [
-          "DERIVED_DATAPACK"
-        ],
-        "approvedByRole": "datapack-release-approver"
-      }
-    },
-    {
-      "sourceId": "kric-station-elevator-movement",
-      "sourceClassId": "static_accessibility_facility",
-      "retentionClassId": "standard-90d",
-      "ownerRole": "datapack-source-owner",
-      "stewardRole": "datapack-data-steward",
-      "approvalRole": "datapack-release-approver",
-      "escalationHours": 4,
-      "alertRoute": "github:area-datapack",
-      "licenseReview": {
-        "status": "APPROVED",
-        "termsHash": "084ab0ae620b74c4ac6633cecd46fae4d91cfc831582beeb84bfe5b2222cd280",
-        "reviewedAt": "2026-07-11T15:00:00Z",
-        "nextReviewAt": "2027-07-11T15:00:00Z",
-        "termsUrl": "https://www.data.go.kr/data/15041689/openapi.do",
-        "reviewedProvider": "국가철도공단",
-        "reviewedDatasetUrl": "https://www.data.go.kr/data/15041689/openapi.do",
-        "redistributionScopes": [
-          "DERIVED_DATAPACK"
-        ],
-        "approvedByRole": "datapack-release-approver"
-      }
-    },
-    {
-      "sourceId": "kric-station-escalator",
-      "sourceClassId": "static_accessibility_facility",
-      "retentionClassId": "standard-90d",
-      "ownerRole": "datapack-source-owner",
-      "stewardRole": "datapack-data-steward",
-      "approvalRole": "datapack-release-approver",
-      "escalationHours": 4,
-      "alertRoute": "github:area-datapack",
-      "licenseReview": {
-        "status": "APPROVED",
-        "termsHash": "2953cce5b977132db7e7a428c677e6d292401f77c40a1e8f8dd84af5a3e61df2",
-        "reviewedAt": "2026-07-11T15:00:00Z",
-        "nextReviewAt": "2027-07-11T15:00:00Z",
-        "termsUrl": "https://www.data.go.kr/data/15041683/openapi.do",
-        "reviewedProvider": "국가철도공단",
-        "reviewedDatasetUrl": "https://www.data.go.kr/data/15041683/openapi.do",
-        "redistributionScopes": [
-          "DERIVED_DATAPACK"
-        ],
-        "approvedByRole": "datapack-release-approver"
-      }
-    },
-    {
       "sourceId": "kric-subway-timetable",
       "sourceClassId": "planned_timetable",
       "retentionClassId": "standard-90d",
@@ -210,52 +141,6 @@
         "termsUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=162&service=trainUseInfo&operation=subwayTimetable&page=2",
         "reviewedProvider": "국가철도공단",
         "reviewedDatasetUrl": "https://data.kric.go.kr/rips/M_01_02/detail.do?id=162&service=trainUseInfo&operation=subwayTimetable&page=2",
-        "redistributionScopes": [
-          "DERIVED_DATAPACK"
-        ],
-        "approvedByRole": "datapack-release-approver"
-      }
-    },
-    {
-      "sourceId": "kric-wheelchair-lift-location",
-      "sourceClassId": "static_accessibility_facility",
-      "retentionClassId": "standard-90d",
-      "ownerRole": "datapack-source-owner",
-      "stewardRole": "datapack-data-steward",
-      "approvalRole": "datapack-release-approver",
-      "escalationHours": 4,
-      "alertRoute": "github:area-datapack",
-      "licenseReview": {
-        "status": "APPROVED",
-        "termsHash": "1148013f21d3b4e66095ae428518b8e69c315bd624c2c09391d60584532e41b1",
-        "reviewedAt": "2026-07-11T15:00:00Z",
-        "nextReviewAt": "2027-07-11T15:00:00Z",
-        "termsUrl": "https://www.data.go.kr/data/15041686/openapi.do",
-        "reviewedProvider": "국가철도공단",
-        "reviewedDatasetUrl": "https://www.data.go.kr/data/15041686/openapi.do",
-        "redistributionScopes": [
-          "DERIVED_DATAPACK"
-        ],
-        "approvedByRole": "datapack-release-approver"
-      }
-    },
-    {
-      "sourceId": "kric-wheelchair-lift-movement",
-      "sourceClassId": "static_accessibility_facility",
-      "retentionClassId": "standard-90d",
-      "ownerRole": "datapack-source-owner",
-      "stewardRole": "datapack-data-steward",
-      "approvalRole": "datapack-release-approver",
-      "escalationHours": 4,
-      "alertRoute": "github:area-datapack",
-      "licenseReview": {
-        "status": "APPROVED",
-        "termsHash": "8363159b325e09fbce4084c635e443db60272d8f973136e927d1348649001803",
-        "reviewedAt": "2026-07-11T15:00:00Z",
-        "nextReviewAt": "2027-07-11T15:00:00Z",
-        "termsUrl": "https://www.data.go.kr/data/15041690/openapi.do",
-        "reviewedProvider": "국가철도공단",
-        "reviewedDatasetUrl": "https://www.data.go.kr/data/15041690/openapi.do",
         "redistributionScopes": [
           "DERIVED_DATAPACK"
         ],

@@ -15,6 +15,7 @@ const resources = new Map([
   ["datapack/production-datapack-scope.json", "release/product-gates/production-datapack-scope.json"],
   ["datapack/train-search-itx-exclusion-gate.json", "release/product-gates/train-search-itx-exclusion-gate.json"],
 ]);
+// 퇴역한 원천이다. 옛 데이터팩 잔재가 production surface로 되돌아오는 것을 막는 fail-closed 방어 목록이다.
 const productionForbiddenMovementSourceIds = [
   "kric-station-elevator-movement",
   "kric-wheelchair-lift-movement",
@@ -342,9 +343,7 @@ test("production datapack은 retired movement source를 required·selected·cove
       assert.ok(!pack.networkEdges.some((edge) => edge.sourceId === sourceId && edge.accessibilityStatus === "AVAILABLE"), `${sourceId}: direct-route success`);
     }
     for (const sourceInventory of [inventory, mobileInventory]) {
-      const historical = sourceInventory.sources.find((source) => source.id === sourceId);
-      assert.ok(historical, `${sourceId}: historical identity`);
-      assert.equal(historical.productionUseAllowed, false, `${sourceId}: production eligibility`);
+      assert.ok(!sourceInventory.sources.some((source) => source.id === sourceId), `${sourceId}: retired from inventory`);
     }
   }
   assert.deepEqual(mobileInventory, inventory, "mobile inventory must match generated Hub inventory");
