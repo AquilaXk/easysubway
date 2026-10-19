@@ -15,8 +15,13 @@ const resources = new Map([
   ["datapack/production-datapack-scope.json", "release/product-gates/production-datapack-scope.json"],
   ["datapack/train-search-itx-exclusion-gate.json", "release/product-gates/train-search-itx-exclusion-gate.json"],
 ]);
-const productionForbiddenMovementSourceIds = [
+// 거버넌스 원장에서 퇴역한 KRIC 접근성 원천 5건이다(AquilaXk/easysubway-data tools/datapack/lib/retired-sources.mjs와 같은 목록).
+// Hub 계약 어디에도 다시 들어오면 안 된다. 옛 데이터팩 잔재가 production surface로 되돌아오는 것을 막는 fail-closed 방어 목록이다.
+const retiredSourceIds = [
+  "kric-station-elevator",
   "kric-station-elevator-movement",
+  "kric-station-escalator",
+  "kric-wheelchair-lift-location",
   "kric-wheelchair-lift-movement",
 ];
 const requiredProductionSourceIds = [
@@ -41,6 +46,9 @@ const dataRepositoryOnlyFreshnessSourceIds = [
   "kric-subway-timetable-station-lines",
   "seoul-metro-transfer-car-door-duration",
 ];
+// candidate가 production inventory 항목을 가리키는데 Hub inventory 사본에 아직 없는 원천의 닫힌 목록이다.
+// seoul-metro-transfer-car-door-duration: Hub inventory 계약이 data 항목을 거부한다(위 dataRepositoryOnlyFreshnessSourceIds와 같은 사유).
+const dataRepositoryOnlyInventoryReferenceIds = ["seoul-metro-transfer-car-door-duration"];
 const externalSourceRegistrations = [
   {
     sourceId: "incheon-transit-accessibility",
@@ -328,7 +336,7 @@ test("production datapack은 retired movement source를 required·selected·cove
     externalSourceRegistrations,
   );
 
-  for (const sourceId of productionForbiddenMovementSourceIds) {
+  for (const sourceId of retiredSourceIds) {
     assert.ok(!scope.productionSourceSet.requiredSourceIds.includes(sourceId), `${sourceId}: required`);
     assert.ok(!bundledScope.productionSourceSet.requiredSourceIds.includes(sourceId), `${sourceId}: bundled required`);
     assert.ok(!input.sourceIds.includes(sourceId), `${sourceId}: selected input`);
@@ -342,10 +350,48 @@ test("production datapack은 retired movement source를 required·selected·cove
       assert.ok(!pack.networkEdges.some((edge) => edge.sourceId === sourceId && edge.accessibilityStatus === "AVAILABLE"), `${sourceId}: direct-route success`);
     }
     for (const sourceInventory of [inventory, mobileInventory]) {
-      const historical = sourceInventory.sources.find((source) => source.id === sourceId);
-      assert.ok(historical, `${sourceId}: historical identity`);
-      assert.equal(historical.productionUseAllowed, false, `${sourceId}: production eligibility`);
+      assert.ok(!sourceInventory.sources.some((source) => source.id === sourceId), `${sourceId}: retired from inventory`);
     }
   }
   assert.deepEqual(mobileInventory, inventory, "mobile inventory must match generated Hub inventory");
+});
+
+test("퇴역한 원천 5건은 freshness SLA, governance 사본, inventory 사본, 번들 어디에도 다시 들어오지 못한다", async () => {
+  const readJson = async (file) => JSON.parse(await readFile(file, "utf8"));
+  const [freshness, governance, inventory, mobileInventory] = await Promise.all([
+    readJson("release/product-gates/datapack-freshness-sla.json"),
+    readJson("tools/datapack/source-governance-policy.json"),
+    readJson("tools/datapack/source-inventory.json"),
+    readJson("apps/mobile/assets/datapacks/source-inventory.json"),
+  ]);
+  const surfaces = new Map([
+    ["freshness SLA", freshness.sourceClasses.flatMap(({ sourceIds }) => sourceIds)],
+    ["governance 사본", governance.sources.map(({ sourceId }) => sourceId)],
+    ["Hub inventory 사본", inventory.sources.map(({ id }) => id)],
+    ["모바일 inventory 사본", mobileInventory.sources.map(({ id }) => id)],
+  ]);
+  for (const version of ["1.0.0", "1.1.0"]) {
+    const { resources } = await readJson(`contracts/bundles/data-contracts-v${version}.json`);
+    const bundledFreshness = JSON.parse(resources["datapack/datapack-freshness-sla.json"]);
+    const bundledGovernance = JSON.parse(resources["datapack/source-governance-policy.json"]);
+    const bundledScope = JSON.parse(resources["datapack/production-datapack-scope.json"]);
+    surfaces.set(`번들 ${version} freshness SLA`, bundledFreshness.sourceClasses.flatMap(({ sourceIds }) => sourceIds));
+    surfaces.set(`번들 ${version} governance`, bundledGovernance.sources.map(({ sourceId }) => sourceId));
+    surfaces.set(`번들 ${version} production scope`, bundledScope.productionSourceSet.requiredSourceIds);
+  }
+  for (const [surface, sourceIds] of surfaces) {
+    assert.ok(sourceIds.length > 0, `${surface}: 비어 있지 않아야 비교가 의미 있다`);
+    assert.deepEqual(sourceIds.filter((sourceId) => retiredSourceIds.includes(sourceId)), [], surface);
+  }
+});
+
+test("미러된 source candidate가 가리키는 inventory 항목은 Hub inventory 사본에 존재한다", async () => {
+  const [{ candidates }, inventory] = await Promise.all([
+    readFile("tools/datapack/source-candidates.json", "utf8").then(JSON.parse),
+    readFile("tools/datapack/source-inventory.json", "utf8").then(JSON.parse),
+  ]);
+  const inventoryIds = new Set(inventory.sources.map(({ id }) => id));
+  const referenced = candidates.map(({ productionInventoryReferenceId }) => productionInventoryReferenceId).filter((id) => id != null);
+  assert.ok(referenced.length > 0);
+  assert.deepEqual(referenced.filter((id) => !inventoryIds.has(id)), dataRepositoryOnlyInventoryReferenceIds);
 });
