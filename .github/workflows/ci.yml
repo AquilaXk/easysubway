@@ -210,7 +210,7 @@ jobs:
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
         env:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
-        run: node --test tools/ci/check-contracts.test.mjs tools/ci/cd-env-call-limit.test.mjs tools/ci/cd-workflow-contract.test.mjs tools/ci/check-boundaries.test.mjs tools/ci/apply-main-ruleset-required-checks.test.mjs tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs tools/ci/documentation-inventory.test.mjs tools/ci/automerge-queue.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs
+        run: node --test tools/ci/check-contracts.test.mjs tools/ci/cd-env-call-limit.test.mjs tools/ci/cd-workflow-contract.test.mjs tools/ci/check-boundaries.test.mjs tools/ci/apply-main-ruleset-required-checks.test.mjs tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs tools/ci/documentation-inventory.test.mjs tools/ci/automerge-queue.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs tools/ops/facility-report-photo-restore-check.test.mjs
 
       - name: Repository CI / Prepare active documentation fragment workspace
         if: ${{ needs.changes.outputs.contracts == 'true' }}
@@ -417,7 +417,7 @@ jobs:
           EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-manifest-only
         run: |
           set -euo pipefail
-          flutter pub get
+          flutter pub get --enforce-lockfile
           flutter build apk --config-only
           gradle_log="${RUNNER_TEMP}/easysubway-mobile-gradle-wrapper.log"
           for attempt in 1 2 3; do
@@ -460,7 +460,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub get
+          flutter pub get --enforce-lockfile
           # `flutter analyze`는 포맷 드리프트를 잡지 못해, 포맷이 어긋난 파일이 CI green으로
           # 병합된 뒤 무관한 PR에서 뒤늦게 터졌다. Dart 소스 전 디렉토리를 게이트로 고정한다.
           dart format --output=none --set-exit-if-changed lib test integration_test test_driver
@@ -521,7 +521,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          flutter pub get
+          flutter pub get --enforce-lockfile
           android_log="${RUNNER_TEMP}/easysubway-android-build.log"
           for attempt in 1 2 3; do
             set +e

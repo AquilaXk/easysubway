@@ -1,33 +1,42 @@
 import assert from "node:assert/strict";
+import childProcess from "node:child_process";
 import { createHash } from "node:crypto";
-import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import fs from "node:fs";
+import { mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { syncBuiltinESMExports } from "node:module";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
-import test, { after, before } from "node:test";
+import { join } from "node:path";
+import test, { after, before, mock } from "node:test";
 
+import { GH_EXECUTABLE_CANDIDATES } from "../lib/gh-executable.mjs";
 import { assembleOwnerReceipts, downloadOwnerHandoffs, runFanInCli, verifyOwnerEvidence } from "./run-public-sensitivity-audit.mjs";
 
 const REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
 const SHA = "a".repeat(40);
 const OBSERVED_AT = "2026-08-09T00:00:00.000Z";
 
-// 이 파일의 어떤 테스트도 실제 gh를 실행하면 안 된다. PATH 맨 앞에 호출을 기록만 하는 가짜 gh를 두고,
-// 파일 전체가 끝난 뒤 기록이 비어 있는지 확인한다(주입되지 않은 기본 provider 경로까지 잡는다).
-let fakeGhLog = null;
-let originalPath = null;
-before(async () => {
-  const directory = await mkdtemp(join(tmpdir(), "d20-fake-gh-"));
-  fakeGhLog = join(directory, "calls.log");
-  await writeFile(fakeGhLog, "");
-  const script = join(directory, "gh");
-  await writeFile(script, `#!/bin/sh\necho "$*" >> "${fakeGhLog}"\nexit 1\n`);
-  await chmod(script, 0o755);
-  originalPath = process.env.PATH;
-  process.env.PATH = `${directory}${delimiter}${originalPath ?? ""}`;
+// 이 파일의 어떤 테스트도 gh를 실행하면 안 된다. 운영 코드는 건드리지 않고 테스트 쪽에서 child_process.spawn을
+// 호출만 기록하는 mock으로 바꾼다(syncBuiltinESMExports로 `import { spawn }` 바인딩에도 반영). gh 탐색이
+// 이 머신의 설치 여부에 좌우되지 않도록 existsSync도 첫 후보에 한해 true로 바꾸고, 더미 토큰을 채워
+// 주입되지 않은 기본 provider가 spawn까지 가게 한다. 파일 전체가 끝난 뒤 spawn 호출이 0건이어야 한다.
+const TOKEN_ENV = "D20_FIVE_REPO_PUBLIC_AUDIT_READ_TOKEN";
+let savedToken;
+let spawnCalls = null;
+before(() => {
+  spawnCalls = [];
+  mock.method(childProcess, "spawn", (...args) => { spawnCalls.push(args); throw new Error("spawn must not be called in tests"); });
+  const realExistsSync = fs.existsSync;
+  mock.method(fs, "existsSync", (candidate) => candidate === GH_EXECUTABLE_CANDIDATES[0] || realExistsSync(candidate));
+  syncBuiltinESMExports();
+  savedToken = process.env[TOKEN_ENV];
+  process.env[TOKEN_ENV] = "dummy-token-for-spawn-spy";
 });
-after(async () => {
-  process.env.PATH = originalPath;
-  assert.equal(await readFile(fakeGhLog, "utf8"), "", "tests must not invoke the real gh CLI");
+after(() => {
+  if (savedToken === undefined) delete process.env[TOKEN_ENV]; else process.env[TOKEN_ENV] = savedToken;
+  const calls = spawnCalls.map(([command, args]) => `${command} ${args.join(" ")}`);
+  mock.restoreAll();
+  syncBuiltinESMExports();
+  assert.deepEqual(calls, [], "tests must not spawn gh through the default provider");
 });
 
 function receipt(repository, overrides = {}) {
