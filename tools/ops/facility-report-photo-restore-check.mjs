@@ -99,9 +99,8 @@ async function verifyManifestRow(line, rowNumber) {
 }
 
 // 사진 수가 많을 수 있어 행을 하나씩 순서대로 읽는다(동시에 읽으면 메모리·파일 핸들이 사진 수만큼 커진다).
-await lines.slice(1).reduce(
-  (previous, line, index) => previous.then(() => verifyManifestRow(line, index + 2)),
-  Promise.resolve(),
-);
+for (const [index, line] of lines.slice(1).entries()) {
+  await verifyManifestRow(line, index + 2); // NOSONAR -- 순차 실행이 의도다: 행마다 사진 전체를 메모리에 올리므로 동시 실행하면 사진 수만큼 메모리와 파일 핸들이 늘어난다.
+}
 
 console.log(`facility report photo restore rehearsal ok: ${restoredDir}`);

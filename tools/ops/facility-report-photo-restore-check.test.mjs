@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
-import { mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
+import { linkSync, mkdirSync, mkdtempSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
@@ -57,6 +57,17 @@ test("an object symlinked outside the backup is rejected even when size and sha2
   const result = runCheck(restoreDir);
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /symlink/);
+});
+
+test("an object hardlinked to a file outside the backup is rejected", () => {
+  const restoreDir = restoreDirWithPhoto();
+  const outside = path.join(path.dirname(restoreDir), "outside.jpg");
+  writeFileSync(outside, PHOTO);
+  rmSync(path.join(restoreDir, "objects", "a.jpg"));
+  linkSync(outside, path.join(restoreDir, "objects", "a.jpg"));
+  const result = runCheck(restoreDir);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /hardlink/);
 });
 
 test("an objects directory symlinked outside the backup is rejected", () => {

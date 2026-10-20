@@ -2,19 +2,22 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { chmod, mkdir, mkdtemp, readFile, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { delimiter, join } from "node:path";
+import { join } from "node:path";
 import test, { after, before } from "node:test";
 
+import { resolveGhExecutable, TEST_GH_EXECUTABLE_ENV } from "../lib/gh-executable.mjs";
 import { assembleOwnerReceipts, downloadOwnerHandoffs, runFanInCli, verifyOwnerEvidence } from "./run-public-sensitivity-audit.mjs";
 
 const REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
 const SHA = "a".repeat(40);
 const OBSERVED_AT = "2026-08-09T00:00:00.000Z";
 
-// 이 파일의 어떤 테스트도 실제 gh를 실행하면 안 된다. PATH 맨 앞에 호출을 기록만 하는 가짜 gh를 두고,
-// 파일 전체가 끝난 뒤 기록이 비어 있는지 확인한다(주입되지 않은 기본 provider 경로까지 잡는다).
+// 이 파일의 어떤 테스트도 실제 gh를 실행하면 안 된다. 기본 provider가 쓰는 gh 경로를 호출만 기록하는 가짜 gh로
+// 돌리고(test-only override), 토큰을 더미로 채워 기본 provider가 spawn까지 가게 한다. 파일 전체가 끝난 뒤
+// 기록이 비어 있어야 한다(주입되지 않은 기본 provider 경로까지 잡는다).
+const SAVED_ENV_KEYS = [TEST_GH_EXECUTABLE_ENV, "D20_FIVE_REPO_PUBLIC_AUDIT_READ_TOKEN"];
 let fakeGhLog = null;
-let originalPath = null;
+let savedEnv = null;
 before(async () => {
   const directory = await mkdtemp(join(tmpdir(), "d20-fake-gh-"));
   fakeGhLog = join(directory, "calls.log");
@@ -22,12 +25,16 @@ before(async () => {
   const script = join(directory, "gh");
   await writeFile(script, `#!/bin/sh\necho "$*" >> "${fakeGhLog}"\nexit 1\n`);
   await chmod(script, 0o755);
-  originalPath = process.env.PATH;
-  process.env.PATH = `${directory}${delimiter}${originalPath ?? ""}`;
+  savedEnv = Object.fromEntries(SAVED_ENV_KEYS.map((key) => [key, process.env[key]]));
+  process.env[TEST_GH_EXECUTABLE_ENV] = script;
+  process.env.D20_FIVE_REPO_PUBLIC_AUDIT_READ_TOKEN = "dummy-token-for-fake-gh";
+  assert.equal(resolveGhExecutable(), script, "the fake gh must be what the default provider would spawn (run with node --test)");
 });
 after(async () => {
-  process.env.PATH = originalPath;
-  assert.equal(await readFile(fakeGhLog, "utf8"), "", "tests must not invoke the real gh CLI");
+  for (const [key, value] of Object.entries(savedEnv)) {
+    if (value === undefined) delete process.env[key]; else process.env[key] = value;
+  }
+  assert.equal(await readFile(fakeGhLog, "utf8"), "", "tests must not invoke the gh CLI through the default provider");
 });
 
 function receipt(repository, overrides = {}) {
