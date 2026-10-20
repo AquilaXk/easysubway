@@ -64,8 +64,7 @@ const lines = manifestBytes.toString("utf8").trimEnd().split(/\r?\n/);
 assert.ok(lines.length > 1, "photo restore manifest must contain at least one object row");
 assert.deepEqual(lines[0].split("\t"), expectedHeader);
 
-for (const [index, line] of lines.slice(1).entries()) {
-  const rowNumber = index + 2;
+async function verifyManifestRow(line, rowNumber) {
   const columns = line.split("\t");
   assert.equal(columns.length, expectedHeader.length, `manifest row ${rowNumber} must have ${expectedHeader.length} columns`);
 
@@ -98,5 +97,11 @@ for (const [index, line] of lines.slice(1).entries()) {
     assert.equal(sha256(objectBytes), row.sha256.toLowerCase(), `manifest row ${rowNumber} object sha256 mismatch`);
   }
 }
+
+// 사진 수가 많을 수 있어 행을 하나씩 순서대로 읽는다(동시에 읽으면 메모리·파일 핸들이 사진 수만큼 커진다).
+await lines.slice(1).reduce(
+  (previous, line, index) => previous.then(() => verifyManifestRow(line, index + 2)),
+  Promise.resolve(),
+);
 
 console.log(`facility report photo restore rehearsal ok: ${restoredDir}`);
