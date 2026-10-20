@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
 
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
+import { resolveGhExecutable } from "../lib/gh-executable.mjs";
 
 export const REPOSITORIES = ["AquilaXk/easysubway", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-data", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"];
 export const SURFACES = ["REPOSITORY_SECURITY_RECEIPT", "ISSUE_TITLE", "ISSUE_BODY", "ISSUE_COMMENT", "PR_TITLE", "PR_BODY", "PR_COMMENT", "PR_REVIEW_BODY", "PR_REVIEW_COMMENT", "COMMIT_COMMENT", "RELEASE_METADATA", "PUBLIC_ARTIFACT"];
@@ -327,9 +329,8 @@ function crc32(bytes) { let crc = 0xffffffff; for (const byte of bytes) { crc ^=
 function sorted(items) { return [...items].sort((left, right) => codepointCompare(left.repository ?? JSON.stringify(left), right.repository ?? JSON.stringify(right))); }
 function dedupe(items) { return [...new Map(items.map((item) => [JSON.stringify(item), item])).values()].sort((left, right) => codepointCompare(JSON.stringify(left), JSON.stringify(right))); }
 function sortedUnique(items) { return Array.isArray(items) && items.every((item, index) => index === 0 || JSON.stringify(items[index - 1]) < JSON.stringify(item)); }
-function codepointCompare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 
-async function boundedGh({ method, endpoint, binary = false }) { if (method !== "GET" || !/^repos\/AquilaXk\/easysubway(?:-(?:backend|data|mobile|platform))?(?:\/|$)/.test(endpoint)) throw new Error("invalid provider request"); return new Promise((resolvePromise, reject) => { const child = spawn("gh", ["api", "--method", "GET", endpoint], { stdio: ["ignore", "pipe", "ignore"] }); const chunks = []; let length = 0; const limit = binary ? BINARY_OUTPUT_LIMIT : OUTPUT_LIMIT; const timer = setTimeout(() => child.kill(), 30_000); child.stdout.on("data", (chunk) => { chunks.push(chunk); length += chunk.length; if (length > limit) child.kill(); }); child.on("error", reject); child.on("close", (code) => { clearTimeout(timer); if (code !== 0 || length > limit) reject(new Error("provider unavailable")); else { const output = Buffer.concat(chunks); try { resolvePromise(binary ? output : JSON.parse(output.toString("utf8"))); } catch { reject(new Error("malformed response")); } } }); }); }
+async function boundedGh({ method, endpoint, binary = false }) { if (method !== "GET" || !/^repos\/AquilaXk\/easysubway(?:-(?:backend|data|mobile|platform))?(?:\/|$)/.test(endpoint)) throw new Error("invalid provider request"); const ghExecutable = resolveGhExecutable(); if (ghExecutable == null) throw new Error("provider unavailable"); return new Promise((resolvePromise, reject) => { const child = spawn(ghExecutable, ["api", "--method", "GET", endpoint], { stdio: ["ignore", "pipe", "ignore"] }); const chunks = []; let length = 0; const limit = binary ? BINARY_OUTPUT_LIMIT : OUTPUT_LIMIT; const timer = setTimeout(() => child.kill(), 30_000); child.stdout.on("data", (chunk) => { chunks.push(chunk); length += chunk.length; if (length > limit) child.kill(); }); child.on("error", reject); child.on("close", (code) => { clearTimeout(timer); if (code !== 0 || length > limit) reject(new Error("provider unavailable")); else { const output = Buffer.concat(chunks); try { resolvePromise(binary ? output : JSON.parse(output.toString("utf8"))); } catch { reject(new Error("malformed response")); } } }); }); }
 
 async function readContracts() {
   const [scopeSchemaText, receiptSchemaText, reportSchemaText, runnerText] = await Promise.all([

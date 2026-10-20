@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 import { inflateRawSync } from "node:zlib";
 
 import { validateSchema } from "../ci/lib/json-schema-lite.mjs";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
+import { resolveGhExecutable } from "../lib/gh-executable.mjs";
 import { REPOSITORIES, runAuditCli, validateReceipt, validateScope } from "./audit-public-sensitivity.mjs";
 
 const OUTPUT_LIMIT = 2 * 1024 * 1024;
@@ -135,13 +137,13 @@ function normalizeTimestamp(value) { const parsed = Date.parse(value ?? ""); ret
 function instant(value) { const parsed = Date.parse(value); return Number.isFinite(parsed) ? parsed : NaN; }
 export function digest(bytes) { return createHash("sha256").update(bytes).digest("hex"); }
 function crc32(bytes) { let crc = 0xffffffff; for (const byte of bytes) { crc ^= byte; for (let bit = 0; bit < 8; bit += 1) crc = (crc >>> 1) ^ (0xedb88320 & -(crc & 1)); } return (crc ^ 0xffffffff) >>> 0; }
-function codepointCompare(left, right) { return left < right ? -1 : left > right ? 1 : 0; }
 function safeToken(value) { return typeof value === "string" && value.length > 0 && value.length <= 4096 && !/[\0-\x1f\x7f]/.test(value); }
 function publicAuditGet(request) { return boundedGet({ token: process.env.D20_FIVE_REPO_PUBLIC_AUDIT_READ_TOKEN, ...request }); }
 function boundedGet({ token, method, endpoint, binary = false }) {
-  if (method !== "GET" || !safeToken(token) || !/^repos\/AquilaXk\/easysubway(?:-(?:backend|data|mobile|platform))?(?:\/|$)/.test(endpoint)) return Promise.reject(new Error("provider unavailable"));
+  const ghExecutable = resolveGhExecutable();
+  if (ghExecutable == null || method !== "GET" || !safeToken(token) || !/^repos\/AquilaXk\/easysubway(?:-(?:backend|data|mobile|platform))?(?:\/|$)/.test(endpoint)) return Promise.reject(new Error("provider unavailable"));
   return new Promise((resolvePromise, reject) => {
-    const child = spawn("gh", ["api", "--method", "GET", endpoint], { env: { ...process.env, GH_TOKEN: token }, stdio: ["ignore", "pipe", "ignore"] }); const chunks = []; let size = 0; const limit = binary ? BINARY_OUTPUT_LIMIT : OUTPUT_LIMIT; const timer = setTimeout(() => child.kill("SIGTERM"), 30_000);
+    const child = spawn(ghExecutable, ["api", "--method", "GET", endpoint], { env: { ...process.env, GH_TOKEN: token }, stdio: ["ignore", "pipe", "ignore"] }); const chunks = []; let size = 0; const limit = binary ? BINARY_OUTPUT_LIMIT : OUTPUT_LIMIT; const timer = setTimeout(() => child.kill("SIGTERM"), 30_000);
     child.stdout.on("data", (chunk) => { chunks.push(chunk); size += chunk.length; if (size > limit) child.kill("SIGTERM"); });
     child.on("error", reject); child.on("close", (code) => { clearTimeout(timer); if (code !== 0 || size > limit) reject(new Error("provider unavailable")); else try { const output = Buffer.concat(chunks); resolvePromise(binary ? output : JSON.parse(output.toString("utf8"))); } catch { reject(new Error("provider unavailable")); } });
   });

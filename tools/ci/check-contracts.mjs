@@ -861,7 +861,7 @@ export function validatePublicSensitivityAuditScope(scope, errors = [], path = "
   const expectedDispositionKeys = JSON.stringify(["detectorId", "expiresAt", "locationFingerprint", "owner", "reason", "verifiedAt"]);
   let previous = "";
   for (const disposition of scope?.falsePositiveDispositions ?? []) {
-    if (JSON.stringify(Object.keys(disposition ?? {}).sort()) !== expectedDispositionKeys) errors.push(`${path}: falsePositiveDisposition shape는 exact여야 한다`);
+    if (JSON.stringify(Object.keys(disposition ?? {}).sort(codepointCompare)) !== expectedDispositionKeys) errors.push(`${path}: falsePositiveDisposition shape는 exact여야 한다`);
     const identity = `${disposition?.locationFingerprint}\u0000${disposition?.detectorId}`;
     if (identity <= previous) errors.push(`${path}: falsePositiveDisposition은 codepoint sorted-unique여야 한다`);
     previous = identity;

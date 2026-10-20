@@ -2,6 +2,8 @@ import { spawn } from "node:child_process";
 import { open, readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
+import { resolveGhExecutable } from "../lib/gh-executable.mjs";
 import { DETECTORS, REPOSITORIES, collectArtifactCatalog, scanArtifactArchive, validateReceipt } from "./audit-public-sensitivity.mjs";
 import { digest, readSingleZipJson, stableJson } from "./run-public-sensitivity-audit.mjs";
 
@@ -119,7 +121,7 @@ function parseArgs(args) {
 
 function validEvidenceShape(evidence) {
   const keys = ["alertEnumerationComplete", "detectorPolicyVersion", "gitSha", "locationEnumerationComplete", "observedAt", "openAlertCount", "publicArtifactEnumerationComplete", "publicArtifacts", "pushProtectionEnabled", "reachableRefAuditComplete", "repository", "schemaVersion", "secretScanningEnabled", "unresolvedAlertCount"];
-  return evidence != null && !Array.isArray(evidence) && JSON.stringify(Object.keys(evidence).sort()) === JSON.stringify(keys);
+  return evidence != null && !Array.isArray(evidence) && JSON.stringify(Object.keys(evidence).sort(codepointCompare)) === JSON.stringify(keys);
 }
 
 function normalizeArtifact(raw) {
@@ -134,9 +136,10 @@ function canonicalUtc(value) { return /^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/
 function normalizeTimestamp(value) { const parsed = Date.parse(value ?? ""); return Number.isFinite(parsed) && /(?:Z|[+-]\d\d:\d\d)$/.test(value ?? "") ? new Date(parsed).toISOString() : null; }
 function instant(value) { const parsed = Date.parse(value); return Number.isFinite(parsed) ? parsed : NaN; }
 function boundedGet({ token, method, endpoint, binary = false }) {
-  if (method !== "GET" || !/^repos\/AquilaXk\/easysubway(?:-(?:backend|data|mobile|platform))?(?:\/|$)/.test(endpoint) || !safeToken(token)) return Promise.reject(new Error("provider unavailable"));
+  const ghExecutable = resolveGhExecutable();
+  if (ghExecutable == null || method !== "GET" || !/^repos\/AquilaXk\/easysubway(?:-(?:backend|data|mobile|platform))?(?:\/|$)/.test(endpoint) || !safeToken(token)) return Promise.reject(new Error("provider unavailable"));
   return new Promise((resolve, reject) => {
-    const child = spawn("gh", ["api", "--method", "GET", endpoint], { env: { ...process.env, GH_TOKEN: token }, stdio: ["ignore", "pipe", "ignore"] }); const chunks = []; let size = 0; const limit = binary ? BINARY_OUTPUT_LIMIT : OUTPUT_LIMIT; const timer = setTimeout(() => child.kill("SIGTERM"), 30_000);
+    const child = spawn(ghExecutable, ["api", "--method", "GET", endpoint], { env: { ...process.env, GH_TOKEN: token }, stdio: ["ignore", "pipe", "ignore"] }); const chunks = []; let size = 0; const limit = binary ? BINARY_OUTPUT_LIMIT : OUTPUT_LIMIT; const timer = setTimeout(() => child.kill("SIGTERM"), 30_000);
     child.stdout.on("data", (chunk) => { chunks.push(chunk); size += chunk.length; if (size > limit) child.kill("SIGTERM"); });
     child.on("error", reject); child.on("close", (code) => { clearTimeout(timer); if (code !== 0 || size > limit) reject(new Error("provider unavailable")); else try { const output = Buffer.concat(chunks); resolve(binary ? output : JSON.parse(output.toString("utf8"))); } catch { reject(new Error("provider unavailable")); } });
   });
