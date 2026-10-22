@@ -55,8 +55,8 @@
     "summaryRequiredKo": "Play Console pre-launch report와 Android vitals의 crash, ANR, policy warning 상태를 민감정보 없이 요약한다."
   },
   "deviceEvidencePolicy": {
-    "codexQaDevice": "local_android_emulator_only",
-    "physicalDeviceEvidence": "not_used_for_codex_pr_evidence",
+    "qaDevice": "local_android_emulator_only",
+    "physicalDeviceEvidence": "not_used_for_pr_evidence",
     "releaseRcEvidence": "play_installed_or_exact_rc_required_before_go",
     "minimumAndroidApi": 35,
     "fontScales": [1.5, 2.0],
