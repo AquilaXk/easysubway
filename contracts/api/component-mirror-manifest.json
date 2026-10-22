@@ -40,14 +40,14 @@
       "hubPath": "tools/datapack/source-candidates.json",
       "repository": "AquilaXk/easysubway-data",
       "sourcePath": "tools/datapack/source-candidates.json",
-      "sourceCommit": "a74044de55104d69dfa54874bfe58a4001cc5c38",
-      "sha256": "bb8355029fc88f016868c80e234180e901bce44db1576289c2a312122b75bb3b"
+      "sourceCommit": "80b54a82fe81434e2dbc00bcf31df2c242058c72",
+      "sha256": "d3e48265a180677dc55c908e7771a3413d5bb4939531e66a80a0c19b79e22f99"
     },
     {
       "hubPath": "tools/datapack/source-operation.mjs",
       "repository": "AquilaXk/easysubway-data",
       "sourcePath": "tools/datapack/source-operation.mjs",
-      "sourceCommit": "a74044de55104d69dfa54874bfe58a4001cc5c38",
+      "sourceCommit": "80b54a82fe81434e2dbc00bcf31df2c242058c72",
       "sha256": "9332a436f39a76d4a49a8d69d1b6cc8d21d85a97c44520b337828972d85aa5d8"
     }
   ]
