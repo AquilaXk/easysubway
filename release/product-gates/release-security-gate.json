@@ -217,13 +217,13 @@
       "linkedArtifacts": ["release/product-gates/abuse-penetration-rehearsal-gate.json", "release/product-gates/security-privacy-release-evidence.json", "backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java", "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java"]
     },
     {
-      "id": "repository_codex_security_scan_before_release",
+      "id": "repository_security_scan_before_release",
       "area": "repository",
       "severity": "release-blocker",
-      "titleKo": "출시 전 Codex Security scan",
+      "titleKo": "출시 전 저장소 보안 scan",
       "ownerKo": "보안/릴리즈 담당",
-      "readyWhenKo": "프로덕션 제출 후보 commit에 대해 Codex Security 저장소 scan과 모바일/백엔드 의존성 점검 결과를 PR 또는 release gate 기록에 남긴다.",
-      "evidence": ["codex-security-scan-result", "release-candidate-review"],
+      "readyWhenKo": "프로덕션 제출 후보 commit에 대해 저장소 보안 scan과 모바일/백엔드 의존성 점검 결과를 PR 또는 release gate 기록에 남긴다.",
+      "evidence": ["repository-security-scan-result", "release-candidate-review"],
       "linkedArtifacts": ["tools/ci/repository-contract.test.mjs", ".github/PULL_REQUEST_TEMPLATE/full.md", ".github/workflows/ci.yml"]
     },
     {

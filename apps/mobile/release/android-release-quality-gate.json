@@ -328,7 +328,7 @@
     }
   },
   "evidencePolicy": {
-    "localOnlyEvidenceRoot": ".codex/evidence/release/android-quality/<rc-or-run>/",
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/android-quality/<rc-or-run>/",
     "githubEvidencePolicy": "summary-or-public-link",
     "sensitiveEvidence": [
       "screen recordings with personal data",

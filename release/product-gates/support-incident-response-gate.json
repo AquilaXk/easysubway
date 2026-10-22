@@ -7,7 +7,7 @@
   "status": "PASS",
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "postLaunchOperationsReviewGate": "release/product-gates/post-launch-operations-review-gate.json",
-  "evidenceRoot": ".codex/evidence/release/support-incident-response/<rc-or-run>/",
+  "evidenceRoot": ".evidence/evidence/release/support-incident-response/<rc-or-run>/",
   "preLaunchReadiness": {
     "status": "PASS",
     "evidenceDateKst": "2026-07-15",
@@ -43,7 +43,7 @@
         "receivedAt": "2026-07-15T00:00:00+09:00",
         "result": "PASS",
         "redactionNotes": "message body, sender, and mailbox personal data omitted",
-        "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/mailbox-routing-summary.json",
+        "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/mailbox-routing-summary.json",
         "evidenceIds": ["support-mailbox-receive-test", "store-contact-preview", "app-help-screen-contact-check"]
       },
       {
@@ -52,7 +52,7 @@
         "receivedAt": "2026-07-15T00:00:00+09:00",
         "result": "PASS",
         "redactionNotes": "summary only; device identifier omitted",
-        "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-help-ui-summary.json",
+        "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-help-ui-summary.json",
         "evidenceIds": ["faq-copy-review", "incident-notice-copy-review", "local-emulator-help-screen-screenshot-or-ui-tree"]
       },
       {
@@ -61,7 +61,7 @@
         "receivedAt": "2026-07-15T00:00:00+09:00",
         "result": "PASS",
         "redactionNotes": "message body, sender, and mailbox personal data omitted",
-        "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/mailbox-routing-summary.json",
+        "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/mailbox-routing-summary.json",
         "evidenceIds": ["security-mailbox-test", "data-deletion-mailbox-test", "privacy-request-routing-check"]
       }
     ],
@@ -72,14 +72,14 @@
       "contactSetSha256": "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
       "contacts": ["support@aquilaxk.site", "security@aquilaxk.site"],
       "dataDeletionRoute": "in-app deletion confirmation",
-      "localOnlyEvidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-help-ui-summary.json"
+      "localOnlyEvidence": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-help-ui-summary.json"
     },
     "operatorContactReadiness": {
       "result": "PASS",
       "verifiedOfficialRoutes": ["Seoul Open Data error report", "MOLIT TAGO subway data inquiry"],
       "outboundContactPerformed": false,
       "publicEvidenceSummary": "공식 오류 신고·데이터 문의 경로, P0 요청 template, 내부 응답 SLA, source archive 위치를 확인했다.",
-      "localOnlyEvidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/operator-contact-readiness.json"
+      "localOnlyEvidence": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/operator-contact-readiness.json"
     },
     "remainingSupportReadiness": []
   },

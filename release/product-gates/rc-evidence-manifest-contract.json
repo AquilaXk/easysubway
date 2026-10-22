@@ -133,9 +133,9 @@
     "noGoStatus": "NO_GO"
   },
   "evidencePolicy": {
-    "localOnlyEvidenceRoot": ".codex/evidence/release/rc-evidence-manifest/<rc-or-run>/",
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/rc-evidence-manifest/<rc-or-run>/",
     "githubUploadPolicy": "summary-or-public-workflow-link",
     "sensitiveEvidencePolicy": "local_path_with_reason",
-    "androidDeviceEvidence": "local_android_emulator_only_for_codex_pr_evidence"
+    "androidDeviceEvidence": "local_android_emulator_only_for_pr_evidence"
   }
 }

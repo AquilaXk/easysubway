@@ -46,7 +46,7 @@
     "uploadAttempted": false,
     "storeSubmitAttempted": false,
     "secretValuesPrinted": false,
-    "localOnlyEvidence": ".codex/evidence/release/play-production-access/1016-api-track-testers-20260728/"
+    "localOnlyEvidence": ".evidence/evidence/release/play-production-access/1016-api-track-testers-20260728/"
   },
   "accountEvidence": {
     "qaEvidenceDateKst": "2026-07-28",
@@ -60,7 +60,7 @@
     "leastPrivilegeConsoleUsers": "READY",
     "twoFactorAuthentication": "READY",
     "testerPersonalDataStoredInTrackedFiles": false,
-    "localOnlyEvidence": ".codex/evidence/release/play-production-access/1016-console-account-access-20260728/"
+    "localOnlyEvidence": ".evidence/evidence/release/play-production-access/1016-console-account-access-20260728/"
   },
   "closedTestProgress": {
     "track": "alpha",
@@ -215,7 +215,7 @@
     "failedRcVersionCodeReuse": "BLOCKED_TECHNICAL"
   },
   "evidencePolicy": {
-    "localOnlyEvidenceRoot": ".codex/evidence/release/play-production-access/<rc-or-run>/",
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/play-production-access/<rc-or-run>/",
     "githubEvidencePolicy": "summary-only",
     "sensitiveEvidence": [
       "Google Play Console screenshots",

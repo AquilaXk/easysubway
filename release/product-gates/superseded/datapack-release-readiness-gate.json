@@ -80,7 +80,7 @@
     "qualityMetricReport": "artifacts/datapack-quality-metrics.json",
     "routeGraphTopologyReport": "artifacts/route-graph-topology-report.json",
     "freshnessSlaPolicy": "release/product-gates/datapack-freshness-sla.json",
-    "androidOfflineRouteEvidence": ".codex/evidence/datapack-release-readiness/<rc-or-run>/android-offline-route-summary.md"
+    "androidOfflineRouteEvidence": ".evidence/evidence/datapack-release-readiness/<rc-or-run>/android-offline-route-summary.md"
   },
   "requiredVerificationCommands": [
     "node tools/datapack/validate-datapack.mjs --require-production ...",
@@ -95,7 +95,7 @@
   ],
   "evidencePolicy": {
     "githubSummaryOnly": true,
-    "localOnlyEvidenceRoot": ".codex/evidence/datapack-release-readiness/<rc-or-run>/",
+    "localOnlyEvidenceRoot": ".evidence/evidence/datapack-release-readiness/<rc-or-run>/",
     "forbiddenInGithubSummary": [
       "provider credential or quota token",
       "backend-only provider key",
