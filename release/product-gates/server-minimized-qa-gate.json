@@ -3,7 +3,7 @@
   "applicationId": "easysubway",
   "releaseGate": "server-minimized-device-qa",
   "localOnlyEvidence": true,
-  "evidenceRoot": ".codex/evidence/server-minimization/pr10",
+  "evidenceRoot": ".evidence/evidence/server-minimization/pr10",
   "releaseBlockerScope": {
     "androidGooglePlayV1Required": true,
     "iosDeferredOutOfScope": true,
@@ -23,7 +23,7 @@
       "finalAcceptanceIds": ["app_starts_without_backend", "no_api_call_on_app_start", "no_anonymous_auth_tokens"],
       "command": "adb shell am start -n com.easysubway.app/com.easysubway.easysubway_mobile.MainActivity",
       "manualTarget": "backend stopped or airplane mode, first screen visible",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/app-start-backend-down",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/app-start-backend-down",
       "evidence": ["screenshot", "logcat_excerpt", "network_request_count_zero"],
       "linkedArtifacts": ["apps/mobile/lib/main.dart", "apps/mobile/lib/app/app_bootstrap.dart", "apps/mobile/lib/core/datapack/data_pack_client.dart"]
     },
@@ -34,7 +34,7 @@
       "finalAcceptanceIds": ["airplane_station_search"],
       "command": "adb shell settings put global airplane_mode_on 1",
       "manualTarget": "search Sangnoksu and station number 448 without HTTP requests",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/airplane-station-search",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/airplane-station-search",
       "evidence": ["ui_tree_dump", "network_proxy_log"],
       "linkedArtifacts": ["apps/mobile/lib/features/stations/data/drift_station_repository.dart", "apps/mobile/lib/station_search.dart", "apps/mobile/test/features/stations/drift_station_repository_test.dart"]
     },
@@ -45,7 +45,7 @@
       "finalAcceptanceIds": ["airplane_route_search"],
       "command": "cd apps/mobile && flutter test test/features/routes test/features/internal_route",
       "manualTarget": "search Sangnoksu to Sadang with wheelchair profile in airplane mode",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/airplane-route-search",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/airplane-route-search",
       "evidence": ["ui_tree_dump", "route_engine_test_result", "network_proxy_log"],
       "linkedArtifacts": ["apps/mobile/lib/features/routes/application/route_engine.dart", "apps/mobile/lib/features/routes/data/local_route_repository.dart", "apps/mobile/lib/route_search.dart"]
     },
@@ -56,7 +56,7 @@
       "finalAcceptanceIds": ["manifest_ttl_or_etag_only", "datapack_failure_keeps_existing_pack"],
       "command": "cd apps/mobile && flutter test test/core/datapack",
       "manualTarget": "corrupt gzip, sha256 mismatch, quick_check failure keep installed pack pointer",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/datapack-failure-keeps-pack",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/datapack-failure-keeps-pack",
       "evidence": ["flutter_test_output"],
       "linkedArtifacts": ["apps/mobile/lib/core/datapack/data_pack_installer.dart", "apps/mobile/lib/core/datapack/data_pack_updater.dart", "apps/mobile/test/core/datapack/data_pack_updater_test.dart"]
     },
@@ -67,7 +67,7 @@
       "finalAcceptanceIds": ["datapack_update_preserves_user_data"],
       "command": "cd apps/mobile && flutter test test/core/database test/features/favorites",
       "manualTarget": "favorite station, favorite route, and report receipt metadata survive catalog pack swap",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/user-db-migration",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/user-db-migration",
       "evidence": ["flutter_test_output", "ui_tree_dump"],
       "linkedArtifacts": ["apps/mobile/lib/core/database/user", "apps/mobile/lib/features/favorites/data/drift_favorite_repositories.dart", "apps/mobile/test/features/favorites/drift_favorite_repositories_test.dart"]
     },
@@ -78,7 +78,7 @@
       "finalAcceptanceIds": ["no_report_photo_base64"],
       "command": "cd apps/mobile && flutter test test/facility_report_test.dart",
       "manualTarget": "photo picker recovery returns object upload payload without base64 report body",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/photo-picker-recovery",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/photo-picker-recovery",
       "evidence": ["flutter_test_output", "logcat_excerpt"],
       "linkedArtifacts": ["apps/mobile/lib/facility_report.dart", "apps/mobile/test/facility_report_test.dart"]
     },
@@ -89,7 +89,7 @@
       "finalAcceptanceIds": ["manifest_ttl_or_etag_only", "datapack_failure_keeps_existing_pack"],
       "command": "cd apps/mobile && flutter test test/core/datapack/data_pack_updater_test.dart",
       "manualTarget": "CDN timeout keeps current pack and shows recoverable state",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/cdn-timeout",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/cdn-timeout",
       "evidence": ["flutter_test_output", "screenshot"],
       "linkedArtifacts": ["apps/mobile/lib/core/datapack/data_pack_client.dart", "apps/mobile/lib/core/datapack/data_pack_updater.dart"]
     },
@@ -100,7 +100,7 @@
       "finalAcceptanceIds": ["airplane_station_search", "airplane_route_search", "receipt_token_only_report_status"],
       "command": "adb shell settings put secure enabled_accessibility_services com.google.android.marvin.talkback/.TalkBackService",
       "manualTarget": "TalkBack reads station search, route search, and report receipt error next actions",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/talkback-search-route-report",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/talkback-search-route-report",
       "evidence": ["screen_recording", "accessibility_notes"],
       "linkedArtifacts": ["apps/mobile/test/accessibility_baseline_test.dart", "apps/mobile/lib/facility_report.dart"]
     },
@@ -111,7 +111,7 @@
       "finalAcceptanceIds": ["airplane_station_search", "airplane_route_search", "airplane_station_detail"],
       "command": "adb shell settings put system font_scale 1.5",
       "manualTarget": "home, station detail, route result, and report screens show no clipped primary actions",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/font-scale-150",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/font-scale-150",
       "evidence": ["screenshots", "ui_tree_dump"],
       "linkedArtifacts": ["apps/mobile/test/widget_test.dart", "apps/mobile/test/accessibility_baseline_test.dart"]
     },
@@ -122,7 +122,7 @@
       "finalAcceptanceIds": ["airplane_station_search", "airplane_route_search", "airplane_station_detail"],
       "command": "cd apps/mobile && flutter test test/accessibility_baseline_test.dart",
       "manualTarget": "high contrast controls and warnings remain visible",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/high-contrast",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/high-contrast",
       "evidence": ["flutter_test_output", "screenshots"],
       "linkedArtifacts": ["apps/mobile/test/accessibility_baseline_test.dart", "apps/mobile/lib/main.dart"]
     },
@@ -133,7 +133,7 @@
       "finalAcceptanceIds": ["airplane_station_search", "airplane_station_detail"],
       "command": "adb shell pm revoke com.easysubway.app android.permission.ACCESS_FINE_LOCATION",
       "manualTarget": "station name search remains usable after location permission denial",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/location-denied",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/location-denied",
       "evidence": ["screenshots", "permission_state"],
       "linkedArtifacts": ["apps/mobile/lib/station_search.dart", "apps/mobile/test/widget_test.dart"]
     },
@@ -144,7 +144,7 @@
       "finalAcceptanceIds": ["app_starts_without_backend"],
       "command": "cd apps/mobile && ../../tools/mobile/validate-release-dart-defines.sh --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\" && flutter build appbundle --release --target-platform=android-arm,android-arm64 --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\"",
       "manualTarget": "installable internal-test-track build or documented Play App Signing path",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/android/internal-test-track-install",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/android/internal-test-track-install",
       "evidence": ["appbundle_build_output", "install_result"],
       "linkedArtifacts": ["apps/mobile/android/app/build.gradle.kts", ".github/workflows/release-artifacts.yml"]
     },
@@ -155,7 +155,7 @@
       "finalAcceptanceIds": ["app_starts_without_backend", "no_api_call_on_app_start"],
       "command": "cd apps/mobile && ../../tools/mobile/validate-release-dart-defines.sh --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\" && flutter build ios --simulator --no-codesign --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\"",
       "manualTarget": "Simulator launches first screen with backend stopped",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/app-start-backend-down",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/ios/app-start-backend-down",
       "evidence": ["screenshot", "xcodebuild_log_excerpt", "network_request_count_zero"],
       "linkedArtifacts": ["apps/mobile/lib/main.dart", "apps/mobile/lib/app/app_bootstrap.dart"]
     },
@@ -166,7 +166,7 @@
       "finalAcceptanceIds": ["airplane_station_search", "airplane_route_search", "airplane_station_detail"],
       "command": "xcrun simctl ui booted appearance light",
       "manualTarget": "VoiceOver focus follows home, search, route, and report primary actions",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/voiceover-focus-order",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/ios/voiceover-focus-order",
       "evidence": ["accessibility_description", "screen_recording"],
       "linkedArtifacts": ["apps/mobile/test/accessibility_baseline_test.dart", "apps/mobile/lib/main.dart"]
     },
@@ -177,7 +177,7 @@
       "finalAcceptanceIds": ["airplane_station_search", "airplane_route_search", "airplane_station_detail"],
       "command": "xcrun simctl ui booted content_size extra-extra-extra-large",
       "manualTarget": "home, station detail, route result, and report screens remain readable",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/dynamic-type-max",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/ios/dynamic-type-max",
       "evidence": ["screenshots", "accessibility_description"],
       "linkedArtifacts": ["apps/mobile/test/widget_test.dart", "apps/mobile/test/accessibility_baseline_test.dart"]
     },
@@ -188,7 +188,7 @@
       "finalAcceptanceIds": ["airplane_station_search", "airplane_route_search", "airplane_station_detail"],
       "command": "xcrun simctl ui booted appearance dark",
       "manualTarget": "bold text, increase contrast, and reduce motion do not hide controls",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/bold-contrast-motion",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/ios/bold-contrast-motion",
       "evidence": ["screenshots", "accessibility_settings"],
       "linkedArtifacts": ["apps/mobile/lib/main.dart", "apps/mobile/test/accessibility_baseline_test.dart"]
     },
@@ -199,7 +199,7 @@
       "finalAcceptanceIds": ["airplane_station_search", "no_report_photo_base64"],
       "command": "plutil -p apps/mobile/ios/Runner/Info.plist",
       "manualTarget": "location and photo permission copy matches current feature purpose",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/permission-dialog-copy",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/ios/permission-dialog-copy",
       "evidence": ["plist_output", "screenshots"],
       "linkedArtifacts": ["apps/mobile/ios/Runner/Info.plist", "apps/mobile/lib/station_search.dart", "apps/mobile/lib/facility_report.dart"]
     },
@@ -210,7 +210,7 @@
       "finalAcceptanceIds": ["no_report_photo_base64", "receipt_token_only_report_status"],
       "command": "cd apps/mobile && flutter test test/facility_report_test.dart",
       "manualTarget": "signed upload failure shows easy next action and does not expose raw token",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/signed-upload-failure",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/ios/signed-upload-failure",
       "evidence": ["flutter_test_output", "screenshot"],
       "linkedArtifacts": ["apps/mobile/lib/facility_report.dart", "apps/mobile/test/facility_report_test.dart"]
     },
@@ -221,7 +221,7 @@
       "finalAcceptanceIds": ["receipt_token_only_report_status"],
       "command": "cd apps/mobile && flutter test test/facility_report_test.dart",
       "manualTarget": "missing receipt token status lookup shows recoverable Korean copy",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/receipt-token-missing",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/ios/receipt-token-missing",
       "evidence": ["flutter_test_output", "screenshot"],
       "linkedArtifacts": ["apps/mobile/lib/facility_report.dart", "apps/mobile/test/facility_report_test.dart"]
     },
@@ -232,7 +232,7 @@
       "finalAcceptanceIds": ["app_starts_without_backend", "datapack_update_preserves_user_data"],
       "command": "cd apps/mobile && ../../tools/mobile/validate-release-dart-defines.sh --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\" && flutter build ios --release --no-codesign --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\"",
       "manualTarget": "Runner.app bundle contains assets/datapacks index and baseline sqlite packs",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/archive-baseline-pack",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/ios/archive-baseline-pack",
       "evidence": ["xcodebuild_log_excerpt", "bundle_file_listing"],
       "linkedArtifacts": ["apps/mobile/pubspec.yaml", "apps/mobile/assets/datapacks/index.json", "apps/mobile/assets/datapacks/nationwide.sqlite.gz"]
     },
@@ -243,7 +243,7 @@
       "finalAcceptanceIds": ["no_report_photo_base64", "receipt_token_only_report_status"],
       "command": "cd apps/mobile && ../../tools/mobile/validate-release-dart-defines.sh --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\" && flutter build ios --release --no-codesign --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\"",
       "manualTarget": "Runner.app bundle contains PrivacyInfo.xcprivacy",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/archive-privacy-manifest",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/ios/archive-privacy-manifest",
       "evidence": ["xcodebuild_log_excerpt", "bundle_file_listing"],
       "linkedArtifacts": ["apps/mobile/ios/Runner/PrivacyInfo.xcprivacy", "apps/mobile/ios/Runner.xcodeproj/project.pbxproj"]
     },
@@ -254,7 +254,7 @@
       "finalAcceptanceIds": ["app_starts_without_backend", "redis_push_not_mvp_required", "admin_review_reaches_override_or_next_pack"],
       "command": "cd apps/mobile && ../../tools/mobile/validate-release-dart-defines.sh --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\" && flutter build ipa --release --dart-define=EASYSUBWAY_API_BASE_URL=\"${EASYSUBWAY_API_BASE_URL}\" --dart-define=EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY=\"${EASYSUBWAY_KAKAO_MAP_NATIVE_APP_KEY}\"",
       "manualTarget": "TestFlight build or signed device install reaches first screen without Redis or push provider",
-      "localEvidencePath": ".codex/evidence/server-minimization/pr10/ios/testflight-or-signed-device",
+      "localEvidencePath": ".evidence/evidence/server-minimization/pr10/ios/testflight-or-signed-device",
       "evidence": ["xcodebuild_log_excerpt", "install_result", "release_notes"],
       "linkedArtifacts": ["apps/mobile/ios/Runner.xcodeproj/project.pbxproj", ".github/workflows/release-artifacts.yml", "backend/src/main/resources/application.yml"]
     }

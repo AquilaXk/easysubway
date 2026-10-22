@@ -40,7 +40,7 @@
     "passCriteriaKo": "로컬 Android emulator의 `adb shell getconf PAGE_SIZE`가 16384이고 RC 또는 Play-installed build 핵심 smoke가 통과해야 한다."
   },
   "evidencePolicy": {
-    "localOnlyEvidenceRoot": ".codex/evidence/release/android-16kb-page-size/<rc-or-run>/",
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/android-16kb-page-size/<rc-or-run>/",
     "githubEvidencePolicy": "summary-only",
     "sensitiveEvidence": [
       "AAB binary",

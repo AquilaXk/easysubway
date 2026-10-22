@@ -27,7 +27,7 @@
     "downloadIdsPrinted": false,
     "certificateFingerprintPrinted": false,
     "secretValuesPrinted": false,
-    "localOnlyEvidence": ".codex/evidence/release/play-generated-apk-device-matrix/1016-generated-apks-10004-20260713/"
+    "localOnlyEvidence": ".evidence/evidence/release/play-generated-apk-device-matrix/1016-generated-apks-10004-20260713/"
   },
   "latestPhysicalDevice": {
     "qaEvidenceDateKst": "2026-07-13",
@@ -135,7 +135,7 @@
     "preLaunchCrashAnrOrPolicyWarningUntriaged": "BLOCKED_TECHNICAL"
   },
   "evidencePolicy": {
-    "localOnlyEvidenceRoot": ".codex/evidence/release/play-generated-apk-device-matrix/<rc-or-run>/",
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/play-generated-apk-device-matrix/<rc-or-run>/",
     "githubEvidencePolicy": "summary-or-public-console-link",
     "sensitiveEvidence": [
       "Google Play Console screenshots",

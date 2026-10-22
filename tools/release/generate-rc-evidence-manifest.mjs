@@ -56,7 +56,7 @@ if (!Number.isFinite(generatedAtMillis)) {
 const generatedAt = new Date(generatedAtMillis).toISOString();
 const testedAt = arg("testedAt", "tested-at") ?? generatedAt;
 const evidenceRoot = normalizeEvidenceRoot(
-  arg("evidenceRoot", "evidence-root") ?? ".codex/evidence/release/rc-evidence-manifest/<rc-or-run>/",
+  arg("evidenceRoot", "evidence-root") ?? ".evidence/evidence/release/rc-evidence-manifest/<rc-or-run>/",
 );
 const appVersion = readFlutterVersion(path.join(appRoot, "pubspec.yaml"));
 const dataPackManifestPath = resolvePath(

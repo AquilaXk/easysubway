@@ -329,7 +329,7 @@ export function classifyReference(reference, { ledger, amendments, openHubIssues
   }
   if (effective?.pendingTransfer && ["ISSUE_TERMINAL_IMPLEMENTATION", "ISSUE_CURRENT_OWNER"].includes(referenceClass)) return makeFinding("WRONG_REPOSITORY_OR_OWNER", referenceClass, reference, item, effective, "pending transfer cannot satisfy terminal/current-owner claim");
   if (reference.markers?.NO_FALLBACK_OWNER !== undefined && reference.markers.NO_FALLBACK_OWNER !== "__OVERLAP__" && reference.markers.NO_FALLBACK_OWNER !== (effective?.canonicalRepository ?? target.repository)) return makeFinding("NO_FALLBACK_OWNER_OR_POLICY_DRIFT", referenceClass, reference, item, effective, "NO_FALLBACK_OWNER differs from canonical owner");
-  if (reference.markers?.REVIEW_FALLBACK !== undefined && !["CODERABBIT", "CODEX_CLI_FALLBACK"].includes(reference.markers.REVIEW_FALLBACK)) return makeFinding("REVIEW_FALLBACK_CLASSIFICATION_DRIFT", referenceClass, reference, item, effective, "REVIEW_FALLBACK is not an exact supported class");
+  if (reference.markers?.REVIEW_FALLBACK !== undefined && reference.markers.REVIEW_FALLBACK !== "CODERABBIT") return makeFinding("REVIEW_FALLBACK_CLASSIFICATION_DRIFT", referenceClass, reference, item, effective, "REVIEW_FALLBACK is not an exact supported class");
   if (effective?.disposition === "SPLIT_CHILDREN") {
     const isParent = target.repository === effective.canonicalRepository && target.number === effective.canonicalNumber;
     const isChild = effective.childIssues.some((child) => child.repository === target.repository && child.number === target.number);

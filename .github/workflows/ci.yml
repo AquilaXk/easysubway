@@ -307,7 +307,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          unexpected_agent_files="$(git ls-files AGENTS.md CLAUDE.md GEMINI.md CURSOR.md COPILOT.md docs .codex .claude .cursor .aider .windsurf .ai)"
+          unexpected_agent_files="$(git ls-files AGENTS.md CLAUDE.md GEMINI.md CURSOR.md COPILOT.md docs .evidence .claude .cursor .aider .windsurf .ai)"
           if [[ -n "${unexpected_agent_files}" ]]; then
             echo "Unexpected tracked local agent file:"
             echo "${unexpected_agent_files}"

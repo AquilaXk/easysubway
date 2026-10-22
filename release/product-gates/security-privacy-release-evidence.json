@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "applicationId": "easysubway",
   "releaseBlockerPolicy": true,
-  "sensitiveEvidenceLocalOnlyPath": ".codex/evidence/security-privacy-release/<pr-or-rc>/",
+  "sensitiveEvidenceLocalOnlyPath": ".evidence/evidence/security-privacy-release/<pr-or-rc>/",
   "datapackSigningKeyLifecycle": {
     "requiredEvidence": [
       "manifest public keyring snapshot",

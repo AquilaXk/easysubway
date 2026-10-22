@@ -17,7 +17,7 @@
     "procedureIdDerivation": "matrixId + '.' + caseId",
     "targetAliasDerivation": "'target.' + matrixId",
     "ownerAliasDerivation": "'owner.' + matrixId",
-    "relativeEvidencePathPattern": "^\\.codex/evidence/security/abuse-penetration-rehearsal/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+)*$",
+    "relativeEvidencePathPattern": "^\\.evidence/evidence/security/abuse-penetration-rehearsal/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+)*$",
     "fieldTypes": {
       "root": { "schemaVersion": "integer", "releaseGate": "string", "issue": "integer", "status": "string", "rawInvocationStored": "boolean", "redactionPolicyId": "string", "artifactIdentity": "object", "evidence": "array", "productionLikeEvidence": "array", "matrices": "array" },
       "artifactIdentity": { "gitSha": "string", "versionCode": "integer", "androidApplicationId": "string", "dataPackManifestSha256": "string", "aabSha256": "string", "generatedApkSha256": "string", "backendImageDigest": "string", "backendArtifactSha256": "string" },
@@ -58,7 +58,7 @@
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "securityPrivacyEvidenceManifest": "release/product-gates/security-privacy-release-evidence.json",
   "releaseSecurityGate": "release/product-gates/release-security-gate.json",
-  "evidenceRoot": ".codex/evidence/security/abuse-penetration-rehearsal/<git-sha>/",
+  "evidenceRoot": ".evidence/evidence/security/abuse-penetration-rehearsal/<git-sha>/",
   "latestQaEvidenceStatus": {
     "qaEvidenceDateKst": "2026-06-28",
     "playAndStorePreflight": {

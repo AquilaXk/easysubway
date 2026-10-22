@@ -68,6 +68,6 @@
   "evidencePolicy": {
     "fixtureOnlyEvidenceAllowedForGo": false,
     "productionOrManualRealtimeEvidenceRequired": true,
-    "localOnlyEvidenceRoot": ".codex/evidence/release/route-readiness/<rc-or-run>/"
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/route-readiness/<rc-or-run>/"
   }
 }

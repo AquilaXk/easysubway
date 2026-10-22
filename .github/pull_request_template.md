@@ -60,5 +60,5 @@ Refs #
 - [ ] 필요한 검증 결과와 미실행 사유를 기록했다.
 - [ ] CodeRabbit 리뷰를 확인했다.
 - [ ] GitHub PR Review 객체가 있는지 확인했다. CodeRabbit status check만으로는 리뷰 완료로 보지 않는다.
-- [ ] CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 Codex CLI code review를 단일 PR review로 게시했다.
+- [ ] CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 `aquila-review` 스킬로 Aquila 마커 Review를 단일 PR review로 게시했다.
 - [ ] CodeRabbit 봇과의 추가 질의응답을 포함하여 모든 Review thread가 해결(Resolve conversation)되었는지 확인했다.

@@ -1093,7 +1093,7 @@ jobs:
             --data-pack-artifact "${data_pack_artifact}"
             --data-pack-fallback-artifact "${data_pack_fallback_artifact}"
             --release-sequence "${release_sequence}"
-            --evidence-root ".codex/evidence/release/rc-evidence-manifest/${GITHUB_SHA}/"
+            --evidence-root ".evidence/evidence/release/rc-evidence-manifest/${GITHUB_SHA}/"
             --device local_android_emulator
             --android-version android-15-or-16
           )
