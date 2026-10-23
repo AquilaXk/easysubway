@@ -39,10 +39,12 @@ const requiredProductionSourceIds = [
 // - seoul-metro-transfer-car-door-duration: Hub inventory 계약(check-contracts 2129-2141)이 data 항목
 //   (productionUseAllowed:true, domain evidence 없음)을 거부한다. 정합은 easysubway-data#888에서 처리한다.
 // - kric-subway-timetable-station-lines: data 레포 등록(easysubway-data#903) 전이라 Hub 사본에 아직 없다.
+// - kric-station-escalator-detailed: data 레포 등록(easysubway-data#1460) 전이라 Hub 사본에 아직 없다.
 const dataRepositoryOnlyFreshnessSourceIds = [
   "incheon-line1-train-timetable",
   "incheon-line2-train-timetable",
   "incheon-transit-station-info",
+  "kric-station-escalator-detailed",
   "kric-subway-timetable-station-lines",
   "seoul-metro-transfer-car-door-duration",
 ];
@@ -297,6 +299,17 @@ test("datapack freshness SLA는 current public route-map position과 연간 공�
     assert.ok(
       bundled.sourceClasses.find((sourceClass) => sourceClass.id === "planned_timetable").sourceIds.includes("kric-subway-timetable-station-lines"),
       `data-contracts-v${version} planned_timetable station-lines source`,
+    );
+  }
+  // QA 승인(2026-10-23, 에픽 #3036 7-34행): KRIC 역 에스컬레이터 상세(stationEscalator)를 재채택한다.
+  // 위치·설비 정적 접근성 원천이므로 static_accessibility_facility 기준을 그대로 따른다(data#1460).
+  assert.equal(classes.get("static_accessibility_facility").sourceIds.at(-1), "kric-station-escalator-detailed");
+  for (const version of ["1.0.0", "1.1.0"]) {
+    const bundle = JSON.parse(await readFile(`contracts/bundles/data-contracts-v${version}.json`, "utf8"));
+    const bundled = JSON.parse(bundle.resources["datapack/datapack-freshness-sla.json"]);
+    assert.ok(
+      bundled.sourceClasses.find((sourceClass) => sourceClass.id === "static_accessibility_facility").sourceIds.includes("kric-station-escalator-detailed"),
+      `data-contracts-v${version} static_accessibility_facility escalator-detailed source`,
     );
   }
   assert.deepEqual(classes.get("incheon_timetable_observation"), {
