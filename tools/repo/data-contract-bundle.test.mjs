@@ -50,7 +50,7 @@ const dataRepositoryOnlyFreshnessSourceIds = [
 ];
 // candidate가 production inventory 항목을 가리키는데 Hub inventory 사본에 아직 없는 원천의 닫힌 목록이다.
 // seoul-metro-transfer-car-door-duration: Hub inventory 계약이 data 항목을 거부한다(위 dataRepositoryOnlyFreshnessSourceIds와 같은 사유).
-const dataRepositoryOnlyInventoryReferenceIds = ["seoul-metro-transfer-car-door-duration"];
+const dataRepositoryOnlyInventoryReferenceIds = ["seoul-metro-transfer-car-door-duration", "kric-station-escalator-detailed"];
 const externalSourceRegistrations = [
   {
     sourceId: "incheon-transit-accessibility",
