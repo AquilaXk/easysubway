@@ -1,206 +1,835 @@
 name: Automerge Queue
 
-# 다중 세션 병합 경합 해소용 FIFO 코디네이터 (#1751).
-# automerge 라벨이 붙은 PR을 생성순으로 한 번에 하나만 처리한다:
-# head PR에 auto-merge를 예약하고 BEHIND면 update-branch 한다.
-# 병합이 일어나면 push 이벤트가 이 워크플로우를 다시 실행해 다음 PR을 처리한다.
-# 라벨은 merge-workflow 규약 4단계(단일 discovery Review 게이트) 완료 후에만 붙인다.
-# fix/rebase는 discovery Review를 무효화하지 않으며 current-head CI·thread·exact-head gate가 delivery를 보호한다.
-# labeled 이벤트의 라벨 검색 인덱싱 지연(빈 큐 오검출)은 이벤트 PR 직접 합류 + REST 재확인으로 보정한다 (#2010).
-
 on:
+  pull_request_target:
+    types: [labeled, unlabeled]
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
   push:
-    branches:
-      - main
-  pull_request:
-    types:
-      - labeled
+    branches: [main]
   pull_request_review:
-    types:
-      - submitted
+    types: [submitted]
+  schedule:
+    - cron: '*/15 * * * *'
   workflow_dispatch:
 
-concurrency:
-  group: automerge-queue
-  cancel-in-progress: false
-
-permissions:
-  contents: read
+permissions: {}
 
 jobs:
+  queue-probe:
+    name: Automerge queue probe
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    permissions:
+      pull-requests: read
+    outputs:
+      labeled: ${{ steps.probe.outputs.labeled }}
+    steps:
+      - name: Probe labeled pull requests
+        id: probe
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          count="$(gh pr list --repo "${GITHUB_REPOSITORY}" --base main --state open --label automerge --draft=false --limit 1 --json number --jq 'length')"
+          [[ "${count}" =~ ^[0-9]+$ ]]
+          if [[ "${count}" -gt 0 ]]; then
+            echo "labeled=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "labeled=false" >> "${GITHUB_OUTPUT}"
+          fi
+
   coordinate:
     name: Automerge Queue
-    if: github.event_name != 'pull_request' || github.event.label.name == 'automerge'
+    needs: queue-probe
+    if: ${{ !cancelled() && (github.event_name != 'schedule' || needs.queue-probe.outputs.labeled == 'true') && (github.event_name != 'pull_request_target' || github.event.label.name == 'automerge') }}
+    concurrency:
+      group: automerge-queue
+      cancel-in-progress: false
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     permissions:
-      contents: write # update-branch API에 필요
-      pull-requests: write # auto-merge 예약, PR 코멘트, automerge 라벨 제거에 필요
+      checks: read
+      contents: write
+      pull-requests: write
+      statuses: read
+    env:
+      # github-actions[bot] 마커 작성자 신원을 보존하기 위해 기본 GH_TOKEN은 github.token으로 고정하고,
+      # 후속 workflow 트리거가 필요한 병합과 update-branch 호출에만 MERGE_GH_TOKEN을 쓴다.
+      GH_TOKEN: ${{ github.token }}
+      MERGE_GH_TOKEN: ${{ secrets.AUTOMERGE_PAT != '' && secrets.AUTOMERGE_PAT || github.token }}
+      HAS_AUTOMERGE_PAT: ${{ secrets.AUTOMERGE_PAT != '' }}
     steps:
-      - name: Process queue head
-        env:
-          # GITHUB_TOKEN의 push는 PR CI를 트리거하지 못하므로 PAT가 없으면 체인이 멈춘다.
-          GH_TOKEN: ${{ secrets.AUTOMERGE_PAT != '' && secrets.AUTOMERGE_PAT || github.token }}
-          HAS_PAT: ${{ secrets.AUTOMERGE_PAT != '' }}
-          REPO: ${{ github.repository }}
-          EVENT_NAME: ${{ github.event_name }}
-          EVENT_PR: ${{ github.event_name == 'pull_request' && github.event.pull_request.number || '' }}
+      - name: Coordinate oldest eligible pull request
+        shell: bash
         run: |
           set -euo pipefail
 
-          if [ "${HAS_PAT}" != "true" ]; then
-            echo "::warning::AUTOMERGE_PAT secret이 없어 GITHUB_TOKEN으로 실행한다. update-branch push가 PR CI를 트리거하지 못해 큐 체인이 멈출 수 있다."
+          if [ "${HAS_AUTOMERGE_PAT}" != "true" ]; then
+            echo "::warning::AUTOMERGE_PAT secret이 없어 GITHUB_TOKEN으로 병합한다. 병합이 후속 workflow run을 만들지 못해 큐 체인이 멈출 수 있다."
           fi
 
-          # Derive the required checks from the main ruleset so newly required
-          # checks (Admin QA Gates, Release Gate Consistency, PR Title) are honored
-          # without editing this workflow. Fall back to the known set if the
-          # ruleset query fails, so a transient API error never lets a PR with a
-          # failing required check slip past the derail logic.
-          ruleset_err="$(mktemp)"
-          required_checks=$(gh api "repos/${REPO}/rules/branches/main" \
-            --jq '[.[] | select(.type == "required_status_checks")
-              | .parameters.required_status_checks[].context]' 2>"${ruleset_err}" || true)
-          if [ -z "${required_checks}" ] || [ "${required_checks}" = "[]" ]; then
-            # Preserve the underlying gh api error so repeated fallbacks are
-            # diagnosable from the workflow log (permission/API change/transient).
-            echo "::warning::main ruleset required_status_checks 동적 조회 실패($(tr '\n' ' ' <"${ruleset_err}")) — 하드코딩 폴백 사용."
-            required_checks='["Changes","Repository CI","Admin QA Gates","Backend CI","Mobile App CI","Android CI","Release Gate Consistency","PR Title"]'
+          repo="${GITHUB_REPOSITORY}"
+          owner="${repo%%/*}"
+          name="${repo#*/}"
+          data_page_limit=3
+          page_size=100
+          overflow_probe_page=$((data_page_limit + 1))
+          window_max=6
+          reserve=300
+          fixed_cost=4
+          per_candidate=28
+          marker_prefix="<!-- Automerge frozen discovery authorization: "
+          superseded_marker="<!-- Automerge frozen discovery authorization superseded -->"
+          base_update_prefix="<!-- Automerge base update requested: "
+
+          budget_query='
+            [.resources.core.remaining, .resources.graphql.remaining] |
+            if length == 2 and all(.[]; type == "number") then min else empty end
+          '
+
+          review_jq_defs="$(cat <<'JQ'
+          def is_coderabbit:
+            .author_association == "NONE" and (.user | type == "object") and
+            .user.login == "coderabbitai[bot]" and .user.id == 136622811 and .user.type == "Bot";
+          def is_trusted_human:
+            (.user | type == "object") and (.user.login | type == "string" and length > 0) and .user.type == "User" and
+            (.author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR");
+          def is_sha_in($commit_shas):
+            (type == "string" and test("^[0-9a-f]{40}$")) and ((.) as $sha | any($commit_shas[]; . == $sha));
+          def strip_markdown_code:
+            gsub("\\r\\n?"; "\n") |
+            gsub("(?m)^ {0,3}(\\x60{3,})[^\\x60\\n]*\\n[\\s\\S]*?(?:^ {0,3}\\1\\x60*[ \\t]*$|\\z)|^ {0,3}(~{3,})[^\\n]*\\n[\\s\\S]*?(?:^ {0,3}\\2~*[ \\t]*$|\\z)"; " ") |
+            gsub("(?<!\\x60)(\\x60+)(?!\\x60)(?:(?!\\n[ \\t]*\\n)[\\s\\S])*?(?<!\\x60)\\1(?!\\x60)"; " ");
+          def has_pstack_interrogate_marker:
+            (.body | type == "string") and
+            (((.body | strip_markdown_code) as $clean |
+              ([$clean | scan("<!--\\s*pstack-interrogate")] | length) > 0));
+          def is_valid_pstack_interrogate_on($expected_head):
+            ($expected_head | type == "string" and test("^[0-9a-f]{40}$")) and
+            is_trusted_human and
+            .state == "COMMENTED" and
+            .commit_id == $expected_head and
+            (.body | type == "string") and
+            (((.body | strip_markdown_code) as $clean |
+              (([$clean | scan("<!--\\s*pstack-interrogate")] | length) == 1 and
+               ($clean | test("(?m)^<!-- pstack-interrogate head=" + $expected_head + " act-on=0 -->[ \\t]*$")))));
+          def is_transferable_frozen_review($commit_shas):
+            .state == "COMMENTED" and is_coderabbit and (.commit_id | is_sha_in($commit_shas));
+          def pos_clears($recorded_pos; $pos):
+            ($pos >= 0 and $pos >= $recorded_pos) or ($pos < 0 and $recorded_pos < 0);
+          def max_pos($a; $b):
+            if $a > $b then $a else $b end;
+          def clear_prior_act_on($pstack; $pos):
+            if $pstack != null and $pstack.kind == "ACT_ON" and ($pstack.current | not) and pos_clears($pstack.pos; $pos)
+            then null else $pstack end;
+          def reduce_review_states($current_head; $commit_shas):
+            sort_by(.submitted_at, .id) |
+            reduce .[] as $review ({};
+              (($review.user.login) as $login |
+               ((.[$login] // { formal: null, formal_pos: -1, pstack: null }) as $cur |
+                ((($commit_shas | index($review.commit_id)) // -1) as $pos |
+                 (($current_head != "" and $review.commit_id == $current_head and $pos >= 0) as $is_cur_head |
+                  if $review.state == "DISMISSED" then
+                    if $cur.pstack != null and $cur.pstack.kind == "ACT_ON" then .[$login] = { formal: null, formal_pos: -1, pstack: $cur.pstack }
+                    else del(.[$login]) end
+                  elif $review.state == "CHANGES_REQUESTED" then
+                    if ($review | is_trusted_human) then
+                      .[$login] = { formal: "CHANGES_REQUESTED", formal_pos: (if $cur.formal == "CHANGES_REQUESTED" then max_pos($cur.formal_pos; $pos) else $pos end), pstack: (if $cur.pstack != null and $cur.pstack.kind == "OK" then null else $cur.pstack end) }
+                    else .[$login] = { formal: "UNTRUSTED_CHANGES_REQUESTED", formal_pos: (if $cur.formal == "UNTRUSTED_CHANGES_REQUESTED" then max_pos($cur.formal_pos; $pos) else $pos end), pstack: $cur.pstack } end
+                  elif $review.state == "APPROVED" then
+                    if ($review | is_trusted_human) and $pos >= 0 then
+                      if $is_cur_head then .[$login] = { formal: "APPROVED", formal_pos: $pos, pstack: null }
+                      elif $cur.formal == "CHANGES_REQUESTED" and (pos_clears($cur.formal_pos; $pos) | not) then
+                        .[$login] = { formal: "CHANGES_REQUESTED", formal_pos: $cur.formal_pos, pstack: clear_prior_act_on($cur.pstack; $pos) }
+                      else .[$login] = { formal: "APPROVED_PRIOR", formal_pos: $pos, pstack: clear_prior_act_on($cur.pstack; $pos) } end
+                    elif ($review | is_trusted_human) and $pos < 0 then
+                      .[$login] = {
+                        formal: (if $cur.formal == "CHANGES_REQUESTED" and pos_clears($cur.formal_pos; $pos) then "COMMENTED" else ($cur.formal // "COMMENTED") end),
+                        formal_pos: (if $cur.formal == "CHANGES_REQUESTED" and pos_clears($cur.formal_pos; $pos) then -1 else $cur.formal_pos end),
+                        pstack: clear_prior_act_on($cur.pstack; $pos)
+                      }
+                    elif ($review | is_coderabbit) and pos_clears($cur.formal_pos; $pos) then
+                      .[$login] = {
+                        formal: (if $cur.formal == "UNTRUSTED_CHANGES_REQUESTED" then "COMMENTED" else ($cur.formal // "COMMENTED") end),
+                        formal_pos: (if $cur.formal == "UNTRUSTED_CHANGES_REQUESTED" then -1 else $cur.formal_pos end),
+                        pstack: $cur.pstack
+                      }
+                    else .[$login] = { formal: ($cur.formal // "COMMENTED"), formal_pos: $cur.formal_pos, pstack: $cur.pstack } end
+                  elif $review.state == "COMMENTED" then
+                    if ($review | is_trusted_human and has_pstack_interrogate_marker) then
+                      if $is_cur_head and ($review | is_valid_pstack_interrogate_on($current_head)) then
+                        .[$login] = { formal: (if $cur.formal == null or $cur.formal == "CHANGES_REQUESTED" then "COMMENTED" else $cur.formal end), formal_pos: (if $cur.formal == "CHANGES_REQUESTED" then -1 else $cur.formal_pos end), pstack: { kind: "OK" } }
+                      elif ($review | is_valid_pstack_interrogate_on($review.commit_id)) then
+                        .[$login] = {
+                          formal: (if $cur.formal == "CHANGES_REQUESTED" and $pos < 0 and $cur.formal_pos < 0 then "COMMENTED" else ($cur.formal // "COMMENTED") end),
+                          formal_pos: (if $cur.formal == "CHANGES_REQUESTED" and $pos < 0 and $cur.formal_pos < 0 then -1 else $cur.formal_pos end),
+                          pstack: clear_prior_act_on($cur.pstack; $pos)
+                        }
+                      elif $is_cur_head then
+                        .[$login] = { formal: (if $cur.formal == "APPROVED" then "APPROVED_PRIOR" else ($cur.formal // "COMMENTED") end), formal_pos: $cur.formal_pos, pstack: { kind: "ACT_ON", pos: $pos, current: true } }
+                      else
+                        .[$login] = {
+                          formal: ($cur.formal // "COMMENTED"),
+                          formal_pos: $cur.formal_pos,
+                          pstack: (if $cur.pstack != null and $cur.pstack.kind == "ACT_ON" then
+                            { kind: "ACT_ON", pos: (if $pos > $cur.pstack.pos then $pos else $cur.pstack.pos end), current: $cur.pstack.current }
+                          else { kind: "ACT_ON", pos: $pos, current: false } end)
+                        }
+                      end
+                    else .[$login] = { formal: ($cur.formal // "COMMENTED"), formal_pos: $cur.formal_pos, pstack: $cur.pstack } end
+                  else .[$login] = { formal: $review.state, formal_pos: $cur.formal_pos, pstack: $cur.pstack } end))))
+            );
+          def state_entry_is_clean($has_current_human_pass):
+            (.formal == null or .formal == "COMMENTED" or .formal == "APPROVED" or .formal == "APPROVED_PRIOR") and
+            (.pstack == null or .pstack.kind == "OK" or (.pstack.kind == "ACT_ON" and (.pstack.current | not) and $has_current_human_pass));
+          def has_current_human_pass_in_states($states):
+            any($states[];
+              (.formal == "APPROVED" and .pstack == null) or
+              ((.pstack != null and .pstack.kind == "OK") and (.formal == "COMMENTED" or .formal == "APPROVED" or .formal == "APPROVED_PRIOR")));
+          def passes_review_discovery($current_head; $commit_shas):
+            (($current_head | type == "string" and test("^[0-9a-f]{40}$")) and
+             ($commit_shas | type == "array" and length > 0 and all(.[]; type == "string" and test("^[0-9a-f]{40}$")) and ($current_head | is_sha_in($commit_shas)))) and
+            (([flatten[] | select(is_trusted_human or is_coderabbit)]) as $trusted |
+             (($trusted | reduce_review_states($current_head; $commit_shas)) as $states |
+              ((has_current_human_pass_in_states($states)) as $has_current_human_pass |
+               (($states | length) > 0 and all($states[]; state_entry_is_clean($has_current_human_pass)) and
+                ($has_current_human_pass or any($trusted[]; is_transferable_frozen_review($commit_shas) and $states[.user.login].formal == "COMMENTED"))))));
+          def review_predates_label($labeled_at):
+            ((.submitted_at | try fromdateiso8601 catch null) as $rev_at | $rev_at != null and $rev_at <= $labeled_at);
+          def passes_exact_head_recovery_discovery($current_head; $commit_shas; $labeled_at):
+            ($labeled_at | type == "number") and passes_review_discovery($current_head; $commit_shas) and
+            (([flatten[] | select(is_trusted_human or is_coderabbit)]) as $trusted |
+             (($trusted | reduce_review_states($current_head; $commit_shas)) as $states |
+              any($trusted[];
+                .commit_id == $current_head and review_predates_label($labeled_at) and
+                ((is_trusted_human and .state == "APPROVED" and $states[.user.login].formal == "APPROVED" and $states[.user.login].pstack == null) or
+                 (is_valid_pstack_interrogate_on($current_head) and $states[.user.login].pstack != null and $states[.user.login].pstack.kind == "OK" and
+                  ($states[.user.login].formal == "COMMENTED" or $states[.user.login].formal == "APPROVED" or $states[.user.login].formal == "APPROVED_PRIOR")) or
+                 (is_coderabbit and .state == "COMMENTED" and $states[.user.login].formal == "COMMENTED")))));
+          def passes_transferable_behind_discovery($commit_shas):
+            ($commit_shas | type == "array" and length > 0 and all(.[]; type == "string" and test("^[0-9a-f]{40}$"))) and
+            (([flatten[] | select(is_trusted_human or is_coderabbit)]) as $trusted |
+             (($trusted | reduce_review_states(""; $commit_shas)) as $states |
+              (($states | length) > 0 and
+               all($states[]; (.formal == null or .formal == "COMMENTED" or .formal == "APPROVED_PRIOR") and .pstack == null) and
+               any($trusted[]; is_transferable_frozen_review($commit_shas) and $states[.user.login].formal == "COMMENTED"))));
+          JQ
+          )"
+
+          json_length() {
+            local payload="$1"
+            jq 'length' <<<"${payload}"
+          }
+
+          threads_query="$(cat <<'GRAPHQL'
+          query($owner: String!, $name: String!, $number: Int!) {
+            repository(owner: $owner, name: $name) {
+              pullRequest(number: $number) {
+                reviewThreads(first: 100) {
+                  nodes { isResolved }
+                  pageInfo { hasNextPage }
+                }
+              }
+            }
+          }
+          GRAPHQL
+          )"
+
+          bounded_api_items() {
+            local endpoint="$1" kind="$2" page response items item_count collected='[]'
+            for ((page = 1; page <= data_page_limit; page++)); do
+              response="$(gh api -H 'Accept: application/vnd.github+json' "${endpoint}?per_page=${page_size}&page=${page}")" || return 1
+              items="$(jq -ce --arg kind "${kind}" '
+                def valid_comment:
+                  type == "object" and (.id | type) == "number" and
+                  ((.body == null) or (.body | type) == "string") and ((.user == null) or (.user | type) == "object");
+                def valid_commit:
+                  type == "object" and (.sha | type) == "string" and (.sha | test("^[0-9a-f]{40}$"));
+                def valid_review:
+                  type == "object" and (.id | type) == "number" and (.state | type) == "string" and
+                  ((.commit_id == null) or (.commit_id | type) == "string") and (.submitted_at | type) == "string" and
+                  (.author_association | type) == "string" and ((.body == null) or (.body | type) == "string") and
+                  ((.user == null) or (.user | type) == "object");
+                def valid_check_run:
+                  type == "object" and (.id | type) == "number" and (.name | type) == "string" and (.status | type) == "string" and
+                  ((.conclusion == null) or (.conclusion | type) == "string") and ((.started_at == null) or (.started_at | type) == "string") and
+                  ((.completed_at == null) or (.completed_at | type) == "string") and ((.app == null) or (.app | type) == "object");
+                def valid_status:
+                  type == "object" and (.id | type) == "number" and (.context | type) == "string" and (.state | type) == "string" and
+                  ((.updated_at == null) or (.updated_at | type) == "string") and ((.created_at == null) or (.created_at | type) == "string");
+                if $kind == "check_runs" then
+                  if type == "object" and (.check_runs | type) == "array" and all(.check_runs[]; valid_check_run)
+                  then .check_runs else error("invalid check_runs page") end
+                elif type != "array" then error("invalid array page")
+                elif $kind == "comments" and all(.[]; valid_comment) then .
+                elif $kind == "commits" and all(.[]; valid_commit) then .
+                elif $kind == "reviews" and all(.[]; valid_review) then .
+                elif $kind == "statuses" and all(.[]; valid_status) then .
+                else error("invalid page items") end
+              ' <<<"${response}")" || return 1
+              collected="$(jq -cn --argjson all "${collected}" --argjson next "${items}" '$all + $next')" || return 1
+              item_count="$(json_length "${items}")" || return 1
+              if [[ "${item_count}" -lt "${page_size}" ]]; then
+                printf '%s\n' "${collected}"
+                return 0
+              fi
+            done
+            response="$(gh api -H 'Accept: application/vnd.github+json' "${endpoint}?per_page=${page_size}&page=${overflow_probe_page}")" || return 1
+            jq -e --arg kind "${kind}" '
+              if $kind == "check_runs" then type == "object" and (.check_runs | type) == "array" and (.check_runs | length) == 0
+              else type == "array" and length == 0 end
+            ' <<<"${response}" >/dev/null || return 1
+            printf '%s\n' "${collected}"
+          }
+
+          canonical_bot_comments() {
+            local payload="$1" prefix="$2"
+            jq -cer --arg prefix "${prefix}" '
+              [.[] | select(
+                type == "object" and (.user | type == "object") and
+                .user.login == "github-actions[bot]" and .user.id == 41898282 and .user.type == "Bot" and
+                (.body | type == "string") and (.body | test("^" + $prefix + "[0-9a-f]{40} -->$"))
+              ) | {id, head: (.body | capture(": (?<sha>[0-9a-f]{40}) -->$").sha)}]
+            ' <<<"${payload}"
+          }
+
+          supersede_canonical_markers() {
+            local target_pr="$1" existing_comments="$2" auth_items base_items ids comment_id
+            if [[ -z "${existing_comments}" ]]; then
+              existing_comments="$(bounded_api_items "repos/${repo}/issues/${target_pr}/comments" comments)" || return 1
+            fi
+            auth_items="$(canonical_bot_comments "${existing_comments}" "${marker_prefix}")" || return 1
+            base_items="$(canonical_bot_comments "${existing_comments}" "${base_update_prefix}")" || return 1
+            ids="$(jq -cn --argjson a "${auth_items}" --argjson b "${base_items}" '($a + $b) | map(.id) | unique')" || return 1
+            while IFS= read -r comment_id; do
+              [[ -n "${comment_id}" ]] || continue
+              gh api --method PATCH "repos/${repo}/issues/comments/${comment_id}" -f body="${superseded_marker}" >/dev/null || return 1
+            done < <(jq -r '.[]' <<<"${ids}")
+          }
+
+          is_open_automerge_pr_info() {
+            local info_json="$1"
+            jq -e '
+              .state == "OPEN" and .isDraft == false and .baseRefName == "main" and
+              any(.labels[]?; .name == "automerge")
+            ' <<<"${info_json}" >/dev/null
+          }
+
+          revoke_automerge_label() {
+            local target_pr="$1" existing_comments="$2"
+            gh pr edit "${target_pr}" --repo "${repo}" --remove-label automerge || true
+            supersede_canonical_markers "${target_pr}" "${existing_comments}" || true
+          }
+
+          is_base_update_merge_commit() {
+            local commit_json="$1" expected_first_parent="$2" second_parent ancestry
+            jq -e --arg first "${expected_first_parent}" '
+              (.parents | type == "array") and (.parents | length == 2) and
+              all(.parents[]; (.sha | type == "string") and (.sha | test("^[0-9a-f]{40}$"))) and
+              .parents[0].sha == $first
+            ' <<<"${commit_json}" >/dev/null || return 1
+            second_parent="$(jq -r '.parents[1].sha' <<<"${commit_json}")"
+            ancestry="$(gh api "repos/${repo}/compare/${second_parent}...main" --jq '.status')" || return 2
+            [[ "${ancestry}" == ahead || "${ancestry}" == identical ]]
+          }
+
+          event_pr=""
+          event_pr_info=""
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request_target" ]]; then
+            event_action="$(jq -er '.action | if . == "labeled" or . == "unlabeled" then . else error("invalid action") end' "${GITHUB_EVENT_PATH}")"
+            event_pr="$(jq -er '.pull_request.number | if type == "number" and . > 0 and floor == . then . else error("invalid PR") end' "${GITHUB_EVENT_PATH}")"
+            if [[ "${event_action}" == "unlabeled" ]]; then
+              if event_pr_info="$(gh pr view "${event_pr}" --repo "${repo}" --json number,createdAt,isDraft,state,baseRefName,headRefOid,labels)"; then
+                if ! is_open_automerge_pr_info "${event_pr_info}"; then
+                  supersede_canonical_markers "${event_pr}" "" ||
+                    echo "::warning::PR #${event_pr}: failed to supersede canonical markers on unlabeled event."
+                fi
+              else
+                echo "::warning::PR #${event_pr}: failed to read PR state on unlabeled event; continuing queue evaluation."
+              fi
+              event_pr=""
+              event_pr_info=""
+            else
+              event_head="$(jq -er '.pull_request.head.sha | if type == "string" and test("^[0-9a-f]{40}$") then . else error("invalid head") end' "${GITHUB_EVENT_PATH}")"
+              sender=""
+              if ! sender="$(jq -er '
+                if (.sender | type == "object") and .sender.type == "User" and
+                   (.sender.login | type == "string" and test("^[A-Za-z0-9-]+$"))
+                then .sender.login else error("invalid sender") end
+              ' "${GITHUB_EVENT_PATH}" 2>/dev/null)"; then
+                revoke_automerge_label "${event_pr}" ""
+                echo "::error::PR #${event_pr}: non-user sender cannot authorize automerge."
+                exit 1
+              fi
+              if ! permission_payload="$(gh api "repos/${repo}/collaborators/${sender}/permission")" ||
+                ! permission_level="$(jq -er '.permission | if type == "string" then . else error("invalid permission") end' <<<"${permission_payload}" 2>/dev/null)"; then
+                echo "::error::PR #${event_pr}: failed to query collaborator permission for ${sender}."
+                exit 1
+              fi
+              if [[ "${permission_level}" != "admin" && "${permission_level}" != "maintain" && "${permission_level}" != "write" ]]; then
+                revoke_automerge_label "${event_pr}" ""
+                echo "::error::PR #${event_pr}: sender ${sender} lacks write permission to authorize automerge."
+                exit 1
+              fi
+              event_pr_info="$(gh pr view "${event_pr}" --repo "${repo}" --json number,createdAt,isDraft,state,baseRefName,headRefOid,labels)"
+              if is_open_automerge_pr_info "${event_pr_info}" &&
+                jq -e --argjson event_pr "${event_pr}" --arg event_head "${event_head}" '
+                  .number == $event_pr and .headRefOid == $event_head and (.createdAt | type == "string" and length > 0)
+                ' <<<"${event_pr_info}" >/dev/null; then
+                marker="${marker_prefix}${event_head} -->"
+                comments="$(bounded_api_items "repos/${repo}/issues/${event_pr}/comments" comments)"
+                existing_markers="$(canonical_bot_comments "${comments}" "${marker_prefix}")"
+                existing_base_records="$(canonical_bot_comments "${comments}" "${base_update_prefix}")"
+                marker_count="$(json_length "${existing_markers}")"
+                if [[ "${marker_count}" -eq 0 ]]; then
+                  gh api --method POST "repos/${repo}/issues/${event_pr}/comments" -f body="${marker}" >/dev/null
+                else
+                  marker_id="$(jq -er '.[0].id' <<<"${existing_markers}")"
+                  gh api --method PATCH "repos/${repo}/issues/comments/${marker_id}" -f body="${marker}" >/dev/null
+                  while IFS= read -r duplicate_id; do
+                    [[ -n "${duplicate_id}" ]] || continue
+                    gh api --method PATCH "repos/${repo}/issues/comments/${duplicate_id}" -f body="${superseded_marker}" >/dev/null
+                  done < <(jq -r '.[1:][].id' <<<"${existing_markers}")
+                fi
+                while IFS= read -r stale_base_id; do
+                  [[ -n "${stale_base_id}" ]] || continue
+                  gh api --method PATCH "repos/${repo}/issues/comments/${stale_base_id}" -f body="${superseded_marker}" >/dev/null
+                done < <(jq -r --arg head "${event_head}" '.[] | select(.head != $head) | .id' <<<"${existing_base_records}")
+              else
+                if is_open_automerge_pr_info "${event_pr_info}"; then
+                  live_head="$(jq -r '.headRefOid // ""' <<<"${event_pr_info}")"
+                  if ! comments="$(bounded_api_items "repos/${repo}/issues/${event_pr}/comments" comments)"; then
+                    echo "::warning::PR #${event_pr}: failed to read comments for delayed labeled check; keeping automerge label."
+                  elif ! existing_markers="$(canonical_bot_comments "${comments}" "${marker_prefix}")" ||
+                    ! existing_base_records="$(canonical_bot_comments "${comments}" "${base_update_prefix}")"; then
+                    echo "::warning::PR #${event_pr}: failed to parse canonical comments for delayed labeled check; keeping automerge label."
+                  elif jq -e --arg head "${live_head}" 'length == 1 and .[0].head == $head' <<<"${existing_markers}" >/dev/null; then
+                    :
+                  elif jq -e --argjson base_records "${existing_base_records}" '
+                    length == 1 and ($base_records | length) == 1 and $base_records[0].head == .[0].head
+                  ' <<<"${existing_markers}" >/dev/null; then
+                    delayed_marker_head="$(jq -r '.[0].head' <<<"${existing_markers}")"
+                    if delayed_live_commit="$(gh api "repos/${repo}/commits/${live_head}")"; then
+                      delayed_merge_rc=0
+                      is_base_update_merge_commit "${delayed_live_commit}" "${delayed_marker_head}" || delayed_merge_rc=$?
+                      if [[ "${delayed_merge_rc}" -eq 1 ]]; then
+                        revoke_automerge_label "${event_pr}" "${comments}"
+                      elif [[ "${delayed_merge_rc}" -ne 0 ]]; then
+                        echo "::warning::PR #${event_pr}: failed to verify merge ancestry for ${live_head}; keeping automerge label."
+                      fi
+                    else
+                      echo "::warning::PR #${event_pr}: failed to read commit ${live_head}; keeping automerge label."
+                    fi
+                  else
+                    revoke_automerge_label "${event_pr}" "${comments}"
+                  fi
+                else
+                  if jq -e 'any(.labels[]?; .name == "automerge")' <<<"${event_pr_info}" >/dev/null; then
+                    gh pr edit "${event_pr}" --repo "${repo}" --remove-label automerge || true
+                  fi
+                  supersede_canonical_markers "${event_pr}" "" || true
+                fi
+                echo "::warning::PR #${event_pr}: live PR state changed while queued; skipping stale ${event_head} authorization marker write."
+                event_pr=""
+                event_pr_info=""
+              fi
+            fi
           fi
-          rm -f "${ruleset_err}"
 
-          # search 인덱스 기반 조회 — labeled 이벤트 직후엔 인덱싱 지연으로 빈 결과가 날 수 있다(#2010).
-          search_candidates=$(gh pr list --repo "${REPO}" --label automerge --base main --state open \
-            --json number --jq '.[].number' || true)
+          fail_closed_pr() {
+            local operation="$1" merge_state="$2" status="$3"
+            local message observed label_removed=false
+            message="자동 병합 조정 작업에 실패했습니다. operation=${operation}; merge_state=${merge_state}; status=${status}; Actions run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}. automerge 라벨을 제거합니다."
+            if ! gh pr comment "${pr}" --repo "${repo}" --body "${message}"; then
+              echo "::warning::PR #${pr}: failed to publish the automerge failure comment."
+            fi
+            for _ in 1 2; do
+              if ! gh pr edit "${pr}" --repo "${repo}" --remove-label automerge; then
+                echo "::warning::PR #${pr}: failed to remove the automerge label."
+              fi
+              if observed="$(gh pr view "${pr}" --repo "${repo}" --json labels --jq '[.labels[].name] | index("automerge") == null')"; then
+                if [[ "${observed}" == "true" ]]; then
+                  label_removed=true
+                  break
+                fi
+                echo "::warning::PR #${pr}: automerge label remains present."
+              else
+                echo "::warning::PR #${pr}: failed to confirm automerge label state."
+              fi
+            done
+            supersede_canonical_markers "${pr}" "${comments}" || true
+            if [[ "${label_removed}" != "true" ]]; then
+              echo "::error::PR #${pr}: automerge label cleanup did not converge."
+              return 1
+            fi
+            return 0
+          }
 
-          # 이벤트 PR을 무조건 후보에 합류시키고(라벨 인덱싱 지연 보정) search 결과와 union·중복 제거한다.
-          candidates=$(printf '%s\n%s\n' "${search_candidates}" "${EVENT_PR}" \
-            | grep -E '^[0-9]+$' | sort -un || true)
+          rules="$(gh api "repos/${repo}/rules/branches/main")"
+          required="$(jq -ce '
+            if type != "array" then error("rules response must be an array") else . end |
+            [.[] |
+              select(.type == "required_status_checks") |
+              .parameters.required_status_checks[] |
+              select((.context | type) == "string" and (.context | length > 0)) |
+              {context, integration_id: (.integration_id // null)}] |
+            unique_by(.context, .integration_id) |
+            select(length > 0)
+          ' <<<"${rules}")"
 
-          # 각 후보를 REST로 재확인해(search 인덱스 비의존) 라벨 실재·open·non-draft·base=main만 남기고,
-          # createdAt 오름차순(FIFO)으로 최종 큐를 만든다.
-          candidate_objs="[]"
-          for cand in ${candidates}; do
-            info=$(gh pr view "${cand}" --repo "${REPO}" \
-              --json number,createdAt,isDraft,state,baseRefName,labels 2>/dev/null) \
-              || { echo "::warning::PR #${cand} 조회 실패 — 후보에서 건너뛴다."; continue; }
-            candidate_objs=$(jq -c --argjson obj "${info}" '. + [$obj]' <<<"${candidate_objs}")
-          done
-
-          queue=$(jq -r '[.[]
-            | select(.state == "OPEN")
-            | select(.isDraft == false)
-            | select(.baseRefName == "main")
-            | select([.labels[].name] | index("automerge") != null)]
-            | sort_by(.createdAt) | .[].number' <<<"${candidate_objs}")
-
-          if [ -z "${queue}" ]; then
-            echo "automerge 큐가 비어 있다. (trigger=${EVENT_NAME}, event_pr=${EVENT_PR:-없음})"
+          budget="$(gh api rate_limit --jq "${budget_query}")" || true
+          if [[ ! "${budget}" =~ ^[0-9]+$ ]]; then
+            echo "::warning::GITHUB_TOKEN rate limit could not be read; skipping this queue run."
+            exit 0
+          fi
+          window=$(( (budget - reserve - fixed_cost) / per_candidate ))
+          if [[ "${window}" -gt "${window_max}" ]]; then
+            window="${window_max}"
+          fi
+          if [[ "${window}" -lt 1 ]]; then
+            echo "::warning::GITHUB_TOKEN remaining budget (${budget}) reached reserve (${reserve}); skipping this queue run."
             exit 0
           fi
 
-          derail() {
-            pr_number="$1"
-            reason="$2"
-            gh pr comment "${pr_number}" --repo "${REPO}" \
-              --body "automerge 큐에서 제외: ${reason} 해결 후 automerge 라벨을 다시 붙여주세요."
-            gh pr edit "${pr_number}" --repo "${REPO}" --remove-label automerge
+          candidate_items="$(gh pr list --repo "${repo}" --base main --state open --label automerge --draft=false \
+            --limit 1000 --json number,createdAt,isDraft)"
+          if [[ "${GITHUB_EVENT_NAME}" == "pull_request_target" && -n "${event_pr}" && -n "${event_pr_info}" ]] &&
+            ! jq -e --argjson event_pr "${event_pr}" 'any(.[]; .number == $event_pr)' <<<"${candidate_items}" >/dev/null; then
+            candidate_items="$(jq -c --argjson item "${event_pr_info}" '. + [{number: $item.number, createdAt: $item.createdAt, isDraft: false}]' <<<"${candidate_items}")"
+          fi
+          candidates="$(jq -c '
+            [.[] | select((.isDraft // false) == false)] |
+            unique_by(.number) |
+            [sort_by(.createdAt, .number)[].number]
+          ' <<<"${candidate_items}")"
+
+          select_candidate_window_in_created_order() {
+            local candidates_json="$1" window_size="$2" total offset=0
+            total="$(json_length "${candidates_json}")"
+            if [[ "${total}" -gt "${window_size}" ]]; then
+              offset="$(( RANDOM % total ))"
+            fi
+            jq -r --argjson window "${window_size}" --argjson offset "${offset}" '
+              ((.) as $all |
+              ((length) as $total |
+              if $total == 0 then empty
+              else [range($offset; $offset + $window) | . % $total] | unique | map($all[.])[]
+              end))
+            ' <<<"${candidates_json}"
           }
 
-          for pr_number in ${queue}; do
-            state=$(gh pr view "${pr_number}" --repo "${REPO}" \
-              --json mergeStateStatus,headRefOid,statusCheckRollup)
-            merge_state=$(jq -r '.mergeStateStatus' <<<"${state}")
-            head=$(jq -r '.headRefOid' <<<"${state}")
-            reviews=$(gh api --paginate --slurp "repos/${REPO}/pulls/${pr_number}/reviews")
-            review_gate=$(jq -r '
-              def is_coderabbit:
-                .author_association == "NONE" and
-                .user.login == "coderabbitai[bot]" and
-                .user.id == 136622811 and
-                .user.type == "Bot";
-              def is_trusted_human:
-                . as $review |
-                (["OWNER", "MEMBER", "COLLABORATOR"] | index($review.author_association)) != null;
-              def is_discovery:
-                (.state == "APPROVED" and is_trusted_human) or
-                (.state == "COMMENTED" and
-                  (is_coderabbit or
-                    ((.body // "" | startswith("**Actionable comments posted: ")) and
-                      ((.body // "" | contains("<!-- Review source: Aquila fallback; canonical visible structure:")) or
-                       (.body // "" | contains("<!-- Review source: Aquila Universal Review; engine: aquila-review -->"))))));
-              [flatten[]
-                | select(.user != null)
-                | select(is_trusted_human or is_coderabbit)] as $eligible
-              | ($eligible | map(select(is_discovery)) | length > 0) as $has_discovery
-              | ($eligible
-                | group_by(.user.id)
-                | map(sort_by(.submitted_at, .id)
-                  | map(select(.state == "APPROVED" or .state == "CHANGES_REQUESTED"))
-                  | last?)
-                | map(select(. != null))) as $latest_opinions
-              | $has_discovery and
-                all($latest_opinions[]; .state != "CHANGES_REQUESTED")
-            ' <<<"${reviews}")
-            threads=$(gh api graphql --paginate --slurp \
-              -f query='query($owner: String!, $name: String!, $number: Int!, $endCursor: String) {
-                repository(owner: $owner, name: $name) {
-                  pullRequest(number: $number) {
-                    reviewThreads(first: 100, after: $endCursor) {
-                      nodes { isResolved }
-                      pageInfo { hasNextPage endCursor }
-                    }
-                  }
-                }
-              }' \
-              -F owner="${REPO%%/*}" \
-              -F name="${REPO##*/}" \
-              -F number="${pr_number}")
-            unresolved_threads=$(jq -r \
-              '[flatten[] | .data.repository.pullRequest.reviewThreads.nodes[]?
-                | select(.isResolved == false)] | length' <<<"${threads}")
-            failed_required=$(jq -r --argjson required "${required_checks}" \
-              '[.statusCheckRollup[]?
-                | select(($required | index(.name? // .context?)) != null)
-                | select(((.conclusion? // .state?) // "") as $c
-                  | $c == "FAILURE" or $c == "ERROR")] | length' <<<"${state}")
-
-            echo "PR #${pr_number}: mergeStateStatus=${merge_state}, reviewGate=${review_gate}, unresolvedThreads=${unresolved_threads}, failedRequiredChecks=${failed_required}"
-
-            if [ "${review_gate}" != "true" ]; then
-              derail "${pr_number}" "지원되는 단일 discovery Review가 없거나 active change request가 있습니다."
-              continue
+          record_base_update() {
+            local target="$1" requested_head="$2" records="$3" record_body record_count
+            record_body="${base_update_prefix}${requested_head} -->"
+            record_count="$(json_length "${records}")"
+            if [[ "${record_count}" -gt 1 ]] || ! jq -e 'all(.[]; .id | type == "number")' <<<"${records}" >/dev/null; then
+              echo "::warning::PR #${target}: base update record is not a single canonical comment; the next head will need a new label authorization."
+              return 0
             fi
-
-            if [ "${unresolved_threads}" -gt 0 ]; then
-              derail "${pr_number}" "미해결 Review thread가 ${unresolved_threads}개 있습니다."
-              continue
+            if [[ "${record_count}" -eq 1 ]]; then
+              if ! gh api --method PATCH "repos/${repo}/issues/comments/$(jq -r '.[0].id' <<<"${records}")" -f body="${record_body}" >/dev/null; then
+                echo "::warning::PR #${target}: base update record could not be written; the next head will need a new label authorization."
+              fi
+            elif ! gh api --method POST "repos/${repo}/issues/${target}/comments" -f body="${record_body}" >/dev/null; then
+              echo "::warning::PR #${target}: base update record could not be written; the next head will need a new label authorization."
             fi
+          }
 
-            if [ "${merge_state}" = "DIRTY" ]; then
-              derail "${pr_number}" "main과 충돌(DIRTY) 상태입니다. 충돌 해결이 필요합니다."
-              continue
+          sync_authorization_marker() {
+            local marker_body markers marker_count marker_id marker_head records head_commit merge_check_rc
+            local response events overflow head_date label_meta label_state label_actor labeled_at label_permission label_level
+            marker_body="${marker_prefix}${head} -->"
+            markers="$(canonical_bot_comments "${comments}" "${marker_prefix}")"
+            marker_count="$(json_length "${markers}")"
+            if [[ "${marker_count}" -gt 1 ]] || ! jq -e 'all(.[]; .id | type == "number")' <<<"${markers}" >/dev/null; then
+              echo "::warning::PR #${pr}: authorization marker is not a single canonical comment; leaving it unchanged."
+              return 0
             fi
+            if [[ "${marker_count}" -eq 1 ]]; then
+              marker_id="$(jq -r '.[0].id' <<<"${markers}")"
+              marker_head="$(jq -r '.[0].head' <<<"${markers}")"
+              if [[ "${marker_head}" == "${head}" ]]; then
+                return 0
+              fi
+              records="$(canonical_bot_comments "${comments}" "${base_update_prefix}")"
+              if ! jq -e --arg head "${marker_head}" 'length == 1 and (.[0].id | type == "number") and .[0].head == $head' <<<"${records}" >/dev/null; then
+                revoke_automerge_label "${pr}" "${comments}"
+                automerge_revoked=true
+                echo "PR #${pr}: no single coordinator base update record for authorized head ${marker_head}; removed automerge so its owning session can re-review ${head}."
+                return 0
+              fi
+              if ! head_commit="$(gh api "repos/${repo}/commits/${head}")"; then
+                echo "::warning::PR #${pr}: failed to read commit ${head}; authorization is not reissued."
+                return 0
+              fi
+              merge_check_rc=0
+              is_base_update_merge_commit "${head_commit}" "${marker_head}" || merge_check_rc=$?
+              if [[ "${merge_check_rc}" -eq 1 ]]; then
+                revoke_automerge_label "${pr}" "${comments}"
+                automerge_revoked=true
+                echo "PR #${pr}: head ${head} is not a base-update merge on authorized head ${marker_head}; removed automerge so its owning session can re-review."
+                return 0
+              elif [[ "${merge_check_rc}" -ne 0 ]]; then
+                echo "::warning::PR #${pr}: failed to verify merge ancestry for ${head}; authorization is not reissued."
+                return 0
+              fi
+              if ! response="$(gh api --method PATCH "repos/${repo}/issues/comments/${marker_id}" -f body="${marker_body}")"; then
+                echo "::warning::PR #${pr}: authorization marker could not be reissued for ${head}."
+                return 0
+              fi
+            else
+              if ! events="$(gh api "repos/${repo}/issues/${pr}/events?per_page=100&page=1")" ||
+                ! jq -e 'type == "array" and all(.[]; type == "object")' <<<"${events}" >/dev/null; then
+                echo "PR #${pr}: label events could not be read; authorization is not recovered."
+                return 0
+              fi
+              if [[ "$(json_length "${events}")" -ge 100 ]] &&
+                { ! overflow="$(gh api "repos/${repo}/issues/${pr}/events?per_page=100&page=2")" ||
+                  ! jq -e 'type == "array" and length == 0' <<<"${overflow}" >/dev/null; }; then
+                echo "PR #${pr}: label events exceed the bounded read; authorization is not recovered."
+                return 0
+              fi
+              head_date="$(jq -r --arg head "${head}" '
+                [.[] | select(.sha == $head) | .commit.committer.date] | unique |
+                if length == 1 and (.[0] | type == "string") then .[0] else "" end
+              ' <<<"${commits}")"
+              if ! label_meta="$(jq -ce --arg head_date "${head_date}" '
+                (([.[] | select((.event == "labeled" or .event == "unlabeled") and .label.name? == "automerge")]) as $label_events |
+                 if ($label_events | length) == 0 or
+                    (all($label_events[]; (.created_at | type == "string") and (.id | type == "number")) | not)
+                 then { state: "defer" }
+                 else
+                   (($label_events | sort_by(.created_at, .id) | last) as $latest_label |
+                    if $latest_label.event != "labeled" then { state: "defer" }
+                    elif (($latest_label.actor | type == "object") and $latest_label.actor.type == "User" and
+                          ($latest_label.actor.login | type == "string" and test("^[A-Za-z0-9-]+$"))) | not
+                    then { state: "revoke", reason: "non-user label actor" }
+                    elif $head_date == "" then { state: "defer" }
+                    else
+                      (($latest_label.created_at | fromdateiso8601) as $labeled_at |
+                       if (($head_date | fromdateiso8601) > $labeled_at) or
+                          any(.[] | select(.event == "head_ref_force_pushed"); (.created_at | fromdateiso8601) >= $labeled_at)
+                       then { state: "revoke", reason: "post-label push" }
+                       else { state: "ok", actor: $latest_label.actor.login, labeled_at: $labeled_at }
+                       end)
+                    end)
+                 end)
+              ' <<<"${events}" 2>/dev/null)"; then
+                echo "PR #${pr}: label events could not be evaluated; authorization is not recovered."
+                return 0
+              fi
+              label_state="$(jq -r '.state' <<<"${label_meta}")"
+              if [[ "${label_state}" == "revoke" ]]; then
+                revoke_automerge_label "${pr}" "${comments}"
+                automerge_revoked=true
+                echo "PR #${pr}: unrecoverable automerge label state ($(jq -r '.reason' <<<"${label_meta}")); removed automerge so its owning session can re-apply."
+                return 0
+              elif [[ "${label_state}" != "ok" ]]; then
+                echo "PR #${pr}: no active automerge label event ready for recovery; authorization is not recovered."
+                return 0
+              fi
+              label_actor="$(jq -r '.actor' <<<"${label_meta}")"
+              labeled_at="$(jq -r '.labeled_at' <<<"${label_meta}")"
+              if ! label_permission="$(gh api "repos/${repo}/collaborators/${label_actor}/permission")" ||
+                ! label_level="$(jq -er '.permission | if type == "string" then . else error("invalid permission") end' <<<"${label_permission}" 2>/dev/null)"; then
+                echo "::warning::PR #${pr}: failed to query collaborator permission for ${label_actor}; authorization is not recovered."
+                return 0
+              fi
+              if [[ "${label_level}" != "admin" && "${label_level}" != "maintain" && "${label_level}" != "write" ]]; then
+                revoke_automerge_label "${pr}" "${comments}"
+                automerge_revoked=true
+                echo "PR #${pr}: latest automerge label actor ${label_actor} lacks write permission; removed automerge."
+                return 0
+              fi
+              if ! jq -e --arg head "${head}" --argjson commit_shas "${commit_shas}" --argjson labeled_at "${labeled_at}" "${review_jq_defs}"'
+                passes_exact_head_recovery_discovery($head; $commit_shas; $labeled_at)
+              ' <<<"${reviews}" >/dev/null; then
+                echo "PR #${pr}: no qualifying exact-head review predating label event on ${head}; authorization is not recovered."
+                return 0
+              fi
+              if ! response="$(gh api --method POST "repos/${repo}/issues/${pr}/comments" -f body="${marker_body}")"; then
+                echo "::warning::PR #${pr}: authorization marker could not be recovered for ${head}."
+                return 0
+              fi
+            fi
+            if ! jq -e --arg body "${marker_body}" '
+              type == "object" and (.id | type == "number") and (.user | type == "object") and
+              .user.login == "github-actions[bot]" and .user.id == 41898282 and .user.type == "Bot" and .body == $body
+            ' <<<"${response}" >/dev/null; then
+              echo "::warning::PR #${pr}: authorization marker response did not prove the current head; it is not used."
+              return 0
+            fi
+            comments="$(jq -c --argjson raw "${response}" '
+              (({id: $raw.id, body: $raw.body, user: $raw.user}) as $item |
+               if any(.[]; .id == $item.id) then map(if .id == $item.id then $item else . end) else . + [$item] end)
+            ' <<<"${comments}")"
+            echo "PR #${pr}: authorization marker now covers ${head}."
+          }
 
-            if [ "${merge_state}" = "BEHIND" ]; then
-              gh api --method PUT "repos/${REPO}/pulls/${pr_number}/update-branch" \
-                -H "Accept: application/vnd.github+json" \
-                -f expected_head_sha="${head}"
-              echo "큐 head PR #${pr_number}: exact head ${head}에서 base 갱신 완료 — current-head CI 뒤 재처리한다."
+          while IFS= read -r pr; do
+            budget="$(gh api rate_limit --jq "${budget_query}")" || true
+            if [[ ! "${budget}" =~ ^[0-9]+$ ]] ||
+              [[ "$(( budget - per_candidate ))" -lt "${reserve}" ]]; then
+              echo "::warning::GITHUB_TOKEN remaining budget (${budget:-unknown}) reached reserve (${reserve}); stopping candidate evaluation."
               exit 0
             fi
 
-            if [ "${failed_required}" -gt 0 ]; then
-              derail "${pr_number}" "실패한 필수 status check가 있습니다."
+            info="$(gh pr view "${pr}" --repo "${repo}" \
+              --json baseRefName,headRefOid,isDraft,labels,mergeStateStatus,state)"
+            if ! is_open_automerge_pr_info "${info}"; then
+              echo "PR #${pr}: no longer an open labeled pull request against main; skipping."
               continue
             fi
 
-            # 여기부터 큐 head 확정 — 한 번에 하나만 처리한다.
-            gh pr merge "${pr_number}" --repo "${REPO}" --squash --auto \
-              --match-head-commit "${head}" \
-              || echo "::warning::PR #${pr_number} auto-merge 예약 실패 — 다음 트리거에서 재시도한다."
+            head="$(jq -r '.headRefOid' <<<"${info}")"
+            merge_state="$(jq -r '.mergeStateStatus' <<<"${info}")"
 
-            echo "큐 head PR #${pr_number} 처리 완료 — 필수 체크 통과 시 auto-merge가 병합한다."
-            exit 0
-          done
+            if ! reviews="$(bounded_api_items "repos/${repo}/pulls/${pr}/reviews" reviews)"; then
+              echo "PR #${pr}: reviews read failed or exceeded page budget; skipping."
+              continue
+            fi
+            if ! commits="$(bounded_api_items "repos/${repo}/pulls/${pr}/commits" commits)"; then
+              echo "PR #${pr}: commits read failed or exceeded page budget; skipping."
+              continue
+            fi
+            commit_shas="$(jq -c 'map(.sha)' <<<"${commits}")" || {
+              echo "PR #${pr}: commits parse failed; skipping."
+              continue
+            }
+            if ! comments="$(bounded_api_items "repos/${repo}/issues/${pr}/comments" comments)"; then
+              echo "PR #${pr}: comments read failed or exceeded page budget; skipping."
+              continue
+            fi
+            automerge_revoked=false
+            sync_authorization_marker
+            if [[ "${automerge_revoked}" == true ]]; then
+              continue
+            fi
+            base_update_records="$(canonical_bot_comments "${comments}" "${base_update_prefix}")"
+            comments_slim="$(jq -c 'map({user, body})' <<<"${comments}")" || {
+              echo "PR #${pr}: comments parse failed; skipping."
+              continue
+            }
 
-          echo "큐에 병합 가능 후보가 없다."
+            review_gate="$(jq -r --arg head "${head}" --argjson commit_shas "${commit_shas}" --argjson comments "${comments_slim}" "${review_jq_defs}"'
+              def canonical_actions_marker:
+                (.user | type == "object") and
+                .user.login == "github-actions[bot]" and
+                .user.id == 41898282 and
+                .user.type == "Bot" and
+                (.body | type == "string") and
+                (.body | test("^<!-- Automerge frozen discovery authorization: [0-9a-f]{40} -->$"));
+              (([$comments[]? | select(canonical_actions_marker)]) as $canonical_markers |
+               ((($canonical_markers | length) == 1 and
+                 $canonical_markers[0].body == ("<!-- Automerge frozen discovery authorization: " + $head + " -->")) as $has_exact_marker |
+                ($has_exact_marker and passes_review_discovery($head; $commit_shas))))
+            ' <<<"${reviews}")"
+            if [[ "${review_gate}" != "true" ]]; then
+              echo "PR #${pr}: no trusted review on the current head, or an active change request is open; skipping."
+              continue
+            fi
+
+            threads="$(gh api graphql -f owner="${owner}" -f name="${name}" -F number="${pr}" -f query="${threads_query}")"
+            if ! jq -e '
+              .data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage == false and
+              all(.data.repository.pullRequest.reviewThreads.nodes[]; .isResolved)
+            ' <<<"${threads}" >/dev/null; then
+              echo "PR #${pr}: unresolved review threads remain; skipping."
+              continue
+            fi
+
+            if ! checks="$(bounded_api_items "repos/${repo}/commits/${head}/check-runs" check_runs)"; then
+              echo "PR #${pr}: check-runs read failed or exceeded page budget; skipping."
+              continue
+            fi
+            if ! statuses="$(bounded_api_items "repos/${repo}/commits/${head}/statuses" statuses)"; then
+              echo "PR #${pr}: commit statuses read failed or exceeded page budget; skipping."
+              continue
+            fi
+            contexts_ok=true
+            while IFS= read -r required_check; do
+              if ! jq -e --argjson required_check "${required_check}" --argjson statuses "${statuses}" '
+                (([.[] |
+                    select(.name == $required_check.context) |
+                    select($required_check.integration_id == null or (.app.id // null) == $required_check.integration_id)] |
+                  group_by((.app.id // -1)) |
+                  map(sort_by((.status != "completed"), (.started_at // .completed_at // ""), .id) | last)) as $latest_runs |
+                ((([$statuses[] | select(.context == $required_check.context)] |
+                  sort_by((.updated_at // .created_at // ""), .id) |
+                  last) // null) as $status |
+                ((if ($latest_runs | length) == 0 then null
+                  elif all($latest_runs[]; .status == "completed" and .conclusion == "success") then "success"
+                  else "not_success" end) as $run_state |
+                ((if $required_check.integration_id != null or $status == null then null
+                  elif $status.state == "success" then "success"
+                  else "not_success" end) as $status_state |
+                (([$run_state, $status_state] | map(select(. != null))) as $observed |
+                (($observed | length) > 0 and all($observed[]; . == "success")))))))
+              ' <<<"${checks}" >/dev/null; then
+                contexts_ok=false
+                echo "PR #${pr}: a required context is not successful; skipping."
+                break
+              fi
+            done < <(jq -c '.[]' <<<"${required}")
+            [[ "${contexts_ok}" == true ]] || continue
+
+            case "${merge_state}" in
+              CLEAN | HAS_HOOKS | UNSTABLE)
+                # ruleset 필수 체크는 위에서 직접 전수 검증했으므로 비필수 체크 실패 상태인 UNSTABLE로 병합을 막지 않는다.
+                if GH_TOKEN="${MERGE_GH_TOKEN}" gh pr merge --squash "${pr}" --repo "${repo}" \
+                  --match-head-commit "${head}"; then
+                  echo "PR #${pr}: merged (${merge_state})."
+                  exit 0
+                else
+                  status=$?
+                  if ! fail_closed_pr "merge" "${merge_state}" "${status}"; then
+                    exit "${status}"
+                  fi
+                  continue
+                fi
+                ;;
+              BEHIND)
+                if ! jq -e --argjson commit_shas "${commit_shas}" "${review_jq_defs}"'
+                  passes_transferable_behind_discovery($commit_shas)
+                ' <<<"${reviews}" >/dev/null; then
+                  revoke_automerge_label "${pr}" "${comments}"
+                  echo "::warning::PR #${pr} is behind main without a transferable frozen discovery review; removed automerge so its owning session can rebase and re-review."
+                  continue
+                fi
+                if [[ "${HAS_AUTOMERGE_PAT}" != true ]]; then
+                  revoke_automerge_label "${pr}" "${comments}"
+                  echo "::warning::PR #${pr} is behind main; removed automerge so its owning session can rebase and push."
+                  continue
+                fi
+                if GH_TOKEN="${MERGE_GH_TOKEN}" gh api --method PUT "repos/${repo}/pulls/${pr}/update-branch" \
+                  -f expected_head_sha="${head}" >/dev/null; then
+                  record_base_update "${pr}" "${head}" "${base_update_records}"
+                  echo "PR #${pr}: behind main; requested a base merge on gated head ${head}. The next run re-evaluates the new head."
+                  exit 0
+                else
+                  status=$?
+                  echo "::warning::PR #${pr} is behind main and its base merge request failed (status ${status}); skipping without merging."
+                  continue
+                fi
+                ;;
+              DIRTY)
+                revoke_automerge_label "${pr}" "${comments}"
+                echo "::warning::PR #${pr} conflicts with the base branch; removed automerge until it is rebased."
+                continue
+                ;;
+              BLOCKED | UNKNOWN)
+                echo "PR #${pr}: not mergeable yet (${merge_state}); skipping."
+                continue
+                ;;
+              *)
+                echo "::warning::PR #${pr} has an unrecognized merge state (${merge_state}); skipping."
+                continue
+                ;;
+            esac
+          done < <(select_candidate_window_in_created_order "${candidates}" "${window}")
+
+          echo "No pull request in the automerge queue is ready to merge."
