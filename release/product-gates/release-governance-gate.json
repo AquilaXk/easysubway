@@ -325,7 +325,7 @@
   ],
   "childIssueLinks": [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230, 1414, 2731],
   "evidencePolicy": {
-    "localOnlyEvidenceRoot": ".codex/evidence/release/android-release-100/",
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/android-release-100/",
     "githubEvidencePolicy": "summary_or_public_link",
     "sensitiveEvidencePolicy": "local_path_with_reason"
   }

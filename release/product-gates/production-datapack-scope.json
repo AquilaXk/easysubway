@@ -234,7 +234,7 @@
   "linkedReleaseBlockers": [547, 571, 1016, 1020, 1021, 1022, 1414],
   "evidencePolicy": {
     "githubSummaryOnly": true,
-    "localOnlyEvidenceRoot": ".codex/evidence/datapack/production-scope/<rc-or-run>/",
+    "localOnlyEvidenceRoot": ".evidence/evidence/datapack/production-scope/<rc-or-run>/",
     "forbiddenInGithubSummary": [
       "production signing private key",
       "object storage credential",

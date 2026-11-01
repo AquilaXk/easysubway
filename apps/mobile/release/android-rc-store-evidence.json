@@ -142,7 +142,7 @@
     "exceptionPath": "#1020 waiver until-date and owner required"
   },
   "evidencePolicy": {
-    "localOnlyEvidenceRoot": ".codex/evidence/release/android-rc-store/<rc-or-run>/",
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/android-rc-store/<rc-or-run>/",
     "githubEvidencePolicy": "summary-or-public-console-link",
     "sensitiveEvidence": [
       "Google Play Console screenshots",

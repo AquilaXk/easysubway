@@ -94,6 +94,16 @@ test("pending TRANSFER의 Hub reference는 nonclosing dependency로 허용한다
   assert.equal(finding, null);
 });
 
+test("REVIEW_FALLBACK은 CODERABBIT만 허용하고 Codex 마커는 분류 drift finding이다", () => {
+  const context = { ledger: { issues: [] }, amendments: { amendments: [] }, item: { repository: "AquilaXk/easysubway", number: 7, type: "ISSUE", title: "x", state: "OPEN", stateReason: null, labels: [], priority: null, milestone: null, parentOwner: null } };
+  const classify = (value) => {
+    const [reference] = extractReferences(`#7 [REFERENCE_CLASS:ISSUE_CURRENT_OWNER] [REVIEW_FALLBACK:${value}]`, { repository: "AquilaXk/easysubway", path: "contracts/a", blobSha: "a".repeat(40) });
+    return classifyReference(reference, context);
+  };
+  assert.equal(classify("CODERABBIT"), null);
+  assert.equal(classify("CODEX_CLI_FALLBACK")?.code, "REVIEW_FALLBACK_CLASSIFICATION_DRIFT");
+});
+
 test("closed referenced issue와 unknown Hub open issue를 finding으로 분리한다", () => {
   const reference = { source: { kind: "PATH", repository: "AquilaXk/easysubway", path: "contracts/a.json", blobSha: "a".repeat(40), locator: "#9" }, target: { repository: "AquilaXk/easysubway", type: "ISSUE", number: 9 }, markers: { REFERENCE_CLASS: "ISSUE_CURRENT_OWNER" } };
   const closed = classifyReference(reference, { ledger: { issues: [] }, amendments: { amendments: [] }, item: { repository: "AquilaXk/easysubway", number: 9, type: "ISSUE", title: "closed", state: "CLOSED", stateReason: "completed", labels: [], milestone: null, parentOwner: null } });

@@ -3,7 +3,7 @@
   "applicationId": "easysubway",
   "releaseGate": "operations-release-evidence",
   "releaseBlockerPolicy": true,
-  "evidenceRoot": ".codex/evidence/operations-release/<rc-or-run>",
+  "evidenceRoot": ".evidence/evidence/operations-release/<rc-or-run>",
   "deploymentWorkflow": {
     "requiredEvidence": [
       "cd-workflow-run-url",

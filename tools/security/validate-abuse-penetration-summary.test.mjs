@@ -17,7 +17,7 @@ const root = path.resolve(import.meta.dirname, "../..");
 const gatePath = path.join(root, "release/product-gates/abuse-penetration-rehearsal-gate.json");
 const gate = JSON.parse(readFileSync(gatePath, "utf8"));
 
-const schemaV2EvidenceRoot = `.codex/evidence/security/abuse-penetration-rehearsal/${"a".repeat(40)}`;
+const schemaV2EvidenceRoot = `.evidence/evidence/security/abuse-penetration-rehearsal/${"a".repeat(40)}`;
 const schemaV2EvidencePath = `${schemaV2EvidenceRoot}/redacted.json`;
 const schemaV2Identity = Object.freeze({
   gitSha: "a".repeat(40), versionCode: 10001, androidApplicationId: "com.easysubway.app",
@@ -62,7 +62,7 @@ function schemaV2Pass(gateValue = gate, withDisposition = true) {
     summary.matrices[0].findingCounts.medium = 1;
     summary.matrices[0].mediumFindingDisposition = {
       ownerAlias: `owner.${summary.matrices[0].matrixId}`,
-      fixPlanEvidencePath: ".codex/evidence/security/abuse-penetration-rehearsal/run/fix-plan.json",
+      fixPlanEvidencePath: ".evidence/evidence/security/abuse-penetration-rehearsal/run/fix-plan.json",
     };
   }
   return summary;
@@ -94,7 +94,7 @@ test("A RED v2 PASS evidence is bound to the root artifact identity", () => {
     (error) => error.code === "SUMMARY_IDENTITY_INVALID" && error.path.endsWith(".artifactIdentitySha256"),
   );
   const stale = schemaV2Pass();
-  stale.productionLikeEvidence[0].localEvidencePath = ".codex/evidence/security/abuse-penetration-rehearsal/older-rc/result.json";
+  stale.productionLikeEvidence[0].localEvidencePath = ".evidence/evidence/security/abuse-penetration-rehearsal/older-rc/result.json";
   assert.throws(
     () => validateAbusePenetrationSummary(stale, gate, true),
     (error) => error.code === "SUMMARY_IDENTITY_INVALID" && error.path.endsWith(".localEvidencePath"),
@@ -122,7 +122,7 @@ test("A RED v2 PASS evidence is bound to the root artifact identity", () => {
   const staleCase = schemaV2Pass();
   staleCase.matrices.find((matrix) => matrix.matrixId === "routeV2IngressAbuse")
     .cases[0].localEvidencePath =
-      `.codex/evidence/security/abuse-penetration-rehearsal/${"f".repeat(40)}/result.json`;
+      `.evidence/evidence/security/abuse-penetration-rehearsal/${"f".repeat(40)}/result.json`;
   assert.throws(
     () => validateAbusePenetrationSummary(staleCase, gate, true),
     (error) => error.code === "SUMMARY_IDENTITY_INVALID" && error.rule === "root-git-sha-path",
