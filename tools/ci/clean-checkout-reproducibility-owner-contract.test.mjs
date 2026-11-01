@@ -7,7 +7,7 @@ import { validateSchema } from "./lib/json-schema-lite.mjs";
 import { validateOwnerContract } from "../repo/audit-clean-checkout-reproducibility.mjs";
 
 const ENGINE_SHA = "4475e6d9da634e28cda4179b738d4f9f440f06a7";
-const TOOLCHAIN_DIGEST = "1ec7049b3d9c7e6013285d13ca46538a061e70ece1cb5d56116844f50c65cc53";
+const TOOLCHAIN_DIGEST = "5be71cac61b3b979269168bef240b5cbe1ed349bacd94f3afdbc05ea9390f319";
 const ENTRYPOINT = "tools/ci/run-clean-checkout-reproducibility-phase.mjs";
 const CONTRACT_PATH = "contracts/documentation/clean-checkout-reproducibility-owner-contract.json";
 
