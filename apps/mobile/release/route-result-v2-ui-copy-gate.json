@@ -7,7 +7,7 @@
   "releaseBlockerPolicy": true,
   "status": "IN_PROGRESS",
   "currentDecision": "NO_GO",
-  "evidenceRoot": ".codex/evidence/release/android-route-result-v2-ui-copy/<run>/",
+  "evidenceRoot": ".evidence/evidence/release/android-route-result-v2-ui-copy/<run>/",
   "latestQaEvidenceStatus": {
     "qaEvidenceDateKst": "2026-07-02",
     "resolvedEvidence": [],

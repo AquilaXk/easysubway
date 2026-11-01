@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
+
 const root = process.cwd();
 const gatePath = path.join(root, "release/product-gates/backup-restore-rehearsal-gate.json");
 const gate = JSON.parse(readFileSync(gatePath, "utf8"));
@@ -19,7 +21,7 @@ assert.equal(gate.releaseBlockerPolicy, true);
 assert.doesNotMatch(JSON.stringify(gate), /\b(TBD|TODO|PLACEHOLDER)\b|\.{3}/i);
 
 const targets = new Map(gate.backupTargets.map((target) => [target.id, target]));
-assert.deepEqual([...targets.keys()].sort(), requiredTargetIds.toSorted());
+assert.deepEqual([...targets.keys()].sort(codepointCompare), requiredTargetIds.toSorted(codepointCompare));
 
 for (const id of requiredTargetIds) {
   const target = targets.get(id);

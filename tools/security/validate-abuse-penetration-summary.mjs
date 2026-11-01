@@ -117,7 +117,7 @@ function artifactIdentitySha256(identity) {
 }
 function validateIdentityEvidencePath(value, identity, path) {
   if (identity === undefined) return;
-  const expectedPathPrefix = `.codex/evidence/security/abuse-penetration-rehearsal/${identity.gitSha}/`;
+  const expectedPathPrefix = `.evidence/evidence/security/abuse-penetration-rehearsal/${identity.gitSha}/`;
   if (!value.startsWith(expectedPathPrefix)) {
     fail("SUMMARY_IDENTITY_INVALID",path,"root-git-sha-path");
   }

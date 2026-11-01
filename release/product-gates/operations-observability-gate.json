@@ -29,7 +29,7 @@
       "evidenceIds": ["admin-usage-api-error-rate", "report-controller-error-log"],
       "result": "PASS",
       "redactionNotes": "summary only; webhook URL omitted",
-      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
+      "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
     },
     {
       "signalId": "admin_review_latency",
@@ -45,7 +45,7 @@
       "evidenceIds": ["datapack-observability-artifact", "pack-version", "source-updated-at", "publish-result"],
       "result": "PASS",
       "redactionNotes": "summary only; provider values omitted",
-      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/emergency-datapack-drill.json"
+      "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/emergency-datapack-drill.json"
     },
     {
       "signalId": "mobile_crash_free_rate",
@@ -53,7 +53,7 @@
       "evidenceIds": ["crash-free-session-dashboard-or-external-blocker"],
       "result": "PASS",
       "redactionNotes": "Phase A verifies the Play access and response runbook; live rate is recorded in Phase B",
-      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/play-api-report.txt"
+      "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/play-api-report.txt"
     },
     {
       "signalId": "mobile_anr_rate",
@@ -61,7 +61,7 @@
       "evidenceIds": ["play-vitals-anr-or-external-blocker"],
       "result": "PASS",
       "redactionNotes": "Phase A verifies the Play access and response runbook; live rate is recorded in Phase B",
-      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/play-api-report.txt"
+      "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/play-api-report.txt"
     },
     {
       "signalId": "mobile_app_start_failure_rate",
@@ -69,7 +69,7 @@
       "evidenceIds": ["release-app-start-smoke", "store-install-log"],
       "result": "PASS",
       "redactionNotes": "summary only; device identifier omitted",
-      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json"
+      "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-rehearsal-summary.json"
     },
     {
       "signalId": "route_search_found_blocked_unknown_distribution",
@@ -93,7 +93,7 @@
       "evidenceIds": ["datapack-updater-test", "rollback-log"],
       "result": "PASS",
       "redactionNotes": "summary only; drill inputs contain no credentials",
-      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/emergency-datapack-drill.json"
+      "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/emergency-datapack-drill.json"
     },
     {
       "signalId": "realtime_provider_success_stale_timeout_latency_eta_error",
@@ -101,7 +101,7 @@
       "evidenceIds": ["provider-success-rate", "source-age", "timeout-count", "fallback-label-count-or-external-blocker"],
       "result": "PASS",
       "redactionNotes": "summary only; provider credentials and webhook URL omitted",
-      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
+      "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
     },
     {
       "signalId": "report_upload_failure_duplicate_orphan_cleanup_rate",
@@ -109,7 +109,7 @@
       "evidenceIds": ["report-upload-failure-count", "duplicate-claim-count", "orphan-cleanup-count"],
       "result": "PASS",
       "redactionNotes": "summary only; receipt tokens, upload URLs, and webhook URL omitted",
-      "localEvidencePath": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
+      "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
     },
     {
       "signalId": "cross_version_correlation_ids",

@@ -8,7 +8,7 @@
   "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
   "operationsEvidenceManifest": "release/product-gates/operations-release-evidence.json",
   "supportIncidentResponseGate": "release/product-gates/support-incident-response-gate.json",
-  "evidenceRoot": ".codex/evidence/release/post-launch-operations-review/<rc-or-run>/",
+  "evidenceRoot": ".evidence/evidence/release/post-launch-operations-review/<rc-or-run>/",
   "preLaunchReadiness": {
     "status": "BLOCKED_EXTERNAL",
     "evidenceDateKst": "2026-07-15",
@@ -33,7 +33,7 @@
         "dataPackManifestSha256": "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5"
       },
       "validatedArtifactIdentityEvidence": {
-        "aabPayload": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260717/fixed-release-rehearsal-summary.json",
+        "aabPayload": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260717/fixed-release-rehearsal-summary.json",
         "backend": "release/product-gates/operations-release-evidence.json",
         "dataPackManifest": "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"
       },
@@ -53,7 +53,7 @@
         {
           "refreshOn": "operations-contract-change",
           "files": [
-            {"path": "release/product-gates/operations-release-evidence.json", "sha256": "c9f09ea9cec335cfaf82884eeddf1d48999890dbd582d6e4a39cd5c5e7cea86b"},
+            {"path": "release/product-gates/operations-release-evidence.json", "sha256": "8c28a2cbbe2f51af63bc13f948198b3223525bed2e1e9bb31910300275c25904"},
             {"path": "release/product-gates/operations-observability-gate.json", "sha256": "6955ac139fbc57be0721bb955e834164015050f397f2562e4402298578027afe"},
             {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "e89a520d6b229c5fd042ef8bcaf74873476c7253cd03b48fac1de21cf55e0c4d"},
             {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "474095e635706a442d79e9c21e274e0aa6eb9e992f480783dbc7d16c66a0fc7e"},
@@ -99,7 +99,7 @@
         {
           "refreshOn": "fixed-release-procedure-change",
           "files": [
-            {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "c9c530aac27b564e4af416c726b9609baf42fc55488a61d3515f95a1abaf9756"},
+            {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "e5f8321dcdce78d7d408a052cf9f58afe840c1a3f0838337d398eabd683e03d1"},
             {"path": "apps/mobile/pubspec.yaml", "sha256": "1c4918747c4acf22bbe885b7cb01cc34cc311e7e44598ac6b817848712614d42"},
             {"path": ".github/workflows/release-artifacts.yml", "sha256": "7a40f47727818e79abe1156eee2dd105a0c499eda087708f419993759d404245"},
             {"path": ".github/workflows/datapack-release.yml", "sha256": "5cfd322afbf316c70862049d8d62eeb60e8d44727aaa0cd115c157e4f9b07996"},
@@ -134,7 +134,7 @@
       {
         "id": "p0-p1-p2-alert-route-dry-run",
         "status": "PASS",
-        "evidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
+        "evidence": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
       },
       {
         "id": "support-security-privacy-data-deletion-mailbox-receive-test",
@@ -149,7 +149,7 @@
       {
         "id": "p0-data-error-emergency-release-rollback-rehearsal",
         "status": "PASS",
-        "evidence": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/emergency-datapack-drill.json"
+        "evidence": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/emergency-datapack-drill.json"
       },
       {
         "id": "fixed-release-versioncode-build-submit-procedure",
@@ -189,7 +189,7 @@
       "channel": "Slack Incoming Webhook",
       "severities": ["P0", "P1", "P2"],
       "publicEvidenceSummary": "P0/P1/P2 각각 HTTP 200 / ok dry-run을 통과했고 webhook URL은 tracked file이나 GitHub에 저장하지 않았다.",
-      "localOnlyEvidenceRoot": ".codex/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/"
+      "localOnlyEvidenceRoot": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/"
     },
     "observabilityAccess": {
       "result": "PASS",
@@ -216,7 +216,7 @@
       "afterPublicRelease": "PT2H",
       "dueAtFormula": "publicReleaseIdentity.publishedAt+PT2H",
       "ownerKo": "릴리즈 운영 담당자",
-      "recordLocation": ".codex/evidence/release/post-launch-operations-review/<public-release>/first_2h/",
+      "recordLocation": ".evidence/evidence/release/post-launch-operations-review/<public-release>/first_2h/",
       "requiredSignals": [
         "play-review-status",
         "crash-free-session-rate",
@@ -233,7 +233,7 @@
       "afterPublicRelease": "P1D",
       "dueAtFormula": "publicReleaseIdentity.publishedAt+P1D",
       "ownerKo": "모바일/운영 공동 담당자",
-      "recordLocation": ".codex/evidence/release/post-launch-operations-review/<public-release>/first_24h/",
+      "recordLocation": ".evidence/evidence/release/post-launch-operations-review/<public-release>/first_24h/",
       "requiredSignals": [
         "crash-anr-summary",
         "play-review-and-rating-summary",
@@ -250,7 +250,7 @@
       "afterPublicRelease": "P7D",
       "dueAtFormula": "publicReleaseIdentity.publishedAt+P7D",
       "ownerKo": "제품/운영 담당자",
-      "recordLocation": ".codex/evidence/release/post-launch-operations-review/<public-release>/day_7/",
+      "recordLocation": ".evidence/evidence/release/post-launch-operations-review/<public-release>/day_7/",
       "requiredSignals": [
         "retention-and-active-use-summary",
         "route-search-success-blocked-unknown-distribution",
@@ -265,7 +265,7 @@
       "afterPublicRelease": "P30D",
       "dueAtFormula": "publicReleaseIdentity.publishedAt+P30D",
       "ownerKo": "릴리즈 책임자",
-      "recordLocation": ".codex/evidence/release/post-launch-operations-review/<public-release>/day_30/",
+      "recordLocation": ".evidence/evidence/release/post-launch-operations-review/<public-release>/day_30/",
       "requiredSignals": [
         "monthly-crash-anr-trend",
         "support-data-error-trend",

@@ -80,10 +80,15 @@ test("discovery 뒤 신뢰된 사람의 CHANGES_REQUESTED는 병합을 막는다
   );
 });
 
-test("기존 Aquila/Codex 마커 Review 경로는 그대로 인정된다 (회귀)", () => {
+test("Aquila 마커 Review 경로만 인정하고 Codex 마커는 거부한다", () => {
   assert.equal(reviewGate([[ownerReview(1, "COMMENTED", AQUILA_FALLBACK_BODY)]]), "true", "Aquila fallback 마커");
   assert.equal(reviewGate([[ownerReview(1, "COMMENTED", AQUILA_UNIVERSAL_BODY)]]), "true", "Aquila Universal Review 마커");
-  assert.equal(reviewGate([[ownerReview(1, "COMMENTED", CODEX_FALLBACK_BODY)]]), "true", "Codex CLI fallback 마커");
+  assert.equal(reviewGate([[ownerReview(1, "COMMENTED", CODEX_FALLBACK_BODY)]]), "false", "Codex CLI fallback 마커만 있는 Review");
+  assert.equal(
+    reviewGate([[ownerReview(1, "COMMENTED", CODEX_FALLBACK_BODY), ownerReview(2, "COMMENTED", AQUILA_UNIVERSAL_BODY)]]),
+    "true",
+    "Aquila 마커 Review가 함께 있으면 인정한다",
+  );
   assert.equal(
     reviewGate([[ownerReview(1, "COMMENTED", "<!-- Review source: Aquila Universal Review; engine: aquila-review -->")]]),
     "false",

@@ -109,7 +109,7 @@
     }
   },
   "evidencePolicy": {
-    "localOnlyEvidencePath": ".codex/evidence/release/mobile-signed-artifacts/",
+    "localOnlyEvidencePath": ".evidence/evidence/release/mobile-signed-artifacts/",
     "githubUploadPolicy": "summary-only"
   }
 }
