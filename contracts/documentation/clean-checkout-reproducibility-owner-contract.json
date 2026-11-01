@@ -5,7 +5,7 @@
     {
       "variantId": "hub-documentation-contracts",
       "runnerImage": "ubuntu-24.04",
-      "toolchainDigest": "572ef6994a102ac7a0e20156813dfe8f37208beae85c28a7baefa3cdd94c8fea",
+      "toolchainDigest": "5be71cac61b3b979269168bef240b5cbe1ed349bacd94f3afdbc05ea9390f319",
       "phases": [
         {
           "phase": "SETUP",
@@ -13,7 +13,7 @@
           "arguments": [
             "setup",
             "24",
-            "572ef6994a102ac7a0e20156813dfe8f37208beae85c28a7baefa3cdd94c8fea"
+            "5be71cac61b3b979269168bef240b5cbe1ed349bacd94f3afdbc05ea9390f319"
           ],
           "workingDirectory": ".",
           "requiredEnvironment": [],
