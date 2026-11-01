@@ -263,15 +263,15 @@ jobs:
                   ((.updated_at == null) or (.updated_at | type) == "string") and ((.created_at == null) or (.created_at | type) == "string");
                 if $kind == "check_runs" then
                   if type == "object" and (.check_runs | type) == "array" and all(.check_runs[]; valid_check_run)
-                  then .check_runs else error("invalid check_runs page") end
+                  then [.check_runs[] | {id, name, status, conclusion, started_at, completed_at, app}] else error("invalid check_runs page") end
                 elif type != "array" then error("invalid array page")
                 elif $kind == "comments" and all(.[]; valid_comment) then .
                 elif $kind == "commits" and all(.[]; valid_commit) then .
                 elif $kind == "reviews" and all(.[]; valid_review) then .
-                elif $kind == "statuses" and all(.[]; valid_status) then .
+                elif $kind == "statuses" and all(.[]; valid_status) then [.[] | {id, context, state, updated_at, created_at}]
                 else error("invalid page items") end
               ' <<<"${response}")" || return 1
-              collected="$(jq -cn --argjson all "${collected}" --argjson next "${items}" '$all + $next')" || return 1
+              collected="$(jq -cs 'add' <<<"${collected}"$'\n'"${items}")" || return 1
               item_count="$(json_length "${items}")" || return 1
               if [[ "${item_count}" -lt "${page_size}" ]]; then
                 printf '%s\n' "${collected}"
