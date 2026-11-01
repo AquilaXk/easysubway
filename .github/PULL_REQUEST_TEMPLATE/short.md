@@ -37,5 +37,5 @@ Refs #
 - [ ] 이슈 범위와 실제 diff가 일치하며 관련 없는 변경을 포함하지 않았다.
 - [ ] 실행한 명령과 결과 또는 미실행 사유를 기록했다.
 - [ ] GitHub PR Review 객체가 있는지 확인했다. CodeRabbit status check만으로는 리뷰 완료로 보지 않는다.
-- [ ] CodeRabbit 실행이 불가능하거나 PR Review 객체가 없으면 폴백 리뷰를 단일 PR review로 게시했다.
+- [ ] 현재 head에 대한 `pstack` `interrogate` Review(`<!-- pstack-interrogate head=<40자 sha> act-on=0 -->`)를 단일 PR review로 게시했다.
 - [ ] CodeRabbit 봇과의 추가 질의응답을 포함하여 모든 Review thread가 해결(Resolve conversation)되었는지 확인했다.

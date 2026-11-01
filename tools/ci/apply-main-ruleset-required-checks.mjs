@@ -11,9 +11,6 @@
 //     --input current.json --output updated.json --backup ruleset-backup.json
 //   # review updated.json, then apply:
 //   gh api -X PUT repos/AquilaXk/easysubway/rulesets/17584352 --input updated.json
-//
-// The context list is the single source of truth shared (via the contract test)
-// with ci.yml job names and the automerge-queue coordinator fallback.
 import { isMainModule } from "../lib/is-main-module.mjs";
 import { readFileSync, writeFileSync } from "node:fs";
 import { argValue } from "../release/summary-validation-utils.mjs";
