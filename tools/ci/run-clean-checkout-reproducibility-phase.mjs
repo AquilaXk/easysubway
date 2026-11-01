@@ -8,7 +8,7 @@ import { fileURLToPath } from "node:url";
 
 const NODE_MAJOR = "24";
 const TOOLCHAIN_LOCK_PATH = "tools/qa/package-lock.json";
-const TOOLCHAIN_DIGEST = "6dd1321bdd3d50511d6d363c3ce7279517c32581fb7b7831d23d13bc11de4ff0";
+const TOOLCHAIN_DIGEST = "572ef6994a102ac7a0e20156813dfe8f37208beae85c28a7baefa3cdd94c8fea";
 
 const COMMANDS = new Map([
   ["build", ["tools/ci/check-contracts.mjs", "--workspace", "contracts/workspaces/hub.json", "--current-only", "--local-contracts-only"]],
