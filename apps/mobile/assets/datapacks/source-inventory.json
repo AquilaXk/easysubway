@@ -4827,7 +4827,7 @@
     },
     {
       "id": "kric-station-convenience-standard",
-      "displayName": "편의정보(표준)",
+      "displayName": "국가철도공단 역사별 승강기·교통약자 편의시설 정보",
       "owner": "국가철도공단",
       "provider": "국가철도공단",
       "providerDepartment": "철도산업정보센터",
