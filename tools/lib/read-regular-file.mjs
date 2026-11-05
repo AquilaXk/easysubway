@@ -17,11 +17,10 @@ export async function readRegularFile(repositoryRoot, relativePath, { label = "i
   if (!rootStat.isDirectory() || rootStat.isSymbolicLink()) throw new Error("repositoryRoot must be a regular directory");
   let source = root;
   const parts = relativePath.split("/");
-  for (const [index, part] of parts.entries()) {
+  for (const part of parts) {
     source = path.join(source, part);
     const stat = await lstat(source);
     if (stat.isSymbolicLink()) throw new Error(`${label} must not contain a symlink`);
-    if (index === parts.length - 1 && !stat.isFile()) throw new Error(`${label} must be a regular file`);
   }
   const handle = await open(source, constants.O_RDONLY | constants.O_NOFOLLOW | constants.O_NONBLOCK);
   try {

@@ -33,6 +33,7 @@
       "id": "facility_report_photo_objects",
       "area": "object-storage",
       "scope": "local-rehearsal-only",
+      "ownerRepository": "AquilaXk/easysubway-platform",
       "ownerKo": "신고 운영 담당자",
       "backupCommand": "tools/ops/facility-report-photo-backup.sh",
       "restoreRehearsalCommand": "node tools/ops/facility-report-photo-restore-check.mjs \"$EASYSUBWAY_PHOTO_RESTORE_DIR\"",
@@ -43,9 +44,8 @@
         "manifest column이 누락됨"
       ],
       "linkedArtifacts": [
-        "tools/ops/facility-report-photo-backup.sh",
-        "tools/ops/facility-report-photo-restore-check.mjs",
-        "backend/src/main/resources/db/migration/postgresql/V2__facility_report_photo_object_storage.sql"
+        "contracts/bundles/platform-contracts-v1.2.0.json",
+        "contracts/release/platform-deployment-contract.json"
       ]
     },
     {
