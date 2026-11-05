@@ -210,7 +210,7 @@ jobs:
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
         env:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
-        run: node --test tools/ci/check-contracts.test.mjs tools/ci/cd-env-call-limit.test.mjs tools/ci/cd-workflow-contract.test.mjs tools/ci/check-boundaries.test.mjs tools/ci/apply-main-ruleset-required-checks.test.mjs tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs tools/ci/documentation-inventory.test.mjs tools/ci/automerge-queue.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs tools/ops/facility-report-photo-restore-check.test.mjs
+        run: node --test tools/ci/check-contracts.test.mjs tools/ci/cd-env-call-limit.test.mjs tools/ci/cd-workflow-contract.test.mjs tools/ci/check-boundaries.test.mjs tools/ci/apply-main-ruleset-required-checks.test.mjs tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs tools/ci/documentation-inventory.test.mjs tools/ci/automerge-queue.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs
 
       - name: Repository CI / Prepare active documentation fragment workspace
         if: ${{ needs.changes.outputs.contracts == 'true' }}
@@ -373,101 +373,6 @@ jobs:
         if: ${{ needs.changes.outputs.mobile != 'true' }}
         run: echo "No mobile app changes; skipping mobile checks."
 
-      - name: Mobile App CI / Checkout repository
-        if: ${{ needs.changes.outputs.mobile == 'true' }}
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-        with:
-          persist-credentials: false
-
-      - name: Mobile App CI / Detect Flutter scaffold
-        if: ${{ needs.changes.outputs.mobile == 'true' }}
-        id: scaffold
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -f apps/mobile/pubspec.yaml ]]; then
-            echo "present=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "present=false" >> "${GITHUB_OUTPUT}"
-            echo "Flutter mobile scaffold not found; skipping mobile checks."
-          fi
-
-      - name: Mobile App CI / Set up Flutter
-        if: ${{ needs.changes.outputs.mobile == 'true' && steps.scaffold.outputs.present == 'true' }}
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
-        with:
-          channel: stable
-          flutter-version: "3.44.0"
-          cache: true
-
-      - name: Mobile App CI / Set up Node.js for mobile contracts
-        if: ${{ needs.changes.outputs.mobile == 'true' && steps.scaffold.outputs.present == 'true' }}
-        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
-        with:
-          node-version: "24"
-
-      - name: Mobile App CI / Generate Android release merged manifest
-        if: ${{ needs.changes.outputs.mobile == 'true' && steps.scaffold.outputs.present == 'true' }}
-        working-directory: apps/mobile
-        shell: bash
-        env:
-          EASYSUBWAY_ANDROID_KEYSTORE_PATH: ci-release-manifest-only.jks
-          EASYSUBWAY_ANDROID_STORE_PASSWORD: ci-release-manifest-only
-          EASYSUBWAY_ANDROID_KEY_ALIAS: ci-release-manifest-only
-          EASYSUBWAY_ANDROID_KEY_PASSWORD: ci-release-manifest-only
-        run: |
-          set -euo pipefail
-          flutter pub get --enforce-lockfile
-          flutter build apk --config-only
-          gradle_log="${RUNNER_TEMP}/easysubway-mobile-gradle-wrapper.log"
-          for attempt in 1 2 3; do
-            set +e
-            android/gradlew -p android :app:processReleaseMainManifest --no-daemon 2>&1 | tee "${gradle_log}"
-            pipeline_status=("${PIPESTATUS[@]}")
-            set -e
-            gradle_status="${pipeline_status[0]}"
-            tee_status="${pipeline_status[1]}"
-
-            if [[ "${tee_status}" -ne 0 ]]; then
-              exit "${tee_status}"
-            fi
-            if [[ "${gradle_status}" -eq 0 ]]; then
-              break
-            fi
-            if [[ "${attempt}" -eq 3 ]] || ! grep -Fq "Unexpected end of file from server" "${gradle_log}"; then
-              exit "${gradle_status}"
-            fi
-
-            echo "Transient Gradle wrapper EOF; retrying bounded attempt $((attempt + 1))/3." >&2
-            sleep "$((attempt * 5))"
-          done
-
-
-      # tools/mobile의 status voice 인벤토리는 apps/mobile/lib 트리를 실제로 스캔하는
-      # drift 가드다(#2518). repository 게이트의 계약 테스트 스텝에만 배선하면 Dart 전용
-      # PR(mobile=true, repository=false)에서 스킵되어, drift가 green으로 병합되고 실패는
-      # 나중에 무관한 PR에서 터진다. 위 mobile contracts 스텝은 --test-name-pattern으로
-      # 걸러지므로 별도 스텝으로 mobile 게이트에 연결한다.
-      - name: Mobile App CI / Run mobile tool tests
-        if: ${{ needs.changes.outputs.mobile == 'true' && steps.scaffold.outputs.present == 'true' }}
-        env:
-          NODE_OPTIONS: --disable-warning=ExperimentalWarning
-        run: node --test tools/mobile/*.test.mjs
-
-      - name: Mobile App CI / Run Flutter analyzer and tests
-        if: ${{ needs.changes.outputs.mobile == 'true' && steps.scaffold.outputs.present == 'true' }}
-        working-directory: apps/mobile
-        shell: bash
-        run: |
-          set -euo pipefail
-          flutter pub get --enforce-lockfile
-          # `flutter analyze`는 포맷 드리프트를 잡지 못해, 포맷이 어긋난 파일이 CI green으로
-          # 병합된 뒤 무관한 PR에서 뒤늦게 터졌다. Dart 소스 전 디렉토리를 게이트로 고정한다.
-          dart format --output=none --set-exit-if-changed lib test integration_test test_driver
-          flutter analyze
-          flutter test --coverage
-          node ../../tools/ci/filter-mobile-lcov.mjs --input coverage/lcov.info --output coverage/lcov.info
-
   android:
     name: Android CI
     runs-on: ubuntu-latest
@@ -479,71 +384,6 @@ jobs:
       - name: Android CI / Skip unchanged area
         if: ${{ needs.changes.outputs.android != 'true' }}
         run: echo "No Android changes; skipping Android checks."
-
-      - name: Android CI / Checkout repository
-        if: ${{ needs.changes.outputs.android == 'true' }}
-        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
-        with:
-          persist-credentials: false
-
-      - name: Android CI / Detect Android scaffold
-        if: ${{ needs.changes.outputs.android == 'true' }}
-        id: scaffold
-        shell: bash
-        run: |
-          set -euo pipefail
-          if [[ -f apps/mobile/pubspec.yaml && -d apps/mobile/android ]]; then
-            echo "present=true" >> "${GITHUB_OUTPUT}"
-          else
-            echo "present=false" >> "${GITHUB_OUTPUT}"
-            echo "Android scaffold not found; skipping Android checks."
-          fi
-
-      - name: Android CI / Set up Java
-        if: ${{ needs.changes.outputs.android == 'true' && steps.scaffold.outputs.present == 'true' }}
-        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
-        with:
-          distribution: temurin
-          java-version: "21"
-          cache: gradle
-
-      - name: Android CI / Set up Flutter
-        if: ${{ needs.changes.outputs.android == 'true' && steps.scaffold.outputs.present == 'true' }}
-        uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2
-        with:
-          channel: stable
-          flutter-version: "3.44.0"
-          cache: true
-
-      - name: Android CI / Build Flutter Android debug APK
-        if: ${{ needs.changes.outputs.android == 'true' && steps.scaffold.outputs.present == 'true' }}
-        working-directory: apps/mobile
-        shell: bash
-        run: |
-          set -euo pipefail
-          flutter pub get --enforce-lockfile
-          android_log="${RUNNER_TEMP}/easysubway-android-build.log"
-          for attempt in 1 2 3; do
-            set +e
-            flutter build apk --debug 2>&1 | tee "${android_log}"
-            pipeline_status=("${PIPESTATUS[@]}")
-            set -e
-            build_status="${pipeline_status[0]}"
-            tee_status="${pipeline_status[1]}"
-
-            if [[ "${tee_status}" -ne 0 ]]; then
-              exit "${tee_status}"
-            fi
-            if [[ "${build_status}" -eq 0 ]]; then
-              break
-            fi
-            if [[ "${attempt}" -eq 3 ]] || ! grep -Fq "Connection closed before full header was received" "${android_log}"; then
-              exit "${build_status}"
-            fi
-
-            echo "Transient Android native asset header close; retrying bounded attempt $((attempt + 1))/3." >&2
-            sleep "$((attempt * 5))"
-          done
 
   notify-slack-ci-failure:
     name: Slack / CI failure

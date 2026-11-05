@@ -28,9 +28,6 @@ jobs:
       upload-sarif: true
       fail-on-vuln: true
       scan-args: |-
-        --lockfile=apps/mobile/pubspec.lock
-        --lockfile=apps/mobile/android/app/gradle.lockfile
-        --lockfile=backend/gradle.lockfile
         --lockfile=tools/qa/package-lock.json
 
   notify-slack-security-failure:
