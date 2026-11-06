@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+import {
+  governedExecutionPaths,
+  validateGovernanceInventory,
+} from "../release/validate-system-release-manifest.mjs";
 import { assertTemporaryReleaseDecisionsCurrent } from "./validate-production-readiness-evidence.mjs";
 
 test("production readiness validator module은 argv 없는 ESM import를 허용한다", () => {
@@ -110,8 +116,41 @@ test("추적 중인 operations-release-evidence.json은 현재 시점 임시 예
 
   const actualSha256 = createHash("sha256").update(rawEvidence).digest("hex");
   const postLaunchGate = JSON.parse(readFileSync(postLaunchUrl, "utf8"));
-  const operationsBinding = postLaunchGate.preLaunchReadiness?.finalRcBinding?.refreshBindings
-    ?.find((entry) => entry.refreshOn === "operations-contract-change")
+  const refreshBindings = postLaunchGate.preLaunchReadiness?.finalRcBinding?.refreshBindings ?? [];
+  const operationsBinding = refreshBindings
+    .find((entry) => entry.refreshOn === "operations-contract-change")
     ?.files?.find((file) => file.path === "release/product-gates/operations-release-evidence.json");
   assert.equal(operationsBinding?.sha256, actualSha256);
+
+  const expectedRefreshOn = postLaunchGate.preLaunchReadiness?.finalRcBinding?.evidenceValidity?.refreshOn ?? [];
+  assert.deepEqual(refreshBindings.map((entry) => entry.refreshOn), expectedRefreshOn);
+  for (const binding of refreshBindings) {
+    assert.ok(Array.isArray(binding.files) && binding.files.length > 0, `${binding.refreshOn}: files must be non-empty`);
+    for (const file of binding.files) {
+      const fileBytes = readFileSync(new URL(`../../${file.path}`, import.meta.url));
+      const fileSha256 = createHash("sha256").update(fileBytes).digest("hex");
+      assert.equal(file.sha256, fileSha256, `${binding.refreshOn}: ${file.path}`);
+    }
+  }
+});
+
+test("추적 중인 system-release-governance-inventory.json은 닫힌 Hub 거버넌스 경로 집합과 일치한다", () => {
+  const repoRootUrl = new URL("../..", import.meta.url);
+  const repoRoot = fileURLToPath(repoRootUrl);
+  assert.doesNotThrow(() => execFileSync(
+    process.execPath,
+    ["tools/release/build-system-release-governance-inventory.mjs", "--check"],
+    { cwd: repoRootUrl, stdio: "pipe" },
+  ));
+  const governanceInventory = JSON.parse(readFileSync(new URL("../../contracts/release/system-release-governance-inventory.json", import.meta.url), "utf8"));
+  const governanceInventorySchema = JSON.parse(readFileSync(new URL("../../contracts/release/system-release-governance-inventory.schema.json", import.meta.url), "utf8"));
+  const errors = validateGovernanceInventory({
+    governanceInventory,
+    governanceInventorySchema,
+    repoRoot,
+    trustedExecutionPaths: Object.fromEntries(
+      governedExecutionPaths.map((relativePath) => [relativePath, path.join(repoRoot, relativePath)]),
+    ),
+  });
+  assert.deepEqual(errors, []);
 });

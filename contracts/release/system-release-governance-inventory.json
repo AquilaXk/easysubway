@@ -4,79 +4,47 @@
   "files": [
     {
       "path": ".github/workflows/datapack-release.yml",
-      "sha256": "edc90472628f236099ba47976f9aa2acf361406ccc27b562db3562cad5764bc3"
+      "sha256": "5cfd322afbf316c70862049d8d62eeb60e8d44727aaa0cd115c157e4f9b07996"
     },
     {
       "path": ".github/workflows/release-artifacts.yml",
-      "sha256": "bb65bee05d42724cd5dc69b9b89272028cc37e3ef20761eb6e9c994b54ec20f0"
-    },
-    {
-      "path": "apps/mobile/lib/app/accessibility_theme.dart",
-      "sha256": "3987679f36ee1226ae75643af6f75178a3dddbb14f7f00d0ac7e0ab9ba943101"
-    },
-    {
-      "path": "apps/mobile/lib/app/app_components.dart",
-      "sha256": "cdbdf988d8cbd5f4d54d159b22f28599499f6eb746db11ef2bba763c9e7ebd01"
-    },
-    {
-      "path": "apps/mobile/lib/app/easy_subway_app.dart",
-      "sha256": "881032641c48b30743ccb8c8b2fcb2ac01b79e0b66e5dbf0d95bee7cd3adb794"
-    },
-    {
-      "path": "apps/mobile/lib/features/account/presentation/user_data_deletion_screen.dart",
-      "sha256": "b4772edc79156c694fc4ddeccc8209d9d515ca449bd8791b0974b23d6bddcf32"
-    },
-    {
-      "path": "apps/mobile/lib/features/attribution/presentation/data_source_attribution_screen.dart",
-      "sha256": "b1768880be57509a1dc2e9a97dd3231a80664267336624d1f547a16d890828c9"
-    },
-    {
-      "path": "apps/mobile/lib/features/favorites/presentation/favorite_home_screen.dart",
-      "sha256": "b60f304bbf37c9df34e8964c2ab48b692f3c9fb62cbc6dd7138cbcddf671a9af"
-    },
-    {
-      "path": "apps/mobile/lib/features/home/presentation/home_screen.dart",
-      "sha256": "cc84ff0ef4dca75ed4b383c669c28265437e6849ce4f9d089dc044bb469872c4"
-    },
-    {
-      "path": "apps/mobile/lib/features/settings/presentation/app_settings_screen.dart",
-      "sha256": "9addd1120dd44a62959422989f78cc308d53e19b12c56e23b527e649739ea5e1"
-    },
-    {
-      "path": "apps/mobile/lib/features/settings/presentation/open_source_licenses_screen.dart",
-      "sha256": "c196f9c4edf55a0423db3371635009db84f856bbd7ff4a626bceb52fd11c3ee8"
-    },
-    {
-      "path": "apps/mobile/lib/features/settings/presentation/service_info_screen.dart",
-      "sha256": "d7aa7cccbff052e84c9aacd5438fc3fbe96dcce0d9e31a0fc5df77bcf29ab93b"
-    },
-    {
-      "path": "apps/mobile/lib/features/support/presentation/inquiry_screen.dart",
-      "sha256": "83cb5c1ee0c01fc270ec45e740634a5daa3efbfcdf997a7d752d1a4a5b4ccbfb"
-    },
-    {
-      "path": "apps/mobile/lib/features/support/presentation/support_access_screen.dart",
-      "sha256": "644103a53ea16b6413c6b892f9bc5c353d96600cfd463d4a27bf3a0b7f5049e7"
-    },
-    {
-      "path": "apps/mobile/lib/main.dart",
-      "sha256": "48e4427763eed179d9f0897715603226ffc68ddcf98e0e76632050b257d194b8"
+      "sha256": "1dd1f6a965454b51581c08a486a5b8af20a92b5556b42ac096324b05ddd68b45"
     },
     {
       "path": "apps/mobile/pubspec.yaml",
-      "sha256": "65dd3d8fbf0df64489d73a41194a97eb8a8986b58024c8a35bbef42e38917abd"
+      "sha256": "3b1c5d56e16c3a45123924e08e183ecb42a9c6ddad9a58432ea990a44e2ab733"
     },
     {
       "path": "apps/mobile/release/signed-release-artifact-gate.json",
-      "sha256": "6570e6317f34142991cf38b213754991ee91732e6b735ebdec6abe3191f47007"
+      "sha256": "e5f8321dcdce78d7d408a052cf9f58afe840c1a3f0838337d398eabd683e03d1"
     },
     {
-      "path": "backend/Dockerfile",
-      "sha256": "bb190eb507645836df69934a0ca6cf4dc7499bd508ed0a485e688eede70e615a"
+      "path": "contracts/bundles/backend-contracts-v1.0.0.json",
+      "sha256": "81763c3462e67a4959babb240a47ada8292d0fe18f77a0db24a73f1fe85baedc"
     },
     {
-      "path": "backend/build.gradle",
-      "sha256": "2684df5a35c4d7952819899810654cfd61d081fe231347e42b37cce05ae9f9bd"
+      "path": "contracts/bundles/data-contracts-v1.0.0.json",
+      "sha256": "48e3a41d992fac4135b28c1fe83dc62f4ca1fcdfc5d2e4dbad4f039d4b4b811c"
+    },
+    {
+      "path": "contracts/bundles/data-contracts-v1.1.0.json",
+      "sha256": "0fa3cdd963e3b2347dacd822937efb16ba38a7d34044cb52bde4df8b406eded7"
+    },
+    {
+      "path": "contracts/bundles/generic-mobile-consumer-bundle-v1.json",
+      "sha256": "7f666d016119591e5c958e7d55c936fffb5e753898e69ec28e4f0cb50b5555ff"
+    },
+    {
+      "path": "contracts/bundles/platform-contracts-v1.0.0.json",
+      "sha256": "a4cc96ac0944ef7cbcba9470a3eb29e473e8f9e6076e729c4b020b1d5428a209"
+    },
+    {
+      "path": "contracts/bundles/platform-contracts-v1.1.0.json",
+      "sha256": "ffbfed08c46916a6a9f7e1bf3d3de46989fe4f2517ed341bd2e2f89e02b7ce58"
+    },
+    {
+      "path": "contracts/bundles/platform-contracts-v1.2.0.json",
+      "sha256": "539229491d8cf072118c8a5d658459ce51d993daac099ee6f00afd019f9059fa"
     },
     {
       "path": "contracts/release/android-datapack-candidate-evidence.schema.json",
@@ -91,72 +59,40 @@
       "sha256": "da70e7ba7892f3d198ec65aea79e726336fdd2aff7fdbb1e60a1952df10fbbc9"
     },
     {
+      "path": "contracts/release/platform-deployment-contract.json",
+      "sha256": "e5fba2310dcda64ca1a25ada3d933a22058857c66bb4772c2cb7e44af8a59ad8"
+    },
+    {
       "path": "contracts/release/system-release-governance-inventory.schema.json",
-      "sha256": "0ad2b1243f43ce22f873e5b9af55acffaaafd79ac89c9ac3d810ee9d45246241"
+      "sha256": "741850c1dcaf8080117a3e03e6130b1465ab51700c3bc25f15849be27704c978"
     },
     {
       "path": "contracts/release/system-release-manifest.schema.json",
       "sha256": "aeb97a3bd43be169c873eb4c0b018b295da557ae3a3d4ac9a81d494bf1a16f68"
     },
     {
-      "path": "infra/alloy/config.alloy",
-      "sha256": "cb8333eecd52ef6cf5fc9ccf62e87a2990deaa57b6ff3b9a2effcfa33a9b3f5a"
-    },
-    {
-      "path": "infra/docker-compose.yml",
-      "sha256": "0f14db02823e85a748b2918b0ea72360f90573bfd31c6042a4fcbf78db6ee145"
-    },
-    {
-      "path": "infra/grafana/provisioning/dashboards/dashboards.yml",
-      "sha256": "648f908f7ddf556b3ec4de0dd9d66dfc75e58a747ebfda411725b8ad301aeb41"
-    },
-    {
-      "path": "infra/grafana/provisioning/dashboards/json/error-ops.json",
-      "sha256": "8d28d95d06780698b51014697ee4e942851876ea75ffcbf2c2a5ce7d394ec862"
-    },
-    {
-      "path": "infra/grafana/provisioning/datasources/loki.yml",
-      "sha256": "57bb87c11cec9f9e728e37a636de9eca2a291c8cd051c67d4e1cd2c683a7675e"
-    },
-    {
-      "path": "infra/grafana/provisioning/datasources/prometheus.yml",
-      "sha256": "9598a3fc9b36ce35c997233ac4a61ff0293023dbb45e1d872270c2a3f8666fc5"
-    },
-    {
-      "path": "infra/loki/loki.yml",
-      "sha256": "35ed63f6a069c0c6da0d711d4495f871886ec7466916cf61cd29989825c690b2"
-    },
-    {
-      "path": "infra/prometheus/alerts.yml",
-      "sha256": "764c3e88fb604ed598d053de5376c531e64f122fa7f496f5969e8511f00538af"
-    },
-    {
-      "path": "infra/prometheus/prometheus.yml",
-      "sha256": "9bcde0205620224c01d86ec99fd2ef68314a9a96f40bd70c58fe67f8123e366f"
-    },
-    {
       "path": "release/product-gates/abuse-penetration-rehearsal-gate.json",
-      "sha256": "39b66abe1bdd938fd54610086b302e3e19d32eaab900f5209cb74c154f9c2f9f"
+      "sha256": "ab52e46a1d955f6bc3c6e8859fc563a2a20db0f3a513803025c94ec7d34d6ae4"
     },
     {
       "path": "release/product-gates/operations-observability-gate.json",
-      "sha256": "d1806235459623db3cd1c6098686d613090373b1dfd116a732ab3ea2b48bc4fb"
+      "sha256": "0b1dc4f9ba19624e6539670b09361a0d29f8ec8dac255f9715407c7af5c3c0e3"
     },
     {
       "path": "release/product-gates/operations-release-evidence.json",
-      "sha256": "e702d13030e789e8c26106fd84bd6928e3471cb1a76f43f243642cae4709cc12"
+      "sha256": "8c28a2cbbe2f51af63bc13f948198b3223525bed2e1e9bb31910300275c25904"
     },
     {
       "path": "release/product-gates/post-launch-operations-review-gate.json",
-      "sha256": "7ce5f313d8d042f40473e4cf16b7cb7748830a530dfaa25a8b30629b26e24237"
+      "sha256": "8d88ba3e026bf35d24358263a0332a9c8de67a08db40c82e1b34b05768192e95"
     },
     {
       "path": "release/product-gates/production-datapack-scope.json",
-      "sha256": "c16530af6d3f41cf22407948dcf912c909eb0f52cf44b4cc32124fa48112d005"
+      "sha256": "9d490eae8e42f83154e2c7fe81510ad14236f8206e588bca9c39850f76d917d4"
     },
     {
       "path": "release/product-gates/rc-evidence-manifest-contract.json",
-      "sha256": "571977ae6cec491579a68e686de35e6f51af68af27e688634a7b4fd4751ccd9a"
+      "sha256": "0ca819602a478b4657004cebdcf6cfae46170fc84a1e027baac6c52d1e8a35ce"
     },
     {
       "path": "release/product-gates/route-commercialization-gate.json",
@@ -164,23 +100,19 @@
     },
     {
       "path": "release/product-gates/support-incident-response-gate.json",
-      "sha256": "92034fe8ad78e29bb267fabf777056684f347c78d2a1f1023ca3109a5fbd2530"
+      "sha256": "82604501ba8e6aebc03e75d18fdaf6a4119bc54289c632f8c0b0a65d9a7cd483"
     },
     {
       "path": "tools/ci/lib/json-schema-lite.mjs",
-      "sha256": "c239c9dc63842d0d293ec3f8ada59d557d1d2a5761f77c0abed07520afb3bc67"
+      "sha256": "d6da2523704dc27db1ff927b010184d53f1ec3c0489c13a5d5f6548a081cb510"
     },
     {
       "path": "tools/ci/validate-store-privacy-env.mjs",
-      "sha256": "5e3bde24adc32d74ae59d575235bab3400936823b9e4c5c2d7af71c6465fcc84"
+      "sha256": "2e1781f02071639107bec9730fe1ae58b5ab6ca008351f72c79dff293af801cd"
     },
     {
       "path": "tools/datapack/build-launch-denominator-report.mjs",
-      "sha256": "0cb452a1a5424f191e44cac1037a5389f5a29c48724a9e7b024f1e0306b7664d"
-    },
-    {
-      "path": "tools/datapack/decide-datapack-release.mjs",
-      "sha256": "e26ec6aa08137ce5efbfd3ccd91bad3908545d98928471a16e1110a7a7e2a9e6"
+      "sha256": "bf54fec7b06ac6e2444253706775557554629ab6190e5586c8ba1e2871103bb0"
     },
     {
       "path": "tools/datapack/lib/manifest-validation.mjs",
@@ -189,18 +121,6 @@
     {
       "path": "tools/datapack/production-url-policy.mjs",
       "sha256": "2f1166cbc241d68aa36a25484159985ec19b9add529eefc0030e780633a422ff"
-    },
-    {
-      "path": "tools/datapack/run-emergency-datapack-drill.mjs",
-      "sha256": "c5368fbe7ac1e705145eb39e5183cb34986dea560558f2e31b4d4e6eaca3c82c"
-    },
-    {
-      "path": "tools/datapack/validate-remote-datapack-artifact.mjs",
-      "sha256": "153a5888903c503fb572b5596afac58d1b0ac1ae973f3e8fda5806948d168b26"
-    },
-    {
-      "path": "tools/datapack/verify-release-request-binding.mjs",
-      "sha256": "33953a3a0432f82021f54df40e072288c3d4100d0a254317fbdeb700e8b03cb3"
     },
     {
       "path": "tools/lib/codepoint-compare.mjs",
@@ -215,10 +135,6 @@
       "sha256": "b74f89aaa3fd86b7a85e2baa3e1b487acd11a9d9099c262d97363b550c8d851c"
     },
     {
-      "path": "tools/realtime/seoul-topis-provider-contract.json",
-      "sha256": "4bd4fd37337ec30833dae3aa0f8ae34f1a08cf06f13dbefad1fe7ccda5a8bc4d"
-    },
-    {
       "path": "tools/release/build-android-datapack-candidate-evidence.mjs",
       "sha256": "0d48a4d72200b6f9ec4bb89d3e434a16dc8d397173c1ea9a846b47e0ef8b8275"
     },
@@ -228,7 +144,7 @@
     },
     {
       "path": "tools/release/generate-rc-evidence-manifest.mjs",
-      "sha256": "ef46d78af3e4d6d121c3b63396dd44938b198b297fecd23e0e3fc20102040a91"
+      "sha256": "6f28e8a0c3c2a255619a3035010e0308fc0b92d948f8579778b7d9742347f685"
     },
     {
       "path": "tools/release/hash-android-bundle-payload.mjs",
@@ -252,7 +168,7 @@
     },
     {
       "path": "tools/release/validate-system-release-manifest.mjs",
-      "sha256": "d8d01f4f689465dca7e0f90bd27b5d1b175c7382b191bd7b5d63e0eade38a383"
+      "sha256": "3e8328ce07a5c8491416d4b49aef6e9a661ed579445f9c064c9d8d9cc95f51d3"
     },
     {
       "path": "tools/security/abuse-penetration-summary-schema.mjs",
@@ -260,7 +176,7 @@
     },
     {
       "path": "tools/security/validate-abuse-penetration-summary.mjs",
-      "sha256": "2fa30e161cf6f8c27147704dfb467ca93cce7142ce1c010fcf52f39abde1bd58"
+      "sha256": "824e570f13020b7a071928934388d8b9e108a7af7fc59920f75247fd2b82c97e"
     }
   ]
 }
