@@ -2,7 +2,13 @@ import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
+import path from "node:path";
 import test from "node:test";
+import { fileURLToPath } from "node:url";
+import {
+  governedExecutionPaths,
+  validateGovernanceInventory,
+} from "../release/validate-system-release-manifest.mjs";
 import { assertTemporaryReleaseDecisionsCurrent } from "./validate-production-readiness-evidence.mjs";
 
 test("production readiness validator module은 argv 없는 ESM import를 허용한다", () => {
@@ -129,10 +135,22 @@ test("추적 중인 operations-release-evidence.json은 현재 시점 임시 예
 });
 
 test("추적 중인 system-release-governance-inventory.json은 닫힌 Hub 거버넌스 경로 집합과 일치한다", () => {
-  const repoRoot = new URL("../..", import.meta.url);
+  const repoRootUrl = new URL("../..", import.meta.url);
+  const repoRoot = fileURLToPath(repoRootUrl);
   assert.doesNotThrow(() => execFileSync(
     process.execPath,
     ["tools/release/build-system-release-governance-inventory.mjs", "--check"],
-    { cwd: repoRoot, stdio: "pipe" },
+    { cwd: repoRootUrl, stdio: "pipe" },
   ));
+  const governanceInventory = JSON.parse(readFileSync(new URL("../../contracts/release/system-release-governance-inventory.json", import.meta.url), "utf8"));
+  const governanceInventorySchema = JSON.parse(readFileSync(new URL("../../contracts/release/system-release-governance-inventory.schema.json", import.meta.url), "utf8"));
+  const errors = validateGovernanceInventory({
+    governanceInventory,
+    governanceInventorySchema,
+    repoRoot,
+    trustedExecutionPaths: Object.fromEntries(
+      governedExecutionPaths.map((relativePath) => [relativePath, path.join(repoRoot, relativePath)]),
+    ),
+  });
+  assert.deepEqual(errors, []);
 });
