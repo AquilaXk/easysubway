@@ -38,6 +38,11 @@ export const MIRROR_DEFINITIONS = Object.freeze([
     sourcePath: "tools/datapack/source-candidates.json",
   },
   {
+    hubPath: "tools/datapack/source-governance-policy.json",
+    repository: "AquilaXk/easysubway-data",
+    sourcePath: "tools/datapack/source-governance-policy.json",
+  },
+  {
     hubPath: "tools/datapack/source-operation.mjs",
     repository: "AquilaXk/easysubway-data",
     sourcePath: "tools/datapack/source-operation.mjs",
