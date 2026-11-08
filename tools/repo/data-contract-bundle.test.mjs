@@ -1,10 +1,15 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
+import {
+  approvedGovernanceBindingTransition,
+  validateGovernancePolicyLineage,
+} from "../datapack/source-governance-policy.mjs";
 import { buildDataContractBundle } from "./build-data-contract-bundle.mjs";
 
 const resources = new Map([
@@ -34,22 +39,22 @@ const requiredProductionSourceIds = [
   "kric-subway-timetable",
   "seoul-metro-transfer-distance-duration",
 ];
-// data 레포 신선도 정책에는 있지만 Hub governance·inventory 사본에는 없는 원천의 닫힌 목록이다.
+// 신선도 정책에는 있지만 거버넌스 원장(tools/datapack/source-governance-policy.json)에는 아직 등록되지 않았거나 비승인인 원천의 닫힌 목록이다.
 // - 인천 원천 3개: governance 등록(라이선스 검토)이 아직 없다(easysubway-data#868).
-// - seoul-metro-transfer-car-door-duration: Hub inventory 계약(check-contracts 2129-2141)이 data 항목
-//   (productionUseAllowed:true, domain evidence 없음)을 거부한다. 정합은 easysubway-data#888에서 처리한다.
-// - kric-subway-timetable-station-lines: data 레포 등록(easysubway-data#903) 전이라 Hub 사본에 아직 없다.
-// - kric-station-escalator-detailed: data 레포 등록(easysubway-data#1460) 전이라 Hub 사본에 아직 없다.
+// - molit-railway-transfer-movement: inventory에 productionUseAllowed:false, requiredForProductionPack:false로 남아 있어 governance 원장 대상이 아니다.
 const dataRepositoryOnlyFreshnessSourceIds = [
   "incheon-line1-train-timetable",
   "incheon-line2-train-timetable",
   "incheon-transit-station-info",
+  "molit-railway-transfer-movement",
+];
+// 거버넌스 원장에는 등록되어 있지만 Hub inventory 사본에는 아직 없는 원천의 닫힌 목록이다.
+const dataRepositoryOnlyGovernanceInventorySourceIds = [
   "kric-station-escalator-detailed",
   "kric-subway-timetable-station-lines",
   "seoul-metro-transfer-car-door-duration",
 ];
 // candidate가 production inventory 항목을 가리키는데 Hub inventory 사본에 아직 없는 원천의 닫힌 목록이다.
-// seoul-metro-transfer-car-door-duration: Hub inventory 계약이 data 항목을 거부한다(위 dataRepositoryOnlyFreshnessSourceIds와 같은 사유).
 const dataRepositoryOnlyInventoryReferenceIds = ["seoul-metro-transfer-car-door-duration", "kric-station-escalator-detailed"];
 const externalSourceRegistrations = [
   {
@@ -198,16 +203,25 @@ test("staged freshness와 governance는 annual official source binding 및 licen
     [...governanceBySource.keys()].sort(),
     freshnessSourceIds.filter((sourceId) => !dataRepositoryOnlyFreshnessSourceIds.includes(sourceId)),
   );
+  const missingFromInventory = [];
   for (const [sourceId, entry] of governanceBySource) {
     const sourceClass = freshness.sourceClasses.find((candidate) => candidate.id === entry.sourceClassId);
     assert.ok(sourceClass?.sourceIds.includes(sourceId), `${sourceId}: governance class binding`);
-  }
-  for (const sourceId of ["incheon-transit-accessibility", "molit-railway-transfer-movement", "seoul-metro-transfer-distance-duration"]) {
     const source = inventory.sources.find((candidate) => candidate.id === sourceId);
     const mobileSource = mobileInventory.sources.find((candidate) => candidate.id === sourceId);
-    assert.equal(source.admissionEvidence?.licenseEvidenceHash, governanceBySource.get(sourceId).licenseReview.termsHash);
-    assert.equal(mobileSource.admissionEvidence?.licenseEvidenceHash, governanceBySource.get(sourceId).licenseReview.termsHash);
+    if (!source) {
+      missingFromInventory.push(sourceId);
+      assert.equal(mobileSource, undefined);
+      continue;
+    }
+    assert.equal(source.admissionEvidence?.licenseEvidenceHash, entry.licenseReview.termsHash, `${sourceId}: hub inventory termsHash`);
+    assert.equal(mobileSource.admissionEvidence?.licenseEvidenceHash, entry.licenseReview.termsHash, `${sourceId}: mobile inventory termsHash`);
   }
+  assert.deepEqual(missingFromInventory.sort(), dataRepositoryOnlyGovernanceInventorySourceIds);
+  const nonProductionTransfer = inventory.sources.find((candidate) => candidate.id === "molit-railway-transfer-movement");
+  assert.equal(nonProductionTransfer?.productionUseAllowed, false);
+  assert.equal(nonProductionTransfer?.requiredForProductionPack, false);
+  assert.equal(governanceBySource.has("molit-railway-transfer-movement"), false);
 });
 
 test("datapack freshness SLA는 current public route-map position과 연간 공식 환승 파일 정책을 고정한다", async () => {
@@ -407,4 +421,62 @@ test("미러된 source candidate가 가리키는 inventory 항목은 Hub invento
   const referenced = candidates.map(({ productionInventoryReferenceId }) => productionInventoryReferenceId).filter((id) => id != null);
   assert.ok(referenced.length > 0);
   assert.deepEqual(referenced.filter((id) => !inventoryIds.has(id)), dataRepositoryOnlyInventoryReferenceIds);
+});
+
+test("미러된 source-governance-policy.json은 component-mirror-manifest에 고정되고 등록·퇴역 lineage 해시 사슬을 통과한다", async () => {
+  const [bytes, manifest] = await Promise.all([
+    readFile("tools/datapack/source-governance-policy.json"),
+    readFile("contracts/api/component-mirror-manifest.json", "utf8").then(JSON.parse),
+  ]);
+  const sha = createHash("sha256").update(bytes).digest("hex");
+  const mirrorEntry = manifest.mirrors.find((entry) => entry.hubPath === "tools/datapack/source-governance-policy.json");
+  assert.deepEqual(mirrorEntry, {
+    hubPath: "tools/datapack/source-governance-policy.json",
+    repository: "AquilaXk/easysubway-data",
+    sourcePath: "tools/datapack/source-governance-policy.json",
+    sourceCommit: mirrorEntry?.sourceCommit,
+    sha256: sha,
+  });
+
+  const policy = JSON.parse(bytes.toString("utf8"));
+  const lineage = validateGovernancePolicyLineage({
+    currentPolicyVersion: policy.policyVersion,
+    currentPolicySha256: sha,
+    currentPolicyBytes: bytes,
+  });
+  assert.equal(lineage.states.length, 19);
+  assert.equal(lineage.root.version, "2026-08-29");
+  assert.deepEqual(policy.registrationLineage.addedSourceIds, ["kric-station-escalator-detailed"]);
+  assert.deepEqual(policy.registrationLineage.predecessorLineage.retiredSourceIds, retiredSourceIds);
+
+  assert.deepEqual(
+    approvedGovernanceBindingTransition({
+      snapshot: {
+        sourceId: "kric-station-escalator-detailed",
+        governancePolicyVersion: policy.policyVersion,
+        governancePolicySha256: sha,
+      },
+      currentPolicyVersion: policy.policyVersion,
+      currentPolicySha256: sha,
+      currentPolicyBytes: bytes,
+    }),
+    {
+      governancePolicyVersion: policy.policyVersion,
+      governancePolicySha256: sha,
+    },
+  );
+
+  const tampered = structuredClone(policy);
+  tampered.registrationLineage.predecessorPolicySha256 = "0".repeat(64);
+  const tamperedBytes = Buffer.from(`${JSON.stringify(tampered, null, 2)}\n`, "utf8");
+  const tamperedSha = createHash("sha256").update(tamperedBytes).digest("hex");
+  assert.throws(
+    () =>
+      validateGovernancePolicyLineage({
+        currentPolicyVersion: tampered.policyVersion,
+        currentPolicySha256: tamperedSha,
+        currentPolicyBytes: tamperedBytes,
+      }),
+    /governance policy binding/,
+  );
 });

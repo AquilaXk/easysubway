@@ -3804,6 +3804,19 @@ test("check-contracts는 inventory·freshness·governance 참조를 함께 검�
   assert.match(errors[0], /RAW_RETENTION_OVERDUE/);
 });
 
+test("check-contracts는 governance registrationLineage 변조를 거부한다", () => {
+  const inventory = loadJson("apps/mobile/assets/datapacks/source-inventory.json");
+  const freshnessPolicy = loadJson("release/product-gates/datapack-freshness-sla.json");
+  const governancePolicy = loadJson("tools/datapack/source-governance-policy.json");
+  governancePolicy.registrationLineage.predecessorPolicySha256 = "0".repeat(64);
+  const errors = [];
+
+  validateSourceGovernanceContracts({ governancePolicy, inventory, freshnessPolicy }, errors);
+
+  assert.equal(errors.length, 1);
+  assert.match(errors[0], /governance policy binding/);
+});
+
 test("필수 계약 입력 파일이 없으면 실패한다", () => {
   const errors = [];
 

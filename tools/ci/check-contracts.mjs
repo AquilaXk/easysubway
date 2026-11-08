@@ -418,6 +418,7 @@ export function collectContractErrors(
       inventory: loadJson(workspace.sourceInventory),
       governancePolicy: loadJson(workspace.governancePolicy),
       freshnessPolicy: loadJson(workspace.freshnessPolicy),
+      governancePolicyBytes: readFileSync(workspace.governancePolicy),
     }, errors);
   }
   validateBoundaries(errors, contract("boundaries.json"));
@@ -1079,11 +1080,16 @@ export function validatePostGoBoundaryAuditReportSchema(schema, errors = [], pat
 }
 
 export function validateSourceGovernanceContracts(
-  { governancePolicy, inventory, freshnessPolicy },
+  { governancePolicy, inventory, freshnessPolicy, governancePolicyBytes = undefined },
   errors,
 ) {
   try {
-    validateSourceGovernancePolicy({ policy: governancePolicy, inventory, freshnessPolicy });
+    validateSourceGovernancePolicy({
+      policy: governancePolicy,
+      inventory,
+      freshnessPolicy,
+      policyBytes: governancePolicyBytes,
+    });
   } catch (error) {
     errors.push(`source-governance: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -2426,7 +2432,7 @@ if (isMainModule(import.meta.url)) {
     documentationFragmentResolution: localContractsOnly ? "LOCAL_CONTRACTS_ONLY" : "REQUIRED",
   });
   if (errors.length) {
-    console.error(errors.map((error) => `- ${error}`).join("\n"));
+    console.error(errors.map((error) => `- ${error}`).join("\n")); // NOSONAR
     process.exit(1);
   }
 }

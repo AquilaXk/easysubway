@@ -5,6 +5,18 @@ import { requiredUtcInstant } from "./lib/utc-instant.mjs";
 import { codepointCompare } from "../lib/codepoint-compare.mjs";
 
 const DAY_MS = 24 * 60 * 60 * 1_000;
+const LEGACY_GOVERNANCE_POLICY_SHA256 = "96fb678f2ec5da7f555d81d9d2009ac838e6145cc48ed2ae4757bce42c90ef70";
+const PRIOR_GOVERNANCE_POLICY_SHA256 = "13f8a78c0ae0f7bfa6817005f44a92be3131e6f6708a69a4024747478203beaa";
+const CURRENT_GOVERNANCE_POLICY_SHA256 = "e6e607e0711bebafbc25843996a0d6ff1dce6e6e82b4cadb425e78ccd284d9f3";
+const CURRENT_GOVERNANCE_POLICY_VERSION = "2026-07-15";
+const ADMISSION_GOVERNANCE_POLICY_VERSION = "2026-08-29";
+const ADMISSION_GOVERNANCE_POLICY_SHA256 = "b4656dca1fdb660da495d0269ff91c7d31469045fd1db66a1534e3feffeeba33";
+const TRANSFER_SOURCE_ID = "seoul-metro-transfer-distance-duration";
+const DATA_REPOSITORY_ONLY_GOVERNANCE_SOURCE_IDS = new Set([
+  "kric-station-escalator-detailed",
+  "kric-subway-timetable-station-lines",
+  "seoul-metro-transfer-car-door-duration",
+]);
 const RELEASE_PROTECTION_MAX_AGE_MS = 5 * 60 * 1_000;
 const RELEASE_PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);
 const LICENSE_STATUSES = new Set(["APPROVED", "REVIEW_REQUIRED", "BLOCKED", "EXPIRED"]);
@@ -21,32 +33,35 @@ const GOVERNANCE_REASON_CODES = new Set([
   "SOURCE_GOVERNANCE_OWNER_MISSING",
 ]);
 
-export function validateSourceGovernancePolicy({ policy, inventory, freshnessPolicy }) {
-  if (policy?.schemaVersion !== 1 || policy?.artifactKind !== "datapack-source-governance-policy") {
-    throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: policy identity");
-  }
-  requiredUtcDate(policy.policyVersion, "policyVersion");
+function indexRetentionClasses(classes) {
   const retentionClasses = new Map();
-  for (const retentionClass of requiredArray(policy.retentionClasses, "retentionClasses")) {
+  for (const retentionClass of requiredArray(classes, "retentionClasses")) {
     const id = requiredRole(retentionClass?.id, "retentionClasses[].id");
     requiredPositiveInteger(retentionClass.retentionDays, `${id}.retentionDays`);
     if (retentionClasses.has(id)) throw new Error(`RAW_RETENTION_OVERDUE: duplicate retention class ${id}`);
     retentionClasses.set(id, retentionClass);
   }
+  return retentionClasses;
+}
 
+function indexInventorySources(sources) {
   const inventorySources = new Map();
-  for (const source of requiredArray(inventory?.sources, "inventory.sources")) {
+  for (const source of requiredArray(sources, "inventory.sources")) {
     const sourceId = requiredText(source?.id, "inventory source id");
     if (inventorySources.has(sourceId)) {
       throw new Error(`SOURCE_GOVERNANCE_OWNER_MISSING: duplicate inventory source ${sourceId}`);
     }
     inventorySources.set(sourceId, source);
   }
-  if (!Array.isArray(policy.sources)) {
+  return inventorySources;
+}
+
+function indexPolicySources(sources, { inventorySources, retentionClasses, freshnessPolicy }) {
+  if (!Array.isArray(sources)) {
     throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: policy.sources");
   }
   const policySources = new Map();
-  for (const entry of policy.sources) {
+  for (const entry of sources) {
     validatePolicySource(entry, { inventorySources, retentionClasses, freshnessPolicy });
     if (policySources.has(entry.sourceId)) {
       throw new Error(`SOURCE_GOVERNANCE_OWNER_MISSING: duplicate source ${entry.sourceId}`);
@@ -58,7 +73,32 @@ export function validateSourceGovernancePolicy({ policy, inventory, freshnessPol
       throw new Error(`SOURCE_GOVERNANCE_OWNER_MISSING: ${source.id}`);
     }
   }
+  return policySources;
+}
+
+function normalizePolicyBytes(policy, policyBytes) {
+  if (policyBytes === undefined) return prettyPolicyBytes(policy);
+  if (Buffer.isBuffer(policyBytes)) return policyBytes;
+  return Buffer.from(policyBytes);
+}
+
+export function validateSourceGovernancePolicy({ policy, inventory, freshnessPolicy, policyBytes = undefined }) {
+  if (policy?.schemaVersion !== 1 || policy?.artifactKind !== "datapack-source-governance-policy") {
+    throw new Error("SOURCE_GOVERNANCE_OWNER_MISSING: policy identity");
+  }
+  requiredUtcDate(policy.policyVersion, "policyVersion");
+  const retentionClasses = indexRetentionClasses(policy.retentionClasses);
+  const inventorySources = indexInventorySources(inventory?.sources);
+  const policySources = indexPolicySources(policy.sources, { inventorySources, retentionClasses, freshnessPolicy });
   validateReasonCodeEscalations(policy.reasonCodeEscalations);
+  if (policyBytes !== undefined || policy.registrationLineage !== undefined) {
+    const bytes = normalizePolicyBytes(policy, policyBytes);
+    validateGovernancePolicyLineage({
+      currentPolicyVersion: policy.policyVersion,
+      currentPolicySha256: sha256(bytes),
+      currentPolicyBytes: bytes,
+    });
+  }
   return { policySources, retentionClasses };
 }
 
@@ -68,6 +108,300 @@ export function deriveRawRetentionExpiresAt({ policy, sourceId, retrievedAt }) {
   if (!retentionClass) throw new Error(`RAW_RETENTION_OVERDUE: retention policy ${sourceId}`);
   const retentionDays = requiredPositiveInteger(retentionClass.retentionDays, "retentionDays");
   return new Date(requiredUtcInstant(retrievedAt, "retrievedAt") + retentionDays * DAY_MS).toISOString();
+}
+
+// Policy additions do not rewrite approvals already sealed under the exact
+// predecessor bytes. Epochs are closed so arbitrary version/hash pairs never
+// become a substitute for the recorded governance lineage.
+const GOVERNANCE_EPOCHS = [
+  {
+    version: CURRENT_GOVERNANCE_POLICY_VERSION,
+    sha256: CURRENT_GOVERNANCE_POLICY_SHA256,
+    predecessorSha256: [PRIOR_GOVERNANCE_POLICY_SHA256, LEGACY_GOVERNANCE_POLICY_SHA256],
+    currentOrPriorSha256: [PRIOR_GOVERNANCE_POLICY_SHA256],
+  },
+  {
+    version: ADMISSION_GOVERNANCE_POLICY_VERSION,
+    sha256: ADMISSION_GOVERNANCE_POLICY_SHA256,
+    predecessorSha256: [CURRENT_GOVERNANCE_POLICY_SHA256, PRIOR_GOVERNANCE_POLICY_SHA256, LEGACY_GOVERNANCE_POLICY_SHA256],
+    currentOrPriorSha256: [CURRENT_GOVERNANCE_POLICY_SHA256],
+  },
+];
+
+function governanceEpoch(currentPolicyVersion, currentPolicySha256) {
+  return GOVERNANCE_EPOCHS.find((epoch) => epoch.version === currentPolicyVersion && epoch.sha256 === currentPolicySha256) ?? null;
+}
+
+function governanceBindingError() {
+  throw new Error("SOURCE_FRESHNESS_POLICY_MISSING: governance policy binding");
+}
+
+function prettyPolicyBytes(policy) {
+  try { return Buffer.from(`${JSON.stringify(policy, null, 2)}\n`); }
+  catch { governanceBindingError(); }
+}
+
+function exactPolicyBytes(bytes) {
+  if (!Buffer.isBuffer(bytes)) governanceBindingError();
+  let policy;
+  try { policy = JSON.parse(bytes); } catch { governanceBindingError(); }
+  if (!policy || typeof policy !== "object" || Array.isArray(policy)) governanceBindingError();
+  return policy;
+}
+
+function sourceIds(policy) {
+  if (!Array.isArray(policy?.sources)) governanceBindingError();
+  const ids = policy.sources.map(({ sourceId }) => requiredText(sourceId, "governance sourceId"));
+  if (new Set(ids).size !== ids.length) governanceBindingError();
+  return ids;
+}
+
+const LINEAGE_COMMON_KEYS = ["predecessorLineage", "predecessorPolicySha256", "predecessorPolicyText"];
+const ADDED_LINEAGE_KEYS = [...LINEAGE_COMMON_KEYS, "addedSourceIds"].sort(codepointCompare);
+const RETIRED_LINEAGE_KEYS = [...LINEAGE_COMMON_KEYS, "retiredSourceIds", "retiredSources"].sort(codepointCompare);
+const RETIRED_RECORD_KEYS = ["position", "source"];
+
+function hasExactKeys(value, expected) {
+  return JSON.stringify(Object.keys(value).sort(codepointCompare)) === JSON.stringify(expected);
+}
+
+function isPlainObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value);
+}
+
+function uniqueSourceIds(value) {
+  if (!Array.isArray(value) || value.length === 0) governanceBindingError();
+  const ids = value.map((sourceId) => requiredText(sourceId, "lineage sourceId"));
+  if (new Set(ids).size !== ids.length) governanceBindingError();
+  return ids;
+}
+
+// 한 단계는 등록(addedSourceIds) 또는 퇴역(retiredSourceIds + 원문) 중 하나만 한다.
+function registrationLineage(policy) {
+  const lineage = policy?.registrationLineage;
+  if (!isPlainObject(lineage)
+    || !(hasExactKeys(lineage, ADDED_LINEAGE_KEYS) || hasExactKeys(lineage, RETIRED_LINEAGE_KEYS))) governanceBindingError();
+  if (lineage.predecessorPolicyText !== null && typeof lineage.predecessorPolicyText !== "string") governanceBindingError();
+  requiredSha256(lineage.predecessorPolicySha256, "predecessorPolicySha256");
+  if (lineage.predecessorLineage !== null && !isPlainObject(lineage.predecessorLineage)) governanceBindingError();
+  uniqueSourceIds(lineage.addedSourceIds ?? lineage.retiredSourceIds);
+  return lineage;
+}
+
+// 직전 lineage 사슬 전체에서 퇴역한 id. 퇴역은 되돌릴 수 없으므로 이후 등록 단계가 같은 id를 다시 추가할 수 없다.
+function retiredSourceIdsIn(lineage) {
+  const retired = new Set();
+  for (let step = lineage; isPlainObject(step); step = step.predecessorLineage) {
+    if (Array.isArray(step.retiredSourceIds)) step.retiredSourceIds.forEach((sourceId) => retired.add(sourceId));
+  }
+  return retired;
+}
+
+function sourcesBeforeRegistration(sources, lineage) {
+  const ids = sources.map(({ sourceId }) => sourceId);
+  const { addedSourceIds } = lineage;
+  const retired = retiredSourceIdsIn(lineage.predecessorLineage);
+  if (addedSourceIds.some((sourceId) => retired.has(sourceId))) governanceBindingError();
+  if (ids.length <= addedSourceIds.length
+    || JSON.stringify(ids.slice(-addedSourceIds.length)) !== JSON.stringify(addedSourceIds)
+    || ids.slice(0, -addedSourceIds.length).some((sourceId) => addedSourceIds.includes(sourceId))) {
+    governanceBindingError();
+  }
+  return sources.slice(0, -addedSourceIds.length);
+}
+
+// 퇴역 원문을 기록된 위치에 되돌려 직전 정책의 sources를 재구성한다. 위치는 직전 정책 기준 오름차순이다.
+function sourcesBeforeRetirement(sources, lineage) {
+  const { retiredSourceIds, retiredSources } = lineage;
+  if (!Array.isArray(retiredSources) || retiredSources.length !== retiredSourceIds.length) governanceBindingError();
+  const restored = [...sources];
+  let previousPosition = -1;
+  for (const [index, record] of retiredSources.entries()) {
+    if (!isPlainObject(record) || !hasExactKeys(record, RETIRED_RECORD_KEYS)
+      || !Number.isSafeInteger(record.position) || record.position <= previousPosition || record.position > restored.length
+      || !isPlainObject(record.source) || record.source.sourceId !== retiredSourceIds[index]) governanceBindingError();
+    restored.splice(record.position, 0, record.source);
+    previousPosition = record.position;
+  }
+  return restored;
+}
+
+function reconstructPredecessorStep(policy, bytes) {
+  if (!bytes.equals(prettyPolicyBytes(policy))) governanceBindingError();
+  const lineage = registrationLineage(policy);
+  const predecessorSources = "retiredSourceIds" in lineage
+    ? sourcesBeforeRetirement(policy.sources, lineage)
+    : sourcesBeforeRegistration(policy.sources, lineage);
+  const predecessor = { ...policy, sources: predecessorSources };
+  if (lineage.predecessorLineage === null) delete predecessor.registrationLineage;
+  else predecessor.registrationLineage = lineage.predecessorLineage;
+  let predecessorBytes = prettyPolicyBytes(predecessor);
+  // 최초 승인 원문의 서식도 증거다. 내용이 같은 원문만 원래 SHA로 검증한다.
+  if (lineage.predecessorPolicyText !== null) {
+    const originalBytes = Buffer.from(lineage.predecessorPolicyText);
+    const original = exactPolicyBytes(originalBytes);
+    if (original.registrationLineage != null
+      || JSON.stringify(original) !== JSON.stringify(predecessor)
+      || !governanceEpoch(original.policyVersion, sha256(originalBytes))) governanceBindingError();
+    predecessorBytes = originalBytes;
+  }
+  if (sha256(predecessorBytes) !== lineage.predecessorPolicySha256) governanceBindingError();
+  return { policy: predecessor, bytes: predecessorBytes };
+}
+
+export function validateGovernancePolicyLineage({ currentPolicyVersion, currentPolicySha256, currentPolicyBytes }) {
+  if (!isSha256(currentPolicySha256)) governanceBindingError();
+  if (currentPolicyBytes === undefined) {
+    const epoch = governanceEpoch(currentPolicyVersion, currentPolicySha256);
+    if (!epoch) governanceBindingError();
+    return { states: [], root: epoch };
+  }
+  if (!Buffer.isBuffer(currentPolicyBytes)) governanceBindingError();
+  const currentBytes = Buffer.from(currentPolicyBytes);
+  if (sha256(currentBytes) !== currentPolicySha256) governanceBindingError();
+  let policy = exactPolicyBytes(currentBytes);
+  if (policy.policyVersion !== currentPolicyVersion) governanceBindingError();
+  let bytes = currentBytes;
+  const states = [];
+  const seenHashes = new Set();
+  while (true) {
+    const digest = sha256(bytes);
+    if (seenHashes.has(digest)) governanceBindingError();
+    seenHashes.add(digest);
+    const ids = sourceIds(policy);
+    states.push({ policy, bytes, sha256: digest, sourceIds: new Set(ids) });
+    const epoch = governanceEpoch(policy.policyVersion, digest);
+    if (epoch) return { states, root: epoch };
+    const previous = reconstructPredecessorStep(policy, bytes);
+    policy = previous.policy;
+    bytes = previous.bytes;
+  }
+}
+
+function knownEpochBinding({ snapshot, epoch }) {
+  const binding = {
+    governancePolicyVersion: snapshot?.governancePolicyVersion,
+    governancePolicySha256: snapshot?.governancePolicySha256,
+  };
+  if (binding.governancePolicyVersion === epoch.version && binding.governancePolicySha256 === epoch.sha256) return binding;
+  if (binding.governancePolicyVersion === CURRENT_GOVERNANCE_POLICY_VERSION
+    && epoch.predecessorSha256.includes(binding.governancePolicySha256)
+    && (binding.governancePolicySha256 !== LEGACY_GOVERNANCE_POLICY_SHA256 || snapshot?.sourceId !== TRANSFER_SOURCE_ID)) return binding;
+  governanceBindingError();
+}
+
+// 직전 정책 bytes가 닫힌 epoch까지 이어지는 승인 lineage를 갖는지 확인하고 다음 단계가 기록할 결속을 만든다.
+function successorBinding(predecessorPolicyBytes) {
+  if (!Buffer.isBuffer(predecessorPolicyBytes)) governanceBindingError();
+  const predecessorBytes = Buffer.from(predecessorPolicyBytes);
+  const predecessor = exactPolicyBytes(predecessorBytes);
+  const predecessorSha256 = sha256(predecessorBytes);
+  const { states } = validateGovernancePolicyLineage({
+    currentPolicyVersion: predecessor.policyVersion,
+    currentPolicySha256: predecessorSha256,
+    currentPolicyBytes: predecessorBytes,
+  });
+  return {
+    predecessor,
+    knownSourceIds: new Set(states.flatMap(({ sourceIds }) => [...sourceIds])),
+    lineageHead: {
+      predecessorPolicySha256: predecessorSha256,
+      predecessorLineage: predecessor.registrationLineage ?? null,
+      predecessorPolicyText: predecessorBytes.equals(prettyPolicyBytes(predecessor))
+        ? null : predecessorBytes.toString("utf8"),
+    },
+  };
+}
+
+function frozenSuccessor(policy) {
+  return Object.freeze({
+    policy: Object.freeze(policy),
+    bytes: prettyPolicyBytes(policy),
+    registrationLineage: Object.freeze(policy.registrationLineage),
+  });
+}
+
+export function buildAppendOnlyGovernancePolicyRegistration({ predecessorPolicyBytes, addedSources }) {
+  const { predecessor, knownSourceIds, lineageHead } = successorBinding(predecessorPolicyBytes);
+  if (!Array.isArray(addedSources) || addedSources.length === 0 || addedSources.some((entry) => !isPlainObject(entry))) {
+    governanceBindingError();
+  }
+  const addedSourceIds = addedSources.map(({ sourceId }) => requiredText(sourceId, "added sourceId"));
+  // 퇴역한 id도 과거 정책에 남아 있으므로 다시 등록할 수 없다.
+  if (new Set(addedSourceIds).size !== addedSourceIds.length || addedSourceIds.some((sourceId) => knownSourceIds.has(sourceId))) governanceBindingError();
+  return frozenSuccessor({
+    ...predecessor,
+    sources: [...predecessor.sources, ...addedSources],
+    registrationLineage: {
+      predecessorPolicySha256: lineageHead.predecessorPolicySha256,
+      addedSourceIds,
+      predecessorLineage: lineageHead.predecessorLineage,
+      predecessorPolicyText: lineageHead.predecessorPolicyText,
+    },
+  });
+}
+
+/**
+ * 원장은 추가 전용이라 원천을 지우지 않고 퇴역 단계를 덧붙인다. 퇴역 원천은 현재 sources에서 빠지고, 원문과 직전 정책 안의
+ * 위치가 lineage에 남아 검증기가 직전 정책 bytes를 그대로 재구성한다. 직전 정책의 sources 순서대로 기록한다.
+ */
+export function buildGovernancePolicyRetirement({ predecessorPolicyBytes, retiredSourceIds }) {
+  const { predecessor, lineageHead } = successorBinding(predecessorPolicyBytes);
+  const requested = uniqueSourceIds(retiredSourceIds);
+  const retiredSources = predecessor.sources
+    .map((source, position) => ({ position, source }))
+    .filter(({ source }) => requested.includes(source.sourceId));
+  if (retiredSources.length !== requested.length || retiredSources.length === predecessor.sources.length) governanceBindingError();
+  return frozenSuccessor({
+    ...predecessor,
+    sources: predecessor.sources.filter(({ sourceId }) => !requested.includes(sourceId)),
+    registrationLineage: {
+      predecessorPolicySha256: lineageHead.predecessorPolicySha256,
+      retiredSourceIds: retiredSources.map(({ source }) => source.sourceId),
+      retiredSources,
+      predecessorLineage: lineageHead.predecessorLineage,
+      predecessorPolicyText: lineageHead.predecessorPolicyText,
+    },
+  });
+}
+
+export function approvedGovernanceBindingTransition({ snapshot, currentPolicyVersion, currentPolicySha256, currentPolicyBytes = undefined }) {
+  const lineage = validateGovernancePolicyLineage({ currentPolicyVersion, currentPolicySha256, currentPolicyBytes });
+  const binding = {
+    governancePolicyVersion: snapshot?.governancePolicyVersion,
+    governancePolicySha256: snapshot?.governancePolicySha256,
+  };
+  if (lineage.states.length === 0) return knownEpochBinding({ snapshot, epoch: lineage.root });
+  const sourceId = snapshot?.sourceId;
+  if (typeof sourceId !== "string") governanceBindingError();
+  for (const state of lineage.states) {
+    if (binding.governancePolicyVersion === state.policy.policyVersion
+      && binding.governancePolicySha256 === state.sha256
+      && state.sourceIds.has(sourceId)) return binding;
+  }
+  if (lineage.states.at(-1).sourceIds.has(sourceId)) return knownEpochBinding({ snapshot, epoch: lineage.root });
+  governanceBindingError();
+}
+
+export function isApprovedCurrentOrPriorGovernanceBinding({
+  binding, currentPolicyVersion, currentPolicySha256, currentPolicyBytes = undefined, sourceId = undefined,
+}) {
+  try {
+    const lineage = validateGovernancePolicyLineage({ currentPolicyVersion, currentPolicySha256, currentPolicyBytes });
+    if (lineage.states.length === 0) {
+      return binding?.governancePolicyVersion === lineage.root.version && binding.governancePolicySha256 === lineage.root.sha256
+        || binding?.governancePolicyVersion === CURRENT_GOVERNANCE_POLICY_VERSION
+          && lineage.root.currentOrPriorSha256.includes(binding.governancePolicySha256);
+    }
+    if (typeof sourceId !== "string") return false;
+    return lineage.states.some((state) => binding?.governancePolicyVersion === state.policy.policyVersion
+      && binding.governancePolicySha256 === state.sha256 && state.sourceIds.has(sourceId))
+      || lineage.states.at(-1).sourceIds.has(sourceId)
+        && binding?.governancePolicyVersion === CURRENT_GOVERNANCE_POLICY_VERSION
+        && lineage.root.currentOrPriorSha256.includes(binding.governancePolicySha256);
+  } catch {
+    return false;
+  }
 }
 
 export function evaluateSourceGovernance({
@@ -151,7 +485,9 @@ export function isValidLegalHold({ hold, policy, sourceId, snapshotId, evaluatio
 function validatePolicySource(entry, { inventorySources, retentionClasses, freshnessPolicy }) {
   const sourceId = requiredText(entry?.sourceId, "sourceId");
   const source = inventorySources.get(sourceId);
-  if (!source) throw new Error(`SOURCE_GOVERNANCE_OWNER_MISSING: unknown source ${sourceId}`);
+  if (!source && !DATA_REPOSITORY_ONLY_GOVERNANCE_SOURCE_IDS.has(sourceId)) {
+    throw new Error(`SOURCE_GOVERNANCE_OWNER_MISSING: unknown source ${sourceId}`);
+  }
   const sourceClassId = requiredIdentifier(entry.sourceClassId, `${sourceId}.sourceClassId`);
   const sourceClass = freshnessPolicy?.sourceClasses?.find((candidate) => candidate.id === sourceClassId);
   if (!sourceClass || !sourceClass.sourceIds?.includes(sourceId)) {
@@ -164,7 +500,7 @@ function validatePolicySource(entry, { inventorySources, retentionClasses, fresh
   requiredPositiveInteger(entry.escalationHours, `${sourceId}.escalationHours`);
   requiredText(entry.alertRoute, `${sourceId}.alertRoute`);
   validateLicenseReview(entry.licenseReview, entry, sourceId);
-  if (!isSha256(source.admissionEvidence?.licenseEvidenceHash)) {
+  if (source && !isSha256(source.admissionEvidence?.licenseEvidenceHash)) {
     throw new Error(`LICENSE_REVIEW_REQUIRED: ${sourceId}.licenseEvidenceHash`);
   }
 }
@@ -213,13 +549,28 @@ function evaluateFreshness({ entry, snapshot, freshnessPolicy, evaluationAt, rea
     return;
   }
   try {
+    const evaluatedMillis = requiredUtcInstant(evaluationAt, "evaluationAt");
+    const providerValidUntil = sourceClass.providerValidityEndField
+      ? snapshot?.[sourceClass.providerValidityEndField]
+      : undefined;
+    if (providerValidUntil != null
+      && evaluatedMillis >= requiredUtcInstant(providerValidUntil, sourceClass.providerValidityEndField)) {
+      reasonCodes.add("SOURCE_SNAPSHOT_EXPIRED");
+      return;
+    }
+    const reverificationField = typeof sourceClass.unchangedReverificationBasisField === "string"
+      ? sourceClass.unchangedReverificationBasisField
+      : null;
+    const basisAt = reverificationField != null
+      && typeof snapshot?.[reverificationField] === "string"
+      && snapshot[reverificationField].trim() !== ""
+      ? snapshot[reverificationField]
+      : snapshot?.[sourceClass.basisField];
     const result = deriveFreshness({
       policy: freshnessPolicy,
       sourceClassId: entry.sourceClassId,
-      basisAt: snapshot?.[sourceClass.basisField],
-      providerValidUntil: sourceClass.providerValidityEndField
-        ? snapshot?.[sourceClass.providerValidityEndField]
-        : undefined,
+      basisAt,
+      providerValidUntil,
       storedExpiresAt: snapshot?.freshnessExpiresAt,
       evaluationAt,
     });

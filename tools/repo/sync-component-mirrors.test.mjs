@@ -1,11 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mkdtemp, rm, writeFile, mkdir } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile, mkdir } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, dirname } from "node:path";
 import { createHash } from "node:crypto";
 
 import {
+  MIRROR_DEFINITIONS,
   validateManifest,
   checkMirrors,
   checkRemoteMirrors,
@@ -210,4 +211,29 @@ test("--check-remote는 원격 sha가 다르면 exit 1 (주입 함수)", async (
   assert.equal(failResult.ok, false);
   assert.equal(failResult.drifted.length, 1);
   assert.equal(failResult.drifted[0].hubPath, "contracts/api/test.json");
+});
+
+test("현재 워크스페이스 미러 매니페스트는 source-governance-policy.json을 포함하고 실제 바이트와 일치한다", async () => {
+  const manifest = JSON.parse(
+    await readFile("contracts/api/component-mirror-manifest.json", "utf8"),
+  );
+  assert.deepEqual(
+    manifest.mirrors.map(({ hubPath, repository, sourcePath }) => ({
+      hubPath,
+      repository,
+      sourcePath,
+    })),
+    [...MIRROR_DEFINITIONS].sort((a, b) => a.hubPath.localeCompare(b.hubPath, "en")),
+  );
+  assert.ok(
+    MIRROR_DEFINITIONS.some(
+      (def) =>
+        def.hubPath === "tools/datapack/source-governance-policy.json" &&
+        def.repository === "AquilaXk/easysubway-data" &&
+        def.sourcePath === "tools/datapack/source-governance-policy.json",
+    ),
+  );
+  const result = await checkMirrors({ rootDir: process.cwd(), manifest });
+  assert.equal(result.ok, true);
+  assert.deepEqual(result.drifted, []);
 });
