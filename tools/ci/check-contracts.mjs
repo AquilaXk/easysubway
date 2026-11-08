@@ -2432,7 +2432,7 @@ if (isMainModule(import.meta.url)) {
     documentationFragmentResolution: localContractsOnly ? "LOCAL_CONTRACTS_ONLY" : "REQUIRED",
   });
   if (errors.length) {
-    console.error(errors.map((error) => `- ${error}`).join("\n"));
+    console.error(errors.map((error) => `- ${error}`).join("\n")); // NOSONAR
     process.exit(1);
   }
 }

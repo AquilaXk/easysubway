@@ -237,4 +237,3 @@ test("현재 워크스페이스 미러 매니페스트는 source-governance-poli
   assert.equal(result.ok, true);
   assert.deepEqual(result.drifted, []);
 });
-

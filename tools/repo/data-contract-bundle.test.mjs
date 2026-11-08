@@ -480,4 +480,3 @@ test("미러된 source-governance-policy.json은 component-mirror-manifest에 �
     /governance policy binding/,
   );
 });
-
