@@ -13,7 +13,7 @@ const MAX_ITEMS = 3000;
 const execFileAsync = promisify(execFile);
 const CLOSING_ISSUES_QUERY = `query($owner: String!, $name: String!, $number: Int!) { repository(owner: $owner, name: $name) { pullRequest(number: $number) { number merged mergeCommit { oid } closingIssuesReferences(first: 100) { totalCount pageInfo { hasNextPage } nodes { number state repository { nameWithOwner } } } } } }`;
 const SELF_FILES = ["contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"];
-const EXPECTED_SCOPE_CANONICAL_SHA256 = "7cb10252e1e50ca5d41941e5397735c4546025a88f5aa81dd402dabada2cc300";
+const EXPECTED_SCOPE_CANONICAL_SHA256 = "911558e02672b927a3658ea052592c1b9d51a93e9aea4e916999044c2f3961cc";
 
 export class AuditIncomplete extends Error { constructor(code, identity) { super(code); this.code = code; this.identity = identity; } }
 

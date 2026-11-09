@@ -210,7 +210,7 @@ jobs:
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
         env:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
-        run: node --test tools/ci/check-contracts.test.mjs tools/ci/cd-env-call-limit.test.mjs tools/ci/cd-workflow-contract.test.mjs tools/ci/check-boundaries.test.mjs tools/ci/apply-main-ruleset-required-checks.test.mjs tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs tools/ci/documentation-inventory.test.mjs tools/ci/automerge-queue.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs
+        run: node --test tools/ci/check-contracts.test.mjs tools/ci/cd-env-call-limit.test.mjs tools/ci/cd-workflow-contract.test.mjs tools/ci/check-boundaries.test.mjs tools/ci/apply-main-ruleset-required-checks.test.mjs tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs tools/ci/documentation-inventory.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs
 
       - name: Repository CI / Prepare active documentation fragment workspace
         if: ${{ needs.changes.outputs.contracts == 'true' }}
@@ -286,16 +286,12 @@ jobs:
           tar -xzf "${workdir}/${tarball}" -C "${workdir}" actionlint
           "${workdir}/actionlint" -color
 
-      - name: Repository CI / Validate issue forms
-        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
-        run: ruby -e 'require "yaml"; ARGV.each { |f| YAML.load_file(f); puts f }' .github/ISSUE_TEMPLATE/*.yml
-
       - name: Repository CI / Validate tracked Markdown policy
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
-          unexpected_markdown="$(git ls-files '*.md' ':!:README.md' ':!:README.ko.md' ':!:SECURITY.md' ':!:.github/pull_request_template.md' ':!:.github/PULL_REQUEST_TEMPLATE/*.md')"
+          unexpected_markdown="$(git ls-files '*.md' ':!:README.md' ':!:README.ko.md' ':!:SECURITY.md')"
           if [[ -n "${unexpected_markdown}" ]]; then
             echo "Unexpected tracked Markdown file:"
             echo "${unexpected_markdown}"

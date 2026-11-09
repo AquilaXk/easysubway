@@ -2,7 +2,7 @@
   "$schema": "./reference-audit-scope.schema.json",
   "schemaVersion": 2,
   "repositories": [
-    { "repository": "AquilaXk/easysubway", "trackedDiscoveryRoots": [".github/PULL_REQUEST_TEMPLATE", "README.md", "contracts", "release/product-gates"] },
+    { "repository": "AquilaXk/easysubway", "trackedDiscoveryRoots": ["README.md", "contracts", "release/product-gates"] },
     { "repository": "AquilaXk/easysubway-backend", "trackedDiscoveryRoots": ["README.md", "contracts", "backend/src/main/resources"] },
     { "repository": "AquilaXk/easysubway-data", "trackedDiscoveryRoots": ["README.md", "contracts", "release"] },
     { "repository": "AquilaXk/easysubway-mobile", "trackedDiscoveryRoots": ["README.md", "contracts", "apps/mobile/release"] },

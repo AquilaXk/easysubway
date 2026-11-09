@@ -5,36 +5,6 @@
   "inventoryBaseHead": "4ccf78d8bf60db2d25233d6fe744daf805c7b0ac",
   "entries": [
     {
-      "resourceId": "hub-automerge-queue",
-      "path": ".github/workflows/automerge-queue.yml",
-      "selector": null,
-      "kind": "WORKFLOW",
-      "classification": "HUB_FALLBACK_REMOVE",
-      "hubOwner": "hub",
-      "targetOwner": null,
-      "targetOutput": "Hub merge coordination",
-      "activeConsumers": [
-        "Hub pull requests"
-      ],
-      "releaseReachability": "CURRENT",
-      "handoffState": "NOT_APPLICABLE",
-      "handoffEvidence": [],
-      "plannedAction": "REMOVE_FALLBACK",
-      "executionEligibility": false,
-      "reviewTrigger": [
-        "workflow change"
-      ],
-      "fallbackExposure": "FORBIDDEN_ACTIVE",
-      "fallbackRemovalOwner": "hub",
-      "fallbackVerification": [
-        "AUTOMERGE_RULESET_FAILURE_FAIL_CLOSED"
-      ],
-      "rollbackMode": "NOT_APPLICABLE",
-      "rollbackRevision": null, "rollbackTargetRepository": null, "rollbackApprovalEvidence": null, "rollbackOperation": "NOT_APPLICABLE",
-      "fallbackVerificationState": "PLANNED",
-      "repository": "AquilaXk/easysubway"
-    },
-    {
       "resourceId": "hub-ci-fan-in",
       "path": ".github/workflows/ci.yml",
       "selector": "hub fan-in and audit jobs",

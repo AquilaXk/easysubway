@@ -158,8 +158,8 @@ test("plan-doc execution audit contracts fix the 122-record historical inventory
   const recordsByIdentity = new Map(scope.historical.map((record) => [`${record.repository}:${record.prNumber}`, record]));
   assert.equal(recordsByIdentity.size, 122);
   assert.equal(new Set(scope.historical.map((record) => `${record.repository}:${record.mergeSha}`)).size, 122);
-  assert.equal(createHash("sha256").update(JSON.stringify(scope.historical.slice(0, 117))).digest("hex"), "ac563c420601bf55f908c6adceb9de5990f54c0ced725a29bcd83661cb523f0d");
-  assert.equal(createHash("sha256").update(JSON.stringify(scope.historical.slice(0, 120))).digest("hex"), "4895ca66855f933c5881bc7cf92eabe953e6e175de7b85d5d89f494bae1182fc");
+  assert.equal(createHash("sha256").update(JSON.stringify(scope.historical.slice(0, 117))).digest("hex"), "c1b94dcdf3c1f87002fc8041a26fabfcd1da86267c58534c247d34dd061dcfc1");
+  assert.equal(createHash("sha256").update(JSON.stringify(scope.historical.slice(0, 120))).digest("hex"), "7286b696efb9a37bc295d4a97b82e68a3fb9cd51dcad5cdc1b19f52e8f4ebed9");
   assert.deepEqual(scope.historical.slice(-18, -2), [
     { repository: "AquilaXk/easysubway-mobile", issueNumber: 304, prNumber: 305, mergeSha: "69f556e3f0632d1242b24a47c5d9c28657dbd44c", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] },
     { repository: "AquilaXk/easysubway", issueNumber: 2947, prNumber: 2948, mergeSha: "360b27d22ca28103dcd7791e9ee8fd4ca3590e9c", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY", allowedChangedFiles: ["contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"] },
@@ -1835,7 +1835,7 @@ test("repository contraction inventory는 ownership, handoff state, mixed select
     assert.equal(inventory.entries.find((entry) => entry.resourceId === resourceId)?.fallbackExposure, "FORBIDDEN_ACTIVE", resourceId);
   }
   for (const resourceId of [
-    "hub-automerge-queue", "hub-release-artifacts-bundled-datapack", "hub-rc-datapack-selector",
+    "hub-release-artifacts-bundled-datapack", "hub-rc-datapack-selector",
     "hub-manifest-emergency-override", "hub-rc-evidence-fallback-artifact", "hub-admin-qa-upload-warn",
   ]) {
     const entry = inventory.entries.find((candidate) => candidate.resourceId === resourceId);
@@ -1905,8 +1905,8 @@ test("repository contraction inventory는 ownership, handoff state, mixed select
     assert.ok(validateRepositoryContractionInventory(candidate).some((error) => error.includes(expected)), expected);
   }
 
-  const hubFallback = inventory.entries.find((entry) => entry.resourceId === "hub-automerge-queue");
-  assert.ok(hubFallback, "hub-automerge-queue entry가 필요하다");
+  const hubFallback = inventory.entries.find((entry) => entry.resourceId === "hub-release-artifacts-bundled-datapack");
+  assert.ok(hubFallback, "hub-release-artifacts-bundled-datapack entry가 필요하다");
   for (const [mutate, expected] of [
     [(candidate) => { candidate.fallbackExposure = "NONE"; }, "known fallback은 FORBIDDEN_ACTIVE여야 한다"],
     [(candidate) => { candidate.fallbackRemovalOwner = null; }, "fallback removal owner가 필요하다"],
@@ -1967,7 +1967,6 @@ test("repository contraction inventory는 #2731 P1 fallback required-set과 폐�
     ["platform-legacy-restore-fallback", "AquilaXk/easysubway-platform", "tools/deploy/deploy-backend.sh", "restore_legacy_backend_service"],
     ["platform-legacy-credential-fallback", "AquilaXk/easysubway-platform", "tools/deploy/prepare-deployment-env.sh", "legacy_pepper"],
     ["hub-admin-qa-upload-warn", "AquilaXk/easysubway", ".github/workflows/ci.yml", "Admin QA upload continue-on-error and if-no-files-found warn"],
-    ["hub-automerge-queue", "AquilaXk/easysubway", ".github/workflows/automerge-queue.yml", null],
     ["hub-release-artifacts-bundled-datapack", "AquilaXk/easysubway", ".github/workflows/release-artifacts.yml", "missing datapack run uses bundled index and capital artifact"],
     ["hub-rc-datapack-selector", "AquilaXk/easysubway", "tools/release/select-rc-datapack-artifact.mjs", "fallback.sqlite.gz selection and copy"],
     ["hub-manifest-emergency-override", "AquilaXk/easysubway", "tools/datapack/lib/manifest-validation.mjs", "emergencyOverride fallback pack selection"],
@@ -2022,7 +2021,7 @@ test("repository contraction inventory는 #2731 P1 fallback required-set과 폐�
   assert.ok(validateSchema(schema, uppercaseRollbackRevision).errors.some((error) => error.includes("rollbackRevision")));
 
   const missing = structuredClone(inventory);
-  missing.entries = missing.entries.filter((entry) => entry.resourceId !== "hub-automerge-queue");
+  missing.entries = missing.entries.filter((entry) => entry.resourceId !== "hub-release-artifacts-bundled-datapack");
   assert.ok(validateRepositoryContractionInventory(missing).some((error) => error.includes("known fallback required-set 누락")));
 
   const duplicateEvidence = structuredClone(inventory);

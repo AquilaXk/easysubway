@@ -180,7 +180,7 @@ test("F6: symlinked input is rejected while the valid output stays contained", (
 test("F8: production scope roots are the current component roots", () => {
   const scope = JSON.parse(readFileSync(resolve(projectRoot(), "contracts/documentation/reference-audit-scope.json"), "utf8"));
   assert.deepEqual(scope.repositories.map(({ trackedDiscoveryRoots }) => trackedDiscoveryRoots), [
-    [".github/PULL_REQUEST_TEMPLATE", "README.md", "contracts", "release/product-gates"],
+    ["README.md", "contracts", "release/product-gates"],
     ["README.md", "contracts", "backend/src/main/resources"], ["README.md", "contracts", "release"],
     ["README.md", "contracts", "apps/mobile/release"], ["README.md", "contracts", "infra"],
   ]);

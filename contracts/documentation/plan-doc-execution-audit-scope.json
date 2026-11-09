@@ -64,9 +64,6 @@
       "planOwner": "PLAN-DOC",
       "changedPathClass": "HUB_GOVERNANCE_ONLY",
       "allowedChangedFiles": [
-        ".github/PULL_REQUEST_TEMPLATE/full.md",
-        ".github/PULL_REQUEST_TEMPLATE/short.md",
-        ".github/pull_request_template.md",
         "contracts/documentation/documentation-fragment.schema.json",
         "contracts/documentation/documentation-resource.schema.json",
         "contracts/documentation/documentation-system-catalog.json",

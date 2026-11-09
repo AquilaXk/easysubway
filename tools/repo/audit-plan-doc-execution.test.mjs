@@ -50,8 +50,8 @@ test("plan-doc execution audit scope fixes the federated 122-record inventory an
   ]) assert.deepEqual(SCOPE.historical.find((record) => record.repository === expected.repository && record.prNumber === expected.prNumber), expected);
   assert.equal(new Set(SCOPE.historical.map((record) => `${record.repository}:${record.prNumber}`)).size, 122);
   assert.equal(new Set(SCOPE.historical.map((record) => `${record.repository}:${record.mergeSha}`)).size, 122);
-  assert.equal(createHash("sha256").update(JSON.stringify(SCOPE.historical.slice(0, 117))).digest("hex"), "ac563c420601bf55f908c6adceb9de5990f54c0ced725a29bcd83661cb523f0d");
-  assert.equal(createHash("sha256").update(JSON.stringify(SCOPE.historical.slice(0, 120))).digest("hex"), "4895ca66855f933c5881bc7cf92eabe953e6e175de7b85d5d89f494bae1182fc");
+  assert.equal(createHash("sha256").update(JSON.stringify(SCOPE.historical.slice(0, 117))).digest("hex"), "c1b94dcdf3c1f87002fc8041a26fabfcd1da86267c58534c247d34dd061dcfc1");
+  assert.equal(createHash("sha256").update(JSON.stringify(SCOPE.historical.slice(0, 120))).digest("hex"), "7286b696efb9a37bc295d4a97b82e68a3fb9cd51dcad5cdc1b19f52e8f4ebed9");
   assert.deepEqual(SCOPE.historical.slice(-18, -2), [
     { repository: "AquilaXk/easysubway-mobile", issueNumber: 304, prNumber: 305, mergeSha: "69f556e3f0632d1242b24a47c5d9c28657dbd44c", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "TARGET_DOCUMENTATION_FRAGMENT", allowedChangedFiles: ["contracts/documentation/documentation-fragment.json"] },
     { repository: "AquilaXk/easysubway", issueNumber: 2947, prNumber: 2948, mergeSha: "360b27d22ca28103dcd7791e9ee8fd4ca3590e9c", relation: "CLOSES", planOwner: "PLAN-DOC", changedPathClass: "HUB_GOVERNANCE_ONLY", allowedChangedFiles: ["contracts/documentation/plan-doc-execution-audit-scope.json", "tools/ci/check-contracts.mjs", "tools/ci/check-contracts.test.mjs", "tools/repo/audit-plan-doc-execution.mjs", "tools/repo/audit-plan-doc-execution.test.mjs"] },

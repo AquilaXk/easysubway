@@ -454,7 +454,6 @@ const KNOWN_FALLBACK_SURFACES = new Map([
   ["mobile-source", ["AquilaXk/easysubway", "apps/mobile", null]],
   ["platform-infra", ["AquilaXk/easysubway", "infra", null]],
   ["platform-deploy-tools", ["AquilaXk/easysubway", "tools/deploy", null]],
-  ["hub-automerge-queue", ["AquilaXk/easysubway", ".github/workflows/automerge-queue.yml", null]],
   ["backend-raw-main-v1-stage", ["AquilaXk/easysubway", "backend/tools/stage-contracts.mjs", null]],
   ["data-freshness-gate", ["AquilaXk/easysubway", "release/product-gates/datapack-freshness-sla.json", null]],
   ["data-previous-artifact-contract", ["AquilaXk/easysubway", "release/product-gates/rc-evidence-manifest-contract.json", "dataPackFallbackArtifactSha256"]],
