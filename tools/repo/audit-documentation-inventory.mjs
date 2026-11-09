@@ -313,10 +313,10 @@ export async function verifyFragment(entry, headSha, { readContent, dynamicResol
     const source = await readTrackedResource(entry, identity[2], fragment.sourceSha, record.resource, {
       readContent,
       missingCode: "TRACKED_RESOURCE_SOURCE_MISSING",
-      allowMissing: false,
+      allowMissing: isDynamic,
     });
-    const sourceActual = identity[3].length === 40 ? source.blobSha : source.sha256;
-    if (sourceActual !== identity[3]) {
+    const sourceActual = source == null ? null : identity[3].length === 40 ? source.blobSha : source.sha256;
+    if (!isDynamic && sourceActual !== identity[3]) {
       verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_SOURCE_BLOB_MISMATCH", identity: record.resource });
       continue;
     }
@@ -326,11 +326,17 @@ export async function verifyFragment(entry, headSha, { readContent, dynamicResol
       allowMissing: true,
     });
     if (current == null) {
+      if (source == null) throw new AuditIncomplete("TRACKED_RESOURCE_SOURCE_MISSING", record.resource, "fragment");
       verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_CURRENT_MISSING", identity: record.resource });
       continue;
     }
     const currentActual = identity[3].length === 40 ? current.blobSha : current.sha256;
-    if (currentActual !== identity[3] && !isDynamic) {
+    if (isDynamic) {
+      if (sourceActual !== identity[3] && currentActual !== identity[3]) {
+        if (source == null) throw new AuditIncomplete("TRACKED_RESOURCE_SOURCE_MISSING", record.resource, "fragment");
+        verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_SOURCE_BLOB_MISMATCH", identity: record.resource });
+      }
+    } else if (currentActual !== identity[3]) {
       verificationFindings.push({ dod: "D01", code: "TRACKED_RESOURCE_CURRENT_BLOB_MISMATCH", identity: record.resource });
     }
   }

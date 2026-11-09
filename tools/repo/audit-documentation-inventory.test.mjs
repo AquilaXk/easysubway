@@ -708,4 +708,48 @@ test("documentation inventory audit supports dynamic resolution mode for D01 liv
   });
   assert.equal(dynamicMissingResult.verificationFindings.length, 1);
   assert.equal(dynamicMissingResult.verificationFindings[0].code, "TRACKED_RESOURCE_CURRENT_MISSING");
+
+  // Same-commit --worktree refresh: sourceSha is parent (SOURCE_SHA, blob "c"x40) while identity[3] records HEAD blob ("f"x40)
+  const worktreeIdentity = `git:${SOURCE_SHA}:contracts/easysubway.json:${"f".repeat(40)}`;
+  const worktreeCandidate = fragment(REPOSITORIES[0], [record(REPOSITORIES[0], {
+    canonicalIdentity: worktreeIdentity,
+    lastVerifiedIdentity: worktreeIdentity,
+  })], { sourceSha: SOURCE_SHA });
+  const readContentForWorktreeRefresh = async (_repository, path, sha) => path === PATH
+    ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(worktreeCandidate)).toString("base64") }
+    : { type: "file", sha: sha === SOURCE_SHA ? "c".repeat(40) : "f".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") };
+
+  const dynamicWorktreeResult = await verifyFragment(SCOPE.repositories[0], SHA, {
+    readContent: readContentForWorktreeRefresh,
+    dynamicResolution: true,
+  });
+  assert.deepEqual(dynamicWorktreeResult.verificationFindings, []);
+
+  const strictWorktreeResult = await verifyFragment(SCOPE.repositories[0], SHA, {
+    readContent: readContentForWorktreeRefresh,
+    dynamicResolution: false,
+  });
+  assert.deepEqual(strictWorktreeResult.verificationFindings, [{
+    dod: "D01",
+    code: "TRACKED_RESOURCE_SOURCE_BLOB_MISMATCH",
+    identity: worktreeCandidate.resources[0].resource,
+  }]);
+
+  // Dynamic resolution still fails closed when identity[3] matches neither SOURCE_SHA blob ("c"x40) nor HEAD blob ("f"x40)
+  const bogusIdentity = `git:${SOURCE_SHA}:contracts/easysubway.json:${"9".repeat(40)}`;
+  const bogusCandidate = fragment(REPOSITORIES[0], [record(REPOSITORIES[0], {
+    canonicalIdentity: bogusIdentity,
+    lastVerifiedIdentity: bogusIdentity,
+  })], { sourceSha: SOURCE_SHA });
+  const dynamicBogusResult = await verifyFragment(SCOPE.repositories[0], SHA, {
+    readContent: async (_repository, path, sha) => path === PATH
+      ? { type: "file", sha: "d".repeat(40), encoding: "base64", content: Buffer.from(JSON.stringify(bogusCandidate)).toString("base64") }
+      : { type: "file", sha: sha === SOURCE_SHA ? "c".repeat(40) : "f".repeat(40), encoding: "base64", content: Buffer.from("{}").toString("base64") },
+    dynamicResolution: true,
+  });
+  assert.deepEqual(dynamicBogusResult.verificationFindings, [{
+    dod: "D01",
+    code: "TRACKED_RESOURCE_SOURCE_BLOB_MISMATCH",
+    identity: bogusCandidate.resources[0].resource,
+  }]);
 });
