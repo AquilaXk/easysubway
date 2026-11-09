@@ -15,7 +15,6 @@ const TRANSFER_SOURCE_ID = "seoul-metro-transfer-distance-duration";
 const DATA_REPOSITORY_ONLY_GOVERNANCE_SOURCE_IDS = new Set([
   "kric-station-escalator-detailed",
   "kric-subway-timetable-station-lines",
-  "seoul-metro-transfer-car-door-duration",
 ]);
 const RELEASE_PROTECTION_MAX_AGE_MS = 5 * 60 * 1_000;
 const RELEASE_PROTECTION_REASONS = new Set(["ACTIVE_RELEASE", "ROLLBACK_WINDOW"]);

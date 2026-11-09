@@ -52,10 +52,9 @@ const dataRepositoryOnlyFreshnessSourceIds = [
 const dataRepositoryOnlyGovernanceInventorySourceIds = [
   "kric-station-escalator-detailed",
   "kric-subway-timetable-station-lines",
-  "seoul-metro-transfer-car-door-duration",
 ];
 // candidate가 production inventory 항목을 가리키는데 Hub inventory 사본에 아직 없는 원천의 닫힌 목록이다.
-const dataRepositoryOnlyInventoryReferenceIds = ["seoul-metro-transfer-car-door-duration", "kric-station-escalator-detailed"];
+const dataRepositoryOnlyInventoryReferenceIds = ["kric-station-escalator-detailed"];
 const externalSourceRegistrations = [
   {
     sourceId: "incheon-transit-accessibility",
