@@ -24,11 +24,11 @@
     },
     {
       "path": "contracts/bundles/data-contracts-v1.0.0.json",
-      "sha256": "48e3a41d992fac4135b28c1fe83dc62f4ca1fcdfc5d2e4dbad4f039d4b4b811c"
+      "sha256": "172b02a6a49b270bb8e4e7716825e19cb4623b08d2efad70a7e195f0c02afdeb"
     },
     {
       "path": "contracts/bundles/data-contracts-v1.1.0.json",
-      "sha256": "0fa3cdd963e3b2347dacd822937efb16ba38a7d34044cb52bde4df8b406eded7"
+      "sha256": "573a358419699aa90054005327b6e43d6256c14ba20e3082a871c887f4e0572f"
     },
     {
       "path": "contracts/bundles/generic-mobile-consumer-bundle-v1.json",
@@ -84,7 +84,7 @@
     },
     {
       "path": "release/product-gates/post-launch-operations-review-gate.json",
-      "sha256": "8d88ba3e026bf35d24358263a0332a9c8de67a08db40c82e1b34b05768192e95"
+      "sha256": "553861e9043a047c370f483c22ecdbc546d4833715d013f8bd4ead1f4a1bbeeb"
     },
     {
       "path": "release/product-gates/production-datapack-scope.json",

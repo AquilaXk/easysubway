@@ -71,7 +71,7 @@ export const JOURNEY_V3_COMPATIBILITY_CONTRACT = deepFreeze({
   },
   canonicalDigests: {
     "contracts/api/journey-v3.openapi.yaml":
-      "a3e0a75361b6ab74cb7e57eb7b68bb49e01400a874caf4afcbdb450e35f2d0f0",
+      "d05b5ea1639a785cee145cb4df70885ecdb76c7415b8209ff06c1c14018e5d67",
     "contracts/bundles/generic-mobile-consumer-bundle-v1.json":
       "7f666d016119591e5c958e7d55c936fffb5e753898e69ec28e4f0cb50b5555ff",
     "contracts/bundles/platform-contracts-v1.2.0.json":

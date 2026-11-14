@@ -66,7 +66,7 @@
           "refreshOn": "support-contact-or-help-ui-change",
           "files": [
             {"path": "release/product-gates/support-incident-response-gate.json", "sha256": "82604501ba8e6aebc03e75d18fdaf6a4119bc54289c632f8c0b0a65d9a7cd483"},
-            {"path": "apps/mobile/release/play-store-submission-content.json", "sha256": "81fddb35a8e6b29f2c9416ba8d258cd2c39dfc2fa9af4dcde7c1f8b7886c7543"},
+            {"path": "apps/mobile/release/play-store-submission-content.json", "sha256": "8e3758f22752a5b58a55357b5b492caef3a6c719ffdee8f7809e83187b1c33df"},
             {"path": "contracts/bundles/generic-mobile-consumer-bundle-v1.json", "sha256": "7f666d016119591e5c958e7d55c936fffb5e753898e69ec28e4f0cb50b5555ff"}
           ]
         },

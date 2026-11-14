@@ -31,6 +31,8 @@ CLAUDE.md
 GEMINI.md
 CURSOR.md
 COPILOT.md
+TODO.md
+.coderabbit.yaml
 docs/
 .evidence/
 .claude/
@@ -39,6 +41,9 @@ docs/
 .aider*
 .windsurf/
 .ai/
+.codex/
+.gemini/
+.agents/
 .playwright-mcp/
 
 # JavaScript / TypeScript

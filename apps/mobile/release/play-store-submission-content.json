@@ -537,7 +537,7 @@
     "listingPreview": "required_play_console_preview_summary"
   },
   "evidencePolicy": {
-    "localOnlyEvidenceRoot": ".codex/evidence/release/play-store-submission/<rc-or-run>/",
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/play-store-submission/<rc-or-run>/",
     "githubEvidencePolicy": "summary-or-public-console-link",
     "sensitiveEvidence": [
       "Google Play Console screenshots",

@@ -76,14 +76,14 @@ jobs:
   dependency-vulnerability-scan:
     name: Dependency Vulnerability Scan
     needs: changes
-    if: ${{ github.event_name == 'pull_request' && needs.changes.outputs.docs_only != 'true' }}
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
     permissions:
       actions: read
       security-events: write
       contents: read
     # OSV export-results gate: google/osv-scanner-action#129 / fix PR #130
     # Pin commit 3a7550f… (post-v2.3.8). Follow-up: move pin when a release includes the gate.
-    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable-pr.yml@3a7550f43ba5b58905a821ce3a0ed24c4858b3f4
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@3a7550f43ba5b58905a821ce3a0ed24c4858b3f4
     with:
       export-results: false
       upload-sarif: true
@@ -136,6 +136,10 @@ jobs:
           node tools/ci/check-admin-vendor-integrity.mjs
           node tools/ci/check-map-attribution.mjs
           node --test tools/ci/check-map-attribution.test.mjs
+          node tools/release/build-system-release-governance-inventory.mjs --check
+          node tools/ci/guard-anti-cheat.mjs
+          node tools/ci/journey-n-minus-1-compatibility.mjs
+          node tools/repo/refresh-documentation-fragment.mjs --worktree --check
 
   admin-qa-gates:
     name: Admin QA Gates
@@ -210,7 +214,7 @@ jobs:
         if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
         env:
           NODE_OPTIONS: --disable-warning=ExperimentalWarning
-        run: node --test tools/ci/check-contracts.test.mjs tools/ci/cd-env-call-limit.test.mjs tools/ci/cd-workflow-contract.test.mjs tools/ci/check-boundaries.test.mjs tools/ci/apply-main-ruleset-required-checks.test.mjs tools/ci/clean-checkout-reproducibility-owner-contract.test.mjs tools/ci/documentation-inventory.test.mjs tools/ci/lib/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs
+        run: node --test tools/ci/*.test.mjs tools/ci/lib/*.test.mjs tools/ops/*.test.mjs tools/release/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs
 
       - name: Repository CI / Prepare active documentation fragment workspace
         if: ${{ needs.changes.outputs.contracts == 'true' }}
@@ -303,7 +307,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          unexpected_agent_files="$(git ls-files AGENTS.md CLAUDE.md GEMINI.md CURSOR.md COPILOT.md docs .evidence .claude .cursor .aider .windsurf .ai)"
+          unexpected_agent_files="$(git ls-files AGENTS.md CLAUDE.md GEMINI.md CURSOR.md COPILOT.md TODO.md .coderabbit.yaml docs .evidence .claude .cursor .aider .windsurf .ai .codex .gemini .agents ':(glob)**/.codex/**' ':(glob)**/.coderabbit*')"
           if [[ -n "${unexpected_agent_files}" ]]; then
             echo "Unexpected tracked local agent file:"
             echo "${unexpected_agent_files}"

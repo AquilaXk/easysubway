@@ -81,7 +81,7 @@ while IFS= read -r file; do
       ci=true
       repository=true
       ;;
-    .github/**|.gitignore|.coderabbit.yaml)
+    .github/**|.gitignore)
       repository=true
       ;;
     tools/deploy/**|infra/**|docker-compose*.yml)
