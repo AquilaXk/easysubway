@@ -1,0 +1,59 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "journey-v3-server-only-release",
+  "issue": 2731,
+  "status": "IN_PROGRESS",
+  "releaseBlockerPolicy": true,
+  "currentDecision": "NO_GO",
+  "canonicalOwner": {
+    "component": "backend",
+    "repository": "AquilaXk/easysubway-backend"
+  },
+  "executionPolicy": {
+    "mode": "SERVER_ONLY",
+    "missingOrInvalidServerResult": "EXPLICIT_FAILURE",
+    "requestTimeFallbackAllowed": false,
+    "operatorApprovedExactDeploymentRollbackOnly": true
+  },
+  "systemManifestBinding": {
+    "schemaVersion": 3,
+    "block": "journeyV3",
+    "requiredForDecision": "GO",
+    "sameRcEquality": [
+      "journeyV3.owner.gitSha=backend.gitSha",
+      "journeyV3.owner.apiContractVersion=backend.artifactIdentity.apiContractVersion"
+    ],
+    "immutableEvidenceField": "journeyV3.evidenceSha256",
+    "fallbackSuccessCounters": {
+      "hubSource": 0,
+      "legacy": 0,
+      "local": 0,
+      "routeV1": 0,
+      "routeV2": 0,
+      "stale": 0,
+      "previous": 0,
+      "alternateProvider": 0,
+      "bestEffort": 0
+    }
+  },
+  "requiredReceiptIssues": [1393, 2058, 2126, 1022],
+  "targetHandoffOwners": {
+    "data": 2705,
+    "mobile": 2710,
+    "platform": 2712,
+    "backend": 2714
+  },
+  "failurePolicy": {
+    "missingJourneyV3EvidenceKeepsNoGo": true,
+    "crossRcIdentityKeepsNoGo": true,
+    "nonzeroFallbackSuccessKeepsNoGo": true,
+    "previousManifestOrHubSourceSuccessAllowed": false
+  },
+  "supersedes": {
+    "releaseGate": "datapack-release-readiness",
+    "archivePath": "release/product-gates/superseded/datapack-release-readiness-gate.json",
+    "archiveExecutable": false
+  }
+}

@@ -1,0 +1,491 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "releaseGate": "operations-release-evidence",
+  "releaseBlockerPolicy": true,
+  "evidenceRoot": ".evidence/evidence/operations-release/<rc-or-run>",
+  "deploymentWorkflow": {
+    "requiredEvidence": [
+      "cd-workflow-run-url",
+      "backend-release-artifact-sha",
+      "deployment-target-sha",
+      "readiness-check-result",
+      "rollback-drill-result"
+    ],
+    "blockedWhenKo": "CD run이 preflight만 수행했거나 deploy target, backend artifact, readiness, rollback 결과 중 하나라도 없으면 production release evidence로 인정하지 않는다."
+  },
+  "migrationPolicy": {
+    "strategy": "expand-contract-or-backup-before-migration",
+    "blockedIfMissingBackupBeforeMigration": true,
+    "requiredEvidence": [
+      "migration-diff-summary",
+      "postgres-backup-before-migration",
+      "restore-rehearsal-after-backup",
+      "rollback-or-forward-fix-decision"
+    ],
+    "policyKo": "schema migration 변경이 있으면 expand/contract 호환성을 설명하거나 배포 전 PostgreSQL dump와 restore rehearsal 결과를 RC evidence에 남긴다."
+  },
+  "restoreRehearsal": {
+    "requiredChecks": [
+      "postgresql-restore-rehearsal",
+      "facility-report-photo-restore-check",
+      "datapack-source-inventory-validation",
+      "datapack-release-manifest-restore"
+    ],
+    "blockedWhenKo": "database dump, object manifest, data source archive, datapack manifest history 중 하나라도 복구 검증이 없으면 release blocker로 처리한다."
+  },
+  "backendControlPlane": {
+    "issue": 1017,
+    "latestQaEvidenceStatus": {
+      "qaEvidenceDateKst": "2026-07-14",
+      "status": "SATISFIED",
+      "readinessResult": "PASS",
+      "scope": "production-environment-and-local-prod-like-readiness",
+      "productionMutationPerformed": false,
+      "githubEnvironmentProtection": {
+        "productionRequiredReviewer": "PASS_REQUIRED_REVIEWER_CONFIGURED",
+        "productionEnvironmentSecret": "PASS_ENV_SCOPED_EASYSUBWAY_ENV_PRESENT",
+        "androidProductionRcEnvironmentSecret": "PASS_ENV_SCOPED_EASYSUBWAY_ENV_PRESENT",
+        "repositoryWideProductionSecretsOnly": "RESOLVED_BY_ENV_SCOPED_SECRET"
+      },
+      "prodLikeLocalValidation": {
+        "deploymentEnvValidation": "PASS_VALIDATE_DEPLOYMENT_ENV",
+        "backendCheck": "PASS_GRADLE_CHECK",
+        "targetRevision": "95702961b3bc59d1d1e2a3c89131ea242c349353",
+        "targetReadiness": "PASS_UP",
+        "rollbackRevision": "c28a1c99b88ccf49bbecb60ca1810775db530813",
+        "rollbackReadiness": "PASS_UP",
+        "migrationDiff": "PASS_NO_BACKEND_DIFF_BETWEEN_TARGET_AND_ROLLBACK",
+        "secretValueCapturedInEvidence": false
+      },
+      "releaseArtifact": {
+        "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29274432867",
+        "result": "PASS_SUCCESS",
+        "commit": "95702961b3bc59d1d1e2a3c89131ea242c349353",
+        "backendArtifact": "easysubway-backend-release-95702961b3bc59d1d1e2a3c89131ea242c349353",
+        "imageId": "sha256:8ecf0dc90e0d6d7010da5613850545bbdd227290bfbedeb568cb2a09ff9d8720",
+        "entrypoint": "java -jar /app/app.jar",
+        "profile": "prod"
+      },
+      "phaseACurrentRcArtifact": {
+        "result": "PASS_TWO_CLEAN_REPRODUCIBLE_BOOTJAR_BUILDS",
+        "sourceCommit": "78e82c982046dc5c3192667599253511b803a85c",
+        "artifact": "backend-boot.jar",
+        "backendArtifactSha256": "74a3e35762d1973c0b05a0c0bd6f0fc6aa2a4657ef23cde359cf100e0830f631",
+        "productionMutationPerformed": false
+      },
+      "datapackArtifact": {
+        "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29271665083",
+        "result": "PASS_SUCCESS",
+        "commit": "c28a1c99b88ccf49bbecb60ca1810775db530813",
+        "artifact": "easysubway-datapacks-c28a1c99b88ccf49bbecb60ca1810775db530813",
+        "manifestRestore": "PASS_DOWNLOADED_ARTIFACT_MANIFEST_AND_SQLITE_VALIDATION"
+      },
+      "restoreReadiness": {
+        "postgresql": "PASS_ISOLATED_DUMP_RESTORE",
+        "facilityReportPhoto": "PASS_ACTUAL_BACKUP_MANIFEST_OBJECT_HASH_SIZE_PATH",
+        "datapackSourceInventory": "PASS_ACTUAL_SELF_CONTAINED_RAW_ARCHIVE_RESTORE",
+        "datapackManifest": "PASS_DOWNLOADED_ACTIONS_ARTIFACT_MANIFEST_RESTORE"
+      },
+      "securityAndAdminReadiness": {
+        "publicApiDefaultDenyAndMatcherContract": "PASS_SECURITY_CONFIG_TEST",
+        "adminBasicAuthProdDefault": "PASS_DISABLED",
+        "adminLockoutAndAudit": "PASS_FOCUSED_TESTS",
+        "adminPagesRoleAndAccessibility": "PASS_PAGE_SMOKE_AND_ACCESSIBILITY_TESTS",
+        "trustedProxyNegativeBoundary": "PASS_SECURITY_CONTRACT_TESTS",
+        "facilityReportAbuseAndObjectStorage": "PASS_FOCUSED_TESTS",
+        "auditRedaction": "PASS_LOCAL_PROD_LIKE_AUDIT_DRILL_AND_TESTS"
+      },
+      "localProdLikeAdminDrill": {
+        "breakGlassFirstUse": "PASS_LOGIN_AND_CREDENTIAL_ROTATION_REQUIRED",
+        "breakGlassSecondCredentialUse": "PASS_LOGIN_AND_CREDENTIAL_ROTATION_REQUIRED",
+        "breakGlassFinalCredential": "PASS_ACTIVE_UNUSED_AFTER_RESTART",
+        "breakGlassLoginAudit": "PASS_SUCCESS_WITH_REASON_NO_SECRET",
+        "reportPhotoReadAudit": "PASS_PRIVACY_READ_WITH_REQUEST_ID_AND_REASON",
+        "adminMutationAudit": "PASS_CSRF_REJECTION_RECORDED_WITH_REQUEST_ID",
+        "sensitiveValueCapturedInEvidence": false
+      },
+      "temporaryReleaseDecisions": {
+        "adminAuthTransition": {
+          "owner": "AquilaXk",
+          "untilDate": "2027-01-13",
+          "risk": "OIDC/MFA/SSO 전환 전까지 운영 관리자 인증은 제한된 legacy 경로와 break-glass 절차에 의존한다.",
+          "mitigation": "production Basic auth 기본 비활성화, required reviewer, lockout, credential rotation과 audit를 강제한다.",
+          "followUpIssue": 1020
+        },
+        "operatorTenantScope": {
+          "scope": "operator-global",
+          "owner": "AquilaXk",
+          "untilDate": "2027-01-13",
+          "risk": "운영기관별 tenant 분리 전에는 operator가 전체 운영 데이터 범위를 조회할 수 있다.",
+          "mitigation": "RBAC, mutating/read audit, trusted proxy 경계와 production required reviewer를 강제한다.",
+          "followUpIssue": 1020
+        },
+        "singleInstanceAbuseControl": {
+          "backendReplicaCountOneEvidence": "PASS_COMPOSE_BACKEND_SERVICE_SINGLE_REPLICA",
+          "scaleOutProhibitedRunbook": "분산 limiter 구현 전 backend service scale-out 금지; 후속 #1022",
+          "owner": "AquilaXk",
+          "untilDate": "2027-01-13",
+          "postLaunchAbuseMonitoringThreshold": "최근 5분 report API 요청 중 429 비율이 5%를 초과하거나 duplicate/orphan cleanup 실패가 1회 발생하면 신규 신고 트래픽을 제한하고 운영 담당자에게 즉시 경보",
+          "distributedLimiterFollowUpIssue": 1022
+        }
+      },
+      "resolvedEvidence": [
+        "backend-public-api-surface-inventory",
+        "default-deny-public-chain-test-output",
+        "security-matcher-contract-test-output",
+        "admin-auth-transition-decision-record",
+        "admin-basic-auth-prod-disabled-test-output",
+        "admin-operator-lockout-test-output",
+        "break-glass-rotation-drill-record",
+        "break-glass-use-immediate-rotation-record",
+        "admin-credential-rotation-cadence-record",
+        "operator-tenant-scope-decision-record",
+        "operator-global-audit-sample",
+        "trusted-proxy-negative-test-output",
+        "multi-instance-rate-limit-test-output-or-single-instance-exception",
+        "abuse-store-mode-release-blocker-record",
+        "github-production-environment-required-reviewer-summary",
+        "staging-prod-environment-separation-summary",
+        "production-secret-scope-review",
+        "admin-operator-page-smoke-output",
+        "admin-page-accessibility-smoke-output",
+        "admin-role-matrix-test-output",
+        "admin-mutating-action-audit-sample",
+        "privacy-read-audit-sample",
+        "report-photo-read-audit-sample",
+        "break-glass-use-audit-sample",
+        "main-release-artifact-run-and-image-inspect",
+        "datapack-release-artifact-manifest-history-restore",
+        "prod-like-env-validation-output",
+        "local-prod-like-target-readiness-output",
+        "local-prod-like-rollback-readiness-output",
+        "postgresql-isolated-dump-restore-output",
+        "facility-report-photo-actual-backup-restore-output",
+        "datapack-source-raw-archive-actual-restore-output",
+        "public-api-default-deny-and-security-matcher-tests",
+        "local-prod-like-break-glass-and-admin-audit-drill",
+        "backend-gradle-check-output"
+      ],
+      "remainingBlockers": [],
+      "closingDecisionKo": "#1017 범위인 production environment와 배포·복구 준비는 main artifact, 로컬 prod-like readiness/rollback, 네 종류 restore와 security/admin 검증으로 완료한다. 실제 production 변경은 수행하지 않았으며 최종 실행은 #1020 GO/NO-GO에서 판정한다.",
+      "productionExecutionGate": {
+        "status": "DEFERRED_OUT_OF_SCOPE",
+        "decision": "FINAL_GO_NO_GO_1020",
+        "issue": 1020,
+        "productionMutationPerformed": false,
+        "requiredBeforeProduction": [
+          "approved-final-target-sha-and-image-digest",
+          "production-deploy-and-public-readiness-result",
+          "production-rollback-target-and-result",
+          "production-data-backup-reference",
+          "final-go-no-go-decision"
+        ]
+      },
+      "redactionPolicy": {
+        "forbiddenInGitHubEvidence": [
+          "raw environment secret",
+          "database dump",
+          "photo binary",
+          "signed URL",
+          "receipt token",
+          "object storage credential"
+        ],
+        "localOnlyEvidenceRequiredForSensitiveArtifacts": true
+      }
+    },
+    "publicApiSurface": {
+      "inventoryRequired": true,
+      "defaultDenyRequired": true,
+      "newApiOrAdminEndpointWithoutMatcherBlocksRelease": true,
+      "securityMatcherComparisonRequired": true,
+      "allowedPublicEndpoints": [
+        "/api/health",
+        "/actuator/health",
+        "/actuator/health/liveness",
+        "/actuator/health/readiness",
+        "/api/v1/report-uploads",
+        "/api/v1/report-uploads/{uploadId}",
+        "/api/v1/reports",
+        "/api/v1/reports/{reportId}",
+        "/api/v1/reports/{reportId}/confirm",
+        "/api/v1/trains/stations",
+        "/api/v1/trains/search",
+        "/api/v1/realtime/arrivals",
+        "/api/v1/realtime/train-positions",
+        "/api/notices/active",
+        "/api/ads/active",
+        "/api/ads/events"
+      ],
+      "allowedPublicSecurityMatchers": [
+        "/api/v1/report-uploads",
+        "/api/v1/report-uploads/*",
+        "/api/v1/reports",
+        "/api/v1/reports/*",
+        "/api/v1/reports/*/confirm",
+        "/api/ads/events",
+        "/api/v1/trains/stations",
+        "/api/v1/trains/search",
+        "/api/health",
+        "/actuator/health",
+        "/actuator/health/liveness",
+        "/actuator/health/readiness",
+        "/api/v1/realtime/**",
+        "/api/notices/active",
+        "/api/ads/active",
+        "/actuator/prometheus"
+      ],
+      "allowedAuthenticatedEndpoints": [
+        "/api/v2/routes/session",
+        "/api/v2/routes/search"
+      ],
+      "closedProductionEndpoints": [
+        "/api/v1/routes/search",
+        "/api/v2/routes/{routeSearchId}/refresh"
+      ],
+      "closedProductionEndpointPolicy": {
+        "strategy": "NON_PRODUCTION_ONLY",
+        "issue": 1913,
+        "androidRouteMode": "LOCAL_FIRST"
+      },
+      "routeV2Readiness": {
+        "issue": 2095,
+        "status": "SATISFIED",
+        "productionReachabilityEvidence": {
+          "observedAt": "2026-07-16T15:20:00+09:00",
+          "candidateGitSha": "e317f3af90292b9e2dff5e7ec90c22792b845435",
+          "rollbackRun": "https://github.com/AquilaXk/easysubway/actions/runs/29470369402",
+          "ingressOpen": false,
+          "activeProductionEndpoints": []
+        },
+        "intendedAndroidConsumers": [
+          {
+            "method": "POST",
+            "path": "/api/v2/routes/session",
+            "consumer": "PlayIntegrityRouteV2SessionProvider",
+            "auth": "Play Integrity attestation and gateway origin proof",
+            "cacheControl": "private, no-store"
+          },
+          {
+            "method": "POST",
+            "path": "/api/v2/routes/search",
+            "consumer": "RouteSearchV2ApiRepository",
+            "auth": "Bearer route:v2:itx session and gateway origin proof",
+            "cacheControl": "private, no-store"
+          }
+        ],
+        "closedRouteEndpoints": [
+          "/api/v1/routes/search",
+          "/api/v2/routes/{routeSearchId}/refresh"
+        ],
+        "subwayLocalFirst": {
+          "consumer": "TransportScopedRouteSearchRepository",
+          "networkCalls": 0
+        },
+        "timetableSnapshotCache": {
+          "status": "BLOCKED_TECHNICAL",
+          "implementedByIssue": 2145,
+          "requiredKey": {
+            "format": "snapshotSha256 + freshUntil",
+            "fields": ["snapshotSha256", "freshUntil"],
+            "sameFreshnessDifferentHashReloadRequired": true
+          },
+          "currentImplementation": {
+            "status": "BLOCKED_TECHNICAL",
+            "fields": ["snapshotSha256", "freshUntil"],
+            "snapshotId": "server-timetable-snapshot-4c5edd51c10fb187",
+            "snapshotSha256": "4c5edd51c10fb187e6d09122b89ddd8b35343b2f54404773f4ed8e245236bfe8",
+            "freshUntil": "2026-08-03T00:00:00+09:00",
+            "evidencePath": "backend/src/main/resources/timetable/server-timetable-snapshot-evidence.json"
+          },
+          "sharedRouteResponseCacheAllowed": false
+        },
+        "realisticLoadEvidence": {
+          "status": "SATISFIED",
+          "requires": ["normal", "burst", "unavailable", "latency", "error", "resource", "purge"],
+          "evidenceSource": "local-production-runner",
+          "runner": "tools/ops/verify-production-route-v2-capacity.sh",
+          "workflow": ".github/workflows/production-route-v2-capacity-evidence.yml",
+          "runnerExitCode": 0,
+          "productionWorkflowRunUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29712689840",
+          "productionWorkflowRun": {
+            "runUrl": "https://github.com/AquilaXk/easysubway/actions/runs/29712689840",
+            "deployedSha": "3cad74667dc4c519aac0d1a9f9bcab2bcf5e5142",
+            "conclusion": "success",
+            "note": "production capacity workflow 최초 완주. run은 candidate SHA(e317f3af90292b9e2dff5e7ec90c22792b845435)가 아닌 이후 배포·검증된 SHA(3cad7466)에서 수행됨 — candidate 블록은 candidate identity로 불변 유지."
+          },
+          "candidate": {
+            "versionName": "1.0.5",
+            "versionCode": 10006,
+            "candidateGitSha": "e317f3af90292b9e2dff5e7ec90c22792b845435"
+          },
+          "profiles": {
+            "normal": { "result": "PASS", "unexpectedErrorCount": 0 },
+            "burst": { "result": "PASS", "expectedStatus": 429, "retryAfterHeader": true, "cacheControl": "private, no-store" },
+            "unavailable": { "result": "PASS", "expectedStatus": 503, "machineCode": "ITX_TIMETABLE_UNAVAILABLE" }
+          },
+          "latencyBudget": { "p95MaxMs": 2000, "p99MaxMs": 5000 },
+          "resourceStability": {
+            "backendOomKilled": false,
+            "backendRestartCount": 0,
+            "gatewayOomKilled": false,
+            "gatewayRestartCount": 0
+          },
+          "cache": { "missObserved": true, "hitObserved": true },
+          "purge": { "states": 1, "sessions": 1, "nonces": 1, "budgetMs": 600000 },
+          "privacy": { "undeclaredDataTransferCount": 0, "sensitivePayloadCount": 0 },
+          "ingressClosed": true
+        },
+        "productionCanaryRollback": {
+          "status": "BLOCKED_EXTERNAL",
+          "explicitProductionApprovalRequired": true,
+          "sameCandidateIdentityRequired": true,
+          "preparedTooling": {
+            "runner": "tools/ops/verify-production-route-v2-canary-rollback.sh",
+            "evidenceLibrary": "tools/ops/route-v2-canary-rollback-evidence.mjs",
+            "workflow": ".github/workflows/production-route-v2-canary-rollback-dry-run.yml",
+            "requiresBeforeExecution": [
+              "explicit-owner-approval-reference",
+              "same-candidate-identity",
+              "signed-rc-canary-attestation-provisioned",
+              "route-v2-ingress-open"
+            ]
+          }
+        }
+      },
+      "requiredEvidence": [
+        "backend-public-api-surface-inventory",
+        "default-deny-public-chain-test-output",
+        "security-matcher-contract-test-output"
+      ]
+    },
+    "adminAuthTransition": {
+      "basicAuthDefaultInProd": "disabled",
+      "oidcMfaSsoDeferredExceptionRequired": true,
+      "temporaryExceptionRequiredFields": ["owner", "untilDate", "risk", "mitigation", "followUpIssue"],
+      "requiredEvidence": [
+        "admin-auth-transition-decision-record",
+        "admin-basic-auth-prod-disabled-test-output",
+        "admin-operator-lockout-test-output",
+        "break-glass-rotation-drill-record",
+        "break-glass-use-immediate-rotation-record",
+        "admin-credential-rotation-cadence-record"
+      ]
+    },
+    "operatorTenantScope": {
+      "temporaryScope": "operator-global",
+      "releaseExceptionRequired": true,
+      "requiredDecisionFields": ["owner", "untilDate", "risk", "mitigation", "followUpIssue"],
+      "requiredEvidence": [
+        "operator-tenant-scope-decision-record",
+        "operator-global-audit-sample",
+        "trusted-proxy-negative-test-output"
+      ],
+      "blockedWhenKo": "운영기관별 tenant 분리가 준비되지 않은 경우 operator-global 임시 scope의 owner, 만료일, risk, mitigation, follow-up issue와 audit sample이 없으면 release blocker로 처리한다."
+    },
+    "abuseControlReleaseException": {
+      "distributedStorePreferred": true,
+      "singleInstanceExceptionRequiredFields": [
+        "backendReplicaCountOneEvidence",
+        "scaleOutProhibitedRunbook",
+        "owner",
+        "untilDate",
+        "postLaunchAbuseMonitoringThreshold",
+        "distributedLimiterFollowUpIssue"
+      ],
+      "requiredEvidence": [
+        "multi-instance-rate-limit-test-output-or-single-instance-exception",
+        "trusted-proxy-negative-test-output",
+        "abuse-store-mode-release-blocker-record"
+      ]
+    },
+    "environmentProtection": {
+      "productionRequiredReviewerRequired": true,
+      "repositoryWideProductionSecretsOnlyBlocksRelease": true,
+      "requiredEvidence": [
+        "github-production-environment-required-reviewer-summary",
+        "staging-prod-environment-separation-summary",
+        "production-secret-scope-review"
+      ]
+    },
+    "adminPageSmoke": {
+      "requiredPages": [
+        "dashboard",
+        "stations",
+        "facilities",
+        "layout-editor",
+        "reports",
+        "quality",
+        "field-verifications",
+        "collections",
+        "batches",
+        "codes",
+        "incidents",
+        "route-searches",
+        "route-feedback",
+        "push",
+        "usage",
+        "system",
+        "audits",
+        "privacy-audits"
+      ],
+      "requiredChecks": [
+        "login-required",
+        "role-denied",
+        "keyboard-navigation",
+        "skip-link",
+        "focus-visible",
+        "csrf-token",
+        "error-flash",
+        "environment-badge",
+        "revision-master-data-version"
+      ],
+      "requiredEvidence": [
+        "admin-operator-page-smoke-output",
+        "admin-page-accessibility-smoke-output",
+        "admin-role-matrix-test-output"
+      ]
+    },
+    "auditRedaction": {
+      "requiredEvidence": [
+        "admin-mutating-action-audit-sample",
+        "privacy-read-audit-sample",
+        "report-photo-read-audit-sample",
+        "break-glass-use-audit-sample"
+      ],
+      "forbiddenInEvidence": [
+        "receipt token",
+        "signed URL",
+        "photo binary",
+        "object storage credential",
+        "raw request body"
+      ]
+    }
+  },
+  "observability": {
+    "requiredResolutionKinds": [
+      "dashboard-url",
+      "alert-route",
+      "runbook"
+    ],
+    "allowedFallbackKinds": [
+      "external-blocker-record"
+    ],
+    "blockedWhenKo": "각 operations signal에 dashboard, alert route, runbook 또는 외부 blocker 기록이 없으면 운영 관측성 gate를 닫지 않는다."
+  },
+  "releaseEvidenceSummaryValidator": {
+    "command": "node tools/ops/validate-operations-release-summary.mjs --summary <summary.json> --rc-manifest <rc-evidence-manifest.json> --require-pass",
+    "passPolicyKo": "external-blocker-record는 남은 외부 blocker를 기록하는 용도이며 최종 PASS를 대체할 수 없다."
+  },
+  "sensitiveEvidencePolicy": {
+    "localOnly": true,
+    "forbiddenInPullRequest": [
+      "database dump",
+      "photo object",
+      "signed URL",
+      "credential",
+      "receipt token"
+    ],
+    "summaryRequiredKo": "민감 증거는 GitHub에 올리지 않고 PR에는 evidence 종류, 대상, 결과, local-only 경로만 적는다."
+  }
+}

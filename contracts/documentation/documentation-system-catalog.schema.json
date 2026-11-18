@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "easysubway/contracts/documentation/documentation-system-catalog",
+  "title": "EasySubway documentation system catalog proposal",
+  "type": "object",
+  "required": ["$schema", "schemaVersion", "status", "inventoryEvidence", "repositories"],
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string", "const": "./documentation-system-catalog.schema.json" },
+    "schemaVersion": { "type": "integer", "const": 1 },
+    "status": { "type": "string", "const": "PROPOSED" },
+    "inventoryEvidence": {
+      "type": "object",
+      "required": ["normalizedSha256", "recordCount", "repositoryCount", "documentationFamilyCount", "sourceSurfaceCount", "gaps"],
+      "additionalProperties": false,
+      "properties": {
+        "normalizedSha256": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" },
+        "recordCount": { "type": "integer", "minimum": 1 },
+        "repositoryCount": { "type": "integer", "const": 5 },
+        "documentationFamilyCount": { "type": "integer", "const": 11 },
+        "sourceSurfaceCount": { "type": "integer", "const": 4 },
+        "gaps": { "type": "array", "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+      }
+    },
+    "repositories": {
+      "type": "array",
+      "minItems": 5,
+      "maxItems": 5,
+      "items": {
+        "type": "object",
+        "required": ["repository", "status", "fragment"],
+        "additionalProperties": false,
+        "properties": {
+          "repository": { "type": "string", "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-data", "AquilaXk/easysubway-backend", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-platform"] },
+          "status": { "type": "string", "enum": ["PROPOSED", "ACTIVE"] },
+          "fragment": {
+            "oneOf": [
+              { "type": "null" },
+              {
+                "type": "object",
+                "required": ["gitSha", "path", "blobSha", "lastVerifiedAt", "verificationEvidence"],
+                "additionalProperties": false,
+                "properties": {
+                  "gitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+                  "path": { "type": "string", "minLength": 1 },
+                  "blobSha": { "type": "string", "pattern": "^(?:[0-9a-f]{40}|[0-9a-f]{64})$" },
+                  "lastVerifiedAt": { "type": "string", "format": "date-time" },
+                  "verificationEvidence": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "minLength": 1 } }
+                }
+              }
+            ]
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "schemaVersion": 1,
+  "releaseGate": "mobile-release-claim-scan",
+  "issue": 1392,
+  "scopeSource": "release/product-gates/production-datapack-scope.json",
+  "scanTargets": [
+    {
+      "path": "apps/mobile/lib",
+      "extensions": [".dart"]
+    },
+    {
+      "path": "apps/mobile/release/play-store-submission-content.json",
+      "jsonPointers": [
+        "/koreanListing",
+        "/requiredScreenshotSet",
+        "/largeScreenScreenshotTargets",
+        "/appContentDeclarations/reviewerAccessNotesKo"
+      ]
+    },
+    {
+      "path": "README.md"
+    }
+  ],
+  "forbiddenClaimsKo": [
+    "전국 완전 지원",
+    "전국 지하철 완전 지원",
+    "모든 역",
+    "100% 안전",
+    "휠체어 경로 보장",
+    "실시간 보장",
+    "항상 정확",
+    "실시간 길찾기 정확 보장",
+    "길찾기도 기기 안에서 끝납니다",
+    "오프라인 길찾기",
+    "인터넷 없이도 길찾기",
+    "장애인"
+  ],
+  "allowedPhrasesKo": [
+    "장애인 화장실",
+    "장애인 엘리베이터",
+    "만 65세 이상·장애인·국가유공자 우대 무임"
+  ]
+}

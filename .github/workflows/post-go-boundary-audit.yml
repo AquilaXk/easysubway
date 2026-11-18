@@ -1,0 +1,56 @@
+name: Post-GO Boundary Audit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/post-go-boundary-audit.yml
+      - contracts/documentation/post-go-boundary-audit-scope.schema.json
+      - contracts/documentation/post-go-boundary-audit-scope.json
+      - contracts/documentation/post-go-boundary-audit-report.schema.json
+      - tools/repo/audit-post-go-boundary.mjs
+      - tools/repo/audit-post-go-boundary.test.mjs
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      issues: read
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+      - name: Create current post-GO boundary report
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          EVIDENCE_DIR="audit-evidence"
+          REPORT_PATH="${EVIDENCE_DIR}/post-go-boundary-audit-report.json"
+          OBSERVED_AT="$(date --utc +"%Y-%m-%dT%H:%M:%S.000Z")"
+          rm --recursive --force -- "${EVIDENCE_DIR}"
+          mkdir --parents -- "${EVIDENCE_DIR}"
+          test ! -e "${REPORT_PATH}"
+          node tools/repo/audit-post-go-boundary.mjs \
+            --scope contracts/documentation/post-go-boundary-audit-scope.json \
+            --scope-schema contracts/documentation/post-go-boundary-audit-scope.schema.json \
+            --report-schema contracts/documentation/post-go-boundary-audit-report.schema.json \
+            --source-sha "${GITHUB_SHA}" \
+            --observed-at "${OBSERVED_AT}" \
+            --output "${REPORT_PATH}"
+      - name: Upload sanitized post-GO boundary report
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: post-go-boundary-audit-${{ github.sha }}
+          path: audit-evidence/post-go-boundary-audit-report.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 14

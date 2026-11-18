@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "System release manifest v4",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "productReleaseId", "phase", "decision", "generatedAt", "issueRefs", "productIdentitySha256", "governanceRevisionSha256", "hubObservedRevision", "contracts", "mobile", "backend", "data", "platform"],
+  "properties": {
+    "schemaVersion": { "const": 4 },
+    "productReleaseId": { "type": "string", "minLength": 1 },
+    "phase": { "type": "string", "enum": ["CANDIDATE", "FINAL"] },
+    "decision": { "type": "string", "enum": ["GO", "NO_GO"] },
+    "generatedAt": { "type": "string", "format": "date-time" },
+    "issueRefs": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^AquilaXk/(easysubway|easysubway-data|easysubway-platform|easysubway-backend|easysubway-mobile)#[1-9][0-9]*$" } },
+    "productIdentitySha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "governanceRevisionSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+    "hubObservedRevision": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "gitSha"],
+      "properties": {
+        "repository": { "const": "AquilaXk/easysubway" },
+        "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" }
+      }
+    },
+    "contracts": { "type": "object", "additionalProperties": false, "required": ["version", "sha256"], "properties": { "version": { "type": "string", "minLength": 1 }, "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" } } },
+    "journeyV3": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["executionMode", "owner", "evidenceSha256", "fallbackSuccessCounters"],
+      "properties": {
+        "executionMode": { "const": "SERVER_ONLY" },
+        "owner": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository", "gitSha", "apiContractVersion"],
+          "properties": {
+            "repository": { "const": "AquilaXk/easysubway-backend" },
+            "gitSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+            "apiContractVersion": { "type": "string", "minLength": 1 }
+          }
+        },
+        "evidenceSha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+        "fallbackSuccessCounters": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["hubSource", "legacy", "local", "routeV1", "routeV2", "stale", "previous", "alternateProvider", "bestEffort"],
+          "properties": {
+            "hubSource": { "type": "integer", "const": 0 },
+            "legacy": { "type": "integer", "const": 0 },
+            "local": { "type": "integer", "const": 0 },
+            "routeV1": { "type": "integer", "const": 0 },
+            "routeV2": { "type": "integer", "const": 0 },
+            "stale": { "type": "integer", "const": 0 },
+            "previous": { "type": "integer", "const": 0 },
+            "alternateProvider": { "type": "integer", "const": 0 },
+            "bestEffort": { "type": "integer", "const": 0 }
+          }
+        }
+      }
+    },
+    "mobile": { "type": "object" }, "backend": { "type": "object" }, "data": { "type": "object" }, "platform": { "type": "object" }
+  }
+}

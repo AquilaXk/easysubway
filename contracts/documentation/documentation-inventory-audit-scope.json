@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "repositories": [
+    { "repository": "AquilaXk/easysubway", "defaultBranch": "main", "fragmentPath": "contracts/documentation/documentation-fragment.json", "requiredStatus": "ACTIVE" },
+    { "repository": "AquilaXk/easysubway-backend", "defaultBranch": "main", "fragmentPath": "contracts/documentation/documentation-fragment.json", "requiredStatus": "ACTIVE" },
+    { "repository": "AquilaXk/easysubway-data", "defaultBranch": "main", "fragmentPath": "contracts/documentation/documentation-fragment.json", "requiredStatus": "ACTIVE" },
+    { "repository": "AquilaXk/easysubway-mobile", "defaultBranch": "main", "fragmentPath": "contracts/documentation/documentation-fragment.json", "requiredStatus": "ACTIVE" },
+    { "repository": "AquilaXk/easysubway-platform", "defaultBranch": "main", "fragmentPath": "contracts/documentation/documentation-fragment.json", "requiredStatus": "ACTIVE" }
+  ],
+  "dods": ["D01", "D02", "D03", "D04", "D05"]
+}

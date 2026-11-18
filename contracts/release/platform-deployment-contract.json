@@ -1,0 +1,22 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "platform-deployment-contract",
+  "contractVersion": "platform-v1",
+  "allowedProducerRepositories": [
+    "AquilaXk/easysubway",
+    "AquilaXk/easysubway-backend"
+  ],
+  "artifactNamePattern": "^easysubway-backend-release-[a-f0-9]{40}$",
+  "imageRepository": "ghcr.io/aquilaxk/easysubway-backend",
+  "platformRepository": "AquilaXk/easysubway-platform",
+  "gitShaPattern": "^[a-f0-9]{40}$",
+  "sha256Pattern": "^[a-f0-9]{64}$",
+  "imageDigestPattern": "^sha256:[a-f0-9]{64}$",
+  "issueRefPattern": "^AquilaXk/(easysubway|easysubway-data|easysubway-platform|easysubway-backend|easysubway-mobile)#[1-9][0-9]*$",
+  "forbiddenInputs": [
+    "branch",
+    "buildContext",
+    "sourceDirectory",
+    "mutableImageTag"
+  ]
+}

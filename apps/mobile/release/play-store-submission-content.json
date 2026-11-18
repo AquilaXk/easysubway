@@ -1,0 +1,550 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "play-store-submission-content",
+  "issue": 1018,
+  "verifiedAccessibilityScopeId": "capital_pilot_android_v1",
+  "verifiedAccessibilityScopeSha256": "e192eef333e7f90312f841b4f5935d31d15118684b4e53e50f44cfbdfe2a1fd6",
+  "launchScopeId": "capital_routing_android_v1",
+  "launchScopeSha256": "5846b91f420b8c6b78cd5094ef7037c8342b4bc4ef9dacf7bc1bb6a5d65e1dbe",
+  "nationwideRoadmapScopeId": "nationwide_roadmap_v1",
+  "nationwideRoadmapScopeSha256": "f93bab74198ed46a708a098201ef53e53c04748a6f18a8a95e01e046d0553442",
+  "identityLinkageMatrixSha256": "3250f17b012d958e784e65ff81df60b38f304f43a3ca5dc3a7fd0cc088f3f6a0",
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "storePrivacyInventory": "apps/mobile/release/store-privacy-inventory.json",
+  "storeSubmissionReadiness": "apps/mobile/release/store-submission-readiness.json",
+  "status": "READY",
+  "latestQaEvidenceSummary": {
+    "qaEvidenceDateKst": "2026-07-28",
+    "privacyPolicyUrl": {
+      "result": "PASS_PUBLIC_HTTPS",
+      "url": "https://easysubway-api.aquilaxk.site/easysubway/privacy",
+      "requiredIn": ["Play Console", "app help", "public policy page"],
+      "remainingActionKo": "Play Console URL 입력 화면과 앱 도움말 화면의 동일 HTTPS URL 검증 완료."
+    },
+    "publicContactMailboxes": {
+      "result": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+      "domain": "aquilaxk.site",
+      "addresses": ["support@aquilaxk.site", "security@aquilaxk.site", "privacy@aquilaxk.site"],
+      "redactionPolicy": "GitHub에는 mailbox 개인 정보, raw report receipt token, message body, operator private contact, provider credential or quota token, photo metadata를 올리지 않는다."
+    },
+    "androidVitalsAndPrelaunchSummary": {
+      "result": "PASS",
+      "userPerceivedCrashRate": 0.0031,
+      "userPerceivedCrashRateThreshold": 0.0109,
+      "userPerceivedAnrRate": 0.0012,
+      "userPerceivedAnrRateThreshold": 0.0047,
+      "preLaunchReportFatalCrashes": 0,
+      "preLaunchReportAnrCount": 0,
+      "preLaunchReportDeviceCount": 66,
+      "sourceOfTruth": ["Android vitals", "Google Play pre-launch report"]
+    },
+    "storeListingAndScreenshotSummary": {
+      "result": "PASS",
+      "koreanListingMatches": true,
+      "englishListingMatches": true,
+      "requiredScreenshotSetCompleted": true,
+      "requiredScreenshotCount": 8,
+      "largeScreenTargetsCompleted": true
+    },
+    "dataSafetyConsolePreviewSummary": {
+      "result": "PASS",
+      "dataSafetyFormReverified": true,
+      "noThirdPartyTracking": true,
+      "kakaoMapExitPreviewThirdPartySharingDeclared": true,
+      "accountAndDataDeletionFlowDocumented": true
+    },
+    "remainingExternalBlockers": [],
+    "remainingEvidenceBeforeFinalGo": []
+  },
+  "appContentDeclarations": {
+    "ads": true,
+    "appAccessRequiresSignIn": false,
+    "publicUserSignIn": false,
+    "accountCreation": false,
+    "backgroundLocation": false,
+    "preciseLocation": "optional_user_triggered_nearby_station_report_location_and_exit_walk_route",
+    "cameraOrPhoto": "optional_user_triggered_report_attachment_only",
+    "restrictedContent": false,
+    "targetAudience": "all_users_not_child_directed",
+    "reviewerAccessNotesKo": "로그인 없는 앱입니다. 위치 권한은 주변 역 찾기, 신고 위치 확인, 출구 도보 길안내에서만 선택적으로 사용합니다. 자체 서빙 비개인화 광고 landing은 사용자가 명시적으로 누를 때만 외부 브라우저로 엽니다."
+  },
+  "requiredScreenshotSet": [
+    {
+      "id": "home_support_scope",
+      "titleKo": "홈 화면과 지원 범위"
+    },
+    {
+      "id": "station_search",
+      "titleKo": "역 검색"
+    },
+    {
+      "id": "station_detail_facility_status",
+      "titleKo": "역 상세와 시설 상태"
+    },
+    {
+      "id": "route_result_found_and_unknown_or_needs_confirmation",
+      "titleKo": "경로 검색 결과와 다시 확인 안내"
+    },
+    {
+      "id": "facility_report_form",
+      "titleKo": "시설 신고 입력"
+    },
+    {
+      "id": "report_receipt_status",
+      "titleKo": "신고 접수와 처리 상태"
+    },
+    {
+      "id": "help_privacy_data_deletion",
+      "titleKo": "도움말 개인정보와 데이터 삭제"
+    },
+    {
+      "id": "data_baseline_source_realtime_scope",
+      "titleKo": "데이터 기준일과 실시간 제공 범위"
+    }
+  ],
+  "largeScreenScreenshotTargets": [
+    {
+      "id": "seven_inch_tablet_landscape",
+      "playConsoleSlot": "7-inch tablet",
+      "viewportClass": "compact-tablet-landscape",
+      "aspectRatio": "16:9-or-play-accepted",
+      "requiredScreenshotIds": ["home_support_scope", "station_search", "station_detail_facility_status"],
+      "requiredEvidenceFields": [
+        "sourceGitSha",
+        "sourceBuildType",
+        "viewport",
+        "seedData",
+        "captureTarget",
+        "localEvidencePath",
+        "uiTreePath",
+        "largeTextScaleResult",
+        "highContrastResult",
+        "accessibilityGuidelineResult",
+        "result"
+      ],
+      "scopeNoteKo": "휴대전화 중앙 고립 UI가 아니라 핵심 CTA, 검색, 역 상세 요약이 대화면 기준으로 표시되는지 확인한다."
+    },
+    {
+      "id": "ten_inch_tablet_landscape",
+      "playConsoleSlot": "10-inch tablet",
+      "viewportClass": "expanded-tablet-landscape",
+      "aspectRatio": "16:9",
+      "requiredScreenshotIds": ["home_support_scope", "station_search", "station_detail_facility_status"],
+      "requiredEvidenceFields": [
+        "sourceGitSha",
+        "sourceBuildType",
+        "viewport",
+        "seedData",
+        "captureTarget",
+        "localEvidencePath",
+        "uiTreePath",
+        "largeTextScaleResult",
+        "highContrastResult",
+        "accessibilityGuidelineResult",
+        "result"
+      ],
+      "scopeNoteKo": "홈, 역 검색, 역 상세가 넓은 화면에서 좌우 정보 구조를 유지하고 큰 글씨 기준의 overflow가 없는지 확인한다."
+    },
+    {
+      "id": "chromebook_16_9",
+      "playConsoleSlot": "Chromebook",
+      "viewportClass": "desktop-window-16-9",
+      "aspectRatio": "16:9",
+      "requiredScreenshotIds": [
+        "home_support_scope",
+        "station_search",
+        "station_detail_facility_status",
+        "help_privacy_data_deletion"
+      ],
+      "requiredEvidenceFields": [
+        "sourceGitSha",
+        "sourceBuildType",
+        "viewport",
+        "seedData",
+        "captureTarget",
+        "localEvidencePath",
+        "uiTreePath",
+        "keyboardMouseSmokeResult",
+        "largeTextScaleResult",
+        "highContrastResult",
+        "accessibilityGuidelineResult",
+        "result"
+      ],
+      "scopeNoteKo": "Chromebook 전용 UX 완성이 아니라 등록정보용 16:9 실제 앱 화면과 기본 focus, 입력, 클릭, 스크롤 smoke 결과를 기록한다."
+    },
+    {
+      "id": "android_xr_16_9",
+      "playConsoleSlot": "Android XR",
+      "viewportClass": "xr-listing-16-9",
+      "aspectRatio": "16:9",
+      "requiredScreenshotIds": [
+        "home_support_scope",
+        "station_search",
+        "station_detail_facility_status",
+        "help_privacy_data_deletion"
+      ],
+      "requiredEvidenceFields": [
+        "sourceGitSha",
+        "sourceBuildType",
+        "viewport",
+        "seedData",
+        "captureTarget",
+        "localEvidencePath",
+        "uiTreePath",
+        "largeTextScaleResult",
+        "highContrastResult",
+        "accessibilityGuidelineResult",
+        "result"
+      ],
+      "scopeNoteKo": "Android XR 등록정보 칸을 위한 16:9 실제 앱 화면 후보이며 XR 전용 spatial UI 지원으로 표현하지 않는다."
+    }
+  ],
+  "dataSafetyDeclarations": {
+    "tracking": false,
+    "sharesDataWithThirdParties": true,
+    "thirdPartySharingScopeKo": "출구 정보가 표시되면 공개 역·출구 좌표와 지도 화면 범위로 카카오맵 미리보기를 자동으로 불러오며 현재 위치는 사용하지 않는다. 사용자가 출구 지도 또는 도보 길안내를 누르면 카카오맵 앱/웹 실행을 차례로 시도하고, 모두 사용할 수 없으면 좌표를 복사한다. 도보 길안내 앱에는 현재 위치 시작 좌표와 목적지 좌표를 전달한다. 이 외부 지도 전달 좌표는 자체 서버에 저장하거나 tracking에 사용하지 않는다.",
+    "dataEncryptedInTransit": true,
+    "dataDeletionRequestSupported": true,
+    "requiredFieldsPerDataType": [
+      "collected",
+      "collectionType",
+      "optional",
+      "required",
+      "purpose",
+      "linkedToUser",
+      "encryptedInTransit",
+      "deletionSupported"
+    ],
+    "requiredCollectedDataTypes": [
+      "Location",
+      "App activity",
+      "Personal info",
+      "User-generated content",
+      "Photos and videos",
+      "Diagnostics",
+      "Device or other IDs"
+    ],
+    "answerMatrix": [
+      {
+        "dataType": "Location",
+        "inventoryDataIds": ["precise_location", "facility_report_location"],
+        "excludedInventoryDataIds": ["embedded_map_preview_public_coordinates"],
+        "containsCollectedData": true,
+        "containsRequiredData": false,
+        "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "App activity",
+        "inventoryDataIds": ["search_queries", "train_search_queries", "favorite_stations_routes_facilities", "route_eta_feedback", "route_v2_itx_request_state"],
+        "containsCollectedData": true,
+        "containsRequiredData": true,
+        "containsOptionalData": true,
+        "containsDeletionUnsupportedData": true,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "Personal info",
+        "inventoryDataIds": ["mobility_profile", "route_v2_itx_mobility_preferences"],
+        "containsCollectedData": true,
+        "containsRequiredData": false,
+        "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "User-generated content",
+        "inventoryDataIds": ["facility_report_content"],
+        "containsCollectedData": true,
+        "containsRequiredData": false,
+        "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "Photos and videos",
+        "inventoryDataIds": ["facility_report_photo"],
+        "containsCollectedData": true,
+        "containsRequiredData": false,
+        "containsOptionalData": true,
+        "containsDeletionUnsupportedData": false,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "Diagnostics",
+        "inventoryDataIds": ["diagnostics_crash_logs", "diagnostics_performance_logs"],
+        "containsCollectedData": true,
+        "containsRequiredData": true,
+        "containsOptionalData": false,
+        "containsDeletionUnsupportedData": false,
+        "containsLocalOnlyDiagnostics": true,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      },
+      {
+        "dataType": "Device or other IDs",
+        "inventoryDataIds": ["route_v2_itx_integrity", "route_v2_gateway_abuse_rate_limit_state", "facility_report_abuse_rate_limit_state", "train_search_abuse_rate_limit_state"],
+        "containsCollectedData": true,
+        "containsRequiredData": false,
+        "containsOptionalData": true,
+        "containsDeletionUnsupportedData": true,
+        "requiredConsoleFields": [
+          "collected",
+          "collectionType",
+          "optional",
+          "required",
+          "purpose",
+          "linkedToUser",
+          "encryptedInTransit",
+          "deletionSupported"
+        ],
+        "evidenceSummaryFields": ["inventoryDataIds", "consolePreviewEvidence", "networkTraceMatchResult", "localEvidencePath"]
+      }
+    ],
+    "optionalUserTriggeredData": [
+      "precise location for nearby station search",
+      "facility report photo",
+      "facility report location",
+      "mobility profile",
+      "favorites",
+      "ITX Route V2 integrity session",
+      "ITX Route V2 gateway abuse prevention state",
+      "train search abuse prevention state",
+      "ITX Route V2 mobility preferences",
+      "ITX Route V2 route request and state"
+    ],
+    "binaryTraceMatchRequired": true,
+    "linkedInventory": "apps/mobile/release/store-privacy-inventory.json",
+    "routeV2Itx": {
+      "optionalUserTriggered": true,
+      "tracking": false,
+      "backendLinkedToUserDeviceOrAccountId": false,
+      "googleIntegrityMayBeLinkedToAccountOrDevice": true,
+      "storedFieldsProcessedEphemerally": false,
+      "gatewayRateLimitStateProcessedEphemerally": false,
+      "officialPolicyReferences": [
+        "https://support.google.com/googleplay/android-developer/answer/10787469?hl=en",
+        "https://developer.android.com/google/play/integrity/terms"
+      ]
+    }
+  },
+  "evidenceSummarySchemas": {
+    "dataSafetyConsoleSummary": {
+      "requiredFields": [
+        "dataType",
+        "inventoryDataIds",
+        "collected",
+        "collectionType",
+        "optional",
+        "required",
+        "purpose",
+        "linkedToUser",
+        "encryptedInTransit",
+        "deletionSupported",
+        "consolePreviewEvidence",
+        "networkTraceMatchResult",
+        "localEvidencePath",
+        "result"
+      ]
+    },
+    "privacyPolicyUrlSummary": {
+      "requiredFields": [
+        "url",
+        "publicHttpsResult",
+        "unauthenticatedResult",
+        "playConsoleUrl",
+        "appHelpUrl",
+        "readmeOrPublicPolicyUrl",
+        "sameUrlResult",
+        "requiredContentResult",
+        "localEvidencePath",
+        "result"
+      ]
+    },
+    "mailboxReceiptSummary": {
+      "requiredFields": [
+        "mailbox",
+        "testMessageId",
+        "sentAt",
+        "receivedAt",
+        "deliveryResult",
+        "redactionResult",
+        "localEvidencePath",
+        "result"
+      ]
+    },
+    "storeScreenshotSummary": {
+      "requiredFields": [
+        "screenshotId",
+        "buildIdentity",
+        "sourceGitSha",
+        "sourceBuildType",
+        "targetDeviceClass",
+        "viewport",
+        "seedData",
+        "uiTreePath",
+        "screenTitleKo",
+        "forbiddenClaimsAbsent",
+        "matchesFeatureScope",
+        "localEvidencePath",
+        "result"
+      ]
+    },
+    "crashAnrPrivacySummary": {
+      "requiredFields": [
+        "separateCrashProvider",
+        "noCrashSdkDependencyScan",
+        "androidVitalsOrPrelaunchEvidence",
+        "redactedLogcatOrCrashSummary",
+        "forbiddenPayloadAbsent",
+        "localEvidencePath",
+        "result"
+      ]
+    },
+    "networkTraceMatchSummary": {
+      "requiredFields": [
+        "traceTarget",
+        "declaredDataTypes",
+        "undeclaredDataTransferCount",
+        "sensitivePayloadAbsent",
+        "localEvidencePath",
+        "result"
+      ]
+    }
+  },
+  "forbiddenEvidenceSummaryValues": ["TBD", "TODO", "unknown", "not checked", "not captured"],
+  "privacyPolicyRequirements": {
+    "urlMustBePublicHttps": true,
+    "urlMustBeUnauthenticated": true,
+    "sameUrlRequiredIn": ["Play Console", "app help", "public policy page"],
+    "requiredContentKo": [
+      "수집 항목",
+      "수집 목적",
+      "보관 기간",
+      "삭제 요청 방법",
+      "개인정보 연락처",
+      "외부 지도 길안내 제3자 공유 범위",
+      "카카오맵 출구 미리보기 자동 로드 범위",
+      "tracking 없음",
+      "SUBWAY 경로 검색은 단말에서만 처리",
+      "선택형 ITX-청춘 Route V2 전송 항목과 논리 만료·5분 purge·물리 파기 경계",
+      "Nginx IP·Authorization shared-memory rate-limit 처리와 DB·access log 비저장 경계",
+      "사진과 위치는 사용자가 신고, 주변 역 찾기, 출구 도보 길안내 흐름에서 직접 선택할 때만 사용"
+    ]
+  },
+  "storeMetadataRequirements": {
+    "publicContactEmailMustMatchAppSupportEmail": true,
+    "recommendedCategoryKo": "Maps & Navigation 또는 Travel & Local 중 대중교통 접근성 이동 보조 설명과 가장 일치하는 항목",
+    "requiredTagsKo": ["대중교통", "접근성", "지하철", "경로 안내"],
+    "reviewerNotesMustIncludeKo": ["로그인 없음", "위치 권한은 선택적 사용", "시설 신고 사진은 사용자가 직접 첨부할 때만 전송", "출구 정보가 표시되면 공개 역·출구 좌표로 카카오맵 미리보기를 자동 로드하며 현재 위치는 사용하지 않음", "외부 카카오맵 앱/웹은 사용자가 지도 또는 도보 길안내를 누를 때만 실행"],
+    "contentRatingBasisKo": "대중교통 정보, 사용자 시설 신고 입력, 자체 서빙 비개인화 광고, 출구 정보의 카카오맵 미리보기 자동 로드, 외부 지도 앱/웹은 사용자가 지도 또는 길안내를 명시적으로 누를 때만 열리고, 광고 landing은 사용자가 광고를 명시적으로 누를 때만 외부 브라우저로 열리는 범위와 일치"
+  },
+  "crashAnrProviderDecision": {
+    "separateCrashProvider": false,
+    "sourceOfTruth": ["Android vitals", "Google Play pre-launch report"],
+    "dependencyEvidenceRequired": "no-crash-sdk-dependency-scan",
+    "linkedInventory": "apps/mobile/release/store-privacy-inventory.json"
+  },
+  "koreanListing": {
+    "appName": "쉬운 지하철",
+    "shortDescription": "교통약자를 위한 지하철 이동 안내",
+    "fullDescriptionKo": "쉬운 지하철은 고령자, 임산부, 휠체어 이용자 등 이동과 정보 접근에 제약이 있는 사용자가 지하철 역과 시설 정보를 더 쉽게 확인하도록 돕는 앱입니다. 접근성 정보 검증 범위는 상록수·사당 검증 pilot입니다. 경춘선 ITX-청춘 길찾기는 준비 중이며 source, server, mobile 출시 근거가 모두 확인되기 전에는 제공하지 않습니다. 엘리베이터, 에스컬레이터, 출구, 환승 동선, 즐겨찾기, 시설 신고 흐름을 제공하며 일부 기능은 로컬 데이터팩으로 오프라인에서도 확인할 수 있습니다. 정보는 데이터 기준일과 공식 출처를 함께 표시하고, 현장 상황이나 실시간 정보는 운영기관 제공 범위와 갱신 상태에 따라 달라질 수 있음을 안내합니다.",
+    "releaseNotesKo": "접근성 이동 정보, 시설 신고, 도움말과 개인정보 안내를 포함한 Android 출시 후보입니다.",
+    "supportRegionKo": "상록수·사당 검증 pilot",
+    "routingLaunchScopeKo": "경춘선 ITX-청춘 길찾기는 source, server, mobile 출시 근거 확인 뒤 제공",
+    "dataBaselineRequired": true,
+    "realtimeSupportScopeKo": "실시간 도착과 열차 위치는 지원 노선과 제공기관 상태가 확인된 범위에서만 표시",
+    "confirmationCopyKo": "경로와 시설 정보는 현장 상황과 다를 수 있어 이동 전 역무원 또는 운영기관 안내를 함께 봐 주세요."
+  },
+  "prohibitedClaims": [
+    "100% 안전",
+    "모든 역",
+    "전국 완전 지원",
+    "휠체어 경로 보장",
+    "실시간 보장",
+    "항상 정확"
+  ],
+  "assetEvidence": {
+    "appIcon": "required_play_console_preview_or_asset_record",
+    "featureGraphic": "required_play_console_preview_or_asset_record",
+    "phoneScreenshots": "required_release_build_screenshots_matching_requiredScreenshotSet",
+    "tabletScreenshots": "required_large_screen_screenshots_matching_largeScreenScreenshotTargets",
+    "chromebookScreenshots": "required_16_9_app_screenshots_matching_largeScreenScreenshotTargets",
+    "androidXrScreenshots": "required_16_9_app_screenshots_without_xr_specific_ui_claim",
+    "tabletPolicy": "large_screen_layout_gate_required_before_final_tablet_listing_assets",
+    "listingPreview": "required_play_console_preview_summary"
+  },
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/play-store-submission/<rc-or-run>/",
+    "githubEvidencePolicy": "summary-or-public-console-link",
+    "sensitiveEvidence": [
+      "Google Play Console screenshots",
+      "network trace",
+      "release build screenshots before publication",
+      "support mailbox headers"
+    ],
+    "summaryRequiredKo": "민감 증거는 GitHub에 파일로 올리지 않고 PR에는 evidence 종류, 대상, 결과, local-only 경로 또는 공개 가능한 Console 링크만 적는다."
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "ownerIssue": 1971,
+  "approval": {
+    "ownerKo": "제품/사업 담당",
+    "recordedAt": "2026-07-11T17:37:02Z",
+    "decision": "DEFER_UNTIL_PLAY_STORE_PUBLICATION"
+  },
+  "execution": {
+    "assigneeKo": "제품/사업 담당",
+    "deadlineAfterPublicRelease": "P1D",
+    "status": "DEFERRED_UNTIL_PUBLIC_RELEASE",
+    "result": "PENDING"
+  },
+  "checks": [
+    {
+      "id": "impression_once",
+      "result": "PENDING"
+    },
+    {
+      "id": "click",
+      "result": "PENDING"
+    },
+    {
+      "id": "expiry_collapse",
+      "result": "PENDING"
+    },
+    {
+      "id": "daily_count",
+      "result": "PENDING"
+    }
+  ]
+}

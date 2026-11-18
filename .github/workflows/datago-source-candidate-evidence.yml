@@ -1,0 +1,62 @@
+name: Data.go.kr Source Candidate Evidence
+
+on:
+  workflow_dispatch:
+    inputs:
+      candidate:
+        description: Data.go.kr source candidate to collect
+        required: true
+        type: choice
+        options:
+          - seoul-metro-transfer-distance-duration
+          - seoul-metro-fast-exit-car-door
+
+permissions: {}
+
+jobs:
+  collect:
+    name: Data.go.kr Source Candidate Evidence
+    if: ${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+      DATAGO_CANDIDATE_ID: ${{ inputs.candidate }}
+
+    steps:
+      - name: Data.go.kr Source Candidate Evidence / Checkout default branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Data.go.kr Source Candidate Evidence / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Data.go.kr Source Candidate Evidence / Collect and validate sanitized evidence
+        env:
+          DATA_GO_KR_SERVICE_KEY: ${{ secrets.DATA_GO_KR_SERVICE_KEY }}
+        run: |
+          set -euo pipefail
+          test -n "${DATA_GO_KR_SERVICE_KEY}"
+          node tools/datapack/collect-datago-source-candidate-evidence.mjs \
+            --candidate "${DATAGO_CANDIDATE_ID}"
+          test -s "${RUNNER_TEMP}/datago-source-candidate-evidence/${DATAGO_CANDIDATE_ID}.sample.json"
+          test -s "${RUNNER_TEMP}/datago-source-candidate-evidence/${DATAGO_CANDIDATE_ID}.report.txt"
+          test -s "${RUNNER_TEMP}/datago-source-candidate-evidence/${DATAGO_CANDIDATE_ID}.hashes.json"
+
+      - name: Data.go.kr Source Candidate Evidence / Upload sanitized evidence
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: datago-source-candidate-evidence
+          path: |
+            ${{ runner.temp }}/datago-source-candidate-evidence/*.sample.json
+            ${{ runner.temp }}/datago-source-candidate-evidence/*.report.txt
+            ${{ runner.temp }}/datago-source-candidate-evidence/*.hashes.json
+          if-no-files-found: error
+          include-hidden-files: false
+          retention-days: 14

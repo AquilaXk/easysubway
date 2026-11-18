@@ -1,0 +1,344 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "android-release-ux-accessibility-performance",
+  "issue": 1021,
+  "releaseBlockerPolicy": true,
+  "scope": {
+    "platform": {
+      "android": "RELEASE_REQUIRED",
+      "ios": "DEFERRED_OUT_OF_SCOPE"
+    },
+    "distribution": "google-play",
+    "primaryLocale": "ko-KR",
+    "targetUsers": [
+      "older-adults",
+      "wheelchair-users",
+      "stroller-users",
+      "pregnant-riders",
+      "temporary-injury-riders",
+      "riders-with-large-baggage"
+    ]
+  },
+  "routeSafetyContract": "#571",
+  "routeSafetyStatusEnum": ["FOUND", "BLOCKED", "UNKNOWN", "UNSUPPORTED", "ERROR"],
+  "buildIdentityPolicy": {
+    "requiredIssueLinks": ["#1015", "#1016", "#1020"],
+    "acceptedBuildSources": ["rc-aab", "play-generated-apk", "play-installed-build"],
+    "requiredIdentityFields": [
+      "gitSha",
+      "versionCode",
+      "aabSha256",
+      "dataPackManifestSha256",
+      "androidApplicationId"
+    ],
+    "mismatchDisposition": "NO_GO"
+  },
+  "playConsoleEvidencePolicy": {
+    "requiredBeforeGo": true,
+    "requiredSummaryFields": [
+      "playPreLaunchReportResult",
+      "playPreLaunchCrashCount",
+      "playPreLaunchAnrCount",
+      "playPolicyWarningStatus",
+      "androidVitalsCrashAnrSummary",
+      "triageDisposition",
+      "capturedAtUtc"
+    ],
+    "goNoGoRules": {
+      "missingConsoleSummary": "BLOCKED_EXTERNAL",
+      "preLaunchCrashOrAnr": "BLOCKED_TECHNICAL",
+      "untriagedPolicyWarning": "BLOCKED_TECHNICAL",
+      "privacyUnsafeCrashLog": "BLOCKED_TECHNICAL"
+    },
+    "summaryRequiredKo": "Play Console pre-launch report와 Android vitals의 crash, ANR, policy warning 상태를 민감정보 없이 요약한다."
+  },
+  "deviceEvidencePolicy": {
+    "qaDevice": "local_android_emulator_only",
+    "physicalDeviceEvidence": "not_used_for_pr_evidence",
+    "releaseRcEvidence": "play_installed_or_exact_rc_required_before_go",
+    "minimumAndroidApi": 35,
+    "fontScales": [1.5, 2.0],
+    "smallScreenViewport": "compact_phone_portrait",
+    "requiredDeviceDiscoveryCommands": [
+      "flutter emulators",
+      "emulator -list-avds",
+      "ANDROID_HOME or ANDROID_SDK_ROOT emulator path check",
+      "flutter devices",
+      "adb devices"
+    ],
+    "emptyAdbDevicesDisposition": "INSUFFICIENT_EVIDENCE"
+  },
+  "manualEvidenceSummaryPolicy": {
+    "commonRequiredFields": [
+      "checkId",
+      "buildIdentity",
+      "evidencePaths",
+      "result",
+      "blockerDisposition"
+    ],
+    "allowedFields": [
+      "checkId",
+      "buildIdentity",
+      "buildSource",
+      "deviceId",
+      "androidApi",
+      "fontScale",
+      "viewport",
+      "evidencePaths",
+      "uiTreePath",
+      "screenshotOrRecordingPath",
+      "logcatSummaryPath",
+      "talkbackNotesPath",
+      "playConsoleSummaryPath",
+      "result",
+      "blockerDisposition"
+    ],
+    "requiredResultValues": ["PASS", "FAIL", "BLOCKED_EXTERNAL", "NOT_APPLICABLE_WITH_REASON"],
+    "forbiddenSummaryValues": ["TBD", "TODO", "unknown", "not checked", "not captured"],
+    "summaryRequiredKo": "PR에는 checkId, build identity, device 조건, evidence path, 결과, blocker 판단을 민감정보 없이 요약하고 실제 파일은 local-only evidence root에 둔다."
+  },
+  "requiredChecks": [
+    {
+      "id": "route_safety_status_copy",
+      "releaseBlocker": true,
+      "states": ["FOUND", "BLOCKED", "UNKNOWN", "UNSUPPORTED", "ERROR"],
+      "evidence": ["screenshots", "ui-tree", "copy-review-notes"],
+      "passCriteriaKo": "FOUND는 검증된 접근성 edge가 있을 때만 안전하게 표현하고, 정보 부족은 UNKNOWN 또는 다시 확인 안내로 표시한다."
+    },
+    {
+      "id": "talkback_primary_journey",
+      "releaseBlocker": true,
+      "journeys": ["home", "station-search", "route-result", "facility-report", "support-info"],
+      "evidence": ["ui-tree", "talkback-reading-order-notes", "screen-recording-or-screenshot-sequence"],
+      "passCriteriaKo": "focus order, role, state, action, dynamic update가 이동 흐름을 이해할 수 있게 읽힌다."
+    },
+    {
+      "id": "font_scale_150_200_small_screen",
+      "releaseBlocker": true,
+      "settings": ["font_scale_1_5", "font_scale_2_0", "compact_phone_portrait"],
+      "evidence": ["screenshots", "ui-tree", "font-scale-value"],
+      "passCriteriaKo": "주요 CTA와 경고 문구가 overflow, clipping, hidden 상태가 아니다."
+    },
+    {
+      "id": "high_contrast_state_visibility",
+      "releaseBlocker": true,
+      "evidence": ["screenshots", "contrast-notes"],
+      "passCriteriaKo": "상태 배지, 오류 안내, 다음 행동, 안전 고지가 색상만으로 전달되지 않는다."
+    },
+    {
+      "id": "location_permission_denied_recovery",
+      "releaseBlocker": true,
+      "states": ["denied", "permanently_denied", "settings_return"],
+      "evidence": ["screenshots", "permission-state", "logcat-summary"],
+      "passCriteriaKo": "현재 위치만 제한되고 역 검색, 정적 경로, 역 상세는 계속 사용할 수 있다."
+    },
+    {
+      "id": "network_server_upload_error_recovery",
+      "releaseBlocker": true,
+      "states": ["airplane", "timeout", "backend_down", "upload_failure"],
+      "evidence": ["screenshots", "logcat-summary", "request-response-summary"],
+      "passCriteriaKo": "오류 이유와 다음 행동을 쉬운 한국어로 안내하고 로컬 기능을 차단하지 않는다."
+    },
+    {
+      "id": "route_map_fallback_zoom_help",
+      "releaseBlocker": true,
+      "evidence": ["screenshots", "ui-tree", "gesture-notes"],
+      "passCriteriaKo": "노선도 렌더링 실패 또는 접근성 사용 시 대체 목록, 확대, 도움말 흐름이 제공된다."
+    },
+    {
+      "id": "route_map_performance_budget",
+      "releaseBlocker": true,
+      "budgets": {
+        "maxJankyPercent": 5,
+        "maxP95FrameMs": 32,
+        "maxP99FrameMs": 48,
+        "maxCameraLatencyP95Ms": 120,
+        "maxTotalPssKb": 250000
+      },
+      "measurementSource": {
+        "releaseOrPlayInstalled": ["gfxinfo-framestats", "meminfo", "screen-recording-or-screenshot-sequence"],
+        "matchedProfileInstrumentation": ["tools/mobile/run-route-map-android-evidence.sh", "tools/mobile/analyze-route-map-android-evidence.mjs"]
+      },
+      "evidence": [
+        "play-installed-route-map-gfxinfo-framestats-summary",
+        "play-installed-route-map-meminfo-summary",
+        "matched-profile-route-map-camera-latency-summary"
+      ],
+      "passCriteriaKo": "RC 또는 Play-installed build의 frame/memory 예산 초과와 동일 git SHA profile instrumentation의 camera latency 예산 초과는 해당 RC의 P0 blocker로 승격한다."
+    },
+    {
+      "id": "scope_source_realtime_support_ui",
+      "releaseBlocker": true,
+      "evidence": ["screenshots", "ui-tree", "store-listing-copy-comparison"],
+      "passCriteriaKo": "지원 지역, 데이터 기준일, 출처, 실시간 지원 범위가 앱 안에서 확인 가능하고 Play listing과 모순되지 않는다."
+    },
+    {
+      "id": "crash_anr_privacy_safe_reporting",
+      "releaseBlocker": true,
+      "evidence": ["logcat-summary", "play-console-pre-launch-report-summary", "android-vitals-summary", "privacy-review-notes"],
+      "passCriteriaKo": "crash/ANR reporting은 민감 위치, 신고 사진, receipt token, signing/credential 값을 노출하지 않는다."
+    }
+  ],
+  "requiredEvidenceSet": [
+    {
+      "id": "home_support_scope",
+      "evidence": ["screenshot", "ui-tree"],
+      "provesKo": "홈에서 지원 범위와 다음 행동을 확인할 수 있다."
+    },
+    {
+      "id": "station_search",
+      "evidence": ["screenshot", "ui-tree"],
+      "provesKo": "역 검색이 큰 글자와 TalkBack 조건에서 탐색 가능하다."
+    },
+    {
+      "id": "station_detail_facility_status",
+      "evidence": ["screenshot", "ui-tree"],
+      "provesKo": "역 상세와 시설 상태가 색상만으로 전달되지 않는다."
+    },
+    {
+      "id": "route_result_found_unknown_unavailable",
+      "evidence": ["screenshot", "ui-tree", "copy-review-notes"],
+      "provesKo": "경로 상태별 안전 문구와 다음 행동이 구분된다."
+    },
+    {
+      "id": "route_map_fallback",
+      "evidence": ["screenshot", "ui-tree", "performance-summary"],
+      "provesKo": "노선도 조작, fallback list, 성능 예산을 확인한다."
+    },
+    {
+      "id": "facility_report_recovery",
+      "evidence": ["screenshot", "ui-tree", "logcat-summary"],
+      "provesKo": "신고 작성과 upload 실패 복구가 데이터 손실 없이 동작한다."
+    },
+    {
+      "id": "help_privacy_data_deletion",
+      "evidence": ["screenshot", "ui-tree"],
+      "provesKo": "도움말, 개인정보, 삭제 요청 경로를 확인할 수 있다."
+    },
+    {
+      "id": "data_baseline_source_realtime_scope",
+      "evidence": ["screenshot", "ui-tree"],
+      "provesKo": "데이터 기준일, 출처, 실시간 범위가 앱과 Play listing copy에 모순되지 않는다."
+    }
+  ],
+  "checkEvidenceMatrix": [
+    {
+      "checkId": "route_safety_status_copy",
+      "requiredEvidenceIds": ["route_result_found_unknown_unavailable"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "talkback_primary_journey",
+      "requiredEvidenceIds": ["home_support_scope", "station_search", "route_result_found_unknown_unavailable", "facility_report_recovery", "help_privacy_data_deletion"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "androidApi", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "talkbackNotesPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "font_scale_150_200_small_screen",
+      "requiredEvidenceIds": ["home_support_scope", "station_search", "route_result_found_unknown_unavailable", "facility_report_recovery", "help_privacy_data_deletion"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "androidApi", "fontScale", "viewport", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "high_contrast_state_visibility",
+      "requiredEvidenceIds": ["station_detail_facility_status", "route_result_found_unknown_unavailable", "facility_report_recovery"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "location_permission_denied_recovery",
+      "requiredEvidenceIds": ["station_search", "route_result_found_unknown_unavailable"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "logcatSummaryPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "network_server_upload_error_recovery",
+      "requiredEvidenceIds": ["station_search", "route_result_found_unknown_unavailable", "facility_report_recovery"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "logcatSummaryPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "route_map_fallback_zoom_help",
+      "requiredEvidenceIds": ["route_map_fallback"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "deviceId", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "route_map_performance_budget",
+      "requiredEvidenceIds": ["route_map_fallback"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "buildSource", "deviceId", "evidencePaths", "logcatSummaryPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "scope_source_realtime_support_ui",
+      "requiredEvidenceIds": ["home_support_scope", "data_baseline_source_realtime_scope"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "evidencePaths", "uiTreePath", "screenshotOrRecordingPath", "result", "blockerDisposition"]
+    },
+    {
+      "checkId": "crash_anr_privacy_safe_reporting",
+      "requiredEvidenceIds": ["facility_report_recovery", "help_privacy_data_deletion"],
+      "requiredSummaryFields": ["checkId", "buildIdentity", "buildSource", "deviceId", "evidencePaths", "logcatSummaryPath", "playConsoleSummaryPath", "result", "blockerDisposition"]
+    }
+  ],
+  "latestQaEvidenceStatus": {
+    "qaEvidenceDateKst": "2026-06-29",
+    "localEvidenceStatus": {
+      "local16KbEmulatorSmoke": "PASS",
+      "fontScale150HomeSmoke": "PASS",
+      "fontScale200HomeSmoke": "PASS",
+      "routeMapInitialViewportSmoke": "PASS",
+      "talkBackRouteMapUiTree": "PASS_UI_TREE_ONLY",
+      "locationPermissionDeniedRecovery": "PASS",
+      "myReportsBackendFailureRecovery": "PASS",
+      "realDeviceHomeSmoke": "PASS",
+      "playInstalledBuildProvenance": "BLOCKED_EXTERNAL",
+      "playConsolePreLaunchAndVitals": "BLOCKED_EXTERNAL"
+    },
+    "resolvedEvidence": [
+      "android-quality-gate-contract",
+      "emulator-discovery-command-policy",
+      "local-16kb-runtime-home-station-search-smoke",
+      "font-scale-150-home-smoke",
+      "font-scale-200-home-smoke",
+      "route-map-initial-bounds-visual-smoke",
+      "talkback-route-map-ui-tree-accessibility-service",
+      "location-permission-denied-recovery",
+      "my-reports-backend-failure-recovery",
+      "real-device-home-smoke",
+      "release-logcat-privacy-marker-scan"
+    ],
+    "remainingExternalBlockers": [
+      "play-installed-build-provenance",
+      "play-generated-apk-download-id-summary",
+      "talkback-manual-reading-order-notes",
+      "play-pre-launch-crash-anr-policy-summary",
+      "android-vitals-crash-anr-summary",
+      "play-installed-network-logcat-privacy-summary",
+      "play-installed-route-map-performance-budget",
+      "play-installed-font-scale-150-200-compact-screen-screenshots",
+      "upload-failure-recovery-on-rc-or-play-installed-build"
+    ],
+    "notClosingReasonKo": "#1021은 local emulator/real-device smoke 일부가 PASS여도 Play-installed provenance, 실제 TalkBack reading order, Play Console pre-launch/vitals, Play-installed 성능/복구 증거가 남아 open 유지한다.",
+    "redactionPolicy": {
+      "secretValuesPrinted": false,
+      "forbiddenInGitHubEvidence": [
+        "raw location coordinates",
+        "facility report photo",
+        "receipt token",
+        "network trace with device identifiers",
+        "Play-installed APK or AAB binary",
+        "signing credential",
+        "session cookie"
+      ]
+    }
+  },
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/android-quality/<rc-or-run>/",
+    "githubEvidencePolicy": "summary-or-public-link",
+    "sensitiveEvidence": [
+      "screen recordings with personal data",
+      "logcat containing device identifiers",
+      "network traces",
+      "Play-installed APK or AAB binaries",
+      "location coordinates",
+      "receipt tokens",
+      "facility report photos"
+    ],
+    "summaryRequiredKo": "PR에는 evidence 종류, 대상, 결과, local-only 경로 또는 공개 가능한 링크만 기록한다."
+  }
+}

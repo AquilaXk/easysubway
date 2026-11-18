@@ -1,0 +1,125 @@
+#!/usr/bin/env node
+import { createHash } from "node:crypto";
+import { readFile, writeFile } from "node:fs/promises";
+import { codepointCompare } from "../lib/codepoint-compare.mjs";
+
+const SHA256 = /^[a-f0-9]{64}$/;
+const SHA40 = /^[a-f0-9]{40}$/;
+const CANDIDATE_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const UTC_MILLISECONDS = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/;
+const OCI_URI = /^oci:\/\/([^/]+)\/([^/]+)\/([A-Za-z0-9][A-Za-z0-9._/-]*)$/;
+
+const required = (value, name) => {
+  if (value === undefined || value === null || value === "") throw new Error(`${name} is required`);
+  return value;
+};
+const sha = (value, name) => {
+  if (!SHA256.test(required(value, name))) throw new Error(`${name} must be sha256`);
+  return value;
+};
+const timestamp = (value, name) => {
+  if (typeof required(value, name) !== "string" || !UTC_MILLISECONDS.test(value)
+    || !Number.isFinite(Date.parse(value)) || new Date(value).toISOString() !== value) {
+    throw new Error(`${name} must be a canonical UTC millisecond timestamp`);
+  }
+  return value;
+};
+const exactObject = (value, fields, name) => {
+  if (!value || typeof value !== "object" || Array.isArray(value)
+    || Object.keys(value).length !== fields.length || fields.some((field) => !Object.hasOwn(value, field))) {
+    throw new Error(`${name} has an invalid field set`);
+  }
+  return value;
+};
+const canonical = (value) => {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value && typeof value === "object") {
+    const entries = Object.keys(value)
+      .sort(codepointCompare)
+      .map((key) => JSON.stringify(key) + ":" + canonical(value[key]));
+    return `{${entries.join(",")}}`;
+  }
+  return JSON.stringify(value);
+};
+const digest = (value) => createHash("sha256").update(canonical(value)).digest("hex");
+
+const validateActionsArtifact = (actionsArtifact, mobileIdentity, now) => {
+  exactObject(actionsArtifact, ["repository", "workflowPath", "runId", "artifactId", "artifactName", "archiveDigest", "headSha", "createdAt", "expiresAt"], "actionsArtifact");
+  if (actionsArtifact.repository !== "AquilaXk/easysubway" || actionsArtifact.workflowPath !== ".github/workflows/release-artifacts.yml") throw new Error("actions artifact source is invalid");
+  if (!Number.isInteger(actionsArtifact.runId) || actionsArtifact.runId < 1 || !Number.isInteger(actionsArtifact.artifactId) || actionsArtifact.artifactId < 1) throw new Error("actions artifact identity is invalid");
+  if (typeof actionsArtifact.artifactName !== "string" || actionsArtifact.artifactName.length === 0) throw new Error("actions artifact name is invalid");
+  if (typeof actionsArtifact.archiveDigest !== "string" || !/^sha256:[a-f0-9]{64}$/.test(actionsArtifact.archiveDigest)) {
+    throw new Error("actionsArtifact.archiveDigest must be sha256:<digest>");
+  }
+  if (!SHA40.test(required(actionsArtifact.headSha, "actionsArtifact.headSha")) || actionsArtifact.headSha !== mobileIdentity.gitSha) throw new Error("actions artifact head must match mobile identity");
+  const artifactCreatedAt = timestamp(actionsArtifact.createdAt, "actionsArtifact.createdAt");
+  const artifactExpiresAt = timestamp(actionsArtifact.expiresAt, "actionsArtifact.expiresAt");
+  if (Date.parse(artifactCreatedAt) > Date.parse(artifactExpiresAt) || new Date(now).getTime() >= Date.parse(artifactExpiresAt)) throw new Error("actions artifact receipt is expired or has invalid time order");
+};
+
+const validateOciReceipt = (ociReceipt, expectedTupleSha256) => {
+  exactObject(ociReceipt, ["namespace", "bucket", "objectKey", "objectUri", "objectSha256", "byteSize", "putAt", "putEtag", "putVersionId", "getAt", "getEtag", "getVersionId", "getSha256", "getByteSize", "createOnly"], "ociReceipt");
+  const match = OCI_URI.exec(required(ociReceipt.objectUri, "ociReceipt.objectUri"));
+  if (!match || ociReceipt.namespace !== match[1] || ociReceipt.bucket !== match[2] || ociReceipt.objectKey !== match[3]) throw new Error("OCI receipt locator is invalid or mutable");
+  if (ociReceipt.createOnly !== true) throw new Error("OCI receipt must prove create-only publication");
+  sha(ociReceipt.objectSha256, "ociReceipt.objectSha256");
+  if (!Number.isInteger(ociReceipt.byteSize) || ociReceipt.byteSize < 1) throw new Error("ociReceipt.byteSize must be positive");
+  const putAt = timestamp(ociReceipt.putAt, "ociReceipt.putAt");
+  const getAt = timestamp(ociReceipt.getAt, "ociReceipt.getAt");
+  if (Date.parse(putAt) > Date.parse(getAt)) throw new Error("OCI receipt GET predates PUT");
+  for (const field of ["putEtag", "putVersionId", "getEtag", "getVersionId"]) {
+    if (typeof required(ociReceipt[field], `ociReceipt.${field}`) !== "string") throw new Error(`ociReceipt.${field} must be a string`);
+  }
+  if (ociReceipt.getEtag !== ociReceipt.putEtag || ociReceipt.getVersionId !== ociReceipt.putVersionId) throw new Error("OCI full GET receipt does not match PUT object identity");
+  if (ociReceipt.getSha256 !== ociReceipt.objectSha256 || ociReceipt.getByteSize !== ociReceipt.byteSize) throw new Error("OCI full GET receipt does not match PUT object bytes");
+  if (ociReceipt.objectSha256 !== expectedTupleSha256 || ociReceipt.getSha256 !== expectedTupleSha256) throw new Error("OCI receipt does not bind candidate tuple bytes");
+};
+
+export function buildAndroidDatapackCandidateEvidence({ candidate, mobileIdentity, actionsArtifact, ociReceipt, now = new Date() }) {
+  exactObject(candidate, ["candidateBinding", "freshnessExpiresAt"], "candidate");
+  const binding = candidate.candidateBinding;
+  exactObject(binding, ["candidateId", "tupleSha256", "buildSpecSha256", "manifestSha256"], "candidateBinding");
+  if (typeof required(binding.candidateId, "candidateBinding.candidateId") !== "string" || !CANDIDATE_ID.test(binding.candidateId)) throw new Error("candidateBinding.candidateId is invalid");
+  sha(binding.tupleSha256, "candidateBinding.tupleSha256");
+  sha(binding.buildSpecSha256, "candidateBinding.buildSpecSha256");
+  sha(binding.manifestSha256, "candidateBinding.manifestSha256");
+  const freshnessExpiresAt = timestamp(candidate.freshnessExpiresAt, "freshnessExpiresAt");
+  if (Date.parse(freshnessExpiresAt) <= new Date(now).getTime()) throw new Error("candidate evidence is expired");
+
+  exactObject(mobileIdentity, ["gitSha", "androidApplicationId", "versionCode", "aabSha256", "aabPayloadSha256", "dataPackManifestSha256"], "mobileIdentity");
+  if (!SHA40.test(required(mobileIdentity.gitSha, "mobileIdentity.gitSha"))) throw new Error("mobileIdentity.gitSha must be a full git SHA");
+  if (mobileIdentity.androidApplicationId !== "com.easysubway.app") throw new Error("mobileIdentity.androidApplicationId is invalid");
+  if (!Number.isInteger(mobileIdentity.versionCode) || mobileIdentity.versionCode < 1) throw new Error("mobileIdentity.versionCode must be positive");
+  for (const field of ["aabSha256", "aabPayloadSha256", "dataPackManifestSha256"]) sha(mobileIdentity[field], `mobileIdentity.${field}`);
+  if (mobileIdentity.dataPackManifestSha256 !== binding.manifestSha256) throw new Error("mobile identity does not bind the candidate manifest");
+
+  validateActionsArtifact(actionsArtifact, mobileIdentity, now);
+  validateOciReceipt(ociReceipt, binding.tupleSha256);
+
+  const body = {
+    schemaVersion: 1,
+    artifactKind: "android-datapack-candidate-evidence",
+    candidateBinding: { candidateId: binding.candidateId, tupleSha256: binding.tupleSha256, buildSpecSha256: binding.buildSpecSha256, manifestSha256: binding.manifestSha256 },
+    freshnessExpiresAt,
+    mobileIdentity: { ...mobileIdentity },
+    sourceActionsArtifact: { ...actionsArtifact },
+    oci: { ...ociReceipt },
+  };
+  return { ...body, receiptSha256: digest(body) };
+}
+
+async function main(argv) {
+  if (argv.length !== 4 || argv[0] !== "--input" || argv[2] !== "--output") throw new Error("usage: --input <json> --output <json>");
+  const input = JSON.parse(await readFile(argv[1], "utf8"));
+  const output = buildAndroidDatapackCandidateEvidence(input);
+  await writeFile(argv[3], `${JSON.stringify(output, null, 2)}\n`, { flag: "wx" });
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  try {
+    await main(process.argv.slice(2));
+  } catch (error) {
+    console.error(error.message);
+    process.exitCode = 1;
+  }
+}

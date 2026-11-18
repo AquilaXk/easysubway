@@ -1,0 +1,384 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "post-launch-operations-review",
+  "issue": 1019,
+  "status": "IN_PROGRESS",
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "operationsEvidenceManifest": "release/product-gates/operations-release-evidence.json",
+  "supportIncidentResponseGate": "release/product-gates/support-incident-response-gate.json",
+  "evidenceRoot": ".evidence/evidence/release/post-launch-operations-review/<rc-or-run>/",
+  "preLaunchReadiness": {
+    "status": "BLOCKED_EXTERNAL",
+    "evidenceDateKst": "2026-07-15",
+    "requiredEvidence": [
+      "signal-owner-threshold-first-response",
+      "grafana-prometheus-loki-play-console-access",
+      "p0-p1-p2-alert-route-dry-run",
+      "support-security-privacy-data-deletion-mailbox-receive-test",
+      "backend-datapack-rollback-rehearsal",
+      "p0-data-error-emergency-release-rollback-rehearsal",
+      "fixed-release-versioncode-build-submit-procedure",
+      "post-launch-window-owner-time-checklist-record-location-reservation",
+      "incident-notice-template-approval-route"
+    ],
+    "finalRcBinding": {
+      "manifest": "release/product-gates/rc-evidence-manifest-contract.json",
+      "requiredFields": ["gitSha", "versionCode", "aabSha256", "aabPayloadSha256", "dataPackManifestSha256", "supportContactSetSha256"],
+      "backendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
+      "validatedArtifactIdentity": {
+        "aabPayloadSha256": "e83fc611df261ab99ce268ae9ac47e2d193253a01cc28801a32d4cca8507b663",
+        "backendArtifactSha256": "74a3e35762d1973c0b05a0c0bd6f0fc6aa2a4657ef23cde359cf100e0830f631",
+        "dataPackManifestSha256": "2ee9f38f3e748d7bbc6d9eba124b34e6b5c8ad539338a6cdeee7a472515456e5"
+      },
+      "validatedArtifactIdentityEvidence": {
+        "aabPayload": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260717/fixed-release-rehearsal-summary.json",
+        "backend": "release/product-gates/operations-release-evidence.json",
+        "dataPackManifest": "apps/mobile/assets/datapacks/metro_map_pack/manifest.json"
+      },
+      "evidenceValidity": {
+        "appVersionName": "1.0.5",
+        "versionCode": 10006,
+        "validFromKst": "2026-07-15",
+        "validUntilKst": "2026-07-28",
+        "refreshOn": [
+          "operations-contract-change",
+          "support-contact-or-help-ui-change",
+          "observability-infrastructure-change",
+          "fixed-release-procedure-change"
+        ]
+      },
+      "refreshBindings": [
+        {
+          "refreshOn": "operations-contract-change",
+          "files": [
+            {"path": "release/product-gates/operations-release-evidence.json", "sha256": "8c28a2cbbe2f51af63bc13f948198b3223525bed2e1e9bb31910300275c25904"},
+            {"path": "release/product-gates/operations-observability-gate.json", "sha256": "0b1dc4f9ba19624e6539670b09361a0d29f8ec8dac255f9715407c7af5c3c0e3"},
+            {"path": "tools/ops/generate-operations-phase-a-summary.mjs", "sha256": "cdf8aa04776d03effe93a829954f331e12fe1cb792fe29a2a6b0da68f0d729cc"},
+            {"path": "tools/ops/validate-operations-release-summary.mjs", "sha256": "b74f89aaa3fd86b7a85e2baa3e1b487acd11a9d9099c262d97363b550c8d851c"},
+            {"path": "tools/release/summary-validation-utils.mjs", "sha256": "aff1abc66a25e5310e69b8fd915026dfd5bf458f6f1977d445e5e635e10a35cc"},
+            {"path": "tools/release/hash-android-bundle-payload.mjs", "sha256": "273799b055726bd1c9b1f8266536d7940be054994b0678e00a83c037358bd54b"},
+            {"path": "release/product-gates/route-commercialization-gate.json", "sha256": "0ac7b2c2ee1e75fc556fa5418ddeac1473d329d2ccd5a1e539e8aced869cab30"}
+          ]
+        },
+        {
+          "refreshOn": "support-contact-or-help-ui-change",
+          "files": [
+            {"path": "release/product-gates/support-incident-response-gate.json", "sha256": "82604501ba8e6aebc03e75d18fdaf6a4119bc54289c632f8c0b0a65d9a7cd483"},
+            {"path": "apps/mobile/release/play-store-submission-content.json", "sha256": "8e3758f22752a5b58a55357b5b492caef3a6c719ffdee8f7809e83187b1c33df"},
+            {"path": "contracts/bundles/generic-mobile-consumer-bundle-v1.json", "sha256": "7f666d016119591e5c958e7d55c936fffb5e753898e69ec28e4f0cb50b5555ff"}
+          ]
+        },
+        {
+          "refreshOn": "observability-infrastructure-change",
+          "files": [
+            {"path": "contracts/release/platform-deployment-contract.json", "sha256": "e5fba2310dcda64ca1a25ada3d933a22058857c66bb4772c2cb7e44af8a59ad8"},
+            {"path": "contracts/bundles/platform-contracts-v1.2.0.json", "sha256": "539229491d8cf072118c8a5d658459ce51d993daac099ee6f00afd019f9059fa"},
+            {"path": "release/product-gates/operations-observability-gate.json", "sha256": "0b1dc4f9ba19624e6539670b09361a0d29f8ec8dac255f9715407c7af5c3c0e3"}
+          ]
+        },
+        {
+          "refreshOn": "fixed-release-procedure-change",
+          "files": [
+            {"path": "apps/mobile/release/signed-release-artifact-gate.json", "sha256": "e5f8321dcdce78d7d408a052cf9f58afe840c1a3f0838337d398eabd683e03d1"},
+            {"path": "apps/mobile/pubspec.yaml", "sha256": "3b1c5d56e16c3a45123924e08e183ecb42a9c6ddad9a58432ea990a44e2ab733"},
+            {"path": ".github/workflows/release-artifacts.yml", "sha256": "26ea7caa95cf71ea73bb714b3cc10a4e23b3774795f32c73eb09a16c8260c92d"},
+            {"path": ".github/workflows/datapack-release.yml", "sha256": "5cfd322afbf316c70862049d8d62eeb60e8d44727aaa0cd115c157e4f9b07996"},
+            {"path": "tools/ci/validate-store-privacy-env.mjs", "sha256": "2e1781f02071639107bec9730fe1ae58b5ab6ca008351f72c79dff293af801cd"},
+            {"path": "release/product-gates/rc-evidence-manifest-contract.json", "sha256": "0ca819602a478b4657004cebdcf6cfae46170fc84a1e027baac6c52d1e8a35ce"},
+            {"path": "tools/datapack/lib/manifest-validation.mjs", "sha256": "9e35372f21307b9c20258fde15556ef4cfc2c28276a46435974fe30253055e81"},
+            {"path": "tools/release/generate-rc-evidence-manifest.mjs", "sha256": "6f28e8a0c3c2a255619a3035010e0308fc0b92d948f8579778b7d9742347f685"},
+            {"path": "tools/release/count-gzip-uncompressed-bytes.mjs", "sha256": "a0297001d2ec3bbb7d1c42b041fc6c08df6ece2f78dcc040d4585a9508d1e64f"},
+            {"path": "tools/release/select-rc-datapack-artifact.mjs", "sha256": "06b1d4e60c041e7cd44e461722a7e5519c515e1135612a16429845bdeac32287"},
+            {"path": "tools/release/upload-play-internal.mjs", "sha256": "7bc41b1fb3ce86b2e24043a9a43e47e91577ab33c5170535c8e8c85c09b5c5eb"}
+          ]
+        }
+      ],
+      "bindingKo": "Phase A는 서명 재생성에 영향받지 않는 AAB payload hash로 검증된 실행 내용을 고정하고, 실제 signed AAB hash는 최종 RC manifest와 summary에 그대로 결속한다."
+    },
+    "evidenceSummary": [
+      {
+        "id": "signal-owner-threshold-first-response",
+        "status": "PASS",
+        "evidence": "release/product-gates/operations-observability-gate.json"
+      },
+      {
+        "id": "grafana-prometheus-loki-play-console-access",
+        "status": "PASS",
+        "evidence": "infra observability contract + Play API access check + main CD run 29419211010"
+      },
+      {
+        "id": "p0-p1-p2-alert-route-dry-run",
+        "status": "PASS",
+        "evidence": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/alert-route-summary.json"
+      },
+      {
+        "id": "support-security-privacy-data-deletion-mailbox-receive-test",
+        "status": "PASS",
+        "evidence": "#1019 QA manual mailbox routing evidence"
+      },
+      {
+        "id": "backend-datapack-rollback-rehearsal",
+        "status": "PASS",
+        "evidence": "release/product-gates/operations-release-evidence.json"
+      },
+      {
+        "id": "p0-data-error-emergency-release-rollback-rehearsal",
+        "status": "PASS",
+        "evidence": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/emergency-datapack-drill.json"
+      },
+      {
+        "id": "fixed-release-versioncode-build-submit-procedure",
+        "status": "BLOCKED_EXTERNAL",
+        "evidence": "Node 24 runtime 변경 후 fixed-release rehearsal 재실행 필요"
+      },
+      {
+        "id": "post-launch-window-owner-time-checklist-record-location-reservation",
+        "status": "PASS",
+        "evidence": "reviewWindows"
+      },
+      {
+        "id": "incident-notice-template-approval-route",
+        "status": "PASS",
+        "evidence": "release/product-gates/support-incident-response-gate.json"
+      }
+    ]
+  },
+  "postLaunchObservation": {
+    "status": "PENDING_PUBLIC_RELEASE",
+    "publicReleaseIdentity": {
+      "publishedAt": null,
+      "versionCode": null,
+      "gitSha": null
+    },
+    "dueTimePolicy": "dueAt = publicReleaseIdentity.publishedAt + reviewWindows[].afterPublicRelease",
+    "allowedStatusTransitions": [
+      "PENDING_PUBLIC_RELEASE->IN_PROGRESS",
+      "IN_PROGRESS->PASS"
+    ],
+    "completionKo": "공개 시각, versionCode, git SHA를 기록한 뒤 2h, 24h, 7d, 30d window를 실행하고 모든 기록이 PASS면 완료한다."
+  },
+  "latestQaEvidenceSummary": {
+    "qaEvidenceDateKst": "2026-07-15",
+    "alertRouteDryRun": {
+      "result": "PASS",
+      "channel": "Slack Incoming Webhook",
+      "severities": ["P0", "P1", "P2"],
+      "publicEvidenceSummary": "P0/P1/P2 각각 HTTP 200 / ok dry-run을 통과했고 webhook URL은 tracked file이나 GitHub에 저장하지 않았다.",
+      "localOnlyEvidenceRoot": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/"
+    },
+    "observabilityAccess": {
+      "result": "PASS",
+      "services": ["Alertmanager", "Prometheus", "Loki", "Grafana", "Google Play Android Publisher API"],
+      "publicEvidenceSummary": "로컬 observability readiness HTTP 200과 Play edit insert/list/validate/delete를 확인했다."
+    },
+    "supportMailboxRouting": {
+      "result": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+      "publicContactDomain": "aquilaxk.site",
+      "addresses": ["support@aquilaxk.site", "security@aquilaxk.site", "privacy@aquilaxk.site"],
+      "summaryKo": "QA 수동 메일 테스트로 support/security/privacy 주소 routing을 정상 확인했다."
+    },
+    "remainingExternalBlockers": [
+      "fixed-release-rehearsal-after-node24-runtime-change",
+      "play-review-status-summary",
+      "crash-anr-vitals-summary",
+      "support-ticket-summary-after-public-release",
+      "post-launch-review-window-evidence-after-public-release"
+    ]
+  },
+  "reviewWindows": [
+    {
+      "id": "first_2h",
+      "afterPublicRelease": "PT2H",
+      "dueAtFormula": "publicReleaseIdentity.publishedAt+PT2H",
+      "ownerKo": "릴리즈 운영 담당자",
+      "recordLocation": ".evidence/evidence/release/post-launch-operations-review/<public-release>/first_2h/",
+      "requiredSignals": [
+        "play-review-status",
+        "crash-free-session-rate",
+        "android-vitals-anr-rate",
+        "backend-readiness",
+        "provider-quota-error-rate",
+        "support-intake-open",
+        "support-incident-response-gate-ready"
+      ],
+      "decisionKo": "P0 crash, ANR 급증, Play rejection, backend readiness DOWN, provider quota exhaustion 중 하나라도 확인되면 공개 공지와 fixed release 판단을 시작한다."
+    },
+    {
+      "id": "first_24h",
+      "afterPublicRelease": "P1D",
+      "dueAtFormula": "publicReleaseIdentity.publishedAt+P1D",
+      "ownerKo": "모바일/운영 공동 담당자",
+      "recordLocation": ".evidence/evidence/release/post-launch-operations-review/<public-release>/first_24h/",
+      "requiredSignals": [
+        "crash-anr-summary",
+        "play-review-and-rating-summary",
+        "support-ticket-summary",
+        "data-error-report-backlog",
+        "facility-report-backlog",
+        "datapack-adoption-rate",
+        "incident-notice-and-faq-readiness"
+      ],
+      "decisionKo": "치명 오류 0, 미응답 문의 0, 데이터 오류 P0 0, 신고 backlog owner 지정 완료를 만족하지 못하면 fixed release 또는 datapack rollback을 결정한다."
+    },
+    {
+      "id": "day_7",
+      "afterPublicRelease": "P7D",
+      "dueAtFormula": "publicReleaseIdentity.publishedAt+P7D",
+      "ownerKo": "제품/운영 담당자",
+      "recordLocation": ".evidence/evidence/release/post-launch-operations-review/<public-release>/day_7/",
+      "requiredSignals": [
+        "retention-and-active-use-summary",
+        "route-search-success-blocked-unknown-distribution",
+        "accessibility-feedback-summary",
+        "support-sla-summary",
+        "provider-cost-and-quota-summary"
+      ],
+      "decisionKo": "고령자/임산부/장애인 사용 흐름의 반복 불편, provider quota 압박, UNKNOWN 경로 급증이 있으면 다음 patch scope와 owner를 확정한다."
+    },
+    {
+      "id": "day_30",
+      "afterPublicRelease": "P30D",
+      "dueAtFormula": "publicReleaseIdentity.publishedAt+P30D",
+      "ownerKo": "릴리즈 책임자",
+      "recordLocation": ".evidence/evidence/release/post-launch-operations-review/<public-release>/day_30/",
+      "requiredSignals": [
+        "monthly-crash-anr-trend",
+        "support-data-error-trend",
+        "datapack-update-adoption-trend",
+        "provider-reliability-trend",
+        "next-release-go-no-go-notes"
+      ],
+      "decisionKo": "다음 정기 업데이트의 staged rollout, support capacity, data provider 계약, accessibility backlog 우선순위를 확정한다."
+    }
+  ],
+  "killSwitchAndRollbackOwners": [
+    {
+      "domain": "backend",
+      "ownerKo": "백엔드 운영 담당자",
+      "actionKo": "admin/report/realtime API 이상 시 backend feature flag, abuse control, CD rollback 또는 fixed release를 판단한다.",
+      "evidence": ["cd-run-url", "readiness-log", "rollback-decision-record"]
+    },
+    {
+      "domain": "datapack",
+      "ownerKo": "데이터팩 운영 담당자",
+      "actionKo": "데이터 오류 P0 또는 adoption 실패 시 active pack rollback, corrected pack publish, 앱 내 데이터 기준일 공지를 판단한다.",
+      "evidence": ["active-pack-version", "rollback-pack-version", "datapack-adoption-summary"]
+    },
+    {
+      "domain": "realtime",
+      "ownerKo": "실시간 정보 담당자",
+      "actionKo": "provider 장애, stale source, quota exhaustion 시 realtime fallback label 유지와 provider 요청 제한을 판단한다.",
+      "evidence": ["provider-status-summary", "quota-error-rate", "fallback-label-count"]
+    }
+  ],
+  "fixedReleaseProcedure": {
+    "initialReleaseKo": "Google Play 최초 공개는 staged rollout halt가 없으므로 P0 앱 문제는 새 versionCode의 fixed release로 제출한다.",
+    "requiredSteps": [
+      "incident-severity-and-owner-record",
+      "root-cause-summary",
+      "fix-branch-and-pr-link",
+      "local-emulator-regression-evidence",
+      "signed-rc-artifact-evidence",
+      "play-review-submission-record",
+      "post-fix-monitoring-window"
+    ],
+    "goNoGoKo": "local emulator regression, signed RC artifact, Play submission record, fixed release monitoring owner 중 하나라도 없으면 fixed release Go가 아니다."
+  },
+  "stagedRolloutPolicy": {
+    "initialProductionRelease": "not-available-for-first-public-release",
+    "secondAndLaterUpdates": [
+      "use-staged-rollout",
+      "monitor-crash-anr-support-data-provider-signals",
+      "halt-rollout-on-p0-or-policy-warning",
+      "resume-or-fixed-release-after-owner-approval"
+    ]
+  },
+  "dryRunRequiredEvidence": [
+    "monitoring-dashboard-or-console-access-summary",
+    "alert-route-dry-run-log",
+    "post-launch-review-checklist-dry-run",
+    "fixed-release-owner-acknowledgement"
+  ],
+  "releaseEvidenceSummaryPolicy": {
+    "githubSummaryFields": [
+      "reviewWindowId",
+      "observedAt",
+      "artifactIdentity",
+      "signalSnapshot",
+      "owner",
+      "decision",
+      "goNoGoResult",
+      "redactionNotes",
+      "localEvidencePath"
+    ],
+    "requiredEvidenceSet": [
+      "monitoring-dashboard-or-console-access-summary",
+      "alert-route-dry-run-log",
+      "post-launch-review-checklist-dry-run",
+      "play-review-status-summary",
+      "crash-anr-vitals-summary",
+      "support-ticket-summary",
+      "data-error-backlog-summary",
+      "datapack-adoption-summary",
+      "provider-quota-summary",
+      "fixed-release-owner-acknowledgement",
+      "incident-severity-and-owner-record",
+      "root-cause-summary",
+      "fix-branch-and-pr-link",
+      "local-emulator-regression-evidence",
+      "signed-rc-artifact-evidence",
+      "play-review-submission-record",
+      "post-fix-monitoring-window",
+      "play-review-status",
+      "crash-free-session-rate",
+      "android-vitals-anr-rate",
+      "backend-readiness",
+      "provider-quota-error-rate",
+      "support-intake-open",
+      "support-incident-response-gate-ready",
+      "crash-anr-summary",
+      "play-review-and-rating-summary",
+      "data-error-report-backlog",
+      "facility-report-backlog",
+      "datapack-adoption-rate",
+      "incident-notice-and-faq-readiness",
+      "retention-and-active-use-summary",
+      "route-search-success-blocked-unknown-distribution",
+      "accessibility-feedback-summary",
+      "support-sla-summary",
+      "provider-cost-and-quota-summary",
+      "monthly-crash-anr-trend",
+      "support-data-error-trend",
+      "datapack-update-adoption-trend",
+      "provider-reliability-trend",
+      "next-release-go-no-go-notes",
+      "cd-run-url",
+      "readiness-log",
+      "rollback-decision-record",
+      "active-pack-version",
+      "rollback-pack-version",
+      "provider-status-summary",
+      "quota-error-rate",
+      "fallback-label-count"
+    ],
+    "forbiddenInGithubSummary": [
+      "Play Console account data",
+      "support mailbox personal data",
+      "device identifiers",
+      "provider credential or quota token"
+    ]
+  },
+  "sensitiveEvidencePolicy": {
+    "localOnly": true,
+    "githubUploadPolicy": "summary-only",
+    "forbiddenInPullRequest": [
+      "Play Console screenshots with account data",
+      "device identifiers",
+      "support mailbox personal data",
+      "provider credential or quota token"
+    ],
+    "summaryRequiredKo": "민감 증거는 GitHub에 올리지 않고 PR에는 evidence 종류, 대상, 결과, local-only 경로만 적는다."
+  }
+}

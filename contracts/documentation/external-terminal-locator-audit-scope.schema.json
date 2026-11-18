@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://easysubway.local/schema/external-terminal-locator-audit-scope.schema.json",
+  "type": "object", "additionalProperties": false, "required": ["schemaVersion", "slots"],
+  "properties": {
+    "schemaVersion": { "const": 1 },
+    "slots": { "type": "array", "minItems": 8, "maxItems": 8, "items": {
+      "type": "object", "additionalProperties": false, "required": ["ownerRepository", "ownerIssue", "accountablePlan", "state", "terminalLocator"],
+      "properties": {
+        "ownerRepository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-platform", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-data"] },
+        "ownerIssue": { "type": "integer", "minimum": 1 }, "accountablePlan": { "enum": ["PLAN-REPO", "PLAN-JOURNEY"] }, "state": { "enum": ["PENDING", "READY"] },
+        "terminalLocator": { "oneOf": [
+          { "type": "null" },
+          { "type": "object", "additionalProperties": false, "required": ["kind", "repository", "commitSha", "path", "blobSha"], "properties": { "kind": { "const": "GIT_BLOB" }, "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-platform", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-data"] }, "commitSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }, "path": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])[A-Za-z0-9][A-Za-z0-9._/-]*$" }, "blobSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" } } },
+          { "type": "object", "additionalProperties": false, "required": ["kind", "registry", "repositoryPath", "digest"], "properties": { "kind": { "const": "OCI_DIGEST" }, "registry": { "const": "ghcr.io" }, "repositoryPath": { "type": "string", "pattern": "^[a-z0-9][a-z0-9._-]*(?:/[a-z0-9][a-z0-9._-]*)*$" }, "digest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" } } },
+          { "type": "object", "additionalProperties": false, "required": ["kind", "repository", "runId", "artifactId", "artifactName", "archiveDigest", "workflowPath", "headSha", "createdAt", "expiresAt"], "properties": { "kind": { "const": "ACTIONS_ARTIFACT" }, "repository": { "enum": ["AquilaXk/easysubway", "AquilaXk/easysubway-platform", "AquilaXk/easysubway-mobile", "AquilaXk/easysubway-data"] }, "runId": { "type": "integer", "minimum": 1 }, "artifactId": { "type": "integer", "minimum": 1 }, "artifactName": { "type": "string", "minLength": 1 }, "archiveDigest": { "type": "string", "pattern": "^sha256:[0-9a-f]{64}$" }, "workflowPath": { "type": "string", "pattern": "^(?!/)(?!.*(?:^|/)\\.{1,2}(?:/|$))(?!.*[?#])\\.github/workflows/[A-Za-z0-9][A-Za-z0-9._/-]*\\.ya?ml$" }, "headSha": { "type": "string", "pattern": "^[0-9a-f]{40}$" }, "createdAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$", "format": "date-time" }, "expiresAt": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(?:\\.\\d{3})?Z$", "format": "date-time" } } }
+        ] }
+      },
+      "oneOf": [
+        { "type": "object", "properties": { "state": { "const": "PENDING" }, "terminalLocator": { "type": "null" } } },
+        { "type": "object", "properties": { "state": { "const": "READY" }, "terminalLocator": { "not": { "type": "null" } } } }
+      ]
+    } }
+  }
+}

@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "mirrors": [
+    {
+      "hubPath": "contracts/api/internal-api-index.json",
+      "repository": "AquilaXk/easysubway-backend",
+      "sourcePath": "contracts/api/internal-api-index.json",
+      "sourceCommit": "a6f35cbda7a3098ceb30440773a15d1387f4977a",
+      "sha256": "e0433afd57e6e0f169efe52355478355d3ae8b621408abc87d9987f13d318f4f"
+    },
+    {
+      "hubPath": "contracts/api/journey-v3.openapi.yaml",
+      "repository": "AquilaXk/easysubway-backend",
+      "sourcePath": "contracts/api/journey-v3.openapi.yaml",
+      "sourceCommit": "a6f35cbda7a3098ceb30440773a15d1387f4977a",
+      "sha256": "d05b5ea1639a785cee145cb4df70885ecdb76c7415b8209ff06c1c14018e5d67"
+    },
+    {
+      "hubPath": "contracts/api/realtime-api.openapi.yaml",
+      "repository": "AquilaXk/easysubway-backend",
+      "sourcePath": "contracts/api/realtime-api.openapi.yaml",
+      "sourceCommit": "a6f35cbda7a3098ceb30440773a15d1387f4977a",
+      "sha256": "ec92607318c92f1c922c3ea12fc0ba4fdfd19bdcf391a031e5af911fa268c5de"
+    },
+    {
+      "hubPath": "contracts/api/report-api.openapi.yaml",
+      "repository": "AquilaXk/easysubway-backend",
+      "sourcePath": "contracts/api/report-api.openapi.yaml",
+      "sourceCommit": "a6f35cbda7a3098ceb30440773a15d1387f4977a",
+      "sha256": "1014a5442224dc178c46f5457f2e694924bd504af7f42e2344d43b0eaff8e5ca"
+    },
+    {
+      "hubPath": "contracts/api/train-api.openapi.yaml",
+      "repository": "AquilaXk/easysubway-backend",
+      "sourcePath": "contracts/api/train-api.openapi.yaml",
+      "sourceCommit": "a6f35cbda7a3098ceb30440773a15d1387f4977a",
+      "sha256": "95c8a72d8ffbd3b76c86d83be65d9c4bd9456e4e4c7a24fbd6ea98196cb93852"
+    },
+    {
+      "hubPath": "tools/datapack/source-candidates.json",
+      "repository": "AquilaXk/easysubway-data",
+      "sourcePath": "tools/datapack/source-candidates.json",
+      "sourceCommit": "dc580f6ac1ef525cda73e610937952248ba42636",
+      "sha256": "b9d42fa06fe65fffcf4b0aa1d70a36e255e279e67aec9abf707d0aac78eeb7ad"
+    },
+    {
+      "hubPath": "tools/datapack/source-governance-policy.json",
+      "repository": "AquilaXk/easysubway-data",
+      "sourcePath": "tools/datapack/source-governance-policy.json",
+      "sourceCommit": "dc580f6ac1ef525cda73e610937952248ba42636",
+      "sha256": "94cfb01168d45b16d0661d30203f0206cfe9688d70da2b5d790567d49951ced4"
+    },
+    {
+      "hubPath": "tools/datapack/source-operation.mjs",
+      "repository": "AquilaXk/easysubway-data",
+      "sourcePath": "tools/datapack/source-operation.mjs",
+      "sourceCommit": "dc580f6ac1ef525cda73e610937952248ba42636",
+      "sha256": "9332a436f39a76d4a49a8d69d1b6cc8d21d85a97c44520b337828972d85aa5d8"
+    }
+  ]
+}

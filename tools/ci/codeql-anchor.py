@@ -1,0 +1,1 @@
+"""CodeQL Python extractor anchor."""

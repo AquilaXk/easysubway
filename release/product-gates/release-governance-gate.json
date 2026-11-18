@@ -1,0 +1,332 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "releaseGate": "android-release-100-governance",
+  "releaseTarget": {
+    "platform": {
+      "android": "RELEASE_REQUIRED",
+      "ios": "DEFERRED_OUT_OF_SCOPE"
+    },
+    "distribution": "google-play",
+    "packageId": "com.easysubway.app",
+    "primaryLocale": "ko-KR",
+    "initialCountries": ["KR"],
+    "supportScope": "national_metro_android_v1",
+    "unsupportedRegionStatus": "UNSUPPORTED_REGION",
+    "devicePolicy": {
+      "phone": "supported",
+      "tablet": "compatible_until_tablet_specific_ui_gate",
+      "foldable": "compatible_until_foldable_specific_ui_gate",
+      "chromebook": "excluded_until_keyboard_and_windowing_qa"
+    },
+    "minimumAndroidVersion": "flutter.minSdkVersion",
+    "targetApiMinimum": 35,
+    "appAccountCreation": false,
+    "ads": false,
+    "payment": false
+  },
+  "gateStatusEnum": [
+    "NOT_STARTED",
+    "IN_PROGRESS",
+    "DENOMINATOR_LOCKED",
+    "BLOCKED_EXTERNAL",
+    "BLOCKED_TECHNICAL",
+    "PASS",
+    "PENDING_PUBLIC_RELEASE",
+    "SATISFIED",
+    "DEFERRED_OUT_OF_SCOPE",
+    "WAIVED_UNTIL",
+    "INVALIDATED"
+  ],
+  "requiredRcEvidenceFields": [
+    "gitSha",
+    "appVersionName",
+    "versionCode",
+    "aabSha256",
+    "aabPayloadSha256",
+    "dataPackManifestSha256",
+    "supportContactSetSha256",
+    "releaseSequence",
+    "routeContractVersion",
+    "realtimeContractVersion",
+    "device",
+    "androidVersion",
+    "testedAt",
+    "evidencePaths",
+    "expiresWhen"
+  ],
+  "requiredRcEvidenceBackendIdentityFieldsAnyOf": ["backendImageDigest", "backendArtifactSha256"],
+  "rcEvidenceManifestContract": "release/product-gates/rc-evidence-manifest-contract.json",
+  "releaseReadiness": {
+    "openAndroidP0BlocksGo": true,
+    "iosBlocksAndroidRelease": false,
+    "completionAxes": [
+      "scope_completeness",
+      "implementation_completeness",
+      "automated_verification_completeness",
+      "manual_rc_verification_completeness",
+      "production_operations_completeness",
+      "google_play_submission_completeness"
+    ],
+    "p0EscalationRules": [
+      "measured_performance_budget_failure",
+      "play_prelaunch_crash",
+      "critical_accessibility_flow_failure",
+      "store_description_scope_mismatch",
+      "privacy_declaration_mismatch",
+      "backup_restore_failure",
+      "missing_alert_route",
+      "production_data_coverage_shortfall",
+      "app_start_or_core_route_crash",
+      "install_update_rollback_failure"
+    ]
+  },
+  "latestOperationsEvidenceStatus": {
+    "issue": 1019,
+    "preLaunchReadiness": "BLOCKED_EXTERNAL",
+    "postLaunchObservation": "PENDING_PUBLIC_RELEASE",
+    "supportMailboxRouting": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+    "alertRouteDryRun": "PASS",
+    "remainingPhaseABlockers": [
+      "fixed-release-versioncode-build-submit-procedure"
+    ],
+    "pendingPostLaunchEvidence": [
+      "play-review-status-summary",
+      "crash-anr-vitals-summary",
+      "support-ticket-summary-after-public-release",
+      "post-launch-review-window-evidence-after-public-release"
+    ]
+  },
+  "latestGoNoGoStatus": {
+    "qaEvidenceDateKst": "2026-07-15",
+    "reviewedMainMergeSha": "ef0084147f0c89c872328b4acbfc040f6db5d0a2",
+    "currentDecision": "NO_GO",
+    "decisionOwner": "release-owner",
+    "blockingOpenIssues": [571, 1016, 1018, 1019, 1021, 1022, 1230, 1414, 2731],
+    "storeRegulatoryGateStatus": "100%_SATISFIED",
+    "recentlyResolvedEvidence": [
+      "production-datapack-release-publish-success",
+      "store-distribution-evidence-success",
+      "play-internal-upload-version-code-10001",
+      "android-publisher-api-access-ready",
+      "server-minimized-android-release-scope-fixed",
+      "android-quality-local-emulator-real-device-smoke-summary",
+      "abuse-rehearsal-local-and-store-preflight-summary",
+      "operations-alert-and-mailbox-routing-summary",
+      "google-play-closed-test-14-day-15-tester-satisfaction",
+      "play-app-signing-and-production-upload-key-pipeline",
+      "kakao-map-native-key-fail-closed-production-binding",
+      "store-submission-content-and-vitals-4-blockers-resolved"
+    ],
+    "remainingP0Blockers": [
+      "play-installed-build-provenance",
+      "play-installed-android-quality-performance-recovery-evidence",
+      "production-like-abuse-rehearsal-evidence",
+      "play-installed-server-minimized-final-acceptance-evidence",
+      "route-result-v2-ui-badge-accessibility-copy-evidence",
+      "route-release-readiness-tracker-evidence",
+      "journey-v3-server-only-release-evidence"
+    ],
+    "remainingApprovalPrerequisites": [
+      "release-owner-final-go-approval"
+    ],
+    "externalEffectGate": {
+      "googlePlayProductionSubmitAllowed": false,
+      "publicReleaseAllowed": false,
+      "reasonKo": "open Android P0 blocker가 남아 있고 Play-installed, Play Console, Android vitals, production-like rehearsal 증거가 아직 동결되지 않았다."
+    },
+    "notClosingReasonKo": "#1020은 latest evidence status를 동결했지만, open release blocker와 final GO approval이 남아 있어 NO-GO 상태로 open 유지한다."
+  },
+  "releaseControl": {
+    "raciRequired": true,
+    "freezeRequired": true,
+    "hotfixPolicyRequired": true,
+    "waiverRequiresUntilDate": true,
+    "finalGoNoGoOwnerRequired": true
+  },
+  "waiverSchema": {
+    "requiredFields": [
+      "owner",
+      "untilDate",
+      "reason",
+      "risk",
+      "mitigation",
+      "followUpIssue"
+    ],
+    "nonWaivableP0Blockers": [
+      "p0_safety_failure",
+      "privacy_declaration_mismatch",
+      "play_prelaunch_crash",
+      "app_start_or_core_route_crash",
+      "production_data_coverage_shortfall"
+    ]
+  },
+  "requiredChecks": [
+    "CI / Repository CI",
+    "CI / Backend CI",
+    "CI / Mobile App CI",
+    "CI / Android CI",
+    "Release Artifacts / Android Release Artifact",
+    "Release Artifacts / RC Evidence Manifest",
+    "Data Pack Release / Data Pack Release",
+    "Dependency Vulnerability Scan",
+    "CI / Release Gate Consistency"
+  ],
+  "releaseImpactPaths": [
+    "apps/mobile/**",
+    "backend/**",
+    "infra/**",
+    "tools/ci/**",
+    "tools/datapack/**",
+    "tools/mobile/**",
+    "tools/release/**",
+    ".github/workflows/**",
+    "apps/mobile/release/**",
+    "release/product-gates/**",
+    ".env.example",
+    "README.md"
+  ],
+  "gates": [
+    {
+      "id": "G0_GOVERNANCE",
+      "issue": 1014,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "release-governance",
+      "nextAction": "release gate vocabulary, required checks, RC identity contract 정합성 검증",
+      "evidenceReference": "release/product-gates/release-governance-gate.json"
+    },
+    {
+      "id": "G1_PRODUCTION_DATAPACK",
+      "issue": 547,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "datapack",
+      "nextAction": "운영 데이터팩 coverage, signing, publish evidence 수집",
+      "evidenceReference": "release/product-gates/server-minimized-qa-gate.json"
+    },
+    {
+      "id": "G2_ROUTE_SAFETY",
+      "issue": 571,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "mobile-routing",
+      "nextAction": "server-minimized route/offline acceptance evidence 연결",
+      "evidenceReference": "release/product-gates/server-minimized-qa-gate.json"
+    },
+    {
+      "id": "G3_ANDROID_16KB_PAGE_SIZE",
+      "issue": 1015,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "android-build",
+      "nextAction": "16 KB page-size AAB alignment와 Android 15/16 runtime smoke evidence 수집",
+      "evidenceReference": "apps/mobile/release/android-16kb-page-size-gate.json"
+    },
+    {
+      "id": "G4_REALTIME",
+      "issue": 1018,
+      "priority": "P0_IF_INCLUDED_IN_STORE_COPY",
+      "status": "SATISFIED",
+      "owner": "store-privacy",
+      "nextAction": "store copy와 실시간 지원 범위 문구 일치 완료",
+      "evidenceReference": "apps/mobile/release/play-store-submission-content.json"
+    },
+    {
+      "id": "G5_BACKEND_CONTROL_PLANE",
+      "issue": 1017,
+      "priority": "P0",
+      "status": "SATISFIED",
+      "owner": "backend-admin",
+      "nextAction": "production environment와 로컬 prod-like 배포·rollback, 실제 restore, break-glass·audit 증거 완료; production 실행은 #1020에서 판정",
+      "evidenceReference": "release/product-gates/operations-release-evidence.json"
+    },
+    {
+      "id": "G6_SECURITY_PRIVACY",
+      "issue": 1022,
+      "priority": "P0",
+      "status": "BLOCKED_EXTERNAL",
+      "owner": "security-privacy",
+      "nextAction": "abuse-case, penetration rehearsal, crash/privacy evidence 수집",
+      "evidenceReference": "release/product-gates/abuse-penetration-rehearsal-gate.json"
+    },
+    {
+      "id": "G7_ANDROID_QUALITY",
+      "issue": 1021,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "android-qa",
+      "nextAction": "TalkBack, large text, route map performance evidence 수집",
+      "evidenceReference": "apps/mobile/release/android-release-quality-gate.json"
+    },
+    {
+      "id": "G8_OPERATIONS",
+      "issue": 1019,
+      "priority": "P0",
+      "status": "BLOCKED_EXTERNAL",
+      "owner": "operations",
+      "nextAction": "Node 24 fixed-release rehearsal을 같은 RC로 재실행하고 Phase A evidence를 재검증",
+      "evidenceReference": "release/product-gates/post-launch-operations-review-gate.json"
+    },
+    {
+      "id": "G9_GOOGLE_PLAY",
+      "issue": 1018,
+      "priority": "P0",
+      "status": "SATISFIED",
+      "owner": "play-console",
+      "nextAction": "Data Safety, 스토어 등록정보, Vitals, 8대 스크린샷 100% 충족 완료",
+      "evidenceReference": "apps/mobile/release/play-store-submission-content.json"
+    },
+    {
+      "id": "G10_PLAY_INSTALL",
+      "issue": 1016,
+      "priority": "P0",
+      "status": "SATISFIED",
+      "owner": "play-console",
+      "nextAction": "Google Play 14일 15인 비공개 테스트 및 Play App Signing 등록 완료",
+      "evidenceReference": "apps/mobile/release/play-generated-apk-device-matrix-gate.json"
+    },
+    {
+      "id": "G11_FINAL_GO_NO_GO",
+      "issue": 1020,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "release-owner",
+      "nextAction": "final RC evidence manifest identity와 waiver 판정 동결",
+      "evidenceReference": "release/product-gates/rc-evidence-manifest-contract.json"
+    },
+    {
+      "id": "G12_ROUTE_RESULT_V2_UI_COPY",
+      "issue": 1230,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "mobile-ux",
+      "nextAction": "Route result V2 badge와 accessibility copy evidence 수집",
+      "evidenceReference": "apps/mobile/release/route-result-v2-ui-copy-gate.json"
+    },
+    {
+      "id": "G13_JOURNEY_V3_SERVER_ONLY",
+      "issue": 2731,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "journey-release",
+      "nextAction": "Journey V3 server-only same-RC identity와 no-fallback zero evidence 수집",
+      "evidenceReference": "release/product-gates/journey-v3-server-only-release-gate.json"
+    },
+    {
+      "id": "G14_ROUTE_RELEASE_READINESS",
+      "issue": 1414,
+      "priority": "P0",
+      "status": "IN_PROGRESS",
+      "owner": "route-release",
+      "nextAction": "길찾기 출시 readiness tracker 하위 이슈와 production route evidence 수집",
+      "evidenceReference": "release/product-gates/route-release-readiness-tracker.json"
+    }
+  ],
+  "childIssueLinks": [547, 571, 1014, 1015, 1016, 1017, 1018, 1019, 1020, 1021, 1022, 1230, 1414, 2731],
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/android-release-100/",
+    "githubEvidencePolicy": "summary_or_public_link",
+    "sensitiveEvidencePolicy": "local_path_with_reason"
+  }
+}

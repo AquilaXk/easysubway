@@ -1,0 +1,657 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "abuse-penetration-rehearsal",
+  "issue": 1022,
+  "status": "BLOCKED_EXTERNAL",
+  "summaryContract": {
+    "currentVersion": 2,
+    "requirePassVersion": 2,
+    "legacyNonPassVersions": [1],
+    "statusValues": ["PASS", "FAIL", "BLOCKED_EXTERNAL"],
+    "resultValues": ["PASS", "FAIL", "BLOCKED_EXTERNAL"],
+    "redactionResultValues": ["PASS", "FAIL", "BLOCKED_EXTERNAL"],
+    "rawInvocationStored": false,
+    "redactionPolicyIds": ["summary-v2-no-sensitive-values"],
+    "procedureIdDerivation": "matrixId + '.' + caseId",
+    "targetAliasDerivation": "'target.' + matrixId",
+    "ownerAliasDerivation": "'owner.' + matrixId",
+    "relativeEvidencePathPattern": "^\\.evidence/evidence/security/abuse-penetration-rehearsal/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+(?:/(?!\\.{1,2}(?:/|$))[A-Za-z0-9._-]+)*$",
+    "fieldTypes": {
+      "root": { "schemaVersion": "integer", "releaseGate": "string", "issue": "integer", "status": "string", "rawInvocationStored": "boolean", "redactionPolicyId": "string", "artifactIdentity": "object", "evidence": "array", "productionLikeEvidence": "array", "matrices": "array" },
+      "artifactIdentity": { "gitSha": "string", "versionCode": "integer", "androidApplicationId": "string", "dataPackManifestSha256": "string", "aabSha256": "string", "generatedApkSha256": "string", "backendImageDigest": "string", "backendArtifactSha256": "string" },
+      "evidence": { "evidenceId": "string", "result": "string", "localEvidencePath": "string", "artifactIdentitySha256": "string" },
+      "matrix": { "matrixId": "string", "result": "string", "findingCounts": "object", "mediumFindingDisposition": "object", "cases": "array" },
+      "findingCounts": { "critical": "integer", "high": "integer", "medium": "integer", "low": "integer" },
+      "mediumFindingDisposition": { "ownerAlias": "string", "fixPlanEvidencePath": "string" },
+      "case": { "procedureId": "string", "targetAlias": "string", "expectedStatus": "integer", "observedStatus": "integer", "redactionResult": "string", "localEvidencePath": "string", "artifactIdentitySha256": "string" }
+    },
+    "requiredFields": {
+      "rootForAllStatuses": ["schemaVersion", "releaseGate", "issue", "status", "rawInvocationStored", "redactionPolicyId"],
+      "rootAdditionalForPass": ["artifactIdentity", "evidence", "productionLikeEvidence", "matrices"],
+      "artifactIdentity": ["gitSha", "versionCode", "androidApplicationId", "dataPackManifestSha256"],
+      "evidence": ["evidenceId", "result", "localEvidencePath", "artifactIdentitySha256"],
+      "matrix": ["matrixId", "result", "findingCounts", "cases"],
+      "findingCounts": ["critical", "high", "medium", "low"],
+      "mediumFindingDisposition": ["ownerAlias", "fixPlanEvidencePath"],
+      "case": ["procedureId", "targetAlias", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath", "artifactIdentitySha256"]
+    },
+    "fieldPatterns": {
+      "artifactIdentity": {
+        "gitSha": "^[0-9a-f]{40}$",
+        "androidApplicationId": "^com\\.easysubway\\.app$",
+        "dataPackManifestSha256": "^[0-9a-f]{64}$",
+        "aabSha256": "^[0-9a-f]{64}$",
+        "generatedApkSha256": "^[0-9a-f]{64}$",
+        "backendArtifactSha256": "^[0-9a-f]{64}$",
+        "backendImageDigest": "^sha256:[0-9a-f]{64}$"
+      },
+      "evidence": {
+        "artifactIdentitySha256": "^[0-9a-f]{64}$"
+      },
+      "case": {
+        "artifactIdentitySha256": "^[0-9a-f]{64}$"
+      }
+    }
+  },
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "securityPrivacyEvidenceManifest": "release/product-gates/security-privacy-release-evidence.json",
+  "releaseSecurityGate": "release/product-gates/release-security-gate.json",
+  "evidenceRoot": ".evidence/evidence/security/abuse-penetration-rehearsal/<git-sha>/",
+  "latestQaEvidenceStatus": {
+    "qaEvidenceDateKst": "2026-06-28",
+    "playAndStorePreflight": {
+      "androidPlayInternalTrack": "READY",
+      "datapackObjectStoragePublish": "READY",
+      "googlePlayApi": "READY_EDIT_TRACK_VALIDATE",
+      "uploadedInternalVersionCode": 10001,
+      "latestVersionCodeEnv": 10001
+    },
+    "resolvedEvidence": [
+      "android-play-internal-track-env-preflight",
+      "datapack-object-storage-publish-env-preflight",
+      "google-play-api-edit-track-validate",
+      "play-internal-upload-version-code-10001",
+      "store-distribution-evidence-success",
+      "production-datapack-release-publish-success",
+      "android-aab-release-artifact-secret-scan-output",
+      "release-aab-internal-endpoint-scan-output",
+      "backend-image-env-redaction-summary",
+      "backend-abuse-security-selected-tests",
+      "trusted-proxy-negative-test-output"
+    ],
+    "remainingExternalBlockers": [
+      "play-generated-apk-download-id-summary",
+      "play-installed-build-smoke",
+      "play-pre-launch-report-crash-anr-policy-summary",
+      "network-trace-redaction-summary-from-play-installed-build",
+      "play-installed-attestation-positive-negative-matrix",
+      "deployed-token-lifecycle-and-session-quota-rehearsal",
+      "deployed-gateway-401-origin-403-no-write-summary",
+      "deployed-limiter-boundary-burst-retry-after-summary",
+      "credential-log-metric-ui-analytics-absence-audit",
+      "deployed-public-https-backend-report-admin-base-url-evidence",
+      "deployed-admin-operator-auth-session-csrf-summary",
+      "deployed-signed-url-boundary-summary",
+      "object-storage-lifecycle-retention-delete-summary",
+      "deployed-distributed-or-multi-node-rate-limit-rehearsal",
+      "deployed-ad-event-edge-rate-limit",
+      "deployed-ad-event-origin-bypass-denial",
+      "deployed-ad-event-privacy-redaction",
+      "container-hardening-negative-controls"
+    ],
+    "notClosingReasonKo": "#1022는 Play credential/store preflight와 local/backend 자동 검증은 확보됐지만, Play-generated/Play-installed artifact 및 deployed production-like rehearsal evidence가 아직 없어 open 유지한다.",
+    "redactionPolicy": {
+      "secretValuesPrinted": false,
+      "forbiddenInGitHubEvidence": [
+        "raw receipt token",
+        "raw signed URL",
+        "photo binary",
+        "provider credential",
+        "operator password",
+        "session cookie",
+        "full object key"
+      ]
+    }
+  },
+  "routeV2IngressAttackMatrix": {
+    "issue": 1022,
+    "status": "BLOCKED_EXTERNAL",
+    "localRegressionStatus": "PASS",
+    "localAutomatedCases": [
+      {
+        "caseId": "attestation_nonce_request_hash",
+        "evidence": "RouteV2SessionServiceTest"
+      },
+      {
+        "caseId": "session_token_scope_expiry_quota",
+        "evidence": "RouteV2IngressFilterTest and ProductionRouteApiClosureTest"
+      },
+      {
+        "caseId": "gateway_401_origin_403_no_write",
+        "evidence": "ProductionRouteApiClosureTest"
+      },
+      {
+        "caseId": "gateway_ip_token_limiter_retry_after",
+        "evidence": "route-v2-gateway.test.mjs and run-route-v2-gateway-integration.sh"
+      }
+    ],
+    "requiredSameRcProductionEvidence": [
+      "play-installed-attestation-positive-negative-matrix",
+      "deployed-token-lifecycle-and-session-quota-rehearsal",
+      "deployed-gateway-401-origin-403-no-write-summary",
+      "deployed-limiter-boundary-burst-retry-after-summary",
+      "credential-log-metric-ui-analytics-absence-audit"
+    ],
+    "productionMutationPerformed": false,
+    "explicitProductionApprovalRequired": true,
+    "rawCredentialOrExploitPayloadStored": false
+  },
+  "productionLikeEvidencePolicy": {
+    "requiredForClosing": [
+      "play-installed-or-play-generated-artifact-identity",
+      "network-trace-from-play-installed-or-generated-build",
+      "deployed-public-https-backend-base-url",
+      "deployed-admin-security-negative-test",
+      "deployed-signed-url-boundary-run",
+      "deployed-object-storage-lifecycle-run",
+      "distributed-or-waived-rate-limit-rehearsal",
+      "deployed-ad-event-edge-rate-limit",
+      "deployed-ad-event-origin-bypass-denial",
+      "deployed-ad-event-privacy-redaction",
+      "container-hardening-negative-controls",
+      "play-installed-attestation-positive-negative-matrix",
+      "deployed-token-lifecycle-and-session-quota-rehearsal",
+      "deployed-gateway-401-origin-403-no-write-summary",
+      "deployed-limiter-boundary-burst-retry-after-summary",
+      "credential-log-metric-ui-analytics-absence-audit"
+    ],
+    "forbiddenClosureEvidence": [
+      "static gate JSON",
+      "fixture output only",
+      "preflight env check only",
+      "local selected tests only",
+      "stale evidence from previous RC"
+    ],
+    "missingEvidenceDisposition": "KEEP_OPEN_NO_GO",
+    "policyKo": "#1022는 Play-generated/Play-installed artifact와 deployed production-like backend/object-storage rehearsal 증거가 없으면 preflight, local selected test, static contract만으로 완료 처리하지 않는다."
+  },
+  "buildIdentityPolicy": {
+    "requiredIssueLinks": ["#1015", "Mobile #8", "#1020", "#1914"],
+    "acceptedArtifactSources": ["rc-aab", "play-generated-apk", "play-installed-build", "backend-release-image"],
+    "requiredIdentityFields": [
+      "gitSha",
+      "versionCode",
+      "androidApplicationId",
+      "dataPackManifestSha256"
+    ],
+    "requiredIdentityAnyOf": [
+      ["aabSha256", "generatedApkSha256"],
+      ["backendImageDigest", "backendArtifactSha256"]
+    ],
+    "mismatchDisposition": "NO_GO"
+  },
+  "artifactSecretAndEndpointScan": {
+    "requiredArtifacts": [
+      "Android AAB or Play-generated APK",
+      "release merged manifest",
+      "release network endpoint trace",
+      "dependency vulnerability scan result"
+    ],
+    "forbiddenFindings": [
+      "provider secret",
+      "object storage credential",
+      "production password",
+      "signing private key",
+      "receipt token",
+      "signed upload URL",
+      "local or internal endpoint"
+    ],
+    "requiredEvidence": [
+      "android-aab-or-play-apk-secret-scan-output",
+      "release-endpoint-allowlist-diff",
+      "network-trace-redaction-summary"
+    ]
+  },
+  "adEventAbuseGuardrails": {
+    "issue": 1912,
+    "edge": {
+      "hostname": "easysubway-api.aquilaxk.site",
+      "method": "POST",
+      "exactPath": "/api/ads/events",
+      "excludedPath": "/api/ads/active",
+      "characteristic": "ip.src",
+      "requests": 120,
+      "periodSeconds": 60,
+      "mitigationSeconds": 60,
+      "action": "block",
+      "responseStatus": 429
+    },
+    "server": {
+      "env": "EASYSUBWAY_ADS_EVENT_DAILY_CAP",
+      "eventsPerUtcCompositeKey": 1000000,
+      "productionDefaultAllowed": false,
+      "capResponseStatus": 204,
+      "malformedResponseStatus": 400,
+      "unexpectedDatabaseFailure": "5xx"
+    },
+    "capacityBasis": {
+      "assumedDau": 10000,
+      "sessionsPerUserPerDay": 5,
+      "exposuresPerSession": 2,
+      "projectedEventsPerDay": 100000,
+      "safetyMultiplier": 10
+    },
+    "origin": {
+      "httpIngressOpen": false,
+      "httpsIngress": "official-cloudflare-ipv4-only",
+      "backendBind": "127.0.0.1",
+      "exactHostAndSniEvidenceRequired": true,
+      "sharedCloudflareCidrsAuthenticateTargetZone": false,
+      "originAuthenticationRequired": true,
+      "cloudflareIpv4SourceUrl": "https://www.cloudflare.com/ips-v4/",
+      "cloudflareIpv4CheckedDate": "2026-07-12",
+      "cloudflareIpv4Owner": "infra-owner",
+      "cloudflareIpv4ReapplyTrigger": "official-endpoint-set-change",
+      "publicIpv6Enabled": false
+    },
+    "revisitTriggers": {
+      "hottestKeyAcceptedEventsPerDay": 700000,
+      "consecutiveDays": 3,
+      "nonAbuseEdge429Ratio": 0.01,
+      "candidateRequestsPer60Seconds": 300
+    }
+  },
+  "abuseScenarios": [
+    {
+      "id": "report_photo_upload_abuse",
+      "area": "report-photo",
+      "severity": "release-blocker",
+      "targetKo": "MIME/extension/magic bytes mismatch, oversized image, decompression bomb, duplicate claim, failed claim orphan cleanup",
+      "requiredEvidence": ["malicious-photo-upload-test-output", "orphan-cleanup-request-response-summary"]
+    },
+    {
+      "id": "receipt_token_replay_and_status_abuse",
+      "area": "report-receipt",
+      "severity": "release-blocker",
+      "targetKo": "receipt token guessing, replay, URL/log exposure, cross-report status lookup, confirm endpoint abuse",
+      "requiredEvidence": ["receipt-token-negative-tests", "redacted-request-response-summary", "log-redaction-check"]
+    },
+    {
+      "id": "signed_url_lifecycle_abuse",
+      "area": "object-storage",
+      "severity": "release-blocker",
+      "targetKo": "signed URL reuse, expiry bypass, object key traversal, orphan object persistence, lifecycle cleanup failure",
+      "requiredEvidence": ["signed-url-expiry-test", "object-lifecycle-cleanup-summary", "storage-log-redaction-check"]
+    },
+    {
+      "id": "admin_operator_auth_session_csrf",
+      "area": "admin",
+      "severity": "release-blocker",
+      "targetKo": "admin/operator auth bypass, weak Basic auth exception, session fixation, CSRF on mutating form, tenant authorization confusion",
+      "requiredEvidence": ["admin-auth-tests", "operator-role-negative-tests", "csrf-negative-test-summary"]
+    },
+    {
+      "id": "distributed_rate_limit_abuse",
+      "area": "backend",
+      "severity": "release-blocker",
+      "targetKo": "multi-node report upload/claim/submit/status/confirm flooding and trusted proxy spoofing",
+      "requiredEvidence": ["distributed-abuse-control-test-output", "trusted-proxy-negative-test", "abuse-store-mode-record"]
+    },
+    {
+      "id": "provider_and_release_secret_exposure",
+      "area": "release",
+      "severity": "release-blocker",
+      "targetKo": "provider key, object credential, production password, local/internal endpoint exposure in app artifact, backend image, logs, PR evidence",
+      "requiredEvidence": ["tracked-secret-search", "release-artifact-secret-scan-output", "backend-image-env-redaction-summary"]
+    },
+    {
+      "id": "route_v2_ingress_abuse",
+      "area": "route-v2-ingress",
+      "severity": "release-blocker",
+      "targetKo": "Play Integrity nonce/requestHash, session scope·expiry·quota, gateway origin 증명, IP·token limiter 우회",
+      "requiredEvidence": [
+        "route-v2-attestation-session-test-output",
+        "route-v2-session-scope-expiry-quota-test-output",
+        "route-v2-origin-auth-negative-test-output",
+        "route-v2-gateway-rate-limit-integration-output"
+      ]
+    },
+    {
+      "id": "ad_counter_inflation",
+      "area": "ads-public-api",
+      "severity": "release-blocker",
+      "targetKo": "광고 event single-IP 폭주, direct-origin 우회, composite key 일일 cap 선점·초과, 식별자 및 IP/User-Agent 저장",
+      "requiredEvidence": [
+        "cloudflare-rate-limit-sanitized-export",
+        "edge-threshold-plus-one-429-summary",
+        "direct-origin-negative-summary",
+        "hostname-scoped-origin-auth-sanitized-export",
+        "reverse-proxy-exact-host-sni-default-reject-export",
+        "wrong-host-wrong-sni-client-auth-negative-summary",
+        "origin-auth-rollback-rehearsal-summary",
+        "cloudflare-ipv4-live-oci-set-equality-summary",
+        "postgres-atomic-daily-cap-test-output",
+        "identifier-zero-request-capture-summary",
+        "origin-log-ip-ua-absence-summary",
+        "cloudflare-logpush-ip-ua-absence-summary"
+      ]
+    }
+  ],
+  "rehearsalMatrices": {
+    "adCounterInflation": {
+      "scenarioId": "ad_counter_inflation",
+      "requiredEvidence": [
+        "cloudflare-rate-limit-sanitized-export",
+        "edge-threshold-plus-one-429-summary",
+        "direct-origin-negative-summary",
+        "hostname-scoped-origin-auth-sanitized-export",
+        "reverse-proxy-exact-host-sni-default-reject-export",
+        "wrong-host-wrong-sni-client-auth-negative-summary",
+        "origin-auth-rollback-rehearsal-summary",
+        "cloudflare-ipv4-live-oci-set-equality-summary",
+        "postgres-atomic-daily-cap-test-output",
+        "identifier-zero-request-capture-summary",
+        "origin-log-ip-ua-absence-summary",
+        "cloudflare-logpush-ip-ua-absence-summary"
+      ],
+      "requiredCases": [
+        "edge_ip_rate_limit",
+        "direct_origin_bypass",
+        "target_hostname_authenticated_origin",
+        "wrong_host_origin_rejected",
+        "wrong_sni_origin_rejected",
+        "missing_or_untrusted_client_auth_rejected",
+        "cloudflare_ipv4_live_oci_set_equality",
+        "postgres_atomic_daily_cap",
+        "cap_silent_drop",
+        "identifier_zero_request_capture",
+        "origin_log_ip_ua_absent",
+        "edge_log_export_ip_ua_absent"
+      ],
+      "summaryFields": [
+        "caseId",
+        "endpoint",
+        "commandOrManualCheck",
+        "expectedStatus",
+        "observedStatus",
+        "redactionResult",
+        "localEvidencePath"
+      ],
+      "expectedStatusByCase": {
+        "edge_ip_rate_limit": [429],
+        "direct_origin_bypass": [0, 403],
+        "target_hostname_authenticated_origin": [204],
+        "wrong_host_origin_rejected": [0, 400, 403, 421],
+        "wrong_sni_origin_rejected": [0, 403],
+        "missing_or_untrusted_client_auth_rejected": [0, 403],
+        "cloudflare_ipv4_live_oci_set_equality": [0],
+        "postgres_atomic_daily_cap": [0],
+        "cap_silent_drop": [204],
+        "identifier_zero_request_capture": [204],
+        "origin_log_ip_ua_absent": [204],
+        "edge_log_export_ip_ua_absent": [0]
+      },
+      "forbiddenSummaryValues": [
+        "full client IP",
+        "raw user-agent",
+        "authorization header",
+        "session cookie",
+        "user identifier",
+        "device identifier",
+        "advertising identifier"
+      ]
+    },
+    "receiptTokenAbuse": {
+      "scenarioId": "receipt_token_replay_and_status_abuse",
+      "requiredEvidence": ["receipt-token-negative-tests", "redacted-request-response-summary", "log-redaction-check"],
+      "requiredCases": [
+        "brute_force_guessing",
+        "replay_after_status_lookup",
+        "cross_report_enumeration",
+        "confirm_endpoint_abuse",
+        "url_header_log_redaction"
+      ],
+      "summaryFields": ["caseId", "endpoint", "attemptCount", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "expectedStatusByCase": {
+        "brute_force_guessing": [401, 403, 429],
+        "replay_after_status_lookup": [401, 403, 409, 410],
+        "cross_report_enumeration": [403, 404],
+        "confirm_endpoint_abuse": [401, 403, 409, 410],
+        "url_header_log_redaction": [200, 204]
+      },
+      "forbiddenSummaryValues": ["raw receipt token", "receipt token hash", "authorization header", "session cookie"]
+    },
+    "signedUploadUrlBoundary": {
+      "scenarioId": "signed_url_lifecycle_abuse",
+      "requiredEvidence": ["signed-url-expiry-test", "storage-log-redaction-check", "redacted-request-response-summary"],
+      "requiredCases": [
+        "method_mismatch",
+        "content_type_mismatch",
+        "size_limit_exceeded",
+        "ttl_expired",
+        "object_key_prefix_traversal",
+        "signed_url_reuse"
+      ],
+      "summaryFields": ["caseId", "method", "contentType", "sizeBytes", "ttlSeconds", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "expectedStatusByCase": {
+        "method_mismatch": [403, 405],
+        "content_type_mismatch": [400, 403, 415],
+        "size_limit_exceeded": [400, 413],
+        "ttl_expired": [401, 403, 410],
+        "object_key_prefix_traversal": [400, 403],
+        "signed_url_reuse": [403, 409, 410]
+      },
+      "forbiddenSummaryValues": ["raw signed URL", "object storage credential", "object key with user identifier", "photo binary"]
+    },
+    "reportUploadLifecycle": {
+      "scenarioId": "report_photo_upload_abuse",
+      "requiredEvidence": ["malicious-photo-upload-test-output", "orphan-cleanup-request-response-summary", "redacted-request-response-summary"],
+      "requiredCases": [
+        "upload_intent_abuse",
+        "duplicate_claim",
+        "submit_without_valid_claim",
+        "status_lookup_without_valid_receipt",
+        "confirm_without_valid_receipt",
+        "orphan_cleanup_after_failed_claim",
+        "malicious_photo_upload"
+      ],
+      "summaryFields": ["caseId", "apiStep", "expectedStatus", "observedStatus", "cleanupResult", "redactionResult", "localEvidencePath"],
+      "expectedStatusByCase": {
+        "upload_intent_abuse": [400, 403, 429],
+        "duplicate_claim": [409],
+        "submit_without_valid_claim": [400, 403, 409],
+        "status_lookup_without_valid_receipt": [401, 403, 404],
+        "confirm_without_valid_receipt": [401, 403, 404, 409],
+        "orphan_cleanup_after_failed_claim": [200, 204],
+        "malicious_photo_upload": [400, 403, 413, 415]
+      },
+      "forbiddenSummaryValues": ["raw receipt token", "raw signed URL", "photo binary", "precise coordinates"]
+    },
+    "adminOperatorSecurity": {
+      "scenarioId": "admin_operator_auth_session_csrf",
+      "requiredEvidence": ["admin-auth-tests", "operator-role-negative-tests", "csrf-negative-test-summary", "admin-operator-lockout-test-output"],
+      "requiredCases": [
+        "login_failure_lockout",
+        "logout_session_invalidation",
+        "session_expiry",
+        "csrf_missing_mutation",
+        "role_denied_personal_data",
+        "role_denied_photo_read",
+        "tenant_authorization_bypass",
+        "break_glass_audit_redaction"
+      ],
+      "summaryFields": ["caseId", "role", "tenantScope", "endpoint", "expectedStatus", "observedStatus", "redactionResult", "auditRedactionResult", "localEvidencePath"],
+      "expectedStatusByCase": {
+        "login_failure_lockout": [401, 403, 423, 429],
+        "logout_session_invalidation": [401, 403],
+        "session_expiry": [401, 403],
+        "csrf_missing_mutation": [403],
+        "role_denied_personal_data": [403, 404],
+        "role_denied_photo_read": [403, 404],
+        "tenant_authorization_bypass": [403, 404],
+        "break_glass_audit_redaction": [200, 204]
+      },
+      "forbiddenSummaryValues": ["operator password", "session cookie", "csrf token", "raw personal data", "raw photo metadata"]
+    },
+    "objectStorageLifecycle": {
+      "scenarioId": "signed_url_lifecycle_abuse",
+      "requiredEvidence": ["object-lifecycle-cleanup-summary", "storage-log-redaction-check", "object-retention-delete-policy-summary"],
+      "requiredCases": [
+        "orphan_object_cleanup",
+        "retention_policy_record",
+        "delete_after_report_deletion",
+        "signed_url_expiry_enforced",
+        "storage_audit_redaction"
+      ],
+      "summaryFields": ["caseId", "bucketOrPolicyAlias", "retentionRule", "deleteOrCleanupResult", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "expectedStatusByCase": {
+        "orphan_object_cleanup": [200, 204],
+        "retention_policy_record": [200, 204],
+        "delete_after_report_deletion": [200, 204, 404, 410],
+        "signed_url_expiry_enforced": [403, 410],
+        "storage_audit_redaction": [200, 204]
+      },
+      "forbiddenSummaryValues": ["raw signed URL", "object storage credential", "photo binary", "full object key"]
+    },
+    "distributedRateLimitAbuse": {
+      "scenarioId": "distributed_rate_limit_abuse",
+      "requiredEvidence": ["distributed-abuse-control-test-output", "trusted-proxy-negative-test", "abuse-store-mode-record"],
+      "requiredCases": [
+        "multi_node_upload_intent_flooding",
+        "claim_submit_status_confirm_flooding",
+        "trusted_proxy_spoofing",
+        "abuse_store_mode_record",
+        "single_instance_exception_link"
+      ],
+      "summaryFields": ["caseId", "nodeOrStoreMode", "endpoint", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "expectedStatusByCase": {
+        "multi_node_upload_intent_flooding": [429],
+        "claim_submit_status_confirm_flooding": [429],
+        "trusted_proxy_spoofing": [400, 403],
+        "abuse_store_mode_record": [200, 204],
+        "single_instance_exception_link": [200, 204]
+      },
+      "forbiddenSummaryValues": ["raw receipt token", "raw signed URL", "client IP full address", "trusted proxy credential"]
+    },
+    "providerReleaseSecretExposure": {
+      "scenarioId": "provider_and_release_secret_exposure",
+      "requiredEvidence": ["tracked-secret-search", "release-artifact-secret-scan-output", "backend-image-env-redaction-summary"],
+      "requiredCases": [
+        "tracked_secret_search",
+        "android_artifact_secret_scan",
+        "backend_image_env_redaction",
+        "release_endpoint_allowlist_diff",
+        "pr_evidence_redaction"
+      ],
+      "summaryFields": ["caseId", "artifactType", "scanTarget", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "expectedStatusByCase": {
+        "tracked_secret_search": [0],
+        "android_artifact_secret_scan": [0],
+        "backend_image_env_redaction": [0],
+        "release_endpoint_allowlist_diff": [0],
+        "pr_evidence_redaction": [0]
+      },
+      "forbiddenSummaryValues": ["provider secret", "object storage credential", "production password", "signing private key", "local or internal endpoint"]
+    },
+    "routeV2IngressAbuse": {
+      "scenarioId": "route_v2_ingress_abuse",
+      "requiredEvidence": [
+        "route-v2-attestation-session-test-output",
+        "route-v2-session-scope-expiry-quota-test-output",
+        "route-v2-origin-auth-negative-test-output",
+        "route-v2-gateway-rate-limit-integration-output"
+      ],
+      "requiredCases": [
+        "attestation_valid",
+        "attestation_invalid_nonce_format",
+        "attestation_nonce_replay",
+        "attestation_stale_verdict",
+        "attestation_future_verdict",
+        "attestation_request_hash_mismatch",
+        "attestation_wrong_request_package",
+        "attestation_wrong_app_package",
+        "attestation_certificate_mismatch",
+        "attestation_app_recognition_mismatch",
+        "attestation_licensing_mismatch",
+        "attestation_device_integrity_mismatch",
+        "attestation_provider_unavailable",
+        "session_expired",
+        "session_wrong_scope",
+        "session_quota_exhausted",
+        "gateway_session_missing",
+        "direct_origin_bypass_no_write",
+        "gateway_ip_limiter",
+        "gateway_token_limiter"
+      ],
+      "summaryFields": ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+      "expectedStatusByCase": {
+        "attestation_valid": [200],
+        "attestation_invalid_nonce_format": [403],
+        "attestation_nonce_replay": [403],
+        "attestation_stale_verdict": [403],
+        "attestation_future_verdict": [403],
+        "attestation_request_hash_mismatch": [403],
+        "attestation_wrong_request_package": [403],
+        "attestation_wrong_app_package": [403],
+        "attestation_certificate_mismatch": [403],
+        "attestation_app_recognition_mismatch": [403],
+        "attestation_licensing_mismatch": [403],
+        "attestation_device_integrity_mismatch": [403],
+        "attestation_provider_unavailable": [503],
+        "session_expired": [401],
+        "session_wrong_scope": [422],
+        "session_quota_exhausted": [429],
+        "gateway_session_missing": [401],
+        "direct_origin_bypass_no_write": [403],
+        "gateway_ip_limiter": [429],
+        "gateway_token_limiter": [429]
+      },
+      "forbiddenSummaryValues": ["raw attestation token", "raw session token", "authorization header", "client IP full address", "origin secret"]
+    }
+  },
+  "manualRehearsalPolicy": {
+    "redactionRequired": true,
+    "requestResponseSummaryOnly": true,
+    "validatorCommand": "node tools/security/validate-abuse-penetration-summary.mjs --summary <summary.json> --require-pass",
+    "githubSummaryFields": [
+      "scenarioId",
+      "artifactIdentity",
+      "commandOrManualCheck",
+      "findingCounts",
+      "result",
+      "redactionNotes",
+      "localEvidencePath"
+    ],
+    "perCaseSummaryRequired": true,
+    "minimumSummaryFields": ["caseId", "expectedStatus", "observedStatus", "redactionResult", "localEvidencePath"],
+    "forbiddenInEvidence": [
+      "raw receipt token",
+      "raw signed URL",
+      "photo binary",
+      "provider credential",
+      "operator password",
+      "session cookie"
+    ],
+    "localAndroidEmulatorRequiredForMobileEvidence": true
+  },
+  "findingPolicy": {
+    "criticalHighAllowed": 0,
+    "mediumAllowedOnlyWithOwnerAndFixPlan": true,
+    "waiverIssue": 1020,
+    "waiverRequiredFields": ["owner", "untilDate", "reason", "risk", "mitigation", "followUpIssue"],
+    "goNoGoKo": "critical/high finding이 1건이라도 남아 있으면 release blocker이며, 예외는 #1020 waiver schema와 mitigation/follow-up issue가 있어야 한다."
+  },
+  "linkedReleaseGates": [
+    "release/product-gates/security-privacy-release-evidence.json",
+    "release/product-gates/release-security-gate.json",
+    "apps/mobile/release/signed-release-artifact-gate.json",
+    "apps/mobile/release/android-rc-store-evidence.json"
+  ],
+  "sensitiveEvidencePolicy": {
+    "localOnly": true,
+    "githubUploadPolicy": "summary-only",
+    "summaryRequiredKo": "abuse rehearsal 증거는 민감값을 제거한 command, request/response summary, finding count, local-only evidence path만 PR에 적는다."
+  }
+}

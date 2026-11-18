@@ -1,0 +1,115 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "mobile-signed-release-artifacts",
+  "storeReadyStatus": "ready",
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "rcEvidenceManifestContract": "release/product-gates/rc-evidence-manifest-contract.json",
+  "androidPageSize16kbGate": "apps/mobile/release/android-16kb-page-size-gate.json",
+  "playProductionAccessGate": "apps/mobile/release/play-production-access-gate.json",
+  "playGeneratedApkDeviceMatrixGate": "apps/mobile/release/play-generated-apk-device-matrix-gate.json",
+  "postLaunchOperationsReviewGate": "release/product-gates/post-launch-operations-review-gate.json",
+  "supportIncidentResponseGate": "release/product-gates/support-incident-response-gate.json",
+  "abusePenetrationRehearsalGate": "release/product-gates/abuse-penetration-rehearsal-gate.json",
+  "operationsPhasePolicy": {
+    "preLaunchRequiredStatus": "PASS",
+    "prePublicPostLaunchStatus": "PENDING_PUBLIC_RELEASE",
+    "actualPostLaunchObservationsRequiredBeforeFirstPublicRelease": false
+  },
+  "officialRequirements": {
+    "android": {
+      "targetApiLevelMinimum": 35,
+      "requiredFrom": "2025-08-31",
+      "source": "https://support.google.com/googleplay/android-developer/answer/11926878"
+    },
+    "ios": {
+      "minimumXcodeMajor": 26,
+      "minimumSdkMajor": 26,
+      "requiredFrom": "2026-04-28",
+      "source": "https://developer.apple.com/news/upcoming-requirements/"
+    }
+  },
+  "artifacts": {
+    "android": {
+      "format": "aab",
+      "ciArtifactStoreReady": true,
+      "ciSigningKeyType": "production-upload-key",
+      "productionRcArtifactStoreReadyCandidate": true,
+      "productionRcSigningKeyType": "production-upload-key",
+      "productionUploadKeySpec": {
+        "algorithm": "RSA",
+        "keysize": 4096,
+        "validityDays": 10000,
+        "alias": "easysubway-upload",
+        "keystoreType": "PKCS12",
+        "generationKeytoolCommand": "keytool -genkeypair -v -keystore easysubway-upload-key.jks -alias easysubway-upload -keyalg RSA -keysize 4096 -validity 10000 -storetype PKCS12 -dname \"CN=EasySubway Release, OU=Release Engineering, O=AquilaXk, L=Seoul, ST=Seoul, C=KR\"",
+        "exportCertificateCommand": "keytool -exportcert -rfc -keystore easysubway-upload-key.jks -alias easysubway-upload -file easysubway-upload-cert.pem",
+        "fingerprintVerificationCommand": "keytool -list -v -keystore easysubway-upload-key.jks -alias easysubway-upload"
+      },
+      "playAppSigningEnrollment": {
+        "enrolled": true,
+        "mode": "google_managed_app_signing",
+        "appSigningKeySha256Fingerprint": "55:87:FE:52:CA:7F:90:30:4F:24:7A:1F:C0:E5:03:32:94:56:A4:89:4E:03:0E:02:30:6A:F0:7A:8D:C6:7F:6A",
+        "uploadKeySha256Fingerprint": "17:58:5A:E3:9E:19:11:8B:CA:29:97:48:17:3A:94:05:55:79:DB:BA:C1:7A:70:F4:43:97:22:29:F6:2F:10:54",
+        "uploadKeyBackupRecoveryOwner": "release-owner@aquilaxk.site",
+        "uploadKeyResetProcedureKo": "Play Console 설정 > 앱 무결성 > Play App Signing > Google Play 개발자 지원팀에 신규 export PEM 인증서 제출을 통한 업로드 키 재설정 요청 절차 표준화"
+      },
+      "ciSecretConfiguration": [
+        "EASYSUBWAY_ANDROID_UPLOAD_KEYSTORE_BASE64",
+        "EASYSUBWAY_ANDROID_STORE_PASSWORD",
+        "EASYSUBWAY_ANDROID_KEY_ALIAS",
+        "EASYSUBWAY_ANDROID_KEY_PASSWORD",
+        "EASYSUBWAY_PLAY_APP_SIGNING_KEY_SHA256"
+      ],
+      "productionRcRequiredMetadata": [
+        "gitSha",
+        "versionName",
+        "versionCode",
+        "packageId",
+        "aabSha256",
+        "aabPayloadSha256",
+        "supportContactSetSha256",
+        "uploadKeySha256Fingerprint",
+        "appSigningKeySha256Fingerprint",
+        "dataPackManifestSha256",
+        "routeContractVersion",
+        "realtimeContractVersion",
+        "versionCodeMonotonicPolicy",
+        "failedRcVersionCodeReusePolicy",
+        "mappingRetentionDays"
+      ],
+      "symbolArtifact": "mapping.txt",
+      "symbolRetentionDays": 90,
+      "storeReadyRequires": [
+        "production signing key material",
+        "Play App Signing enrollment",
+        "Play internal track upload or pre-launch report evidence",
+        "Play-generated APK or Play-installed build smoke evidence",
+        "Android 16 KB page-size AAB and runtime smoke evidence",
+        "Play production access or closed test requirement satisfaction evidence",
+        "Play-generated APK device compatibility matrix evidence",
+        "Phase A pre-launch operations readiness and dry-run evidence",
+        "Support, data correction, incident notice, emergency datapack response evidence",
+        "Abuse-case and penetration rehearsal evidence"
+      ]
+    },
+    "ios": {
+      "format": "Runner.app.zip",
+      "ciArtifactStoreReady": false,
+      "ciArtifactProducer": "deferred_until_ios_release_phase",
+      "ciSigningKeyType": "not-produced",
+      "symbolArtifact": "dSYM",
+      "symbolRetentionDays": 90,
+      "storeReadyRequires": [
+        "Apple distribution signing",
+        "export archive",
+        "TestFlight or signed-device install evidence"
+      ]
+    }
+  },
+  "evidencePolicy": {
+    "localOnlyEvidencePath": ".evidence/evidence/release/mobile-signed-artifacts/",
+    "githubUploadPolicy": "summary-only"
+  }
+}

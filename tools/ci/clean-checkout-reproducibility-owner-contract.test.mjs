@@ -1,0 +1,165 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { readFile, stat } from "node:fs/promises";
+import test from "node:test";
+
+import { validateSchema } from "./lib/json-schema-lite.mjs";
+import { validateOwnerContract } from "../repo/audit-clean-checkout-reproducibility.mjs";
+
+const TOOLCHAIN_DIGEST = "5be71cac61b3b979269168bef240b5cbe1ed349bacd94f3afdbc05ea9390f319";
+const ENTRYPOINT = "tools/ci/run-clean-checkout-reproducibility-phase.mjs";
+const CONTRACT_PATH = "contracts/documentation/clean-checkout-reproducibility-owner-contract.json";
+
+const expectedContract = {
+  schemaVersion: 1,
+  repository: "AquilaXk/easysubway",
+  variants: [{
+    variantId: "hub-documentation-contracts",
+    runnerImage: "ubuntu-24.04",
+    toolchainDigest: TOOLCHAIN_DIGEST,
+    phases: [
+      phase("SETUP", ["setup", "24", TOOLCHAIN_DIGEST], "NONE", 60),
+      phase("BUILD", ["build"], "NONE", 120),
+      phase("TEST", ["test"], "NONE", 300),
+      phase("DEBUG", ["debug"], "LOCAL_ONLY", 60),
+    ],
+  }],
+};
+
+const expectedWorkflow = `name: D13 Hub Clean Checkout Owner Receipt
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  owner-receipt:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/clean-checkout-reproducibility-owner-receipt.yml
+    with:
+      contract_path: ${CONTRACT_PATH}
+`;
+
+test("Hub owner contract pins the exact four reproducibility phases and current toolchain lock", async () => {
+  const [contractText, schemaText, lockBytes, entrypointStat] = await Promise.all([
+    readFile(new URL(`../../${CONTRACT_PATH}`, import.meta.url), "utf8"),
+    readFile(new URL("../../contracts/documentation/clean-checkout-reproducibility-owner-contract.schema.json", import.meta.url), "utf8"),
+    readFile(new URL("../../tools/qa/package-lock.json", import.meta.url)),
+    stat(new URL(`../../${ENTRYPOINT}`, import.meta.url)),
+  ]);
+  const contract = JSON.parse(contractText);
+  const schema = JSON.parse(schemaText);
+
+  assert.deepEqual(contract, expectedContract);
+  assert.equal(validateSchema(schema, contract).ok, true);
+  assert.deepEqual(validateOwnerContract(contract), []);
+  assert.equal(createHash("sha256").update(lockBytes).digest("hex"), TOOLCHAIN_DIGEST);
+  assert.notEqual(entrypointStat.mode & 0o111, 0);
+});
+
+test("Hub caller is dispatch-only and invokes the immutable reusable producer without secrets", async () => {
+  const text = await readFile(
+    new URL("../../.github/workflows/clean-checkout-reproducibility-owner-receipt-caller.yml", import.meta.url),
+    "utf8",
+  );
+  assert.equal(text, expectedWorkflow);
+  for (const mutation of [
+    expectedWorkflow.replace("workflow_dispatch:", "push:"),
+    expectedWorkflow.replace("permissions: {}", "permissions:\n  actions: write"),
+    expectedWorkflow.replace("      contents: read", "      contents: write"),
+    expectedWorkflow.replace("./.github/workflows/clean-checkout-reproducibility-owner-receipt.yml", "AquilaXk/easysubway/.github/workflows/clean-checkout-reproducibility-owner-receipt.yml@main"),
+    expectedWorkflow.replace("./.github/workflows/clean-checkout-reproducibility-owner-receipt.yml", "AquilaXk/easysubway/.github/workflows/clean-checkout-reproducibility-owner-receipt.yml@b89f4ddd50e98b2cff5a2a4cee0e0245a59a383a"),
+    expectedWorkflow.replace(`contract_path: ${CONTRACT_PATH}`, "contract_path: contracts/other.json"),
+    expectedWorkflow.replace("    with:\n", "    secrets: inherit\n    with:\n"),
+    `${expectedWorkflow}  extra:\n    runs-on: ubuntu-latest\n`,
+  ]) assert.equal(validateCaller(mutation), false);
+});
+
+test("Audit workflow produces the same-head owner receipt before auditing without weakening the audit", async () => {
+  const text = await readFile(
+    new URL("../../.github/workflows/clean-checkout-reproducibility-audit.yml", import.meta.url),
+    "utf8",
+  );
+  const receiptStep = text.indexOf("- name: Produce same-head owner receipt");
+  const auditStep = text.indexOf("- name: Audit current clean-checkout reproducibility evidence");
+  assert.notEqual(receiptStep, -1);
+  assert.ok(receiptStep < auditStep, "receipt must be produced before the audit reads it");
+  const receiptBlock = text.slice(receiptStep, auditStep);
+  assert.match(text, /on:\n  push:\n    branches: \[main\]/);
+  assert.match(text, /permissions:\n      contents: read\n      issues: read\n      actions: write\n/);
+  assert.match(receiptBlock, /CALLER="clean-checkout-reproducibility-owner-receipt-caller\.yml"/);
+  assert.match(receiptBlock, /gh workflow run "\$\{CALLER\}" --ref "\$\{DEFAULT_BRANCH\}"/);
+  assert.match(receiptBlock, /gh run watch .* --exit-status/);
+  assert.match(receiptBlock, /GITHUB_SHA/);
+  assert.match(receiptBlock, /git ls-remote|repos\/\$\{GITHUB_REPOSITORY\}\/commits/);
+  assert.match(receiptBlock, /superseded/);
+  // the audit itself keeps the strict same-head inputs
+  assert.match(text, /--source-sha "\$\{GITHUB_SHA\}"/);
+  // the receipt caller stays dispatch-only so the audit's workflow_dispatch run filter still holds
+  assert.equal(await readFile(
+    new URL("../../.github/workflows/clean-checkout-reproducibility-owner-receipt-caller.yml", import.meta.url),
+    "utf8",
+  ), expectedWorkflow);
+});
+
+test("phase entrypoint maps only the four approved commands and fails closed", async () => {
+  const { runHubReproducibilityPhase } = await import("./run-clean-checkout-reproducibility-phase.mjs");
+  const lockBytes = await readFile(new URL("../../tools/qa/package-lock.json", import.meta.url));
+  const calls = [];
+  const spawnProcess = (executable, arguments_, options) => {
+    calls.push({ executable, arguments_, options });
+    return { status: 0, error: undefined };
+  };
+  const base = {
+    nodeVersion: "24.19.0",
+    repositoryRoot: "/workspace",
+    lockBytes,
+    spawnProcess,
+  };
+
+  assert.equal(runHubReproducibilityPhase(["setup", "24", TOOLCHAIN_DIGEST], base), 0);
+  assert.equal(runHubReproducibilityPhase(["build"], base), 0);
+  assert.equal(runHubReproducibilityPhase(["test"], base), 0);
+  assert.equal(runHubReproducibilityPhase(["debug"], base), 0);
+  assert.deepEqual(calls.map(({ arguments_ }) => arguments_), [
+    ["tools/ci/check-contracts.mjs", "--workspace", "contracts/workspaces/hub.json", "--current-only", "--local-contracts-only"],
+    ["--test", "tools/repo/audit-clean-checkout-reproducibility.test.mjs", "tools/repo/produce-clean-checkout-reproducibility-owner-receipt.test.mjs"],
+    ["tools/ci/api-catalog.mjs", "list"],
+  ]);
+  assert.equal(calls.every(({ executable, options }) => executable === process.execPath
+    && options.cwd === "/workspace"
+    && options.shell === false
+    && options.stdio === "ignore"), true);
+
+  for (const arguments_ of [[], ["unknown"], ["build", "extra"], ["setup", "23", TOOLCHAIN_DIGEST]]) {
+    assert.throws(() => runHubReproducibilityPhase(arguments_, base), /D13_HUB_PHASE_INVALID/);
+  }
+  assert.throws(() => runHubReproducibilityPhase(["setup", "24", "0".repeat(64)], base), /D13_HUB_TOOLCHAIN_MISMATCH/);
+  assert.throws(() => runHubReproducibilityPhase(["setup", "24", TOOLCHAIN_DIGEST], { ...base, nodeVersion: "23.0.0" }), /D13_HUB_NODE_MISMATCH/);
+  for (const command of ["build", "test", "debug"]) {
+    assert.throws(() => runHubReproducibilityPhase([command], { ...base, nodeVersion: "23.0.0" }), /D13_HUB_NODE_MISMATCH/);
+    assert.throws(() => runHubReproducibilityPhase([command], { ...base, lockBytes: Buffer.from("mismatch") }), /D13_HUB_TOOLCHAIN_MISMATCH/);
+  }
+  assert.equal(calls.length, 3);
+  assert.throws(() => runHubReproducibilityPhase(["build"], { ...base, spawnProcess: () => ({ status: 1 }) }), /D13_HUB_PHASE_NONZERO/);
+  assert.throws(() => runHubReproducibilityPhase(["build"], { ...base, spawnProcess: () => ({ error: new Error("raw") }) }), /D13_HUB_PHASE_START_FAILED/);
+});
+
+function phase(name, arguments_, networkPolicy, timeoutSeconds) {
+  return {
+    phase: name,
+    entrypoint: ENTRYPOINT,
+    arguments: arguments_,
+    workingDirectory: ".",
+    requiredEnvironment: [],
+    networkPolicy,
+    timeoutSeconds,
+    expectedExitCode: 0,
+  };
+}
+
+function validateCaller(value) {
+  return value === expectedWorkflow;
+}

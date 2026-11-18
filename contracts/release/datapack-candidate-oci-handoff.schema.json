@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "easysubway/contracts/release/datapack-candidate-oci-handoff",
+  "title": "Data candidate OCI handoff input",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["storage", "identity"],
+  "properties": {
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["namespace", "bucket"],
+      "properties": {
+        "namespace": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" },
+        "bucket": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{0,62}$" }
+      }
+    },
+    "identity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["repository", "workflowRunId", "headSha", "candidateId", "artifactName", "artifactId"],
+      "properties": {
+        "repository": { "const": "AquilaXk/easysubway-data" },
+        "workflowRunId": { "type": "string", "pattern": "^[1-9][0-9]*$" },
+        "headSha": { "type": "string", "pattern": "^[a-f0-9]{40}$" },
+        "candidateId": { "type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$" },
+        "artifactName": { "type": "string", "pattern": "^easysubway-datapack-candidate-[1-9][0-9]*$" },
+        "artifactId": { "type": "string", "pattern": "^[a-f0-9]{64}$" }
+      }
+    }
+  }
+}

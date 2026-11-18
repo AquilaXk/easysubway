@@ -1,0 +1,132 @@
+{
+  "$schema": "./documentation-system-catalog.schema.json",
+  "schemaVersion": 1,
+  "status": "PROPOSED",
+  "inventoryEvidence": {
+    "normalizedSha256": "sha256:b877e8a0f5498c4b19662ca9ae84aed556c1e80f2e338f7d02ed0e597f87b133",
+    "recordCount": 34,
+    "repositoryCount": 5,
+    "documentationFamilyCount": 11,
+    "sourceSurfaceCount": 4,
+    "gaps": [
+      "gap:kubernetes:platform-deployment-contract"
+    ]
+  },
+  "repositories": [
+    {
+      "repository": "AquilaXk/easysubway",
+      "status": "ACTIVE",
+      "fragment": {
+        "gitSha": "0000000000000000000000000000000000000000",
+        "path": "contracts/documentation/documentation-fragment.json",
+        "blobSha": "2ca7cf20b2e895233da20e143d683c78fcc44418",
+        "lastVerifiedAt": "2026-11-18T13:40:00.000Z",
+        "verificationEvidence": [
+          "https://github.com/AquilaXk/easysubway/issues/2748",
+          "https://github.com/AquilaXk/easysubway/issues/2861",
+          "https://github.com/AquilaXk/easysubway/issues/2863",
+          "https://github.com/AquilaXk/easysubway/issues/2876",
+          "https://github.com/AquilaXk/easysubway/issues/2886",
+          "https://github.com/AquilaXk/easysubway/issues/2902"
+        ]
+      }
+    },
+    {
+      "repository": "AquilaXk/easysubway-backend",
+      "status": "ACTIVE",
+      "fragment": {
+        "gitSha": "0000000000000000000000000000000000000000",
+        "path": "contracts/documentation/documentation-fragment.json",
+        "blobSha": "7405290947856d166199e49093a65694d6c589af",
+        "lastVerifiedAt": "2026-11-18T13:40:00.000Z",
+        "verificationEvidence": [
+          "https://github.com/AquilaXk/easysubway-backend/issues/247",
+          "https://github.com/AquilaXk/easysubway-backend/issues/261",
+          "https://github.com/AquilaXk/easysubway-backend/issues/265",
+          "https://github.com/AquilaXk/easysubway-backend/issues/272",
+          "https://github.com/AquilaXk/easysubway-backend/issues/285",
+          "https://github.com/AquilaXk/easysubway-backend/issues/295",
+          "https://github.com/AquilaXk/easysubway-backend/issues/460",
+          "https://github.com/AquilaXk/easysubway-backend/pull/250",
+          "https://github.com/AquilaXk/easysubway/pull/2854",
+          "https://github.com/AquilaXk/easysubway/pull/2856"
+        ]
+      }
+    },
+    {
+      "repository": "AquilaXk/easysubway-data",
+      "status": "ACTIVE",
+      "fragment": {
+        "gitSha": "0000000000000000000000000000000000000000",
+        "path": "contracts/documentation/documentation-fragment.json",
+        "blobSha": "b09542cc7d4ccda75ae3378a02033e5102228133",
+        "lastVerifiedAt": "2026-11-18T13:40:00.000Z",
+        "verificationEvidence": [
+          "https://github.com/AquilaXk/easysubway-data/issues/1060",
+          "https://github.com/AquilaXk/easysubway-data/issues/237",
+          "https://github.com/AquilaXk/easysubway-data/issues/281",
+          "https://github.com/AquilaXk/easysubway-data/issues/286",
+          "https://github.com/AquilaXk/easysubway-data/issues/304",
+          "https://github.com/AquilaXk/easysubway-data/issues/310",
+          "https://github.com/AquilaXk/easysubway-data/issues/316",
+          "https://github.com/AquilaXk/easysubway-data/issues/38",
+          "https://github.com/AquilaXk/easysubway-data/issues/399",
+          "https://github.com/AquilaXk/easysubway-data/issues/406",
+          "https://github.com/AquilaXk/easysubway-data/issues/424",
+          "https://github.com/AquilaXk/easysubway-data/issues/430",
+          "https://github.com/AquilaXk/easysubway-data/issues/439",
+          "https://github.com/AquilaXk/easysubway-data/issues/485",
+          "https://github.com/AquilaXk/easysubway-data/issues/493",
+          "https://github.com/AquilaXk/easysubway-data/issues/495",
+          "https://github.com/AquilaXk/easysubway-data/issues/540",
+          "https://github.com/AquilaXk/easysubway-data/issues/558",
+          "https://github.com/AquilaXk/easysubway-data/issues/561",
+          "https://github.com/AquilaXk/easysubway-data/issues/565",
+          "https://github.com/AquilaXk/easysubway-data/issues/569",
+          "https://github.com/AquilaXk/easysubway-data/issues/582",
+          "https://github.com/AquilaXk/easysubway-data/issues/585",
+          "https://github.com/AquilaXk/easysubway-data/issues/587",
+          "https://github.com/AquilaXk/easysubway-data/issues/595"
+        ]
+      }
+    },
+    {
+      "repository": "AquilaXk/easysubway-mobile",
+      "status": "ACTIVE",
+      "fragment": {
+        "gitSha": "0000000000000000000000000000000000000000",
+        "path": "contracts/documentation/documentation-fragment.json",
+        "blobSha": "31b22261c6c8f87bb05c9af80b14a6a504e2c894",
+        "lastVerifiedAt": "2026-11-18T13:40:00.000Z",
+        "verificationEvidence": [
+          "https://github.com/AquilaXk/easysubway-mobile/issues/225",
+          "https://github.com/AquilaXk/easysubway-mobile/issues/250",
+          "https://github.com/AquilaXk/easysubway-mobile/issues/255",
+          "https://github.com/AquilaXk/easysubway-mobile/issues/265",
+          "https://github.com/AquilaXk/easysubway-mobile/issues/293",
+          "https://github.com/AquilaXk/easysubway-mobile/issues/304",
+          "https://github.com/AquilaXk/easysubway-mobile/issues/310",
+          "https://github.com/AquilaXk/easysubway/pull/2854"
+        ]
+      }
+    },
+    {
+      "repository": "AquilaXk/easysubway-platform",
+      "status": "ACTIVE",
+      "fragment": {
+        "gitSha": "0000000000000000000000000000000000000000",
+        "path": "contracts/documentation/documentation-fragment.json",
+        "blobSha": "828d9f10a759109ceba63f61b5955ce1fdfb83fa",
+        "lastVerifiedAt": "2026-11-18T13:40:00.000Z",
+        "verificationEvidence": [
+          "https://github.com/AquilaXk/easysubway-platform/issues/1",
+          "https://github.com/AquilaXk/easysubway-platform/issues/109",
+          "https://github.com/AquilaXk/easysubway-platform/issues/120",
+          "https://github.com/AquilaXk/easysubway-platform/issues/126",
+          "https://github.com/AquilaXk/easysubway-platform/issues/136",
+          "https://github.com/AquilaXk/easysubway-platform/issues/143"
+        ]
+      }
+    }
+  ]
+}

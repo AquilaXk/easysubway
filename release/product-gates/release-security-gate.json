@@ -1,0 +1,240 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "release-security-gate",
+  "releaseBlockerPolicy": true,
+  "policyRefreshKo": "출시 전 최신 모바일 스토어 보안 요구사항, 백엔드 운영 보안 설정, 의존성 취약점 상태를 다시 확인한다.",
+  "items": [
+    {
+      "id": "mobile_cleartext_disabled",
+      "area": "mobile",
+      "severity": "release-blocker",
+      "titleKo": "모바일 릴리즈 평문 통신 차단",
+      "ownerKo": "모바일 담당",
+      "readyWhenKo": "Android release manifest는 cleartext traffic을 허용하지 않고, iOS와 Flutter 네트워크 호출은 운영 환경에서 HTTPS API만 사용한다.",
+      "evidence": ["release-merged-manifest", "mobile-network-endpoint-review"],
+      "linkedArtifacts": ["apps/mobile/android/app/src/main/AndroidManifest.xml", "apps/mobile/lib/app/app_endpoints.dart", "apps/mobile/lib/station_search.dart"]
+    },
+    {
+      "id": "mobile_debug_network_overrides_limited",
+      "area": "mobile",
+      "severity": "release-blocker",
+      "titleKo": "모바일 debug/profile 네트워크 예외 분리",
+      "ownerKo": "모바일 담당",
+      "readyWhenKo": "debug와 profile manifest의 cleartext override는 개발용 빌드에만 존재하고 release manifest에는 포함되지 않는다.",
+      "evidence": ["debug-manifest-review", "profile-manifest-review", "release-manifest-review"],
+      "linkedArtifacts": ["apps/mobile/android/app/src/debug/AndroidManifest.xml", "apps/mobile/android/app/src/profile/AndroidManifest.xml", "apps/mobile/android/app/src/main/AndroidManifest.xml"]
+    },
+    {
+      "id": "mobile_release_signing_externalized",
+      "area": "mobile",
+      "severity": "release-blocker",
+      "titleKo": "Android 릴리즈 서명 비밀값 외부화",
+      "ownerKo": "모바일/릴리즈 담당",
+      "readyWhenKo": "release signing은 debug signing을 사용하지 않고, keystore 경로와 비밀번호는 Gradle property 또는 환경 변수로만 주입한다.",
+      "evidence": ["release-build-config-review", "secret-storage-review"],
+      "linkedArtifacts": ["apps/mobile/android/app/build.gradle.kts", ".env.example", ".gitignore"]
+    },
+    {
+      "id": "datapack_signing_key_lifecycle",
+      "area": "mobile",
+      "severity": "release-blocker",
+      "titleKo": "데이터팩 서명 key lifecycle",
+      "ownerKo": "모바일/데이터 담당",
+      "readyWhenKo": "manifest public keyring, signing key rotation, revocation, emergency rollback key 사용 기준과 test vector가 PR 검증 증거에 남고, private signing key는 저장소와 모바일 산출물에 포함되지 않는다.",
+      "evidence": ["manifest-signature-test-vector", "key-rotation-revocation-record", "emergency-rollback-key-approval", "release-artifact-secret-scan-output"],
+      "linkedArtifacts": ["release/product-gates/security-privacy-release-evidence.json", "tools/datapack/schema/manifest.schema.json", "tools/datapack/datapack-tools.test.mjs", "apps/mobile/lib/core/datapack/data_pack_manifest.dart"]
+    },
+    {
+      "id": "mobile_test_credentials_absent",
+      "area": "mobile",
+      "severity": "release-blocker",
+      "titleKo": "모바일 테스트 계정과 샘플 비밀값 미포함",
+      "ownerKo": "모바일/QA 담당",
+      "readyWhenKo": "릴리즈 빌드와 앱 저장소에 심사용 데모 계정, 테스트 API 키, 샘플 비밀번호, 운영 지도 키가 하드코딩되어 있지 않다.",
+      "evidence": ["credential-string-search", "release-artifact-review"],
+      "linkedArtifacts": ["apps/mobile/lib/main.dart", ".env.example", ".gitignore"]
+    },
+    {
+      "id": "mobile_release_artifact_secret_trace_scan",
+      "area": "mobile",
+      "severity": "release-blocker",
+      "titleKo": "모바일 릴리즈 산출물 비밀값과 network trace 점검",
+      "ownerKo": "모바일/보안 담당",
+      "readyWhenKo": "AAB/IPA 또는 Play-generated APK 후보에서 provider key, signing private key, upload URL, receipt token, local placeholder endpoint가 검색되지 않고, release network trace는 개인정보 인벤토리와 같은 endpoint/데이터 흐름만 보인다.",
+      "evidence": ["release-artifact-secret-scan-output", "release-network-trace-review", "android-emulator-release-smoke-log"],
+      "linkedArtifacts": [".github/workflows/release-artifacts.yml", "release/product-gates/security-privacy-release-evidence.json", "apps/mobile/release/store-privacy-inventory.json", "apps/mobile/lib/app/app_endpoints.dart"]
+    },
+    {
+      "id": "mobile_error_stacktrace_sanitized",
+      "area": "mobile",
+      "severity": "release-blocker",
+      "titleKo": "모바일 사용자 오류 메시지와 스택 분리",
+      "ownerKo": "모바일 담당",
+      "readyWhenKo": "사용자 화면은 쉬운 오류 안내와 다음 행동만 보여주고, 원본 예외와 stack trace는 오류 리포터로만 전달한다.",
+      "evidence": ["mobile-error-flow-tests", "release-error-screen-review"],
+      "linkedArtifacts": ["apps/mobile/lib/mobile_error_reporter.dart", "apps/mobile/lib/station_search.dart", "apps/mobile/lib/route_search.dart", "apps/mobile/test/widget_test.dart"]
+    },
+    {
+      "id": "backend_admin_auth_required",
+      "area": "backend",
+      "severity": "release-blocker",
+      "titleKo": "백엔드 관리자 인증 필수",
+      "ownerKo": "백엔드 담당",
+      "readyWhenKo": "관리자 화면과 관리자 API는 인증된 관리자만 접근하고, 운영 프로필에서 관리자 계정 설정이 비어 있으면 시작하지 않는다.",
+      "evidence": ["spring-security-config-review", "admin-controller-tests"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/test/java/com/easysubway/transit/adapter/in/web/TransitMasterControllerTest.java"]
+    },
+    {
+      "id": "backend_admin_basic_auth_transition_gate",
+      "area": "backend",
+      "severity": "release-blocker",
+      "titleKo": "관리자 Basic auth 운영 전환 기준",
+      "ownerKo": "백엔드/운영 담당",
+      "readyWhenKo": "운영 프로필은 Basic auth를 기본 비활성화하고, 예외적으로 켤 때는 owner와 만료일을 명시한 승인 기록, 관리자와 운영기관 인증 실패 lockout 검증, OIDC/MFA/SSO 전환 결정 증거가 PR 검증 증거에 남아야 한다.",
+      "evidence": ["admin-auth-transition-decision-record", "basic-auth-prod-disable-test", "basic-auth-exception-expiry-record", "admin-basic-auth-lockout-tests", "admin-security-config-review"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProvider.java", "backend/src/test/java/com/easysubway/common/security/AdminOperatorLockoutAuthenticationProviderTest.java", "tools/ci/repository-contract.test.mjs"]
+    },
+    {
+      "id": "backend_role_authorization",
+      "area": "backend",
+      "severity": "release-blocker",
+      "titleKo": "백엔드 관리자와 운영기관 역할 분리",
+      "ownerKo": "백엔드 담당",
+      "readyWhenKo": "전역 관리자와 운영기관 전용 화면은 별도 역할로 분리하고, 기관용 리포트는 읽기 전용 동작을 유지한다.",
+      "evidence": ["role-security-config-review", "operator-report-controller-tests"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportPageController.java", "backend/src/test/java/com/easysubway/operator/adapter/in/web/OperatorAccessibilityReportControllerTest.java"]
+    },
+    {
+      "id": "backend_report_photo_upload_limits",
+      "area": "backend",
+      "severity": "release-blocker",
+      "titleKo": "신고 사진 업로드 제한",
+      "ownerKo": "백엔드/모바일 담당",
+      "readyWhenKo": "시설 신고 사진은 허용 MIME type과 최대 크기를 검증하고, Base64 디코딩 실패나 크기 초과는 안전한 사용자 메시지로 거절한다.",
+      "evidence": ["facility-report-service-tests", "upload-limit-review"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java", "backend/src/test/java/com/easysubway/report/application/service/FacilityReportServiceTest.java", "apps/mobile/lib/facility_report.dart"]
+    },
+    {
+      "id": "backend_report_photo_malicious_upload_defense",
+      "area": "backend",
+      "severity": "release-blocker",
+      "titleKo": "악성 신고 사진 업로드 방어",
+      "ownerKo": "백엔드/보안 담당",
+      "readyWhenKo": "시설 신고 사진은 MIME, extension, magic bytes, checksum, image decode, thumbnail 생성 실패를 모두 검증하고, claim 실패나 중복 제출 실패 시 orphan cleanup 경로가 검증된다.",
+      "evidence": ["malicious-photo-upload-tests", "orphan-cleanup-failure-path-test", "facility-report-photo-processor-review", "receipt-token-boundary-review"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java", "backend/src/test/java/com/easysubway/report/application/service/FacilityReportPhotoProcessorTest.java", "backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java", "backend/src/test/java/com/easysubway/report/application/service/FacilityReportServiceTest.java", "backend/src/test/java/com/easysubway/report/adapter/in/web/FacilityReportUploadIntentsTest.java"]
+    },
+    {
+      "id": "backend_report_abuse_control_release_gate",
+      "area": "backend",
+      "severity": "release-blocker",
+      "titleKo": "신고 abuse control 운영 store 경계",
+      "ownerKo": "백엔드/운영 담당",
+      "readyWhenKo": "사진 업로드 intent, claim, 신고 제출, 상태 조회, 확인 API는 운영 공유 store 또는 동등한 분산 제한 증거를 갖추고, local store 모드는 단일 노드 검증용 release blocker로 기록한다.",
+      "evidence": ["facility-report-abuse-control-tests", "abuse-store-mode-release-blocker-record", "deployment-env-contract"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java", "backend/src/test/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControlTest.java", "backend/src/main/resources/application-prod.yml", "tools/deploy/backend-app-env.allowlist"]
+    },
+    {
+      "id": "backend_error_response_sanitized",
+      "area": "backend",
+      "severity": "release-blocker",
+      "titleKo": "백엔드 오류 응답 상세 정보 비노출",
+      "ownerKo": "백엔드 담당",
+      "readyWhenKo": "공통 예외 응답은 stack trace, 클래스명, 내부 SQL, raw exception을 API 응답에 포함하지 않고 사용자에게 필요한 안전한 문구만 반환한다.",
+      "evidence": ["exception-handler-review", "api-error-tests"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java", "backend/src/main/java/com/easysubway/common/web/ApiResponse.java"]
+    },
+    {
+      "id": "backend_api_traffic_monitoring",
+      "area": "backend",
+      "severity": "release-blocker",
+      "titleKo": "백엔드 API 오류율 관측",
+      "ownerKo": "백엔드 담당",
+      "readyWhenKo": "사용자 활동과 API 오류율을 분리해 기록하고, 관리자 대시보드에서 실패율 급증을 확인할 수 있다.",
+      "evidence": ["api-traffic-tests", "usage-dashboard-review"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityTrackingFilter.java", "backend/src/main/java/com/easysubway/usage/adapter/out/persistence/JdbcUserActivityRepository.java", "backend/src/main/java/com/easysubway/usage/adapter/in/web/UserActivityAdminPageController.java"]
+    },
+    {
+      "id": "backend_sensitive_log_minimization",
+      "area": "backend",
+      "severity": "release-blocker",
+      "titleKo": "백엔드 민감 로그 최소화",
+      "ownerKo": "백엔드/운영 담당",
+      "readyWhenKo": "위치, 사용자 식별자, 신고 사진, 인증 비밀번호가 운영 로그에 불필요하게 남지 않도록 오류 로그와 감사 로그의 목적을 분리한다.",
+      "evidence": ["log-field-review", "audit-log-review"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/report/application/service/FacilityReportService.java", "backend/src/main/java/com/easysubway/report/domain/FacilityReportReviewAudit.java", "backend/src/main/java/com/easysubway/common/web/CommonExceptionHandler.java"]
+    },
+    {
+      "id": "user_data_deletion_retention_e2e",
+      "area": "user-data",
+      "severity": "release-blocker",
+      "titleKo": "사용자 데이터 삭제와 retention E2E",
+      "ownerKo": "모바일/백엔드/개인정보 담당",
+      "readyWhenKo": "데이터 삭제 요청은 local data, report link, photo object, notification preference/device, favorite, search history, mobility profile retention을 같은 사용자 범위로 삭제 또는 익명화하고 Android emulator UI evidence와 백엔드/모바일 자동 테스트 결과를 PR에 남긴다.",
+      "evidence": ["backend-user-data-deletion-service-test", "mobile-user-data-deletion-local-test", "android-emulator-deletion-ui-evidence", "report-photo-object-delete-test", "retention-inventory-cross-check"],
+      "linkedArtifacts": ["backend/src/main/java/com/easysubway/user/application/service/UserDataDeletionService.java", "backend/src/test/java/com/easysubway/user/application/service/UserDataDeletionServiceTest.java", "backend/src/test/java/com/easysubway/report/adapter/out/persistence/JdbcFacilityReportRepositoryTest.java", "apps/mobile/lib/user_data_deletion.dart", "apps/mobile/test/user_data_deletion_test.dart", "release/product-gates/security-privacy-release-evidence.json"]
+    },
+    {
+      "id": "repository_secrets_not_tracked",
+      "area": "repository",
+      "severity": "release-blocker",
+      "titleKo": "저장소 비밀값 추적 금지",
+      "ownerKo": "릴리즈/운영 담당",
+      "readyWhenKo": "keystore, private key, provisioning profile, Firebase 설정 파일, 로컬 env 파일은 git에 추적되지 않고 CI에는 단일 dotenv secret으로 주입한다.",
+      "evidence": ["gitignore-review", "tracked-secret-search", "actions-env-contract-test"],
+      "linkedArtifacts": [".gitignore", ".env.example", ".github/workflows/ci.yml", "tools/ci/repository-contract.test.mjs"]
+    },
+    {
+      "id": "repository_provider_storage_exposure_guard",
+      "area": "repository",
+      "severity": "release-blocker",
+      "titleKo": "provider key와 object storage 노출 방지",
+      "ownerKo": "보안/릴리즈 담당",
+      "readyWhenKo": "모바일 릴리즈 산출물은 provider key, object storage credential, signed URL을 직접 포함하지 않고, 백엔드가 짧은 만료 signed upload URL만 발급하며 로그와 감사 기록에는 upload intent와 receipt token 원문을 남기지 않는다.",
+      "evidence": ["provider-security-boundary-regression-test", "release-artifact-credential-search", "signed-upload-url-expiry-contract", "sensitive-log-redaction-review"],
+      "linkedArtifacts": [".github/workflows/release-artifacts.yml", "backend/src/test/java/com/easysubway/report/adapter/in/web/FacilityReportUploadIntentsTest.java", "backend/src/main/java/com/easysubway/report/adapter/out/storage/ObjectStorageFacilityReportPhotoStorage.java", "tools/ci/repository-contract.test.mjs"]
+    },
+    {
+      "id": "repository_dependency_review",
+      "area": "repository",
+      "severity": "release-blocker",
+      "titleKo": "출시 전 의존성 점검",
+      "ownerKo": "모바일/백엔드 담당",
+      "readyWhenKo": "Flutter, Android Gradle, Java, Spring 의존성 lock과 빌드 파일을 출시 전 점검하고 OSV Scanner PR scan이 새 취약 의존성을 PR에서 차단한다.",
+      "evidence": ["pubspec-lock-review", "gradle-dependency-review", "osv-scanner-pr-result", "github-actions-ci-result"],
+      "linkedArtifacts": ["apps/mobile/android/app/gradle.lockfile", "apps/mobile/android/app/osv-scanner.toml", "apps/mobile/android/app/build.gradle.kts", "apps/mobile/android/build.gradle.kts", "backend/gradle.lockfile", "backend/osv-scanner.toml", "backend/build.gradle", ".github/workflows/ci.yml"]
+    },
+    {
+      "id": "repository_abuse_penetration_rehearsal",
+      "area": "repository",
+      "severity": "release-blocker",
+      "titleKo": "출시 전 abuse-case와 penetration rehearsal",
+      "ownerKo": "보안/릴리즈 담당",
+      "readyWhenKo": "Android AAB 또는 Play-generated APK secret scan, report photo/receipt/signed URL abuse, admin/operator auth/session/CSRF, tenant authorization, distributed rate limit, object lifecycle rehearsal 결과가 있고 critical/high finding이 0이거나 #1020 waiver와 fix plan이 있다.",
+      "evidence": ["abuse-penetration-rehearsal-gate-manifest", "android-artifact-secret-scan-output", "redacted-abuse-request-response-summary", "critical-high-finding-zero-or-waiver"],
+      "linkedArtifacts": ["release/product-gates/abuse-penetration-rehearsal-gate.json", "release/product-gates/security-privacy-release-evidence.json", "backend/src/main/java/com/easysubway/common/security/SecurityConfig.java", "backend/src/main/java/com/easysubway/report/adapter/in/web/FacilityReportAbuseControl.java", "backend/src/main/java/com/easysubway/report/application/service/FacilityReportPhotoProcessor.java"]
+    },
+    {
+      "id": "repository_security_scan_before_release",
+      "area": "repository",
+      "severity": "release-blocker",
+      "titleKo": "출시 전 저장소 보안 scan",
+      "ownerKo": "보안/릴리즈 담당",
+      "readyWhenKo": "프로덕션 제출 후보 commit에 대해 저장소 보안 scan과 모바일/백엔드 의존성 점검 결과를 PR 또는 release gate 기록에 남긴다.",
+      "evidence": ["repository-security-scan-result", "release-candidate-review"],
+      "linkedArtifacts": ["tools/ci/repository-contract.test.mjs", ".github/workflows/ci.yml"]
+    },
+    {
+      "id": "cross_store_privacy_security_consistency",
+      "area": "cross-store",
+      "severity": "release-blocker",
+      "titleKo": "개인정보와 보안 고지 일관성",
+      "ownerKo": "개인정보/릴리즈 담당",
+      "readyWhenKo": "Data safety, App Privacy, PrivacyInfo, 스토어 심사 정보, 앱 도움말, 보안 문의 경로와 release network trace가 같은 데이터 처리와 삭제 요청 기준을 설명한다.",
+      "evidence": ["privacy-inventory-cross-check", "store-submission-readiness-review", "help-screen-review", "release-network-trace-review"],
+      "linkedArtifacts": ["apps/mobile/release/store-privacy-inventory.json", "apps/mobile/release/store-submission-readiness.json", "apps/mobile/ios/Runner/PrivacyInfo.xcprivacy"]
+    }
+  ]
+}

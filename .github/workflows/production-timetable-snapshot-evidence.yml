@@ -1,0 +1,44 @@
+name: Production timetable snapshot evidence
+
+on:
+  workflow_dispatch:
+
+jobs:
+  verify:
+    name: Verify production timetable snapshot
+    permissions:
+      contents: read
+    runs-on:
+      - self-hosted
+      - easysubway-production
+    timeout-minutes: 20
+    environment: production
+    concurrency:
+      group: production-timetable-snapshot-evidence
+      cancel-in-progress: false
+    env:
+      DEPLOY_ROOT: ${{ vars.DEPLOY_ROOT }}
+      EXPECTED_DEPLOYED_SHA: ${{ github.sha }}
+
+    steps:
+      - name: Reject non-main manual execution
+        shell: bash
+        run: |
+          if [[ "${GITHUB_REF}" != "refs/heads/main" ]]; then
+            echo "production timetable evidence must run from main" >&2
+            exit 1
+          fi
+
+      - name: Checkout reviewed main
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Verify active identity, cache, freshness, and rollback
+        shell: bash
+        run: bash tools/ops/verify-production-timetable-snapshot.sh

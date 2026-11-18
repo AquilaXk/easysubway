@@ -1,0 +1,113 @@
+name: Store Distribution Evidence
+
+on:
+  workflow_dispatch:
+
+concurrency:
+  group: store-distribution-evidence-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  preflight:
+    name: Store Distribution Evidence / Preflight
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      NODE_OPTIONS: --disable-warning=ExperimentalWarning
+
+    steps:
+      - name: Store Distribution Evidence / Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Store Distribution Evidence / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Store Distribution Evidence / Restore GitHub Actions dotenv secret
+        env:
+          EASYSUBWAY_ENV_SECRET: ${{ secrets.EASYSUBWAY_ENV }}
+        run: |
+          set -euo pipefail
+          if [[ -z "${EASYSUBWAY_ENV_SECRET}" ]]; then
+            echo "::error title=Store distribution evidence env::EASYSUBWAY_ENV secret is not configured."
+            exit 1
+          fi
+          env_file="${RUNNER_TEMP}/easysubway-store-distribution.env"
+          printf '%s' "${EASYSUBWAY_ENV_SECRET}" > "${env_file}"
+          chmod 600 "${env_file}"
+          echo "EASYSUBWAY_ENV_FILE=${env_file}" >> "${GITHUB_ENV}"
+
+      - name: Store Distribution Evidence / Check credential and publish env readiness
+        id: store-env
+        run: |
+          set -euo pipefail
+          node tools/ci/check-store-distribution-evidence-env.mjs \
+            --env-file "${EASYSUBWAY_ENV_FILE}" \
+            --mobile-pubspec apps/mobile/pubspec.yaml \
+            --github-output "${GITHUB_OUTPUT}" \
+            --report "${RUNNER_TEMP}/store-distribution-evidence-preflight.txt"
+
+      - name: Store Distribution Evidence / Check Google Play API access
+        id: google-play-api
+        run: |
+          set -euo pipefail
+          node tools/ci/check-google-play-api-access.mjs \
+            --env-file "${EASYSUBWAY_ENV_FILE}" \
+            --github-output "${GITHUB_OUTPUT}" \
+            --report "${RUNNER_TEMP}/google-play-api-access.txt"
+
+      - name: Store Distribution Evidence / Validate data pack object storage publish env
+        id: datapack-env
+        run: |
+          set -euo pipefail
+          node tools/datapack/export-publish-env.mjs \
+            --env-file "${EASYSUBWAY_ENV_FILE}" \
+            --github-env "${GITHUB_ENV}" \
+            --github-output "${GITHUB_OUTPUT}"
+
+      - name: Store Distribution Evidence / Upload preflight evidence
+        if: ${{ always() }}
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: store-distribution-evidence-preflight-${{ github.sha }}
+          path: |
+            ${{ runner.temp }}/store-distribution-evidence-preflight.txt
+            ${{ runner.temp }}/google-play-api-access.txt
+          if-no-files-found: warn
+          retention-days: 14
+
+  notify-slack-store-result:
+    name: Slack / Store distribution evidence result
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs: preflight
+    if: ${{ always() }}
+    env:
+      SLACK_RELEASE_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_WEBHOOK_URL }}
+    steps:
+      - name: Slack / Skip missing release webhook
+        if: ${{ env.SLACK_RELEASE_WEBHOOK_URL == '' }}
+        run: echo "::notice title=Slack notification::SLACK_RELEASE_WEBHOOK_URL is not configured."
+
+      - name: Slack / Notify store distribution evidence result
+        if: ${{ env.SLACK_RELEASE_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
+        with:
+          webhook: ${{ env.SLACK_RELEASE_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "EasySubway store distribution evidence ${{ needs.preflight.result }}"
+            blocks:
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: |
+                    *EasySubway Store Distribution Evidence ${{ needs.preflight.result }}*
+                    • repo: `${{ github.repository }}`
+                    • ref: `${{ github.ref_name }}`
+                    • actor: `${{ github.actor }}`
+                    • run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions 열기>

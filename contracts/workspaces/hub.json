@@ -1,0 +1,31 @@
+{
+  "contracts": "..",
+  "gateDirectories": {
+    "hub": "../../release/product-gates",
+    "mobile": "../../apps/mobile/release"
+  },
+  "datapackIndex": "../../apps/mobile/assets/datapacks/index.json",
+  "sourceInventory": "../../apps/mobile/assets/datapacks/source-inventory.json",
+  "governancePolicy": "../../tools/datapack/source-governance-policy.json",
+  "freshnessPolicy": "../../release/product-gates/datapack-freshness-sla.json",
+  "architectureDecision": "../documentation/ADR-HUB-0001.json",
+  "documentationSystemCatalog": "../documentation/documentation-system-catalog.json",
+  "productClaimCatalog": "../documentation/product-claim-catalog.json",
+  "referenceAuditScope": "../documentation/reference-audit-scope.json",
+  "referenceAuditReportSchema": "../documentation/reference-audit-report.schema.json",
+  "publicSensitivityAuditScope": "../documentation/public-sensitivity-audit-scope.json",
+  "publicSensitivityOwnerReceiptSchema": "../documentation/public-sensitivity-owner-receipt.schema.json",
+  "publicSensitivityAuditReportSchema": "../documentation/public-sensitivity-audit-report.schema.json",
+  "planDocExecutionAuditScope": "../documentation/plan-doc-execution-audit-scope.json",
+  "planDocExecutionAuditReportSchema": "../documentation/plan-doc-execution-audit-report.schema.json",
+  "externalTerminalLocatorAuditScope": "../documentation/external-terminal-locator-audit-scope.json",
+  "externalTerminalLocatorAuditReportSchema": "../documentation/external-terminal-locator-audit-report.schema.json",
+  "postGoBoundaryAuditScope": "../documentation/post-go-boundary-audit-scope.json",
+  "postGoBoundaryAuditReportSchema": "../documentation/post-go-boundary-audit-report.schema.json",
+  "cleanCheckoutReproducibilityAuditScope": "../documentation/clean-checkout-reproducibility-audit-scope.json",
+  "cleanCheckoutReproducibilityOwnerContractSchema": "../documentation/clean-checkout-reproducibility-owner-contract.schema.json",
+  "cleanCheckoutReproducibilityOwnerReceiptSchema": "../documentation/clean-checkout-reproducibility-owner-receipt.schema.json",
+  "cleanCheckoutReproducibilityAuditReportSchema": "../documentation/clean-checkout-reproducibility-audit-report.schema.json",
+  "documentationInventoryAuditScope": "../documentation/documentation-inventory-audit-scope.json",
+  "documentationInventoryAuditReportSchema": "../documentation/documentation-inventory-audit-report.schema.json"
+}

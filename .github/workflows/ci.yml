@@ -1,0 +1,442 @@
+name: CI
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+      - edited
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  changes:
+    name: Changes
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    outputs:
+      android: ${{ steps.filter.outputs.android }}
+      backend: ${{ steps.filter.outputs.backend }}
+      mobile: ${{ steps.filter.outputs.mobile }}
+      ios: ${{ steps.filter.outputs.ios }}
+      repository: ${{ steps.filter.outputs.repository }}
+      docs_only: ${{ steps.filter.outputs.docs_only }}
+      ci: ${{ steps.filter.outputs.ci }}
+      deploy: ${{ steps.filter.outputs.deploy }}
+      datapack: ${{ steps.filter.outputs.datapack }}
+      route_map: ${{ steps.filter.outputs.route_map }}
+      realtime: ${{ steps.filter.outputs.realtime }}
+      release: ${{ steps.filter.outputs.release }}
+      contracts: ${{ steps.filter.outputs.contracts }}
+
+    steps:
+      - name: Changes / Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Changes / Detect changed paths and CI areas
+        id: filter
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          zero_sha="0000000000000000000000000000000000000000"
+          head_sha="${HEAD_SHA}"
+
+          if [[ "${EVENT_NAME}" == "pull_request" ]]; then
+            base_sha="${BASE_SHA}"
+            git diff --name-only "${base_sha}" "${head_sha}" > changed-files.txt
+          elif [[ -n "${BEFORE_SHA}" && "${BEFORE_SHA}" != "${zero_sha}" ]] && git cat-file -e "${BEFORE_SHA}^{commit}" 2>/dev/null && git merge-base --is-ancestor "${BEFORE_SHA}" "${head_sha}" 2>/dev/null; then
+            base_sha="${BEFORE_SHA}"
+            git diff --name-only "${base_sha}" "${head_sha}" > changed-files.txt
+          elif git rev-parse HEAD^ >/dev/null 2>&1; then
+            base_sha="$(git rev-list --max-parents=0 HEAD)"
+            git diff --name-only "${base_sha}" "${head_sha}" > changed-files.txt
+          else
+            git ls-tree -r --name-only "${head_sha}" > changed-files.txt
+          fi
+
+          bash tools/ci/detect-changed-paths.sh changed-files.txt
+
+  dependency-vulnerability-scan:
+    name: Dependency Vulnerability Scan
+    needs: changes
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    permissions:
+      actions: read
+      security-events: write
+      contents: read
+    # OSV export-results gate: google/osv-scanner-action#129 / fix PR #130
+    # Pin commit 3a7550f… (post-v2.3.8). Follow-up: move pin when a release includes the gate.
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@3a7550f43ba5b58905a821ce3a0ed24c4858b3f4
+    with:
+      export-results: false
+      upload-sarif: true
+      fail-on-vuln: true
+      scan-args: |-
+        --lockfile=tools/qa/package-lock.json
+
+  pr-title:
+    name: PR Title
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+    env:
+      PR_TITLE: ${{ github.event.pull_request.title }}
+    steps:
+      - name: PR Title / Validate bracket prefix
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "${PR_TITLE}" =~ ^\[(Feat|Fix|Test|Chore|Docs|Build|CI|Style|Refactor|Backend|Mobile)\]\ .+ ]]; then
+            echo "::error title=PR title::Use '[Type] 한국어 작업 요약' format."
+            exit 1
+          fi
+
+  release-gate-consistency:
+    name: Release Gate Consistency
+    runs-on: ubuntu-latest
+    needs: changes
+    permissions:
+      contents: read
+
+    steps:
+      - name: Release Gate Consistency / Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Release Gate Consistency / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Release Gate Consistency / Run release gate contract tests
+        env:
+          NODE_OPTIONS: --disable-warning=ExperimentalWarning
+        run: |
+          node --test tools/ci/check-contracts.test.mjs
+          node tools/ci/check-admin-vendor-integrity.mjs
+          node tools/ci/check-map-attribution.mjs
+          node --test tools/ci/check-map-attribution.test.mjs
+          node tools/release/build-system-release-governance-inventory.mjs --check
+          node tools/ci/guard-anti-cheat.mjs
+          node tools/ci/journey-n-minus-1-compatibility.mjs
+          node tools/repo/refresh-documentation-fragment.mjs --worktree --check
+
+  admin-qa-gates:
+    name: Admin QA Gates
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.docs_only != 'true' }}
+    permissions:
+      contents: read
+
+    steps:
+      - name: Admin QA Gates / Checkout repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Admin QA Gates / Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Admin QA Gates / Install pinned QA tools
+        run: npm ci --prefix tools/qa --ignore-scripts
+
+      - name: Admin QA Gates / Run static QA gates
+        env:
+          NODE_OPTIONS: --disable-warning=ExperimentalWarning
+        run: |
+          node tools/ci/check-admin-vendor-integrity.mjs
+          npm test --prefix tools/qa
+
+  repository-contracts:
+    name: Repository CI
+    runs-on: ubuntu-latest
+    needs: changes
+    permissions:
+      contents: read
+
+    steps:
+      - name: Repository CI / Skip unchanged area
+        if: ${{ needs.changes.outputs.repository != 'true' && needs.changes.outputs.docs_only != 'true' && needs.changes.outputs.ci != 'true' }}
+        run: echo "No repository, docs-only, or CI changes; skipping repository checks."
+
+      - name: Repository CI / Checkout repository
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' || needs.changes.outputs.contracts == 'true' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.mobile == 'true' || needs.changes.outputs.datapack == 'true' }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Repository CI / Set up Node.js
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' || needs.changes.outputs.contracts == 'true' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.mobile == 'true' || needs.changes.outputs.datapack == 'true' }}
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: "24"
+
+      - name: Repository CI / Validate whitespace
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if git rev-parse HEAD^ >/dev/null 2>&1; then
+            git diff --check HEAD^ HEAD
+          else
+            git diff-tree --check --root HEAD
+          fi
+
+      # tools/qa는 detect-changed-paths.sh에서 tools/ci·tools/repo와 같은 arm(ci=true, repository=true)에
+      # 묶이므로 계약 테스트 스텝 글롭에 넣는다(#2558). Admin QA Gates의 `npm test --prefix tools/qa`는
+      # playwright 설치(npm ci)에 딸린 실행 경로라, 설치가 깨지면 계약 테스트까지 함께 사라진다.
+      # tools/qa 테스트는 소스를 텍스트로 파싱해 playwright 없이 돌아가므로 여기서도 그대로 실행된다.
+      - name: Repository CI / Run contract tests
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
+        env:
+          NODE_OPTIONS: --disable-warning=ExperimentalWarning
+        run: node --test tools/ci/*.test.mjs tools/ci/lib/*.test.mjs tools/ops/*.test.mjs tools/release/*.test.mjs tools/repo/*.test.mjs tools/lib/*.test.mjs tools/qa/*.test.mjs
+
+      - name: Repository CI / Prepare active documentation fragment workspace
+        if: ${{ needs.changes.outputs.contracts == 'true' }}
+        run: >-
+          node tools/ci/prepare-documentation-fragment-workspace.mjs
+          --catalog contracts/documentation/documentation-system-catalog.json
+          --scope contracts/documentation/documentation-inventory-audit-scope.json
+          --root "${RUNNER_TEMP}/documentation-fragment-repositories-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+          --output "${RUNNER_TEMP}/documentation-fragment-workspace.json"
+
+      - name: Repository CI / Validate PR contract transitions
+        if: ${{ needs.changes.outputs.contracts == 'true' && github.event_name == 'pull_request' }}
+        env:
+          BASE_REF: ${{ github.event.pull_request.base.sha }}
+        run: >-
+          node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json
+          --base-ref "${BASE_REF}"
+          --documentation-fragment-workspace "${RUNNER_TEMP}/documentation-fragment-workspace.json"
+
+      - name: Repository CI / Validate push contract transitions
+        if: ${{ needs.changes.outputs.contracts == 'true' && github.event_name == 'push' }}
+        env:
+          BASE_REF: ${{ github.event.before }}
+        run: |
+          if [[ -n "${BASE_REF}" && "${BASE_REF}" != "0000000000000000000000000000000000000000" ]] && git cat-file -e "${BASE_REF}^{commit}" 2>/dev/null && git merge-base --is-ancestor "${BASE_REF}" HEAD 2>/dev/null; then
+            node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json \
+              --base-ref "${BASE_REF}" \
+              --documentation-fragment-workspace "${RUNNER_TEMP}/documentation-fragment-workspace.json"
+          else
+            node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json \
+              --current-only \
+              --documentation-fragment-workspace "${RUNNER_TEMP}/documentation-fragment-workspace.json"
+          fi
+
+      - name: Repository CI / Validate current contracts
+        if: ${{ needs.changes.outputs.contracts == 'true' && github.event_name == 'workflow_dispatch' }}
+        run: >-
+          node tools/ci/check-contracts.mjs --workspace contracts/workspaces/hub.json
+          --current-only
+          --documentation-fragment-workspace "${RUNNER_TEMP}/documentation-fragment-workspace.json"
+
+      - name: Repository CI / Check component contract mirrors
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.contracts == 'true' || needs.changes.outputs.ci == 'true' }}
+        run: node tools/repo/sync-component-mirrors.mjs --check
+
+      - name: Repository CI / Check directory boundaries
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' || needs.changes.outputs.contracts == 'true' || needs.changes.outputs.backend == 'true' || needs.changes.outputs.mobile == 'true' || needs.changes.outputs.datapack == 'true' }}
+        run: node tools/ci/check-boundaries.mjs
+
+
+
+      - name: Repository CI / Run security tool tests
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.ci == 'true' }}
+        env:
+          NODE_OPTIONS: --disable-warning=ExperimentalWarning
+        run: node --test tools/security/*.test.mjs
+
+
+
+
+      - name: Repository CI / Lint GitHub Actions workflows
+        if: ${{ needs.changes.outputs.ci == 'true' }}
+        shell: bash
+        env:
+          # #2396: job 수준 env에서 runner context를 쓰는 등 context availability·표현식·스키마
+          # 오류를 PR 단계에서 사전 차단한다. 커스텀 self-hosted 러너 라벨은 .github/actionlint.yaml에 등록.
+          ACTIONLINT_VERSION: "1.7.12"
+          ACTIONLINT_SHA256: "8aca8db96f1b94770f1b0d72b6dddcb1ebb8123cb3712530b08cc387b349a3d8"
+          # 사전 존재하는 info/style 수준 shellcheck 잡음은 게이트 대상에서 제외하고
+          # warning 이상(실제 셸 결함)만 실패시킨다.
+          SHELLCHECK_OPTS: --severity=warning
+        run: |
+          set -euo pipefail
+          tarball="actionlint_${ACTIONLINT_VERSION}_linux_amd64.tar.gz"
+          url="https://github.com/rhysd/actionlint/releases/download/v${ACTIONLINT_VERSION}/${tarball}"
+          workdir="$(mktemp -d)"
+          curl --proto '=https' --tlsv1.2 -fsSL "${url}" -o "${workdir}/${tarball}"
+          echo "${ACTIONLINT_SHA256}  ${workdir}/${tarball}" | sha256sum --check --status
+          tar -xzf "${workdir}/${tarball}" -C "${workdir}" actionlint
+          "${workdir}/actionlint" -color
+
+      - name: Repository CI / Validate tracked Markdown policy
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          unexpected_markdown="$(git ls-files '*.md' ':!:README.md' ':!:README.ko.md' ':!:SECURITY.md' ':!:THIRD_PARTY_NOTICES.md')"
+          if [[ -n "${unexpected_markdown}" ]]; then
+            echo "Unexpected tracked Markdown file:"
+            echo "${unexpected_markdown}"
+            exit 1
+          fi
+
+      - name: Repository CI / Validate local agent docs are not tracked
+        if: ${{ needs.changes.outputs.repository == 'true' || needs.changes.outputs.docs_only == 'true' || needs.changes.outputs.ci == 'true' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          unexpected_agent_files="$(git ls-files AGENTS.md CLAUDE.md GEMINI.md CURSOR.md COPILOT.md TODO.md .coderabbit.yaml docs .evidence .claude .cursor .aider .windsurf .ai .codex .gemini .agents ':(glob)**/.codex/**' ':(glob)**/.coderabbit*')"
+          if [[ -n "${unexpected_agent_files}" ]]; then
+            echo "Unexpected tracked local agent file:"
+            echo "${unexpected_agent_files}"
+            exit 1
+          fi
+
+  backend:
+    name: Backend CI
+    runs-on: ubuntu-latest
+    needs: changes
+    permissions:
+      contents: read
+
+    steps:
+      - name: Backend CI / Skip unchanged area
+        if: ${{ needs.changes.outputs.backend != 'true' }}
+        run: echo "No backend changes; skipping backend checks."
+
+      - name: Backend CI / Checkout repository
+        if: ${{ needs.changes.outputs.backend == 'true' }}
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          persist-credentials: false
+
+      - name: Backend CI / Detect backend scaffold
+        if: ${{ needs.changes.outputs.backend == 'true' }}
+        id: scaffold
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ -f backend/gradlew ]]; then
+            chmod +x backend/gradlew
+            echo "present=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "present=false" >> "${GITHUB_OUTPUT}"
+            echo "Backend scaffold not found; skipping backend checks."
+          fi
+
+      - name: Backend CI / Set up Java
+        if: ${{ needs.changes.outputs.backend == 'true' && steps.scaffold.outputs.present == 'true' }}
+        uses: actions/setup-java@be666c2fcd27ec809703dec50e508c2fdc7f6654
+        with:
+          distribution: temurin
+          java-version: "21"
+          cache: gradle
+
+      - name: Backend CI / Run Gradle checks
+        if: ${{ needs.changes.outputs.backend == 'true' && steps.scaffold.outputs.present == 'true' }}
+        working-directory: backend
+        env:
+          EASYSUBWAY_CONTRACTS_BUNDLE: ${{ github.workspace }}/contracts/bundles/backend-contracts-v1.0.0.json
+        run: ./gradlew check --no-daemon
+
+  mobile-app:
+    name: Mobile App CI
+    runs-on: ubuntu-latest
+    needs: changes
+    permissions:
+      contents: read
+
+    steps:
+      - name: Mobile App CI / Skip unchanged area
+        if: ${{ needs.changes.outputs.mobile != 'true' }}
+        run: echo "No mobile app changes; skipping mobile checks."
+
+  android:
+    name: Android CI
+    runs-on: ubuntu-latest
+    needs: changes
+    permissions:
+      contents: read
+
+    steps:
+      - name: Android CI / Skip unchanged area
+        if: ${{ needs.changes.outputs.android != 'true' }}
+        run: echo "No Android changes; skipping Android checks."
+
+  notify-slack-ci-failure:
+    name: Slack / CI failure
+    runs-on: ubuntu-latest
+    permissions: {}
+    needs:
+      - changes
+      - release-gate-consistency
+      - repository-contracts
+      - admin-qa-gates
+      - backend
+      - mobile-app
+      - android
+      - dependency-vulnerability-scan
+    if: >-
+      ${{
+        always() &&
+        github.event_name == 'push' &&
+        github.ref == 'refs/heads/main' &&
+        (contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled'))
+      }}
+    env:
+      SLACK_CI_WEBHOOK_URL: ${{ secrets.SLACK_CI_WEBHOOK_URL }}
+    steps:
+      - name: Slack / Skip missing CI webhook
+        if: ${{ env.SLACK_CI_WEBHOOK_URL == '' }}
+        run: echo "::notice title=Slack notification::SLACK_CI_WEBHOOK_URL is not configured."
+
+      - name: Slack / Notify CI failure
+        if: ${{ env.SLACK_CI_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@45a88b9581bfab2566dc881e2cd66d334e621e2c
+        with:
+          webhook: ${{ env.SLACK_CI_WEBHOOK_URL }}
+          webhook-type: incoming-webhook
+          payload: |
+            text: "EasySubway CI failed"
+            blocks:
+              - type: section
+                text:
+                  type: mrkdwn
+                  text: |
+                    *EasySubway CI 실패*
+                    • repo: `${{ github.repository }}`
+                    • ref: `${{ github.ref_name }}`
+                    • actor: `${{ github.actor }}`
+                    • run: <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|GitHub Actions 열기>

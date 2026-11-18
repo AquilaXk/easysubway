@@ -1,0 +1,157 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "android-rc-store-evidence",
+  "releaseBlockerPolicy": true,
+  "scope": {
+    "platform": {
+      "android": "RELEASE_REQUIRED",
+      "ios": "DEFERRED_OUT_OF_SCOPE"
+    },
+    "store": "google-play",
+    "initialCountry": "KR",
+    "distributionFlow": [
+      "internal-test",
+      "closed-test",
+      "production-access",
+      "rc-freeze",
+      "go-no-go",
+      "production-submission",
+      "post-release-monitoring"
+    ],
+    "issueMap": {
+      "rcDeviceQa": 571,
+      "pageSize16kb": 1015,
+      "productionAccessClosedTest": 1016,
+      "playContentDataSafetyListing": 1018,
+      "playGeneratedApkDeviceMatrix": 1016,
+      "postReleaseOperationsReview": 1019,
+      "supportDataIncidentResponse": 1019,
+      "abusePenetrationRehearsal": 1022,
+      "rcEvidenceManifestAutomation": 1020
+    }
+  },
+  "requiredEvidence": {
+    "signingAndIdentity": [
+      "rc-evidence-manifest",
+      "package-id-app-name-versionName-versionCode-record",
+      "production-upload-key-material-owner-record",
+      "play-app-signing-enrollment",
+      "upload-key-and-app-signing-key-sha256-fingerprints",
+      "upload-key-backup-recovery-record",
+      "latest-play-uploaded-versioncode-comparison",
+      "failed-rc-versioncode-reuse-policy",
+      "api-provider-fingerprint-registration",
+      "play-console-least-privilege-2fa-check"
+    ],
+    "aabInspection": [
+      "signed-aab-sha256",
+      "bundletool-manifest-dump",
+      "bundletool-config-dump",
+      "apkanalyzer-target-sdk",
+      "permission-network-security-manifest-review",
+      "supported-abi-device-catalog-review"
+    ],
+    "pageSize16kb": [
+      "android-16kb-page-size-gate-manifest",
+      "bundletool-config-dump",
+      "native-library-page-size-scan",
+      "flutter-engine-plugin-native-library-compatibility",
+      "adb-getconf-page-size-16384",
+      "android-15-or-16-page-size-smoke",
+      "sqlite-gzip-datapack-smoke",
+      "photo-picker-route-map-report-upload-smoke"
+    ],
+    "playGeneratedArtifact": [
+      "play-generated-apk-device-matrix-gate-manifest",
+      "internal-app-sharing-or-track-upload-record",
+      "app-bundle-explorer-generated-apk-record",
+      "play-app-signing-certificate-record",
+      "play-generated-artifact-identity-match-record",
+      "rc-versioncode-greater-than-latest-play-artifact-record",
+      "split-apk-manifest-permission-network-config-record",
+      "device-matrix-smoke-summary",
+      "play-generated-apk-or-installed-build-smoke",
+      "play-installed-build-logcat-no-crash"
+    ],
+    "androidAccessibilityQa": [
+      "android-release-quality-gate-manifest",
+      "talkback-rc-build-notes",
+      "font-scale-150-200-screenshots",
+      "small-screen-layout-screenshots",
+      "local-emulator-ui-tree-screenshots",
+      "location-permission-denied-recovery",
+      "network-server-error-recovery",
+      "route-map-performance-summary"
+    ],
+    "playConsoleSubmission": [
+      "play-production-access-gate-manifest",
+      "account-type-production-access-record",
+      "tester-requirement-record",
+      "closed-test-12-testers-14-days-continuous-opt-in-record",
+      "production-access-application-response-record",
+      "play-store-submission-content-manifest",
+      "app-content-declarations",
+      "data-safety-answer-contract",
+      "data-safety-binary-network-trace-match",
+      "privacy-policy-url-help-screen-match",
+      "korean-store-listing-contract",
+      "store-graphic-screenshot-asset-record",
+      "large-screen-store-screenshot-asset-record",
+      "store-listing-scope-copy-review",
+      "support-channel-release-notes-review"
+    ],
+    "preReviewPreLaunch": [
+      "abuse-penetration-rehearsal-gate-manifest",
+      "android-aab-or-play-apk-secret-scan-output",
+      "report-photo-receipt-signed-url-abuse-summary",
+      "admin-operator-session-csrf-rate-limit-abuse-summary",
+      "critical-high-finding-zero-or-waiver-record",
+      "pre-review-critical-issue-0",
+      "pre-launch-report-crash-0",
+      "pre-launch-report-anr-0",
+      "pre-launch-report-policy-warning-0-or-triaged",
+      "waiver-record-for-any-exception"
+    ],
+    "postReleaseReadiness": [
+      "post-launch-operations-review-gate-manifest",
+      "support-incident-response-gate-manifest",
+      "first-2h-monitoring-owner-schedule",
+      "24h-7d-30d-review-owner-schedule",
+      "play-review-crash-anr-provider-quota-report-backlog-signals",
+      "backend-datapack-realtime-kill-switch-rollback-owner-record",
+      "fixed-release-submission-procedure-record",
+      "second-update-staged-rollout-halt-rollback-procedure",
+      "customer-support-intake-ready",
+      "support-faq-and-incident-notice-copy-review",
+      "data-error-triage-dry-run",
+      "operator-contact-route-record",
+      "emergency-datapack-release-rollback-runbook-match",
+      "retention-duplicate-override-recovery-policy",
+      "data-error-response-ready",
+      "incident-response-ready"
+    ]
+  },
+  "blockerPolicy": {
+    "iosBlocksAndroidRelease": false,
+    "stagedRolloutBeforeAccess": "blocked",
+    "missingPlayGeneratedArtifact": "blocked",
+    "missingPreLaunchCrashZero": "blocked",
+    "missingDataSafetyNetworkTraceMatch": "blocked",
+    "exceptionPath": "#1020 waiver until-date and owner required"
+  },
+  "evidencePolicy": {
+    "localOnlyEvidenceRoot": ".evidence/evidence/release/android-rc-store/<rc-or-run>/",
+    "githubEvidencePolicy": "summary-or-public-console-link",
+    "sensitiveEvidence": [
+      "Google Play Console screenshots",
+      "service account JSON",
+      "signing key material",
+      "AAB/APK binary",
+      "network trace",
+      "tester personal data"
+    ],
+    "summaryRequiredKo": "민감 증거는 GitHub에 파일로 올리지 않고 PR에는 evidence 종류, 대상, 결과, local-only 경로 또는 공개 가능한 console/workflow 링크만 적는다."
+  }
+}

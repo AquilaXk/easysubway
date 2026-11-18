@@ -1,0 +1,14 @@
+name: D13 Hub Clean Checkout Owner Receipt
+
+on:
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  owner-receipt:
+    permissions:
+      contents: read
+    uses: ./.github/workflows/clean-checkout-reproducibility-owner-receipt.yml
+    with:
+      contract_path: contracts/documentation/clean-checkout-reproducibility-owner-contract.json

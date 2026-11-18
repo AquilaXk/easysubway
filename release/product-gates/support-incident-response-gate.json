@@ -1,0 +1,280 @@
+{
+  "schemaVersion": 1,
+  "applicationId": "easysubway",
+  "androidApplicationId": "com.easysubway.app",
+  "releaseGate": "support-incident-response",
+  "issue": 1019,
+  "status": "PASS",
+  "androidRcEvidenceManifest": "apps/mobile/release/android-rc-store-evidence.json",
+  "postLaunchOperationsReviewGate": "release/product-gates/post-launch-operations-review-gate.json",
+  "evidenceRoot": ".evidence/evidence/release/support-incident-response/<rc-or-run>/",
+  "preLaunchReadiness": {
+    "status": "PASS",
+    "evidenceDateKst": "2026-07-15",
+    "resolvedEvidence": [
+      "mailbox-routing-and-receive-test",
+      "data-error-triage-dry-run",
+      "emergency-datapack-release-rollback-runbook-match",
+      "incident-notice-copy-review",
+      "local-emulator-help-screen-screenshot-or-ui-tree",
+      "app-help-contact-contract",
+      "operator-contact-route-contract",
+      "official-contact-url-or-partner-contact-record",
+      "request-template",
+      "response-sla-note",
+      "source-owner-contact-record",
+      "license-and-correction-policy-note",
+      "emergency-source-archive"
+    ]
+  },
+  "latestQaEvidenceSummary": {
+    "qaEvidenceDateKst": "2026-07-15",
+    "publicContactDomain": "aquilaxk.site",
+    "mailboxRouting": {
+      "result": "RESOLVED_BY_QA_MANUAL_EVIDENCE",
+      "addresses": ["support@aquilaxk.site", "security@aquilaxk.site", "privacy@aquilaxk.site"],
+      "dnsEvidence": ["MX records present", "SPF TXT present", "DKIM TXT present"],
+      "redactionPolicy": "GitHub에는 support mailbox 개인 정보, raw report receipt token, message body, operator private contact, provider credential or quota token, photo metadata를 올리지 않는다."
+    },
+    "channelEvidence": [
+      {
+        "channelId": "support_email",
+        "redactedReceiptReference": "phase-a-support-mailbox-routing-check",
+        "receivedAt": "2026-07-15T00:00:00+09:00",
+        "result": "PASS",
+        "redactionNotes": "message body, sender, and mailbox personal data omitted",
+        "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/mailbox-routing-summary.json",
+        "evidenceIds": ["support-mailbox-receive-test", "store-contact-preview", "app-help-screen-contact-check"]
+      },
+      {
+        "channelId": "faq_and_status_notice",
+        "redactedReceiptReference": "phase-a-help-and-notice-copy-check",
+        "receivedAt": "2026-07-15T00:00:00+09:00",
+        "result": "PASS",
+        "redactionNotes": "summary only; device identifier omitted",
+        "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-help-ui-summary.json",
+        "evidenceIds": ["faq-copy-review", "incident-notice-copy-review", "local-emulator-help-screen-screenshot-or-ui-tree"]
+      },
+      {
+        "channelId": "security_privacy_deletion",
+        "redactedReceiptReference": "phase-a-security-privacy-mailbox-routing-check",
+        "receivedAt": "2026-07-15T00:00:00+09:00",
+        "result": "PASS",
+        "redactionNotes": "message body, sender, and mailbox personal data omitted",
+        "localEvidencePath": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/mailbox-routing-summary.json",
+        "evidenceIds": ["security-mailbox-test", "data-deletion-mailbox-test", "privacy-request-routing-check"]
+      }
+    ],
+    "helpScreenDeviceQa": {
+      "result": "PASS",
+      "versionName": "1.0.5",
+      "versionCode": 10006,
+      "contactSetSha256": "e361e4d770796fc6dc2ade2eb560b2e6885917c027a67661b3644ea8ff30044a",
+      "contacts": ["support@aquilaxk.site", "security@aquilaxk.site"],
+      "dataDeletionRoute": "in-app deletion confirmation",
+      "localOnlyEvidence": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/fixed-release-help-ui-summary.json"
+    },
+    "operatorContactReadiness": {
+      "result": "PASS",
+      "verifiedOfficialRoutes": ["Seoul Open Data error report", "MOLIT TAGO subway data inquiry"],
+      "outboundContactPerformed": false,
+      "publicEvidenceSummary": "공식 오류 신고·데이터 문의 경로, P0 요청 template, 내부 응답 SLA, source archive 위치를 확인했다.",
+      "localOnlyEvidence": ".evidence/evidence/release/post-launch-operations-review/issue-1019-phase-a-20260715/operator-contact-readiness.json"
+    },
+    "remainingSupportReadiness": []
+  },
+  "supportChannels": [
+    {
+      "id": "support_email",
+      "source": "EASYSUBWAY_SUPPORT_EMAIL",
+      "ownerKo": "고객지원 담당자",
+      "readyWhenKo": "스토어 연락처, 앱 도움말, 공개 정책 페이지의 support email이 같은 운영 수신함으로 연결되고 수신 테스트를 통과한다.",
+      "requiredEvidence": ["support-mailbox-receive-test", "store-contact-preview", "app-help-screen-contact-check"]
+    },
+    {
+      "id": "faq_and_status_notice",
+      "source": "public-support-page",
+      "ownerKo": "운영/제품 담당자",
+      "readyWhenKo": "FAQ, 장애 공지, 데이터 기준일, 지원 지역, 문의 전 확인 항목이 공개 지원 페이지 또는 앱 도움말에서 확인된다.",
+      "requiredEvidence": ["faq-copy-review", "incident-notice-copy-review", "local-emulator-help-screen-screenshot-or-ui-tree"]
+    },
+    {
+      "id": "security_privacy_deletion",
+      "source": "EASYSUBWAY_SECURITY_EMAIL and EASYSUBWAY_DATA_DELETION_EMAIL",
+      "ownerKo": "보안/개인정보 담당자",
+      "readyWhenKo": "보안 문의, 개인정보 문의, 데이터 삭제 요청이 일반 문의와 분리되어 접수되고 SLA owner가 지정된다.",
+      "requiredEvidence": ["security-mailbox-test", "data-deletion-mailbox-test", "privacy-request-routing-check"]
+    }
+  ],
+  "intakeCategories": [
+    {
+      "id": "p0_safety_data_error",
+      "severity": "P0",
+      "triageTarget": "PT2H",
+      "ownerKo": "데이터 오류 대응 담당자",
+      "examplesKo": ["휠체어 접근 불가 경로를 가능으로 안내", "엘리베이터 장기 고장 누락", "잘못된 역/출구 위치로 위험 이동 유도"],
+      "requiredNextAction": "operator-contact-or-field-check-and-emergency-datapack-decision"
+    },
+    {
+      "id": "p1_accessibility_blocker",
+      "severity": "P1",
+      "triageTarget": "P1D",
+      "ownerKo": "접근성 품질 담당자",
+      "examplesKo": ["스크린리더 핵심 흐름 이해 불가", "큰 글씨에서 주요 버튼 사용 불가", "신고 제출 반복 실패"],
+      "requiredNextAction": "app-fix-or-support-guidance"
+    },
+    {
+      "id": "p2_support_question",
+      "severity": "P2",
+      "triageTarget": "P3D",
+      "ownerKo": "고객지원 담당자",
+      "examplesKo": ["지원 지역 문의", "데이터 기준일 문의", "기능 사용 문의"],
+      "requiredNextAction": "faq-or-support-reply"
+    }
+  ],
+  "dataCorrectionFlow": {
+    "requiredSteps": [
+      "intake-and-receipt-id-record",
+      "severity-triage",
+      "source-and-operator-contact-check",
+      "override-approval",
+      "emergency-datapack-release-or-rollback",
+      "user-notice-and-support-reply",
+      "post-release-verification"
+    ],
+    "slaTargets": {
+      "p0SafetyErrorTriage": "PT2H",
+      "dataCorrectionApproval": "P1D",
+      "emergencyOverridePublish": "PT4H",
+      "emergencyDatapackRelease": "P1D",
+      "mistakenOverrideRollback": "PT4H"
+    },
+    "goNoGoKo": "P0 안전 오류 triage, correction approval, emergency datapack release/rollback, 사용자 공지 owner 중 하나라도 없으면 출시 후 대응 준비 완료가 아니다."
+  },
+  "operatorContactRoutes": [
+    {
+      "id": "seoul_metro_or_city_provider",
+      "ownerKo": "운영기관 연락 담당자",
+      "requiredEvidence": ["official-contact-url-or-partner-contact-record", "request-template", "response-sla-note"]
+    },
+    {
+      "id": "national_or_regional_datapack_source",
+      "ownerKo": "데이터팩 운영 담당자",
+      "requiredEvidence": ["source-owner-contact-record", "license-and-correction-policy-note", "emergency-source-archive"]
+    }
+  ],
+  "incidentNoticeTemplates": [
+    {
+      "id": "data_error_notice",
+      "channel": "app-help-or-support-page",
+      "copyKo": "일부 역/시설 정보가 현장과 다를 수 있어 확인 중입니다. 이동 전 역 직원 또는 운영기관 안내도 함께 확인해 주세요."
+    },
+    {
+      "id": "provider_outage_notice",
+      "channel": "app-help-or-support-page",
+      "copyKo": "실시간 도착 정보 제공처 응답이 불안정해 최신 정보가 늦게 표시될 수 있습니다. 앱은 다시 확인해 달라는 안내로 표시합니다."
+    },
+    {
+      "id": "fixed_release_notice",
+      "channel": "store-release-notes-and-support-page",
+      "copyKo": "접수된 문제를 수정한 업데이트를 제출했습니다. 업데이트가 표시되면 최신 버전으로 이용해 주세요."
+    }
+  ],
+  "incidentNoticeApprovalRoute": {
+    "draftOwnerKo": "운영 담당자",
+    "approverKo": "릴리즈 책임자",
+    "p0ApprovalTarget": "PT30M",
+    "publishChannels": ["app-help-or-support-page", "store-release-notes"],
+    "requiredRecord": "incident-severity-owner-approver-published-at"
+  },
+  "retentionDuplicateOverridePolicy": {
+    "oldReportRetentionKo": "오래된 신고는 감사와 데이터 품질 분석에 필요한 최소 기간만 보관하고 개인정보 연결은 삭제 요청 시 익명화한다.",
+    "duplicateHandlingKo": "같은 역/시설/증상 신고는 기준 신고에 연결하고 사용자에게 중복 정리 안내를 남긴다.",
+    "mistakenOverrideRecoveryKo": "잘못된 override는 rollback pack 또는 corrected pack으로 회수하고 영향 범위, 회수 시각, 검증 결과를 evidence에 기록한다.",
+    "requiredEvidence": [
+      "retention-policy-review",
+      "duplicate-report-triage-sample",
+      "override-rollback-sample",
+      "audit-log-redaction-check"
+    ]
+  },
+  "dryRunRequiredEvidence": [
+    "support-channel-access-check",
+    "data-error-triage-dry-run",
+    "emergency-datapack-release-rollback-runbook-match",
+    "incident-notice-copy-review",
+    "local-emulator-help-screen-screenshot-or-ui-tree"
+  ],
+  "emergencyDatapackDrill": {
+    "command": "node tools/datapack/run-emergency-datapack-drill.mjs --input <drill-input.json> --output <drill-evidence.json>",
+    "requiredEvidence": [
+      "manifest-hashes",
+      "release-channel",
+      "rollback-time",
+      "emergency-patch-audit-id",
+      "route-regression-replay",
+      "verification-command-output"
+    ]
+  },
+  "supportEvidenceSummaryPolicy": {
+    "githubSummaryFields": [
+      "channelId",
+      "redactedReceiptReference",
+      "receivedAt",
+      "owner",
+      "result",
+      "redactionNotes",
+      "localEvidencePath"
+    ],
+    "requiredEvidenceSet": [
+      "support-mailbox-receive-test",
+      "store-contact-preview",
+      "app-help-screen-contact-check",
+      "security-mailbox-test",
+      "data-deletion-mailbox-test",
+      "privacy-request-routing-check",
+      "faq-copy-review",
+      "support-channel-access-check",
+      "data-error-triage-dry-run",
+      "emergency-datapack-release-rollback-runbook-match",
+      "incident-notice-copy-review",
+      "local-emulator-help-screen-screenshot-or-ui-tree",
+      "official-contact-url-or-partner-contact-record",
+      "request-template",
+      "response-sla-note",
+      "source-owner-contact-record",
+      "license-and-correction-policy-note",
+      "emergency-source-archive",
+      "retention-policy-review",
+      "duplicate-report-triage-sample",
+      "override-rollback-sample",
+      "audit-log-redaction-check",
+      "intake-and-receipt-id-record",
+      "severity-triage",
+      "source-and-operator-contact-check",
+      "override-approval",
+      "emergency-datapack-release-or-rollback",
+      "user-notice-and-support-reply",
+      "post-release-verification"
+    ],
+    "forbiddenInGithubSummary": [
+      "support mailbox personal data",
+      "raw report receipt token",
+      "operator private contact",
+      "provider credential or quota token",
+      "photo metadata"
+    ]
+  },
+  "sensitiveEvidencePolicy": {
+    "localOnly": true,
+    "githubUploadPolicy": "summary-only",
+    "forbiddenInPullRequest": [
+      "support mailbox personal data",
+      "report receipt token",
+      "operator private contact",
+      "provider credential or quota token",
+      "Play Console account data"
+    ],
+    "summaryRequiredKo": "민감 증거는 GitHub에 올리지 않고 PR에는 evidence 종류, 대상, 결과, local-only 경로만 적는다."
+  }
+}

@@ -1,0 +1,182 @@
+{
+  "schemaVersion": 1,
+  "artifactKind": "system-release-governance-inventory",
+  "files": [
+    {
+      "path": ".github/workflows/datapack-release.yml",
+      "sha256": "5cfd322afbf316c70862049d8d62eeb60e8d44727aaa0cd115c157e4f9b07996"
+    },
+    {
+      "path": ".github/workflows/release-artifacts.yml",
+      "sha256": "26ea7caa95cf71ea73bb714b3cc10a4e23b3774795f32c73eb09a16c8260c92d"
+    },
+    {
+      "path": "apps/mobile/pubspec.yaml",
+      "sha256": "3b1c5d56e16c3a45123924e08e183ecb42a9c6ddad9a58432ea990a44e2ab733"
+    },
+    {
+      "path": "apps/mobile/release/signed-release-artifact-gate.json",
+      "sha256": "e5f8321dcdce78d7d408a052cf9f58afe840c1a3f0838337d398eabd683e03d1"
+    },
+    {
+      "path": "contracts/bundles/backend-contracts-v1.0.0.json",
+      "sha256": "81763c3462e67a4959babb240a47ada8292d0fe18f77a0db24a73f1fe85baedc"
+    },
+    {
+      "path": "contracts/bundles/data-contracts-v1.0.0.json",
+      "sha256": "53101d2a2150373c9b6cbb565753be9534ac54ebdfb3dbe4e6abe056b3ae22e6"
+    },
+    {
+      "path": "contracts/bundles/data-contracts-v1.1.0.json",
+      "sha256": "88c61934e0e6c850dfb6fa60f8c5bd93ac83f44f4b0da4e36aec427292ac8dde"
+    },
+    {
+      "path": "contracts/bundles/generic-mobile-consumer-bundle-v1.json",
+      "sha256": "7f666d016119591e5c958e7d55c936fffb5e753898e69ec28e4f0cb50b5555ff"
+    },
+    {
+      "path": "contracts/bundles/platform-contracts-v1.0.0.json",
+      "sha256": "a4cc96ac0944ef7cbcba9470a3eb29e473e8f9e6076e729c4b020b1d5428a209"
+    },
+    {
+      "path": "contracts/bundles/platform-contracts-v1.1.0.json",
+      "sha256": "ffbfed08c46916a6a9f7e1bf3d3de46989fe4f2517ed341bd2e2f89e02b7ce58"
+    },
+    {
+      "path": "contracts/bundles/platform-contracts-v1.2.0.json",
+      "sha256": "539229491d8cf072118c8a5d658459ce51d993daac099ee6f00afd019f9059fa"
+    },
+    {
+      "path": "contracts/release/android-datapack-candidate-evidence.schema.json",
+      "sha256": "439493f21fcc9b4cb2a2e6ed10d0bf04ccab2db369413c0222c16fb663ae3e79"
+    },
+    {
+      "path": "contracts/release/component-manifest.schema.json",
+      "sha256": "08159722e1abcb51cdb6ffefd9f55f03450b104e6792bd6888d98470e7659ad5"
+    },
+    {
+      "path": "contracts/release/issue-ref.schema.json",
+      "sha256": "da70e7ba7892f3d198ec65aea79e726336fdd2aff7fdbb1e60a1952df10fbbc9"
+    },
+    {
+      "path": "contracts/release/platform-deployment-contract.json",
+      "sha256": "e5fba2310dcda64ca1a25ada3d933a22058857c66bb4772c2cb7e44af8a59ad8"
+    },
+    {
+      "path": "contracts/release/system-release-governance-inventory.schema.json",
+      "sha256": "741850c1dcaf8080117a3e03e6130b1465ab51700c3bc25f15849be27704c978"
+    },
+    {
+      "path": "contracts/release/system-release-manifest.schema.json",
+      "sha256": "aeb97a3bd43be169c873eb4c0b018b295da557ae3a3d4ac9a81d494bf1a16f68"
+    },
+    {
+      "path": "release/product-gates/abuse-penetration-rehearsal-gate.json",
+      "sha256": "ab52e46a1d955f6bc3c6e8859fc563a2a20db0f3a513803025c94ec7d34d6ae4"
+    },
+    {
+      "path": "release/product-gates/operations-observability-gate.json",
+      "sha256": "0b1dc4f9ba19624e6539670b09361a0d29f8ec8dac255f9715407c7af5c3c0e3"
+    },
+    {
+      "path": "release/product-gates/operations-release-evidence.json",
+      "sha256": "8c28a2cbbe2f51af63bc13f948198b3223525bed2e1e9bb31910300275c25904"
+    },
+    {
+      "path": "release/product-gates/post-launch-operations-review-gate.json",
+      "sha256": "d5c19b07cc5f451c52d6c2722f66825c182d23f94888319a1c49e75d1d7f0c41"
+    },
+    {
+      "path": "release/product-gates/production-datapack-scope.json",
+      "sha256": "9d490eae8e42f83154e2c7fe81510ad14236f8206e588bca9c39850f76d917d4"
+    },
+    {
+      "path": "release/product-gates/rc-evidence-manifest-contract.json",
+      "sha256": "0ca819602a478b4657004cebdcf6cfae46170fc84a1e027baac6c52d1e8a35ce"
+    },
+    {
+      "path": "release/product-gates/route-commercialization-gate.json",
+      "sha256": "0ac7b2c2ee1e75fc556fa5418ddeac1473d329d2ccd5a1e539e8aced869cab30"
+    },
+    {
+      "path": "release/product-gates/support-incident-response-gate.json",
+      "sha256": "82604501ba8e6aebc03e75d18fdaf6a4119bc54289c632f8c0b0a65d9a7cd483"
+    },
+    {
+      "path": "tools/ci/lib/json-schema-lite.mjs",
+      "sha256": "12da2cb6f7b1646371717eb0c6a5da77bd0ac1ead0c4e7a78e37451b6f07fce2"
+    },
+    {
+      "path": "tools/ci/validate-store-privacy-env.mjs",
+      "sha256": "2e1781f02071639107bec9730fe1ae58b5ab6ca008351f72c79dff293af801cd"
+    },
+    {
+      "path": "tools/datapack/build-launch-denominator-report.mjs",
+      "sha256": "bf54fec7b06ac6e2444253706775557554629ab6190e5586c8ba1e2871103bb0"
+    },
+    {
+      "path": "tools/datapack/lib/manifest-validation.mjs",
+      "sha256": "9e35372f21307b9c20258fde15556ef4cfc2c28276a46435974fe30253055e81"
+    },
+    {
+      "path": "tools/datapack/production-url-policy.mjs",
+      "sha256": "2f1166cbc241d68aa36a25484159985ec19b9add529eefc0030e780633a422ff"
+    },
+    {
+      "path": "tools/lib/codepoint-compare.mjs",
+      "sha256": "d3da920bfa5b108ad3d096b21e83dd821772edefcbed7c7b64a2a68e6c54971d"
+    },
+    {
+      "path": "tools/ops/generate-operations-phase-a-summary.mjs",
+      "sha256": "cdf8aa04776d03effe93a829954f331e12fe1cb792fe29a2a6b0da68f0d729cc"
+    },
+    {
+      "path": "tools/ops/validate-operations-release-summary.mjs",
+      "sha256": "b74f89aaa3fd86b7a85e2baa3e1b487acd11a9d9099c262d97363b550c8d851c"
+    },
+    {
+      "path": "tools/release/build-android-datapack-candidate-evidence.mjs",
+      "sha256": "0d48a4d72200b6f9ec4bb89d3e434a16dc8d397173c1ea9a846b47e0ef8b8275"
+    },
+    {
+      "path": "tools/release/count-gzip-uncompressed-bytes.mjs",
+      "sha256": "a0297001d2ec3bbb7d1c42b041fc6c08df6ece2f78dcc040d4585a9508d1e64f"
+    },
+    {
+      "path": "tools/release/generate-rc-evidence-manifest.mjs",
+      "sha256": "6f28e8a0c3c2a255619a3035010e0308fc0b92d948f8579778b7d9742347f685"
+    },
+    {
+      "path": "tools/release/hash-android-bundle-payload.mjs",
+      "sha256": "273799b055726bd1c9b1f8266536d7940be054994b0678e00a83c037358bd54b"
+    },
+    {
+      "path": "tools/release/lib/semver.mjs",
+      "sha256": "abea907d2cbe2e681fb7942a243616754320a7b579c38bcf9e6a979fc5f1dbe6"
+    },
+    {
+      "path": "tools/release/select-rc-datapack-artifact.mjs",
+      "sha256": "06b1d4e60c041e7cd44e461722a7e5519c515e1135612a16429845bdeac32287"
+    },
+    {
+      "path": "tools/release/summary-validation-utils.mjs",
+      "sha256": "aff1abc66a25e5310e69b8fd915026dfd5bf458f6f1977d445e5e635e10a35cc"
+    },
+    {
+      "path": "tools/release/upload-play-internal.mjs",
+      "sha256": "7bc41b1fb3ce86b2e24043a9a43e47e91577ab33c5170535c8e8c85c09b5c5eb"
+    },
+    {
+      "path": "tools/release/validate-system-release-manifest.mjs",
+      "sha256": "3e8328ce07a5c8491416d4b49aef6e9a661ed579445f9c064c9d8d9cc95f51d3"
+    },
+    {
+      "path": "tools/security/abuse-penetration-summary-schema.mjs",
+      "sha256": "b3aeca3f32f241704dd6be667e99b3b4a83adc1573918ce178ea683f1680ff48"
+    },
+    {
+      "path": "tools/security/validate-abuse-penetration-summary.mjs",
+      "sha256": "824e570f13020b7a071928934388d8b9e108a7af7fc59920f75247fd2b82c97e"
+    }
+  ]
+}
